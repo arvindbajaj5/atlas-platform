@@ -1,341 +1,343 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ATLAS — AI Transaction and Lifecycle Architecture Suite</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="atlas-shell.css">
-  <style>
-    .atlas-login { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--atlas-navy); }
-    .atlas-login__card { background:var(--atlas-white); border-radius:var(--atlas-radius-lg); padding:48px; width:100%; max-width:400px; box-shadow:var(--atlas-shadow-lg); }
-    .atlas-login__wordmark { font-size:32px; font-weight:900; color:var(--atlas-navy); letter-spacing:4px; text-align:center; }
-    .atlas-login__wordmark span { color:var(--atlas-orange); }
-    .atlas-login__tagline { text-align:center; font-size:12px; color:var(--atlas-mid-grey); margin-bottom:32px; }
-    .atlas-login__title { font-size:18px; font-weight:700; color:var(--atlas-navy); margin-bottom:24px; }
-    .atlas-login__footer { text-align:center; margin-top:24px; font-size:11px; color:var(--atlas-mid-grey); }
-    .portal-header { margin-bottom:24px; }
-    .portal-header h1 { font-size:22px; font-weight:700; color:var(--atlas-navy); }
-    .portal-header p { font-size:13px; color:var(--atlas-mid-grey); margin-top:4px; }
-    .portal-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px; }
-    .portal-stat { background:var(--atlas-white); border:1px solid var(--atlas-mid-grey); border-radius:var(--atlas-radius); padding:16px 20px; box-shadow:var(--atlas-shadow); }
-    .portal-stat__value { font-size:28px; font-weight:900; color:var(--atlas-navy); }
-    .portal-stat__label { font-size:11px; color:var(--atlas-mid-grey); margin-top:2px; }
-    .portal-stat--orange .portal-stat__value { color:var(--atlas-orange); }
-    .portal-stat--teal .portal-stat__value { color:var(--atlas-teal); }
-    .portal-stat--blue .portal-stat__value { color:var(--atlas-blue); }
-    .portal-category { margin-bottom:32px; }
-    .portal-category__title { font-size:13px; font-weight:700; color:var(--atlas-navy); text-transform:uppercase; letter-spacing:0.5px; padding-bottom:8px; border-bottom:2px solid var(--atlas-orange); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-    .atlas-tool-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
-    .atlas-tool-card { background:var(--atlas-white); border:1px solid var(--atlas-mid-grey); border-radius:var(--atlas-radius); padding:16px; cursor:pointer; transition:all 0.15s; box-shadow:var(--atlas-shadow); }
-    .atlas-tool-card:hover { border-color:var(--atlas-orange); box-shadow:var(--atlas-shadow-md); transform:translateY(-1px); }
-    .atlas-tool-card--pending { opacity:0.6; cursor:default; }
-    .atlas-tool-card--pending:hover { transform:none; border-color:var(--atlas-mid-grey); }
-    .atlas-tool-card__name { font-size:13px; font-weight:600; color:var(--atlas-navy); margin-bottom:4px; }
-    .atlas-tool-card__version { font-size:11px; color:var(--atlas-mid-grey); }
-    .atlas-no-project { background:rgba(28,56,245,0.06); border:1px solid rgba(28,56,245,0.2); border-radius:var(--atlas-radius); padding:12px 16px; font-size:13px; color:var(--atlas-blue); margin-bottom:24px; display:flex; align-items:center; gap:8px; }
-    .badge { display:inline-block; font-size:10px; font-weight:600; padding:2px 8px; border-radius:10px; }
-    .badge-complete { background:rgba(0,178,144,0.15); color:var(--atlas-teal); }
-    .badge-progress { background:rgba(255,182,0,0.15); color:var(--atlas-amber); }
-    .badge-pending { background:rgba(180,180,190,0.2); color:var(--atlas-mid-grey); }
-    .form-group { margin-bottom:16px; }
-    .form-label { display:block; font-size:12px; font-weight:600; color:var(--atlas-dark-grey); margin-bottom:6px; }
-    .form-label--required::after { content:' *'; color:var(--atlas-orange); }
-    .form-control { width:100%; padding:10px 12px; border:1px solid var(--atlas-mid-grey); border-radius:var(--atlas-radius-sm); font-size:13px; font-family:var(--atlas-font); color:var(--atlas-dark-grey); background:var(--atlas-white); transition:border-color 0.15s; }
-    .form-control:focus { outline:none; border-color:var(--atlas-blue); }
-    .form-hint { font-size:11px; color:var(--atlas-mid-grey); margin-top:4px; }
-    .btn { display:inline-flex; align-items:center; gap:6px; padding:10px 20px; border-radius:var(--atlas-radius-sm); font-size:13px; font-weight:600; font-family:var(--atlas-font); border:none; cursor:pointer; transition:all 0.15s; }
-    .btn-primary { background:var(--atlas-orange); color:var(--atlas-white); }
-    .btn-primary:hover { background:#e6421f; }
-    .btn-secondary { background:var(--atlas-navy); color:var(--atlas-white); }
-    .btn-secondary:hover { background:#001d5c; }
-    .btn-ghost { background:transparent; color:rgba(255,255,255,0.8); border:1px solid rgba(255,255,255,0.3); }
-    .btn-ghost:hover { background:rgba(255,255,255,0.1); color:var(--atlas-white); }
-    .btn-sm { padding:6px 14px; font-size:12px; }
-    .todo-item { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid var(--atlas-light-grey); font-size:13px; }
-    .todo-item--done { color:var(--atlas-mid-grey); text-decoration:line-through; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — AI Transaction and Lifecycle Architecture Suite</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --orange: #FF5539;
+    --navy: #002870;
+    --blue: #1C38F5;
+    --teal: #00B290;
+    --amber: #FFB600;
+    --white: #FFFFFF;
+    --light: #F5F5F7;
+    --mid: #B4B4BE;
+    --dark: #282832;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Roboto', sans-serif; background: var(--light); color: var(--dark); }
+
+  /* LOGIN */
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--navy); }
+  .login-card { background: var(--white); border-radius: 12px; padding: 40px; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  .login-mark { font-size: 28px; font-weight: 900; color: var(--navy); letter-spacing: 4px; text-align: center; margin-bottom: 4px; }
+  .login-mark span { color: var(--orange); }
+  .login-tag { text-align: center; font-size: 11px; color: var(--mid); margin-bottom: 28px; }
+  .login-title { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 20px; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--dark); margin-bottom: 5px; }
+  label.req::after { content: ' *'; color: var(--orange); }
+  input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--mid); border-radius: 6px; font-size: 13px; font-family: inherit; color: var(--dark); background: var(--white); margin-bottom: 14px; }
+  input:focus, select:focus { outline: none; border-color: var(--blue); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; font-family: inherit; border: none; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: var(--orange); color: var(--white); width: 100%; }
+  .btn-primary:hover { background: #e6421f; }
+  .btn-secondary { background: var(--navy); color: var(--white); }
+  .btn-secondary:hover { background: #001d5c; }
+  .btn-ghost { background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: var(--white); }
+  .btn-sm { padding: 6px 14px; font-size: 12px; }
+  .login-foot { text-align: center; margin-top: 20px; font-size: 11px; color: var(--mid); }
+
+  /* APP SHELL */
+  .app { display: none; grid-template-rows: 48px 36px 1fr; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  .app.active { display: grid; }
+  header { grid-column: 1/-1; background: var(--navy); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+  .hdr-mark { font-size: 18px; font-weight: 900; color: var(--white); letter-spacing: 3px; }
+  .hdr-mark span { color: var(--orange); }
+  .hdr-right { display: flex; align-items: center; gap: 12px; }
+  .hdr-user { color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 500; }
+  .hdr-role { background: rgba(255,255,255,0.15); color: var(--white); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+  .ctx-bar { grid-column: 1/-1; background: #f0f0f5; border-bottom: 1px solid var(--mid); display: flex; align-items: center; gap: 12px; padding: 0 20px; font-size: 12px; cursor: pointer; }
+  .ctx-label { font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: 0.5px; }
+  .ctx-project { color: var(--dark); }
+  .ctx-meta { color: var(--mid); margin-left: auto; }
+  .ctx-bar.active { background: rgba(0,178,144,0.1); border-color: var(--teal); }
+  sidebar { background: var(--navy); padding: 16px 0; overflow-y: auto; }
+  .nav-cat { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px; padding: 16px 16px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 9px 16px; font-size: 13px; color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent; }
+  .nav-item:hover, .nav-item.active { color: var(--white); background: rgba(255,255,255,0.08); border-left-color: var(--orange); }
+  .nav-badge { margin-left: auto; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px; }
+  .nav-badge.ready { background: rgba(0,178,144,0.25); color: var(--teal); }
+  .nav-badge.soon { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); }
+  main { padding: 24px; overflow-y: auto; }
+
+  /* CARDS */
+  .card { background: var(--white); border: 1px solid #e0e0e8; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+  .card-sub { font-size: 12px; color: var(--mid); margin-bottom: 16px; }
+
+  /* PORTAL HOME */
+  .ph-title { font-size: 22px; font-weight: 700; color: var(--navy); }
+  .ph-sub { font-size: 13px; color: var(--mid); margin-top: 4px; margin-bottom: 20px; }
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+  .stat { background: var(--white); border: 1px solid #e0e0e8; border-radius: 8px; padding: 14px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .stat-val { font-size: 26px; font-weight: 900; color: var(--navy); }
+  .stat-lbl { font-size: 11px; color: var(--mid); margin-top: 2px; }
+  .stat.orange .stat-val { color: var(--orange); }
+  .stat.teal .stat-val { color: var(--teal); }
+  .stat.blue .stat-val { color: var(--blue); }
+  .section-title { font-size: 12px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 8px; border-bottom: 2px solid var(--orange); margin-bottom: 14px; margin-top: 24px; }
+  .tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 10px; margin-bottom: 8px; }
+  .tool-card { background: var(--white); border: 1px solid #e0e0e8; border-radius: 8px; padding: 14px; cursor: pointer; transition: all 0.15s; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .tool-card:hover { border-color: var(--orange); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .tool-card.dim { opacity: 0.55; cursor: default; }
+  .tool-card.dim:hover { transform: none; border-color: #e0e0e8; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .tc-name { font-size: 12px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+  .tc-ver { font-size: 11px; color: var(--mid); margin-bottom: 6px; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 8px; }
+  .badge.ready { background: rgba(0,178,144,0.15); color: var(--teal); }
+  .badge.update { background: rgba(255,182,0,0.15); color: var(--amber); }
+  .badge.soon { background: rgba(180,180,190,0.2); color: var(--mid); }
+  .no-project { background: rgba(28,56,245,0.06); border: 1px solid rgba(28,56,245,0.2); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--blue); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+
+  /* TODO */
+  .todo-item { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--light); font-size: 13px; }
+  .todo-item.done { color: var(--mid); text-decoration: line-through; }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 8px 12px; font-size: 11px; color: var(--mid); text-transform: uppercase; border-bottom: 2px solid var(--light); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--light); font-size: 13px; }
+  tr:hover td { background: rgba(0,0,0,0.02); }
+
+  /* FORM */
+  .form-hint { font-size: 11px; color: var(--mid); margin-top: -10px; margin-bottom: 14px; }
+
+  /* COMING SOON */
+  .coming-soon { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; text-align: center; }
+  .coming-soon .icon { font-size: 48px; margin-bottom: 16px; }
+  .coming-soon h2 { font-size: 20px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+  .coming-soon p { font-size: 14px; color: var(--mid); margin-bottom: 24px; }
+</style>
 </head>
 <body>
 
-<!-- LOGIN SCREEN -->
-<div class="atlas-login" id="loginScreen">
-  <div class="atlas-login__card">
-    <div style="text-align:center;margin-bottom:8px">
-      <div class="atlas-login__wordmark">ATL<span>A</span>S</div>
-    </div>
-    <div class="atlas-login__tagline">AI Transaction and Lifecycle Architecture Suite</div>
-    <div class="atlas-login__title">Sign In</div>
-    <div class="form-group">
-      <label class="form-label form-label--required">Name</label>
-      <input type="text" class="form-control" id="loginName" placeholder="Your name" autocomplete="name">
-    </div>
-    <div class="form-group">
-      <label class="form-label form-label--required">Role</label>
-      <select class="form-control" id="loginRole">
-        <option value="">— Select your role —</option>
-        <option value="BUSINESS_HEAD">Business Head</option>
-        <option value="SALES">Sales &amp; Sales Support</option>
-        <option value="PRESALES">Pre-Sales</option>
-        <option value="OPERATIONS">Operations</option>
-      </select>
-    </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="handleLogin()">Enter ATLAS</button>
-    <div class="atlas-login__footer">ATLAS v1.0 &nbsp;|&nbsp; © 2026</div>
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div class="login-mark">ATL<span>A</span>S</div>
+    <div class="login-tag">AI Transaction and Lifecycle Architecture Suite</div>
+    <div class="login-title">Sign In</div>
+    <label class="req">Name</label>
+    <input type="text" id="loginName" placeholder="Your name" autocomplete="name">
+    <label class="req">Role</label>
+    <select id="loginRole">
+      <option value="">— Select your role —</option>
+      <option value="BUSINESS_HEAD">Business Head</option>
+      <option value="SALES">Sales &amp; Sales Support</option>
+      <option value="PRESALES">Pre-Sales</option>
+      <option value="OPERATIONS">Operations</option>
+    </select>
+    <button class="btn btn-primary" onclick="doLogin()">Enter ATLAS</button>
+    <div class="login-foot">ATLAS v1.0 &nbsp;|&nbsp; © 2026</div>
   </div>
 </div>
 
-<!-- APP SHELL -->
-<div class="atlas-app" id="appScreen" style="display:none">
-
-  <header class="atlas-header">
-    <div class="atlas-header__brand">
-      <div class="atlas-header__wordmark">ATL<span style="color:var(--atlas-orange)">A</span>S</div>
-    </div>
-    <div class="atlas-header__right">
-      <div class="atlas-header__user">
-        <span id="headerUserName">—</span>
-        <span class="atlas-header__role-badge" id="headerUserRole">—</span>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="handleLogout()">Sign Out</button>
+<!-- APP -->
+<div class="app" id="appWrap">
+  <header>
+    <div class="hdr-mark">ATL<span>A</span>S</div>
+    <div class="hdr-right">
+      <div class="hdr-user" id="hdrName">—</div>
+      <div class="hdr-role" id="hdrRole">—</div>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">Sign Out</button>
     </div>
   </header>
-
-  <div class="atlas-context atlas-context--none" id="contextBar" onclick="showProjectSelector()" style="cursor:pointer">
-    <span class="atlas-context__label">Active Project</span>
-    <span class="atlas-context__project" id="contextProject">No project selected — click to select or create</span>
-    <span class="atlas-context__meta" id="contextMeta">—</span>
+  <div class="ctx-bar" id="ctxBar" onclick="showProjects()">
+    <span class="ctx-label">Project</span>
+    <span class="ctx-project" id="ctxProject">No project selected — tap to select or create</span>
+    <span class="ctx-meta" id="ctxMeta">—</span>
   </div>
-
-  <nav class="atlas-sidebar" id="appSidebar"></nav>
-  <main class="atlas-main" id="appMain"></main>
-
+  <sidebar id="sidebar"></sidebar>
+  <main id="main"></main>
 </div>
 
-<script src="atlas-config.js"></script>
-<script src="atlas-store.js"></script>
 <script>
-
-let currentUser = null, currentProject = null, allProjects = []
-
-// ── Auth ─────────────────────────────────────────────────────
-async function handleLogin() {
-  const name = document.getElementById('loginName').value.trim()
-  const role = document.getElementById('loginRole').value
-  if (!name || !role) { alert('Kindly enter your name and select your role.'); return }
-  currentUser = { name, role, label: ATLAS_CONFIG.roles[role].label }
-  await AtlasStore.setCurrentUser(currentUser)
-  document.getElementById('loginScreen').style.display = 'none'
-  document.getElementById('appScreen').style.display = 'grid'
-  initApp()
+// ── Config ───────────────────────────────────────────────────
+const ROLES = {
+  BUSINESS_HEAD: { label: 'Business Head', access: 'all' },
+  SALES:         { label: 'Sales & Sales Support', access: ['sales','opportunity','rac'] },
+  PRESALES:      { label: 'Pre-Sales', access: ['presales','opportunity','benchmark'] },
+  OPERATIONS:    { label: 'Operations', access: ['operations'] }
 }
 
-function handleLogout() {
+const CATEGORIES = [
+  { id: 'sales', label: '01 — Sales Enablement', icon: '📊', tools: ['portfolio-portal'] },
+  { id: 'opportunity', label: '02 — Opportunity Management', icon: '🎯', tools: ['rac','deal-analysis'] },
+  { id: 'presales', label: '03 — Presales', icon: '🔷', tools: ['domain-config','inferencing','geoai-civ','geoai-mil','compass','sovereign','benchmark'] },
+  { id: 'operations', label: '04 — Business Operations', icon: '⚙️', tools: ['hpc-monitor','ai-sovereignty'] }
+]
+
+const TOOLS = {
+  'portfolio-portal': { label: 'AI Portfolio Portal',       status: 'soon',     version: null },
+  'rac':              { label: 'RAC Tool',                  status: 'ready',    version: '1.0' },
+  'deal-analysis':    { label: 'Deal Analysis Tool',        status: 'update',   version: '3.x' },
+  'domain-config':    { label: 'Domain Configurator',       status: 'soon',     version: null },
+  'inferencing':      { label: 'AI Inferencing Factory',    status: 'ready',    version: '2.2' },
+  'geoai-civ':        { label: 'GeoAI Civilian + MDoNER',   status: 'ready',    version: '16' },
+  'geoai-mil':        { label: 'GeoAI Military',            status: 'ready',    version: '1.0' },
+  'compass':          { label: 'COMPASS',                   status: 'ready',    version: '1.0' },
+  'sovereign':        { label: 'Sovereign AI Platform',     status: 'ready',    version: '1.0' },
+  'benchmark':        { label: 'Benchmark Tool',            status: 'soon',     version: null },
+  'hpc-monitor':      { label: 'HPC Monitoring',            status: 'soon',     version: null },
+  'ai-sovereignty':   { label: 'AI Sovereignty Index',      status: 'soon',     version: null }
+}
+
+// ── State ────────────────────────────────────────────────────
+let user = null, project = null
+const projects = JSON.parse(localStorage.getItem('atlas_projects') || '[]')
+
+function saveProjects() { localStorage.setItem('atlas_projects', JSON.stringify(projects)) }
+
+// ── Auth ─────────────────────────────────────────────────────
+function doLogin() {
+  const name = document.getElementById('loginName').value.trim()
+  const role = document.getElementById('loginRole').value
+  if (!name) { alert('Kindly enter your name.'); return }
+  if (!role) { alert('Kindly select your role.'); return }
+  user = { name, role, label: ROLES[role].label }
+  localStorage.setItem('atlas_user', JSON.stringify(user))
+  document.getElementById('loginWrap').style.display = 'none'
+  document.getElementById('appWrap').className = 'app active'
+  document.getElementById('hdrName').textContent = name
+  document.getElementById('hdrRole').textContent = ROLES[role].label
+  renderSidebar()
+  renderHome()
+}
+
+function doLogout() {
   localStorage.removeItem('atlas_user')
-  currentUser = null; currentProject = null
-  document.getElementById('loginScreen').style.display = 'flex'
-  document.getElementById('appScreen').style.display = 'none'
+  user = null; project = null
+  document.getElementById('loginWrap').style.display = 'flex'
+  document.getElementById('appWrap').className = 'app'
   document.getElementById('loginName').value = ''
   document.getElementById('loginRole').value = ''
 }
 
-// ── Init ─────────────────────────────────────────────────────
-async function initApp() {
-  document.getElementById('headerUserName').textContent = currentUser.name
-  document.getElementById('headerUserRole').textContent = currentUser.label
-  allProjects = await AtlasStore.getProjects()
-  renderSidebar()
-  renderPortalHome()
-}
-
 // ── Sidebar ──────────────────────────────────────────────────
 function renderSidebar() {
-  const access = ATLAS_CONFIG.roles[currentUser.role].access
-  let html = `<div class="atlas-nav__item atlas-nav__item--active" onclick="renderPortalHome()"><span class="atlas-nav__item-icon">🏡</span>Portal Home</div>`
-
-  ATLAS_CONFIG.categories.forEach(cat => {
-    const catId = cat.id.replace('-readonly','')
-    if (!access.includes('all') && !access.some(a => a === cat.id || a === catId)) return
-    html += `<div class="atlas-nav__category">${cat.label}</div>`
+  const access = ROLES[user.role].access
+  const canSee = (catId) => access === 'all' || access.includes(catId)
+  let h = `<div class="nav-item active" onclick="renderHome()">🏡 &nbsp;Portal Home</div>`
+  CATEGORIES.forEach(cat => {
+    if (!canSee(cat.id)) return
+    h += `<div class="nav-cat">${cat.label}</div>`
     cat.tools.forEach(id => {
-      const t = ATLAS_CONFIG.tools[id]; if (!t) return
-      const sc = t.status === 'baselined' ? 'baselined' : 'pending'
-      html += `<div class="atlas-nav__item" onclick="launchTool('${id}')"><span class="atlas-nav__item-icon">⚡</span>${t.label}<span class="atlas-nav__status atlas-nav__status--${sc}">${t.status === 'baselined' ? 'Ready' : 'Soon'}</span></div>`
+      const t = TOOLS[id]; if (!t) return
+      const badge = t.status === 'ready' ? `<span class="nav-badge ready">Ready</span>` : t.status === 'update' ? `<span class="nav-badge ready">Live</span>` : `<span class="nav-badge soon">Soon</span>`
+      h += `<div class="nav-item" onclick="launchTool('${id}')">${t.label}${badge}</div>`
     })
   })
-
-  if (currentUser.role === 'BUSINESS_HEAD') {
-    html += `<div class="atlas-nav__category">Engineering</div>`
-    html += `<div class="atlas-nav__item" onclick="showEngineeringTodo()"><span class="atlas-nav__item-icon">🔩</span>Engineering To-Do</div>`
-    html += `<div class="atlas-nav__item" onclick="showSettings()"><span class="atlas-nav__item-icon">⚙️</span>Settings</div>`
+  if (user.role === 'BUSINESS_HEAD') {
+    h += `<div class="nav-cat">Engineering</div>`
+    h += `<div class="nav-item" onclick="showTodo()">🔩 &nbsp;Engineering To-Do</div>`
+    h += `<div class="nav-item" onclick="showSettings()">⚙️ &nbsp;Settings</div>`
   }
-
-  document.getElementById('appSidebar').innerHTML = html
+  document.getElementById('sidebar').innerHTML = h
 }
 
 // ── Portal Home ──────────────────────────────────────────────
-async function renderPortalHome() {
-  const access = ATLAS_CONFIG.roles[currentUser.role].access
-  const main = document.getElementById('appMain')
-  const active = allProjects.filter(p => p.status === 'active').length
-  const draft = allProjects.filter(p => p.status === 'draft').length
-  const ready = Object.values(ATLAS_CONFIG.tools).filter(t => t.status === 'baselined').length
-
-  let html = `
-    <div class="portal-header">
-      <h1>Welcome, ${currentUser.name.split(' ')[0]}</h1>
-      <p>ATLAS v1.0 &nbsp;— AI Transaction and Lifecycle Architecture Suite</p>
-    </div>
-    <div class="portal-stats">
-      <div class="portal-stat"><div class="portal-stat__value">${allProjects.length}</div><div class="portal-stat__label">Total Projects</div></div>
-      <div class="portal-stat portal-stat--teal"><div class="portal-stat__value">${active}</div><div class="portal-stat__label">Active</div></div>
-      <div class="portal-stat portal-stat--orange"><div class="portal-stat__value">${draft}</div><div class="portal-stat__label">In Draft</div></div>
-      <div class="portal-stat portal-stat--blue"><div class="portal-stat__value">${ready}</div><div class="portal-stat__label">Tools Ready</div></div>
+function renderHome() {
+  const access = ROLES[user.role].access
+  const canSee = (catId) => access === 'all' || access.includes(catId)
+  const active = projects.filter(p => p.status === 'active').length
+  const draft = projects.filter(p => p.status === 'draft').length
+  const ready = Object.values(TOOLS).filter(t => t.status === 'ready' || t.status === 'update').length
+  let h = `
+    <div class="ph-title">Welcome, ${user.name.split(' ')[0]}</div>
+    <div class="ph-sub">ATLAS v1.0 — AI Transaction and Lifecycle Architecture Suite</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-val">${projects.length}</div><div class="stat-lbl">Total Projects</div></div>
+      <div class="stat teal"><div class="stat-val">${active}</div><div class="stat-lbl">Active</div></div>
+      <div class="stat orange"><div class="stat-val">${draft}</div><div class="stat-lbl">In Draft</div></div>
+      <div class="stat blue"><div class="stat-val">${ready}</div><div class="stat-lbl">Tools Ready</div></div>
     </div>`
-
-  if (!currentProject) html += `<div class="atlas-no-project">ℹ No project selected. <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="showProjectSelector()">Select Project</button></div>`
-
-  ATLAS_CONFIG.categories.forEach(cat => {
-    const catId = cat.id.replace('-readonly','')
-    if (!access.includes('all') && !access.some(a => a === cat.id || a === catId)) return
-    html += `<div class="portal-category"><div class="portal-category__title">${cat.icon} ${cat.label}</div><div class="atlas-tool-grid">`
+  if (!project) h += `<div class="no-project">ℹ No project selected. <button class="btn btn-sm btn-secondary" style="margin-left:auto" onclick="showProjects()">Select Project</button></div>`
+  CATEGORIES.forEach(cat => {
+    if (!canSee(cat.id)) return
+    h += `<div class="section-title">${cat.icon} ${cat.label}</div><div class="tool-grid">`
     cat.tools.forEach(id => {
-      const t = ATLAS_CONFIG.tools[id]; if (!t) return
-      const isPending = t.status === 'pending'
-      const badge = t.status === 'baselined'
-        ? `<span class="badge badge-complete">Ready</span>`
-        : t.pendingUpdates
-          ? `<span class="badge badge-progress">Update pending</span>`
-          : `<span class="badge badge-pending">Coming soon</span>`
-      html += `<div class="atlas-tool-card ${isPending ? 'atlas-tool-card--pending' : ''}" onclick="${isPending ? 'showComingSoon()' : `launchTool('${id}')`}">
-        <div class="atlas-tool-card__name">${t.label}</div>
-        <div class="atlas-tool-card__version">${t.version ? `v${t.version}` : '—'}</div>
+      const t = TOOLS[id]; if (!t) return
+      const isSoon = t.status === 'soon'
+      const badge = t.status === 'ready' ? `<span class="badge ready">Ready</span>` : t.status === 'update' ? `<span class="badge update">Update pending</span>` : `<span class="badge soon">Coming soon</span>`
+      h += `<div class="tool-card ${isSoon ? 'dim' : ''}" onclick="${isSoon ? 'showComingSoon()' : `launchTool('${id}')`}">
+        <div class="tc-name">${t.label}</div>
+        <div class="tc-ver">${t.version ? 'v' + t.version : '—'}</div>
         ${badge}
       </div>`
     })
-    html += `</div></div>`
+    h += `</div>`
   })
-
-  main.innerHTML = html
+  document.getElementById('main').innerHTML = h
 }
 
-// ── Project Selector ─────────────────────────────────────────
-async function showProjectSelector() {
-  allProjects = await AtlasStore.getProjects()
-  const main = document.getElementById('appMain')
-  const rows = allProjects.length === 0
-    ? `<tr><td colspan="4" style="text-align:center;color:var(--atlas-mid-grey);padding:32px">No projects yet. Create your first project below.</td></tr>`
-    : allProjects.map(p => `<tr style="cursor:pointer" onclick="selectProject('${p.id}')">
-        <td style="padding:10px 12px;font-weight:500">${p.name}</td>
-        <td style="padding:10px 12px">${p.domain || '—'}</td>
-        <td style="padding:10px 12px">${p.tier || '—'}</td>
-        <td style="padding:10px 12px"><span class="badge badge-${p.status === 'active' ? 'complete' : 'progress'}">${p.status}</span></td>
+// ── Projects ─────────────────────────────────────────────────
+function showProjects() {
+  const rows = projects.length === 0
+    ? `<tr><td colspan="4" style="text-align:center;color:var(--mid);padding:28px">No projects yet. Create your first below.</td></tr>`
+    : projects.map(p => `<tr onclick="selectProject('${p.id}')" style="cursor:pointer">
+        <td style="font-weight:500">${p.name}</td>
+        <td>${p.domain || '—'}</td>
+        <td>${p.tier || '—'}</td>
+        <td><span class="badge ${p.status === 'active' ? 'ready' : 'update'}">${p.status}</span></td>
       </tr>`).join('')
-
-  main.innerHTML = `
-    <div class="portal-header"><h1>Project Library</h1><p>Select an existing project or create a new one</p></div>
-    <div class="atlas-card">
+  document.getElementById('main').innerHTML = `
+    <div class="ph-title" style="margin-bottom:4px">Project Library</div>
+    <div class="ph-sub">Select an existing project or create a new one</div>
+    <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div style="font-size:15px;font-weight:700;color:var(--atlas-navy)">All Projects</div>
-        <button class="btn btn-primary btn-sm" onclick="showCreateProject()">+ New Project</button>
+        <div class="card-title">All Projects</div>
+        <button class="btn btn-secondary btn-sm" onclick="showCreate()">+ New Project</button>
       </div>
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr style="border-bottom:2px solid var(--atlas-light-grey)">
-          <th style="text-align:left;padding:8px 12px;font-size:11px;color:var(--atlas-mid-grey);text-transform:uppercase">Project</th>
-          <th style="text-align:left;padding:8px 12px;font-size:11px;color:var(--atlas-mid-grey);text-transform:uppercase">Domain</th>
-          <th style="text-align:left;padding:8px 12px;font-size:11px;color:var(--atlas-mid-grey);text-transform:uppercase">Tier</th>
-          <th style="text-align:left;padding:8px 12px;font-size:11px;color:var(--atlas-mid-grey);text-transform:uppercase">Status</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
+      <table><thead><tr><th>Project</th><th>Domain</th><th>Tier</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
     </div>`
 }
 
-function showCreateProject() {
-  document.getElementById('appMain').innerHTML = `
-    <div class="portal-header"><h1>Create New Project</h1><p>Define the basic project parameters to get started</p></div>
-    <div class="atlas-card" style="max-width:600px">
-      <div class="form-group"><label class="form-label form-label--required">Project Name</label><input type="text" class="form-control" id="newProjectName" placeholder="e.g. MDoNER GeoAI Platform"></div>
-      <div class="form-group"><label class="form-label form-label--required">Domain</label>
-        <select class="form-control" id="newProjectDomain">
-          <option value="">— Select domain —</option>
-          <option value="geospatial">Geospatial AI</option>
-          <option value="defence">Defence</option>
-          <option value="aviation">Aviation / DGCA</option>
-          <option value="healthcare">Healthcare</option>
-          <option value="smartcity">Smart City</option>
-          <option value="finance">Finance</option>
-          <option value="custom">Custom</option>
-        </select>
-      </div>
-      <div class="form-group"><label class="form-label form-label--required">Architecture Tier</label>
-        <select class="form-control" id="newProjectTier">
-          <option value="">— Select tier —</option>
-          <option value="C1">C1 | Edge / Departmental</option>
-          <option value="C2">C2 | Enterprise / Zonal</option>
-          <option value="C3">C3 | National / State Platform</option>
-          <option value="C4">C4 | Hyperscale / AI Factory</option>
-        </select>
-      </div>
-      <div class="form-group"><label class="form-label">Customer / Organisation</label><input type="text" class="form-control" id="newProjectCustomer" placeholder="e.g. Ministry of DONER"></div>
-      <div style="display:flex;gap:12px;margin-top:8px">
-        <button class="btn btn-primary" onclick="createProject()">Create Project</button>
-        <button class="btn btn-secondary" onclick="showProjectSelector()">Cancel</button>
+function showCreate() {
+  document.getElementById('main').innerHTML = `
+    <div class="ph-title" style="margin-bottom:4px">Create New Project</div>
+    <div class="ph-sub">Define the basic project parameters</div>
+    <div class="card" style="max-width:560px">
+      <label class="req">Project Name</label>
+      <input type="text" id="pName" placeholder="e.g. MDoNER GeoAI Platform">
+      <label class="req">Domain</label>
+      <select id="pDomain">
+        <option value="">— Select domain —</option>
+        <option value="Geospatial AI">Geospatial AI</option>
+        <option value="Defence">Defence</option>
+        <option value="Aviation / DGCA">Aviation / DGCA</option>
+        <option value="Healthcare">Healthcare</option>
+        <option value="Smart City">Smart City</option>
+        <option value="Finance">Finance</option>
+        <option value="Custom">Custom</option>
+      </select>
+      <label class="req">Architecture Tier</label>
+      <select id="pTier">
+        <option value="">— Select tier —</option>
+        <option value="C1">C1 | Edge / Departmental</option>
+        <option value="C2">C2 | Enterprise / Zonal</option>
+        <option value="C3">C3 | National / State Platform</option>
+        <option value="C4">C4 | Hyperscale / AI Factory</option>
+      </select>
+      <label>Customer / Organisation</label>
+      <input type="text" id="pCust" placeholder="e.g. Ministry of DONER">
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button class="btn btn-primary" style="width:auto" onclick="createProject()">Create Project</button>
+        <button class="btn btn-secondary" onclick="showProjects()">Cancel</button>
       </div>
     </div>`
 }
 
-async function createProject() {
-  const name = document.getElementById('newProjectName').value.trim()
-  const domain = document.getElementById('newProjectDomain').value
-  const tier = document.getElementById('newProjectTier').value
-  const customer = document.getElementById('newProjectCustomer').value.trim()
+function createProject() {
+  const name = document.getElementById('pName').value.trim()
+  const domain = document.getElementById('pDomain').value
+  const tier = document.getElementById('pTier').value
+  const customer = document.getElementById('pCust').value.trim()
   if (!name || !domain || !tier) { alert('Kindly fill in all required fields.'); return }
-  const saved = await AtlasStore.saveProject({ name, domain, tier, customer, status: 'draft', createdBy: currentUser.name })
-  allProjects = await AtlasStore.getProjects()
-  selectProject(saved.id)
-}
-
-function selectProject(id) {
-  currentProject = allProjects.find(p => p.id === id)
-  if (!currentProject) return
-  const bar = document.getElementById('contextBar')
-  bar.className = `atlas-context atlas-context--${currentProject.status}`
-  document.getElementById('contextProject').textContent = currentProject.name
-  document.getElementById('contextMeta').textContent = `${currentProject.domain || '—'} · ${currentProject.tier || '—'} · ${currentProject.status}`
-  renderPortalHome()
-}
-
-// ── Tool Launcher ────────────────────────────────────────────
-function launchTool(id) {
-  const t = ATLAS_CONFIG.tools[id]
-  if (!t || t.status === 'pending') { showComingSoon(); return }
-  window.location.href = t.path
-}
-
-function showComingSoon() {
-  document.getElementById('appMain').innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;text-align:center">
-      <div style="font-size:48px;margin-bottom:16px">🔧</div>
-      <div style="font-size:20px;font-weight:700;color:var(--atlas-navy);margin-bottom:8px">Coming Soon</div>
-      <div style="font-size:14px;color:var(--atlas-mid-grey)">This tool is currently being built and will be available shortly.</div>
-      <button class="btn btn-primary" style="margin-top:24px" onclick="renderPortalHome()">Back to Portal</button>
-    </div>`
-}
-
-// ── Engineering To-Do (Business Head only) ───────────────────
-function showEngineeringTodo() {
-  const todo = (items) => items.map(i => `
-    <div class="todo-item ${i.done ? 'todo-item--done' : ''}">
-      <span>${i.done ? '✅' : '⬜'}</span>
-      <span>${i.t}</span>
-    </div>`).join('')
-
-  document.getElementById('appMain').innerHTML = `
-    <div class="portal-header"><h1>🔩 Engineering To-Do</h1><p>Visible to Business Head only</p></div>
-
-    <div class="atlas-card">
-      <div style="font-size:15px;font-weight:700;color:var(--atlas-navy);margin-bottom:12px">Phase 1 — Scaffolding</div>
-      ${todo([
-        {done:true,  t:'GitHub repo created (arvindbajaj5/atlas-platform)'},
-     
+  const p = { id: 'p_' + Date.now(), name, domain, tier, customer, status: 'draft', createdBy: user.name, createdAt: new Date().toISOString() }
+  projects.push(p)
+  saveProjects()
+  selectProject(p.id)
