@@ -3,40 +3,481 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ATLAS Test</title>
+<title>ATLAS — AI Transaction and Lifecycle Architecture Suite</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-  body { font-family: sans-serif; background: #002870; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-  .card { background: white; border-radius: 12px; padding: 32px; width: 320px; }
-  h2 { color: #002870; margin-bottom: 20px; }
-  input, select { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
-  button { width: 100%; padding: 12px; background: #FF5539; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; }
-  #msg { margin-top: 16px; color: #002870; font-weight: bold; text-align: center; }
+  :root {
+    --orange: #FF5539;
+    --navy: #002870;
+    --blue: #1C38F5;
+    --teal: #00B290;
+    --amber: #FFB600;
+    --white: #FFFFFF;
+    --light: #F5F5F7;
+    --mid: #B4B4BE;
+    --dark: #282832;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Roboto', sans-serif; background: var(--light); color: var(--dark); }
+
+  /* LOGIN */
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--navy); }
+  .login-card { background: var(--white); border-radius: 12px; padding: 40px; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  .login-mark { font-size: 28px; font-weight: 900; color: var(--navy); letter-spacing: 4px; text-align: center; margin-bottom: 4px; }
+  .login-mark span { color: var(--orange); }
+  .login-tag { text-align: center; font-size: 11px; color: var(--mid); margin-bottom: 28px; }
+  .login-title { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 20px; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--dark); margin-bottom: 5px; }
+  label.req::after { content: ' *'; color: var(--orange); }
+  input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--mid); border-radius: 6px; font-size: 13px; font-family: inherit; color: var(--dark); background: var(--white); margin-bottom: 14px; }
+  input:focus, select:focus { outline: none; border-color: var(--blue); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; font-family: inherit; border: none; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: var(--orange); color: var(--white); width: 100%; }
+  .btn-primary:hover { background: #e6421f; }
+  .btn-secondary { background: var(--navy); color: var(--white); }
+  .btn-secondary:hover { background: #001d5c; }
+  .btn-ghost { background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: var(--white); }
+  .btn-sm { padding: 6px 14px; font-size: 12px; }
+  .login-foot { text-align: center; margin-top: 20px; font-size: 11px; color: var(--mid); }
+
+  /* APP SHELL */
+  .app { display: none; grid-template-rows: 48px 36px 1fr; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  .app.active { display: grid; }
+  header { grid-column: 1/-1; background: var(--navy); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+  .hdr-mark { font-size: 18px; font-weight: 900; color: var(--white); letter-spacing: 3px; }
+  .hdr-mark span { color: var(--orange); }
+  .hdr-right { display: flex; align-items: center; gap: 12px; }
+  .hdr-user { color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 500; }
+  .hdr-role { background: rgba(255,255,255,0.15); color: var(--white); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+  .ctx-bar { grid-column: 1/-1; background: #f0f0f5; border-bottom: 1px solid var(--mid); display: flex; align-items: center; gap: 12px; padding: 0 20px; font-size: 12px; cursor: pointer; }
+  .ctx-label { font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: 0.5px; }
+  .ctx-project { color: var(--dark); }
+  .ctx-meta { color: var(--mid); margin-left: auto; }
+  .ctx-bar.active { background: rgba(0,178,144,0.1); border-color: var(--teal); }
+  sidebar { background: var(--navy); padding: 16px 0; overflow-y: auto; }
+  .nav-cat { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px; padding: 16px 16px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 9px 16px; font-size: 13px; color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent; }
+  .nav-item:hover, .nav-item.active { color: var(--white); background: rgba(255,255,255,0.08); border-left-color: var(--orange); }
+  .nav-badge { margin-left: auto; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px; }
+  .nav-badge.ready { background: rgba(0,178,144,0.25); color: var(--teal); }
+  .nav-badge.soon { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); }
+  main { padding: 24px; overflow-y: auto; }
+
+  /* CARDS */
+  .card { background: var(--white); border: 1px solid #e0e0e8; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+  .card-sub { font-size: 12px; color: var(--mid); margin-bottom: 16px; }
+
+  /* PORTAL HOME */
+  .ph-title { font-size: 22px; font-weight: 700; color: var(--navy); }
+  .ph-sub { font-size: 13px; color: var(--mid); margin-top: 4px; margin-bottom: 20px; }
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+  .stat { background: var(--white); border: 1px solid #e0e0e8; border-radius: 8px; padding: 14px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .stat-val { font-size: 26px; font-weight: 900; color: var(--navy); }
+  .stat-lbl { font-size: 11px; color: var(--mid); margin-top: 2px; }
+  .stat.orange .stat-val { color: var(--orange); }
+  .stat.teal .stat-val { color: var(--teal); }
+  .stat.blue .stat-val { color: var(--blue); }
+  .section-title { font-size: 12px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 8px; border-bottom: 2px solid var(--orange); margin-bottom: 14px; margin-top: 24px; }
+  .tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 10px; margin-bottom: 8px; }
+  .tool-card { background: var(--white); border: 1px solid #e0e0e8; border-radius: 8px; padding: 14px; cursor: pointer; transition: all 0.15s; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .tool-card:hover { border-color: var(--orange); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .tool-card.dim { opacity: 0.55; cursor: default; }
+  .tool-card.dim:hover { transform: none; border-color: #e0e0e8; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .tc-name { font-size: 12px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+  .tc-ver { font-size: 11px; color: var(--mid); margin-bottom: 6px; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 8px; }
+  .badge.ready { background: rgba(0,178,144,0.15); color: var(--teal); }
+  .badge.update { background: rgba(255,182,0,0.15); color: var(--amber); }
+  .badge.soon { background: rgba(180,180,190,0.2); color: var(--mid); }
+  .no-project { background: rgba(28,56,245,0.06); border: 1px solid rgba(28,56,245,0.2); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--blue); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+
+  /* TODO */
+  .todo-item { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--light); font-size: 13px; }
+  .todo-item.done { color: var(--mid); text-decoration: line-through; }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 8px 12px; font-size: 11px; color: var(--mid); text-transform: uppercase; border-bottom: 2px solid var(--light); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--light); font-size: 13px; }
+  tr:hover td { background: rgba(0,0,0,0.02); }
+
+  /* FORM */
+  .form-hint { font-size: 11px; color: var(--mid); margin-top: -10px; margin-bottom: 14px; }
+
+  /* COMING SOON */
+  .coming-soon { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; text-align: center; }
+  .coming-soon .icon { font-size: 48px; margin-bottom: 16px; }
+  .coming-soon h2 { font-size: 20px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+  .coming-soon p { font-size: 14px; color: var(--mid); margin-bottom: 24px; }
 </style>
 </head>
 <body>
-<div class="card">
-  <h2>ATLAS — Sign In</h2>
-  <input type="text" id="name" placeholder="Your name">
-  <select id="role">
-    <option value="">Select role</option>
-    <option value="BUSINESS_HEAD">Business Head</option>
-    <option value="SALES">Sales</option>
-    <option value="PRESALES">Pre-Sales</option>
-    <option value="OPERATIONS">Operations</option>
-  </select>
-  <button id="loginBtn">Enter ATLAS</button>
-  <div id="msg"></div>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div class="login-mark">ATL<span>A</span>S</div>
+    <div class="login-tag">AI Transaction and Lifecycle Architecture Suite</div>
+    <div class="login-title">Sign In</div>
+    <label class="req">Name</label>
+    <input type="text" id="loginName" placeholder="Your name" autocomplete="name">
+    <label class="req">Role</label>
+    <select id="loginRole">
+      <option value="">— Select your role —</option>
+      <option value="BUSINESS_HEAD">Business Head</option>
+      <option value="SALES">Sales &amp; Sales Support</option>
+      <option value="PRESALES">Pre-Sales</option>
+      <option value="OPERATIONS">Operations</option>
+    </select>
+    <button class="btn btn-primary" onclick="doLogin()">Enter ATLAS</button>
+    <div class="login-foot">ATLAS v1.0 &nbsp;|&nbsp; © 2026</div>
+  </div>
 </div>
+
+<!-- APP -->
+<div class="app" id="appWrap">
+  <header>
+    <div class="hdr-mark">ATL<span>A</span>S</div>
+    <div class="hdr-right">
+      <div class="hdr-user" id="hdrName">—</div>
+      <div class="hdr-role" id="hdrRole">—</div>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">Sign Out</button>
+    </div>
+  </header>
+  <div class="ctx-bar" id="ctxBar" onclick="showProjects()">
+    <span class="ctx-label">Project</span>
+    <span class="ctx-project" id="ctxProject">No project selected — tap to select or create</span>
+    <span class="ctx-meta" id="ctxMeta">—</span>
+  </div>
+  <sidebar id="sidebar"></sidebar>
+  <main id="main"></main>
+</div>
+
 <script>
-  document.getElementById('loginBtn').addEventListener('click', function() {
-    var name = document.getElementById('name').value.trim();
-    var role = document.getElementById('role').value;
-    if (!name || !role) {
-      document.getElementById('msg').textContent = 'Please enter name and select role.';
-      return;
+// ── Config ───────────────────────────────────────────────────
+const ROLES = {
+  BUSINESS_HEAD: { label: 'Business Head', access: 'all' },
+  SALES:         { label: 'Sales & Sales Support', access: ['sales','opportunity','rac'] },
+  PRESALES:      { label: 'Pre-Sales', access: ['presales','opportunity','benchmark'] },
+  OPERATIONS:    { label: 'Operations', access: ['operations'] }
+}
+
+const CATEGORIES = [
+  { id: 'sales', label: '01 — Sales Enablement', icon: '📊', tools: ['portfolio-portal'] },
+  { id: 'opportunity', label: '02 — Opportunity Management', icon: '🎯', tools: ['rac','deal-analysis'] },
+  { id: 'presales', label: '03 — Presales', icon: '🔷', tools: ['domain-config','inferencing','geoai-civ','geoai-mil','compass','sovereign','benchmark'] },
+  { id: 'operations', label: '04 — Business Operations', icon: '⚙️', tools: ['hpc-monitor','ai-sovereignty'] }
+]
+
+const TOOLS = {
+  'portfolio-portal': { label: 'AI Portfolio Portal',       status: 'soon',     version: null },
+  'rac':              { label: 'RAC Tool',                  status: 'ready',    version: '1.0' },
+  'deal-analysis':    { label: 'Deal Analysis Tool',        status: 'update',   version: '3.x' },
+  'domain-config':    { label: 'Domain Configurator',       status: 'soon',     version: null },
+  'inferencing':      { label: 'AI Inferencing Factory',    status: 'ready',    version: '2.2' },
+  'geoai-civ':        { label: 'GeoAI Civilian + MDoNER',   status: 'ready',    version: '16' },
+  'geoai-mil':        { label: 'GeoAI Military',            status: 'ready',    version: '1.0' },
+  'compass':          { label: 'COMPASS',                   status: 'ready',    version: '1.0' },
+  'sovereign':        { label: 'Sovereign AI Platform',     status: 'ready',    version: '1.0' },
+  'benchmark':        { label: 'Benchmark Tool',            status: 'soon',     version: null },
+  'hpc-monitor':      { label: 'HPC Monitoring',            status: 'soon',     version: null },
+  'ai-sovereignty':   { label: 'AI Sovereignty Index',      status: 'soon',     version: null }
+}
+
+// ── State ────────────────────────────────────────────────────
+let user = null, project = null
+const projects = JSON.parse(localStorage.getItem('atlas_projects') || '[]')
+
+function saveProjects() { localStorage.setItem('atlas_projects', JSON.stringify(projects)) }
+
+// ── Auth ─────────────────────────────────────────────────────
+function doLogin() {
+  const name = document.getElementById('loginName').value.trim()
+  const role = document.getElementById('loginRole').value
+  if (!name) { alert('Kindly enter your name.'); return }
+  if (!role) { alert('Kindly select your role.'); return }
+  user = { name, role, label: ROLES[role].label }
+  localStorage.setItem('atlas_user', JSON.stringify(user))
+  document.getElementById('loginWrap').style.display = 'none'
+  document.getElementById('appWrap').className = 'app active'
+  document.getElementById('hdrName').textContent = name
+  document.getElementById('hdrRole').textContent = ROLES[role].label
+  renderSidebar()
+  renderHome()
+}
+
+function doLogout() {
+  localStorage.removeItem('atlas_user')
+  user = null; project = null
+  document.getElementById('loginWrap').style.display = 'flex'
+  document.getElementById('appWrap').className = 'app'
+  document.getElementById('loginName').value = ''
+  document.getElementById('loginRole').value = ''
+}
+
+// ── Sidebar ──────────────────────────────────────────────────
+function renderSidebar() {
+  const access = ROLES[user.role].access
+  const canSee = (catId) => access === 'all' || access.includes(catId)
+  let h = `<div class="nav-item active" onclick="renderHome()">🏡 &nbsp;Portal Home</div>`
+  CATEGORIES.forEach(cat => {
+    if (!canSee(cat.id)) return
+    h += `<div class="nav-cat">${cat.label}</div>`
+    cat.tools.forEach(id => {
+      const t = TOOLS[id]; if (!t) return
+      const badge = t.status === 'ready' ? `<span class="nav-badge ready">Ready</span>` : t.status === 'update' ? `<span class="nav-badge ready">Live</span>` : `<span class="nav-badge soon">Soon</span>`
+      h += `<div class="nav-item" onclick="launchTool('${id}')">${t.label}${badge}</div>`
+    })
+  })
+  if (user.role === 'BUSINESS_HEAD') {
+    h += `<div class="nav-cat">Engineering</div>`
+    h += `<div class="nav-item" onclick="showTodo()">🔩 &nbsp;Engineering To-Do</div>`
+    h += `<div class="nav-item" onclick="showSettings()">⚙️ &nbsp;Settings</div>`
+  }
+  document.getElementById('sidebar').innerHTML = h
+}
+
+// ── Portal Home ──────────────────────────────────────────────
+function renderHome() {
+  const access = ROLES[user.role].access
+  const canSee = (catId) => access === 'all' || access.includes(catId)
+  const active = projects.filter(p => p.status === 'active').length
+  const draft = projects.filter(p => p.status === 'draft').length
+  const ready = Object.values(TOOLS).filter(t => t.status === 'ready' || t.status === 'update').length
+  let h = `
+    <div class="ph-title">Welcome, ${user.name.split(' ')[0]}</div>
+    <div class="ph-sub">ATLAS v1.0 — AI Transaction and Lifecycle Architecture Suite</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-val">${projects.length}</div><div class="stat-lbl">Total Projects</div></div>
+      <div class="stat teal"><div class="stat-val">${active}</div><div class="stat-lbl">Active</div></div>
+      <div class="stat orange"><div class="stat-val">${draft}</div><div class="stat-lbl">In Draft</div></div>
+      <div class="stat blue"><div class="stat-val">${ready}</div><div class="stat-lbl">Tools Ready</div></div>
+    </div>`
+  if (!project) h += `<div class="no-project">ℹ No project selected. <button class="btn btn-sm btn-secondary" style="margin-left:auto" onclick="showProjects()">Select Project</button></div>`
+  CATEGORIES.forEach(cat => {
+    if (!canSee(cat.id)) return
+    h += `<div class="section-title">${cat.icon} ${cat.label}</div><div class="tool-grid">`
+    cat.tools.forEach(id => {
+      const t = TOOLS[id]; if (!t) return
+      const isSoon = t.status === 'soon'
+      const badge = t.status === 'ready' ? `<span class="badge ready">Ready</span>` : t.status === 'update' ? `<span class="badge update">Update pending</span>` : `<span class="badge soon">Coming soon</span>`
+      h += `<div class="tool-card ${isSoon ? 'dim' : ''}" onclick="${isSoon ? 'showComingSoon()' : `launchTool('${id}')`}">
+        <div class="tc-name">${t.label}</div>
+        <div class="tc-ver">${t.version ? 'v' + t.version : '—'}</div>
+        ${badge}
+      </div>`
+    })
+    h += `</div>`
+  })
+  document.getElementById('main').innerHTML = h
+}
+
+// ── Projects ─────────────────────────────────────────────────
+function showProjects() {
+  const rows = projects.length === 0
+    ? `<tr><td colspan="4" style="text-align:center;color:var(--mid);padding:28px">No projects yet. Create your first below.</td></tr>`
+    : projects.map(p => `<tr onclick="selectProject('${p.id}')" style="cursor:pointer">
+        <td style="font-weight:500">${p.name}</td>
+        <td>${p.domain || '—'}</td>
+        <td>${p.tier || '—'}</td>
+        <td><span class="badge ${p.status === 'active' ? 'ready' : 'update'}">${p.status}</span></td>
+      </tr>`).join('')
+  document.getElementById('main').innerHTML = `
+    <div class="ph-title" style="margin-bottom:4px">Project Library</div>
+    <div class="ph-sub">Select an existing project or create a new one</div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="card-title">All Projects</div>
+        <button class="btn btn-secondary btn-sm" onclick="showCreate()">+ New Project</button>
+      </div>
+      <table><thead><tr><th>Project</th><th>Domain</th><th>Tier</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`
+}
+
+function showCreate() {
+  document.getElementById('main').innerHTML = `
+    <div class="ph-title" style="margin-bottom:4px">Create New Project</div>
+    <div class="ph-sub">Define the basic project parameters</div>
+    <div class="card" style="max-width:560px">
+      <label class="req">Project Name</label>
+      <input type="text" id="pName" placeholder="e.g. MDoNER GeoAI Platform">
+      <label class="req">Domain</label>
+      <select id="pDomain">
+        <option value="">— Select domain —</option>
+        <option value="Geospatial AI">Geospatial AI</option>
+        <option value="Defence">Defence</option>
+        <option value="Aviation / DGCA">Aviation / DGCA</option>
+        <option value="Healthcare">Healthcare</option>
+        <option value="Smart City">Smart City</option>
+        <option value="Finance">Finance</option>
+        <option value="Custom">Custom</option>
+      </select>
+      <label class="req">Architecture Tier</label>
+      <select id="pTier">
+        <option value="">— Select tier —</option>
+        <option value="C1">C1 | Edge / Departmental</option>
+        <option value="C2">C2 | Enterprise / Zonal</option>
+        <option value="C3">C3 | National / State Platform</option>
+        <option value="C4">C4 | Hyperscale / AI Factory</option>
+      </select>
+      <label>Customer / Organisation</label>
+      <input type="text" id="pCust" placeholder="e.g. Ministry of DONER">
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button class="btn btn-primary" style="width:auto" onclick="createProject()">Create Project</button>
+        <button class="btn btn-secondary" onclick="showProjects()">Cancel</button>
+      </div>
+    </div>`
+}
+
+function createProject() {
+  const name = document.getElementById('pName').value.trim()
+  const domain = document.getElementById('pDomain').value
+  const tier = document.getElementById('pTier').value
+  const customer = document.getElementById('pCust').value.trim()
+  if (!name || !domain || !tier) { alert('Kindly fill in all required fields.'); return }
+  const p = { id: 'p_' + Date.now(), name, domain, tier, customer, status: 'draft', createdBy: user.name, createdAt: new Date().toISOString() }
+  projects.push(p)
+  saveProjects()
+  selectProject(p.id)
+}
+
+function selectProject(id) {
+  project = projects.find(p => p.id === id)
+  if (!project) return
+  const bar = document.getElementById('ctxBar')
+  bar.className = 'ctx-bar active'
+  document.getElementById('ctxProject').textContent = project.name
+  document.getElementById('ctxMeta').textContent = `${project.domain} · ${project.tier} · ${project.status}`
+  renderHome()
+}
+
+// ── Tools ─────────────────────────────────────────────────────
+function launchTool(id) {
+  const t = TOOLS[id]
+  if (!t || t.status === 'soon') { showComingSoon(); return }
+  showComingSoon() // until actual tool paths are set up
+}
+
+function showComingSoon() {
+  document.getElementById('main').innerHTML = `
+    <div class="coming-soon">
+      <div class="icon">🔧</div>
+      <h2>Coming Soon</h2>
+      <p>This tool is currently being built and will be available shortly.</p>
+      <button class="btn btn-secondary" onclick="renderHome()">Back to Portal</button>
+    </div>`
+}
+
+// ── Engineering To-Do ─────────────────────────────────────────
+function showTodo() {
+  const todo = items => items.map(i => `<div class="todo-item ${i.done ? 'done' : ''}"><span>${i.done ? '✅' : '⬜'}</span><span>${i.t}</span></div>`).join('')
+  document.getElementById('main').innerHTML = `
+    <div class="ph-title" style="margin-bottom:4px">🔩 Engineering To-Do</div>
+    <div class="ph-sub">Visible to Business Head only</div>
+    <div class="card">
+      <div class="card-title">Phase 1 — Scaffolding</div>
+      ${todo([
+        {done:true,  t:'GitHub repo created (arvindbajaj5/atlas-platform)'},
+        {done:true,  t:'GitHub Pages enabled — live at arvindbajaj5.github.io/atlas-platform'},
+        {done:true,  t:'ATLAS shell built — config, store, CSS, index.html'},
+        {done:true,  t:'Data folder with 6 empty JSON files'},
+        {done:true,  t:'Login and role switching working'},
+        {done:true,  t:'Project create and save working (localStorage)'},
+        {done:false, t:'Test on iPad'},
+        {done:false, t:'Confirm all 4 roles render correctly'},
+        {done:false, t:'Move data layer to JSON files on OneDrive'}
+      ])}
+    </div>
+    <div class="card">
+      <div class="card-title">Standards & Config</div>
+      ${todo([
+        {done:true,  t:'brand.md v1.1 — Indian Language & Style Standards'},
+        {done:true,  t:'architecture-tiers.md'},
+        {done:true,  t:'hardware-preferences.md'},
+        {done:true,  t:'project-definition-schema.md'},
+        {done:true,  t:'tool-features.md'},
+        {done:true,  t:'claude-session-activator.md'},
+        {done:true,  t:'atlas-document-factory.md'},
+        {done:false, t:'tool-features.md v1.1 — visualisation standards'},
+        {done:false, t:'xlsx-export-standards.md'},
+        {done:false, t:'OneDrive migration script'},
+        {done:false, t:'PocketBase migration script'}
+      ])}
+    </div>
+    <div class="card">
+      <div class="card-title">Phase 2+ — Tools to Build</div>
+      ${todo([
+        {done:false, t:'Domain Configurator (Phase 2)'},
+        {done:false, t:'Portfolio Portal (Phase 3)'},
+        {done:false, t:'AI Inferencing Factory upgrade — domain-aware (Phase 4)'},
+        {done:false, t:'RAC Tool rebuild — pipeline spine (Phase 5)'},
+        {done:false, t:'Deal Analysis Tool updates (Phase 6)'},
+        {done:false, t:'Document Factory — Claude API (Phase 7)'},
+        {done:false, t:'Benchmark Tool — phased 5a→5d (Phase 8)'},
+        {done:false, t:'Second Brain domain files — GeoAI first (Phase 9)'},
+        {done:false, t:'HPC Monitoring + AI Sovereignty Index (Phase 10)'},
+        {done:false, t:'ATLAS Portal final integration (Phase 10)'}
+      ])}
+    </div>`
+}
+
+// ── Settings ──────────────────────────────────────────────────
+function showSettings() {
+  document.getElementById('main').innerHTML = `
+    <div class="ph-title" style="margin-bottom:4px">⚙️ Settings</div>
+    <div class="ph-sub">Business Head access only</div>
+    <div class="card" style="max-width:520px">
+      <div class="card-title">AI Configuration</div>
+      <div class="card-sub">Anthropic API key for Document Factory features</div>
+      <label>Anthropic API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-ant-...">
+      <div class="form-hint">Stored in this browser only. Never sent to any external server.</div>
+      <button class="btn btn-secondary btn-sm" onclick="saveKey()">Save Key</button>
+    </div>
+    <div class="card" style="max-width:520px">
+      <div class="card-title">Data Export</div>
+      <div class="card-sub">Export all ATLAS data for backup or PocketBase migration</div>
+      <button class="btn btn-secondary btn-sm" onclick="exportData()">Export All Data (JSON)</button>
+    </div>`
+  const k = localStorage.getItem('atlas_api_key')
+  if (k) document.getElementById('apiKey').value = k
+}
+
+function saveKey() {
+  const k = document.getElementById('apiKey').value.trim()
+  if (k) { localStorage.setItem('atlas_api_key', k); alert('API key saved.') }
+}
+
+function exportData() {
+  const data = { exportedAt: new Date().toISOString(), version: '1.0', projects }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `atlas-export-${new Date().toISOString().slice(0,10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ── Auto-login ────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('atlas_user')
+  if (saved) {
+    try {
+      user = JSON.parse(saved)
+      document.getElementById('loginWrap').style.display = 'none'
+      document.getElementById('appWrap').className = 'app active'
+      document.getElementById('hdrName').textContent = user.name
+      document.getElementById('hdrRole').textContent = ROLES[user.role].label
+      renderSidebar()
+      renderHome()
+    } catch(e) {
+      localStorage.removeItem('atlas_user')
     }
-    document.getElementById('msg').textContent = 'Welcome, ' + name + '! Role: ' + role;
-  });
+  }
+})
 </script>
 </body>
 </html>
