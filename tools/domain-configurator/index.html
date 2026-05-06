@@ -3,1025 +3,955 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ATLAS — Domain Configurator</title>
+<title>ATLAS — Domain Configurator v2</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
-  --orange: #FF5539; --navy: #002870; --blue: #1C38F5;
-  --teal: #00B290; --amber: #FFB600; --indigo: #3C00B4;
-  --white: #FFFFFF; --light: #F5F5F7; --mid: #B4B4BE;
-  --dark: #282832; --black: #0A0A0F;
-  --geo-primary: #1C38F5; --geo-accent: #00B290;
-  --def-primary: #3C00B4; --def-accent: #FF5539;
-  --shadow: 0 2px 8px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.16);
-  --radius: 8px; --radius-sm: 6px; --radius-lg: 12px;
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;
+  --teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFFFFF;--light:#F5F5F7;--mid:#B4B4BE;
+  --dark:#282832;--black:#0A0A0F;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.12);
+  --r:8px;--r-sm:6px;--r-lg:12px;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Roboto', sans-serif; background: var(--light); color: var(--dark); min-height: 100vh; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
 
 /* HEADER */
-.dc-header { background: var(--navy); padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow-md); }
-.dc-header__brand { font-size: 16px; font-weight: 900; color: var(--white); letter-spacing: 3px; }
-.dc-header__brand span { color: var(--orange); }
-.dc-header__title { font-size: 13px; color: rgba(255,255,255,0.7); font-weight: 500; }
-.dc-header__right { display: flex; align-items: center; gap: 12px; }
-.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; font-family: inherit; border: none; cursor: pointer; transition: all 0.15s; text-decoration: none; }
-.btn-primary { background: var(--orange); color: var(--white); }
-.btn-primary:hover { background: #e6421f; }
-.btn-secondary { background: var(--navy); color: var(--white); }
-.btn-secondary:hover { background: #001d5c; }
-.btn-ghost { background: transparent; color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); }
-.btn-ghost:hover { background: rgba(255,255,255,0.1); color: var(--white); }
-.btn-outline { background: transparent; color: var(--navy); border: 1px solid var(--navy); }
-.btn-outline:hover { background: var(--navy); color: var(--white); }
-.btn-teal { background: var(--teal); color: var(--white); }
-.btn-teal:hover { background: #009a7c; }
-.btn-sm { padding: 6px 12px; font-size: 11px; }
-.btn-lg { padding: 12px 24px; font-size: 14px; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-title{font-size:13px;color:rgba(255,255,255,0.6);font-weight:500;}
+.hdr-right{display:flex;align-items:center;gap:12px;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-secondary{background:var(--navy);color:var(--white);}
+.btn-secondary:hover{background:#001d5c;}
+.btn-ghost{background:transparent;color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.1);color:var(--white);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-danger{background:#DC2626;color:var(--white);}
+.btn-danger:hover{background:#b91c1c;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-lg{padding:12px 24px;font-size:14px;}
+.btn-icon{padding:6px;border-radius:var(--r-sm);background:transparent;border:1px solid #d0d0d8;color:var(--mid);cursor:pointer;font-size:14px;transition:all 0.15s;}
+.btn-icon:hover{border-color:var(--navy);color:var(--navy);}
 
 /* STEPPER */
-.stepper { background: var(--white); border-bottom: 1px solid #e0e0e8; padding: 0 24px; display: flex; align-items: center; gap: 0; overflow-x: auto; }
-.step { display: flex; align-items: center; gap: 8px; padding: 14px 20px; font-size: 12px; font-weight: 600; color: var(--mid); cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
-.step.active { color: var(--navy); border-bottom-color: var(--orange); }
-.step.done { color: var(--teal); border-bottom-color: var(--teal); }
-.step__num { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: var(--light); color: var(--mid); }
-.step.active .step__num { background: var(--orange); color: var(--white); }
-.step.done .step__num { background: var(--teal); color: var(--white); }
-.step__arrow { color: var(--mid); margin: 0 -12px; font-size: 14px; }
+.stepper{background:var(--white);border-bottom:1px solid #e0e0e8;padding:0 24px;display:flex;align-items:center;overflow-x:auto;}
+.step{display:flex;align-items:center;gap:8px;padding:14px 16px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s;white-space:nowrap;}
+.step.active{color:var(--navy);border-bottom-color:var(--orange);}
+.step.done{color:var(--teal);border-bottom-color:var(--teal);}
+.step__num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:var(--light);color:var(--mid);}
+.step.active .step__num{background:var(--orange);color:var(--white);}
+.step.done .step__num{background:var(--teal);color:var(--white);}
+.step__arr{color:var(--mid);margin:0 -8px;font-size:14px;}
 
 /* LAYOUT */
-.dc-body { display: grid; grid-template-columns: 1fr 340px; gap: 24px; padding: 24px; max-width: 1400px; margin: 0 auto; }
-.dc-main { min-width: 0; }
-.dc-sidebar { display: flex; flex-direction: column; gap: 16px; }
+.body{display:grid;grid-template-columns:1fr 320px;gap:24px;padding:24px;max-width:1400px;margin:0 auto;}
+.main{min-width:0;}
+.sidebar{display:flex;flex-direction:column;gap:16px;}
 
 /* CARDS */
-.card { background: var(--white); border: 1px solid #e0e0e8; border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow); }
-.card-title { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
-.card-sub { font-size: 12px; color: var(--mid); margin-bottom: 20px; }
-.card-section { margin-bottom: 24px; }
-.card-section:last-child { margin-bottom: 0; }
-.section-label { font-size: 11px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--light); }
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:24px;box-shadow:var(--shadow);margin-bottom:16px;}
+.card:last-child{margin-bottom:0;}
+.card-title{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:12px;color:var(--mid);margin-bottom:20px;}
+.sec{margin-bottom:24px;}
+.sec:last-child{margin-bottom:0;}
+.sec-label{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--light);}
 
 /* FORM */
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-.form-group { margin-bottom: 16px; }
-.form-group:last-child { margin-bottom: 0; }
-label { display: block; font-size: 11px; font-weight: 700; color: var(--dark); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.3px; }
-label.req::after { content: ' *'; color: var(--orange); }
-input[type=text], input[type=number], select, textarea {
-  width: 100%; padding: 9px 12px; border: 1px solid #d0d0d8; border-radius: var(--radius-sm);
-  font-size: 13px; font-family: inherit; color: var(--dark); background: var(--white);
-  transition: border-color 0.15s; appearance: none;
-}
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(28,56,245,0.08); }
-textarea { resize: vertical; min-height: 80px; }
-.form-hint { font-size: 11px; color: var(--mid); margin-top: 4px; }
-.input-with-unit { display: flex; gap: 0; }
-.input-with-unit input { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
-.input-with-unit .unit { background: var(--light); border: 1px solid #d0d0d8; border-left: none; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 9px 10px; font-size: 12px; color: var(--mid); font-weight: 600; white-space: nowrap; display: flex; align-items: center; }
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;}
+.fg{margin-bottom:16px;}
+.fg:last-child{margin-bottom:0;}
+label{display:block;font-size:11px;font-weight:700;color:var(--dark);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;}
+label.req::after{content:' *';color:var(--orange);}
+input[type=text],input[type=number],select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);transition:border-color 0.15s;appearance:none;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(28,56,245,0.08);}
+textarea{resize:vertical;min-height:70px;}
+.hint{font-size:11px;color:var(--mid);margin-top:4px;}
+.unit-wrap{display:flex;}
+.unit-wrap input{border-radius:var(--r-sm) 0 0 var(--r-sm);}
+.unit-wrap .unit{background:var(--light);border:1px solid #d0d0d8;border-left:none;border-radius:0 var(--r-sm) var(--r-sm) 0;padding:9px 10px;font-size:11px;color:var(--mid);font-weight:600;white-space:nowrap;display:flex;align-items:center;}
 
-/* DOMAIN SELECTOR */
-.domain-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-.domain-card { border: 2px solid #e0e0e8; border-radius: var(--radius-lg); padding: 20px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
-.domain-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--mid); transition: background 0.2s; }
-.domain-card.geo::before { background: linear-gradient(90deg, var(--geo-primary), var(--geo-accent)); }
-.domain-card.def::before { background: linear-gradient(90deg, var(--def-primary), var(--def-accent)); }
-.domain-card:hover { border-color: var(--navy); box-shadow: var(--shadow-md); }
-.domain-card.selected { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(255,85,57,0.15); }
-.domain-card.selected.geo { border-color: var(--geo-primary); box-shadow: 0 0 0 3px rgba(28,56,245,0.12); }
-.domain-card.selected.def { border-color: var(--def-primary); box-shadow: 0 0 0 3px rgba(60,0,180,0.12); }
-.domain-card__icon { font-size: 28px; margin-bottom: 10px; }
-.domain-card__name { font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
-.domain-card__desc { font-size: 11px; color: var(--mid); line-height: 1.5; }
-.domain-card__check { position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; border-radius: 50%; background: var(--teal); color: var(--white); display: none; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
-.domain-card.selected .domain-card__check { display: flex; }
+/* DOMAIN CARDS */
+.domain-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.domain-card{border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:18px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;}
+.domain-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--mid);transition:all 0.2s;}
+.domain-card.geo::before{background:linear-gradient(90deg,var(--blue),var(--teal));}
+.domain-card.def::before{background:linear-gradient(90deg,var(--indigo),var(--orange));}
+.domain-card:hover{border-color:var(--navy);box-shadow:var(--shadow-md);}
+.domain-card.sel.geo{border-color:var(--blue);box-shadow:0 0 0 3px rgba(28,56,245,0.1);}
+.domain-card.sel.def{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(60,0,180,0.1);}
+.domain-card__icon{font-size:26px;margin-bottom:8px;}
+.domain-card__name{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.domain-card__desc{font-size:11px;color:var(--mid);line-height:1.5;}
+.domain-card__chk{position:absolute;top:10px;right:10px;width:20px;height:20px;border-radius:50%;background:var(--teal);color:var(--white);display:none;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
+.domain-card.sel .domain-card__chk{display:flex;}
 
-/* TIER SELECTOR */
-.tier-cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 16px; }
-.tier-card { border: 2px solid #e0e0e8; border-radius: var(--radius); padding: 14px 10px; cursor: pointer; transition: all 0.2s; text-align: center; }
-.tier-card:hover { border-color: var(--navy); }
-.tier-card.selected { border-color: var(--orange); background: rgba(255,85,57,0.04); }
-.tier-card__code { font-size: 20px; font-weight: 900; color: var(--navy); margin-bottom: 4px; }
-.tier-card__name { font-size: 10px; font-weight: 600; color: var(--mid); text-transform: uppercase; margin-bottom: 6px; }
-.tier-card__range { font-size: 10px; color: var(--mid); font-family: 'Roboto Mono', monospace; }
-.tier-card.selected .tier-card__code { color: var(--orange); }
-
-/* USE CASE SELECTOR */
-.uc-list { display: flex; flex-direction: column; gap: 8px; }
-.uc-item { border: 1px solid #e0e0e8; border-radius: var(--radius); padding: 12px 16px; cursor: pointer; transition: all 0.15s; display: flex; align-items: flex-start; gap: 12px; }
-.uc-item:hover { border-color: var(--blue); background: rgba(28,56,245,0.02); }
-.uc-item.selected { border-color: var(--blue); background: rgba(28,56,245,0.05); }
-.uc-item.selected .uc-check { background: var(--blue); border-color: var(--blue); }
-.uc-check { width: 18px; height: 18px; border-radius: 4px; border: 2px solid #d0d0d8; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; transition: all 0.15s; }
-.uc-check::after { content: '✓'; color: var(--white); font-size: 10px; font-weight: 700; display: none; }
-.uc-item.selected .uc-check::after { display: block; }
-.uc-info { flex: 1; min-width: 0; }
-.uc-name { font-size: 13px; font-weight: 600; color: var(--dark); margin-bottom: 2px; }
-.uc-desc { font-size: 11px; color: var(--mid); line-height: 1.4; }
-.uc-tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
-.tag { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 8px; background: var(--light); color: var(--mid); }
-.tag.model { background: rgba(28,56,245,0.08); color: var(--blue); }
-.tag.workload { background: rgba(0,178,144,0.08); color: var(--teal); }
-.tag.latency { background: rgba(255,182,0,0.1); color: #a07000; }
-.uc-filter { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.filter-btn { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 12px; border: 1px solid #d0d0d8; background: var(--white); color: var(--mid); cursor: pointer; transition: all 0.15s; }
-.filter-btn.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
+/* TIER */
+.tier-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.tier-card{border:2px solid #e0e0e8;border-radius:var(--r);padding:14px 8px;cursor:pointer;transition:all 0.2s;text-align:center;}
+.tier-card:hover{border-color:var(--navy);}
+.tier-card.sel{border-color:var(--orange);background:rgba(255,85,57,0.04);}
+.tier-card__code{font-size:20px;font-weight:900;color:var(--navy);margin-bottom:4px;}
+.tier-card.sel .tier-card__code{color:var(--orange);}
+.tier-card__name{font-size:10px;font-weight:600;color:var(--mid);text-transform:uppercase;margin-bottom:4px;}
+.tier-card__range{font-size:10px;color:var(--mid);font-family:'Roboto Mono',monospace;}
 
 /* PERSONAS */
-.persona-list { display: flex; flex-direction: column; gap: 8px; }
-.persona-item { border: 1px solid #e0e0e8; border-radius: var(--radius); padding: 12px 16px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 12px; }
-.persona-item:hover { border-color: var(--teal); }
-.persona-item.selected { border-color: var(--teal); background: rgba(0,178,144,0.04); }
-.persona-icon { font-size: 24px; }
-.persona-info { flex: 1; }
-.persona-name { font-size: 13px; font-weight: 600; color: var(--dark); }
-.persona-desc { font-size: 11px; color: var(--mid); }
-.persona-check { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #d0d0d8; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
-.persona-item.selected .persona-check { background: var(--teal); border-color: var(--teal); }
-.persona-item.selected .persona-check::after { content: '✓'; color: var(--white); font-size: 10px; font-weight: 700; }
+.persona-item{border:1px solid #e0e0e8;border-radius:var(--r);padding:12px 14px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+.persona-item:hover{border-color:var(--teal);}
+.persona-item.sel{border-color:var(--teal);background:rgba(0,178,144,0.04);}
+.persona-item.custom{border-style:dashed;}
+.persona-icon{font-size:22px;flex-shrink:0;}
+.persona-info{flex:1;min-width:0;}
+.persona-name{font-size:13px;font-weight:600;color:var(--dark);}
+.persona-desc{font-size:11px;color:var(--mid);margin-top:2px;}
+.persona-chk{width:18px;height:18px;border-radius:50%;border:2px solid #d0d0d8;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;font-size:10px;font-weight:700;color:transparent;}
+.persona-item.sel .persona-chk{background:var(--teal);border-color:var(--teal);color:var(--white);}
+.add-persona-form{border:2px dashed #d0d0d8;border-radius:var(--r);padding:16px;margin-top:8px;display:none;}
+.add-persona-form.open{display:block;}
+.emoji-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.emoji-btn{font-size:18px;padding:4px 6px;border:1px solid #d0d0d8;border-radius:var(--r-sm);cursor:pointer;transition:all 0.1s;background:var(--white);}
+.emoji-btn:hover,.emoji-btn.sel{border-color:var(--navy);background:var(--light);}
 
-/* SIDEBAR PANELS */
-.sidebar-panel { background: var(--white); border: 1px solid #e0e0e8; border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); }
-.sidebar-panel__title { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-.progress-ring { display: flex; flex-direction: column; gap: 8px; }
-.progress-item { display: flex; flex-direction: column; gap: 4px; }
-.progress-item__label { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--dark); }
-.progress-item__pct { color: var(--mid); }
-.progress-bar { height: 6px; background: var(--light); border-radius: 3px; overflow: hidden; }
-.progress-fill { height: 100%; border-radius: 3px; background: var(--teal); transition: width 0.4s ease; }
-.progress-fill.orange { background: var(--orange); }
-.progress-fill.blue { background: var(--blue); }
+/* USE CASES */
+.uc-filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.f-btn{font-size:11px;font-weight:600;padding:4px 10px;border-radius:12px;border:1px solid #d0d0d8;background:var(--white);color:var(--mid);cursor:pointer;transition:all 0.15s;}
+.f-btn.act{background:var(--navy);color:var(--white);border-color:var(--navy);}
+.uc-item{border:1px solid #e0e0e8;border-radius:var(--r);padding:12px 14px;cursor:pointer;transition:all 0.15s;display:flex;align-items:flex-start;gap:12px;margin-bottom:8px;}
+.uc-item:hover{border-color:var(--blue);background:rgba(28,56,245,0.02);}
+.uc-item.sel{border-color:var(--blue);background:rgba(28,56,245,0.04);}
+.uc-chk{width:18px;height:18px;border-radius:4px;border:2px solid #d0d0d8;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all 0.15s;font-size:10px;font-weight:700;color:transparent;}
+.uc-item.sel .uc-chk{background:var(--blue);border-color:var(--blue);color:var(--white);}
+.uc-body{flex:1;min-width:0;}
+.uc-name{font-size:13px;font-weight:600;color:var(--dark);margin-bottom:2px;}
+.uc-desc{font-size:11px;color:var(--mid);line-height:1.4;}
+.uc-personas{font-size:10px;color:var(--blue);margin-top:4px;font-weight:500;}
+.tags{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;}
+.tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;}
+.tag-model{background:rgba(28,56,245,0.08);color:var(--blue);}
+.tag-wl{background:rgba(0,178,144,0.08);color:var(--teal);}
+.tag-lat{background:rgba(255,182,0,0.1);color:#9a7000;}
+.cnt-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--blue);background:rgba(28,56,245,0.08);padding:4px 10px;border-radius:12px;margin-bottom:12px;}
 
-/* SUMMARY PANEL */
-.summary-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--light); font-size: 12px; gap: 12px; }
-.summary-item:last-child { border-bottom: none; }
-.summary-item__label { color: var(--mid); font-weight: 500; flex-shrink: 0; }
-.summary-item__value { color: var(--dark); font-weight: 600; text-align: right; }
-.summary-item__value.orange { color: var(--orange); }
-.summary-item__value.teal { color: var(--teal); }
+/* VOLUMETRICS TABLE */
+.vol-table{width:100%;border-collapse:collapse;font-size:13px;}
+.vol-table th{text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.3px;border-bottom:2px solid var(--light);background:var(--light);}
+.vol-table td{padding:8px 10px;border-bottom:1px solid var(--light);vertical-align:middle;}
+.vol-table tr:last-child td{border-bottom:none;}
+.vol-table input,
+.vol-table select{width:100%;padding:6px 8px;font-size:12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-family:inherit;background:var(--white);}
+.vol-table input:focus,
+.vol-table select:focus{outline:none;border-color:var(--blue);}
+.vol-agg{background:rgba(0,40,112,0.04);border:1px solid rgba(0,40,112,0.15);border-radius:var(--r);padding:14px 16px;margin-top:16px;}
+.vol-agg-title{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px;}
+.vol-agg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.vol-agg-item{text-align:center;}
+.vol-agg-val{font-size:20px;font-weight:900;color:var(--navy);}
+.vol-agg-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
 
-/* BADGES */
-.badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
-.badge-navy { background: rgba(0,40,112,0.1); color: var(--navy); }
-.badge-orange { background: rgba(255,85,57,0.12); color: var(--orange); }
-.badge-teal { background: rgba(0,178,144,0.12); color: var(--teal); }
-.badge-blue { background: rgba(28,56,245,0.1); color: var(--blue); }
-.badge-indigo { background: rgba(60,0,180,0.1); color: var(--indigo); }
+/* SAT SOURCES TABLE */
+.sat-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;}
+.sat-table th{text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
+.sat-table td{padding:6px 8px;border-bottom:1px solid var(--light);vertical-align:middle;}
+.sat-table input,.sat-table select{width:100%;padding:5px 8px;font-size:12px;border:1px solid #d0d0d8;border-radius:4px;font-family:inherit;}
+.sat-table input:focus,.sat-table select:focus{outline:none;border-color:var(--blue);}
+
+/* SITE TABS */
+.site-tabs{display:flex;gap:0;border-bottom:2px solid #e0e0e8;margin-bottom:20px;}
+.site-tab{padding:10px 20px;font-size:13px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
+.site-tab.act{color:var(--navy);border-bottom-color:var(--orange);}
+.site-panel{display:none;}
+.site-panel.act{display:block;}
+
+/* SIDEBAR */
+.sb-panel{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow);}
+.sb-title{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.prog-item{margin-bottom:10px;}
+.prog-item:last-child{margin-bottom:0;}
+.prog-lbl{display:flex;justify-content:space-between;font-size:11px;font-weight:600;color:var(--dark);margin-bottom:4px;}
+.prog-bar{height:5px;background:var(--light);border-radius:3px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:3px;background:var(--teal);transition:width 0.4s ease;}
+.prog-fill.o{background:var(--orange);}
+.prog-fill.b{background:var(--blue);}
+.sum-item{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--light);font-size:11px;gap:10px;}
+.sum-item:last-child{border-bottom:none;}
+.sum-lbl{color:var(--mid);font-weight:500;flex-shrink:0;}
+.sum-val{color:var(--dark);font-weight:600;text-align:right;}
+.sum-val.t{color:var(--teal);}
+.sum-val.o{color:var(--orange);}
 
 /* STEP PANELS */
-.step-panel { display: none; }
-.step-panel.active { display: block; }
+.sp{display:none;}
+.sp.act{display:block;}
+.step-nav{display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:20px;border-top:1px solid var(--light);}
 
-/* NAV BUTTONS */
-.step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--light); }
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:var(--r);font-size:12px;margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-ok{background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.25);color:#007a60;}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.3);color:#9a7000;}
 
-/* CHART */
-.chart-wrap { position: relative; height: 200px; }
+/* REVIEW */
+.out-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.out-card{border:1px solid #e0e0e8;border-radius:var(--r);padding:16px;text-align:center;cursor:pointer;transition:all 0.15s;}
+.out-card:hover{border-color:var(--orange);box-shadow:var(--shadow-md);}
+.out-card__icon{font-size:26px;margin-bottom:8px;}
+.out-card__lbl{font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px;}
+.out-card__desc{font-size:11px;color:var(--mid);}
+.json-out{background:var(--black);border-radius:var(--r);padding:14px;font-family:'Roboto Mono',monospace;font-size:11px;color:#a8ff78;line-height:1.6;overflow:auto;max-height:350px;white-space:pre;}
+.chart-wrap{position:relative;height:220px;}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;}
+.b-navy{background:rgba(0,40,112,0.1);color:var(--navy);}
+.b-teal{background:rgba(0,178,144,0.12);color:var(--teal);}
+.b-orange{background:rgba(255,85,57,0.12);color:var(--orange);}
+.b-blue{background:rgba(28,56,245,0.1);color:var(--blue);}
 
-/* SELECTED COUNT */
-.selected-count { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--blue); background: rgba(28,56,245,0.08); padding: 4px 10px; border-radius: 12px; margin-bottom: 12px; }
-
-/* OUTPUT */
-.output-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-.output-card { border: 1px solid #e0e0e8; border-radius: var(--radius); padding: 16px; text-align: center; cursor: pointer; transition: all 0.15s; }
-.output-card:hover { border-color: var(--orange); box-shadow: var(--shadow-md); }
-.output-card__icon { font-size: 28px; margin-bottom: 8px; }
-.output-card__label { font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
-.output-card__desc { font-size: 11px; color: var(--mid); }
-
-/* JSON OUTPUT */
-.json-output { background: var(--black); border-radius: var(--radius); padding: 16px; font-family: 'Roboto Mono', monospace; font-size: 11px; color: #a8ff78; line-height: 1.6; overflow: auto; max-height: 400px; white-space: pre; }
-
-/* DOMAIN BADGE */
-.domain-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
-.domain-badge.geo { background: rgba(28,56,245,0.1); color: var(--blue); }
-.domain-badge.def { background: rgba(60,0,180,0.1); color: var(--indigo); }
-
-/* ALERT */
-.alert { padding: 12px 16px; border-radius: var(--radius); font-size: 13px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px; }
-.alert-info { background: rgba(28,56,245,0.06); border: 1px solid rgba(28,56,245,0.2); color: var(--blue); }
-.alert-warning { background: rgba(255,182,0,0.08); border: 1px solid rgba(255,182,0,0.3); color: #9a7000; }
-.alert-success { background: rgba(0,178,144,0.08); border: 1px solid rgba(0,178,144,0.3); color: #007a60; }
-
-/* RESPONSIVE */
-@media (max-width: 900px) {
-  .dc-body { grid-template-columns: 1fr; }
-  .dc-sidebar { display: none; }
-  .domain-cards { grid-template-columns: 1fr; }
-  .tier-cards { grid-template-columns: repeat(2,1fr); }
-  .form-row, .form-row-3 { grid-template-columns: 1fr; }
-  .output-grid { grid-template-columns: 1fr; }
+@media(max-width:900px){
+  .body{grid-template-columns:1fr;}
+  .sidebar{display:none;}
+  .domain-grid,.row2,.row3{grid-template-columns:1fr;}
+  .tier-grid{grid-template-columns:repeat(2,1fr);}
+  .out-grid{grid-template-columns:1fr;}
+  .vol-agg-grid{grid-template-columns:1fr 1fr;}
 }
 </style>
 </head>
 <body>
 
-<div class="dc-header">
-  <div class="dc-header__brand">ATL<span>A</span>S</div>
-  <div class="dc-header__title">Domain Configurator v1.0</div>
-  <div class="dc-header__right">
-    <span id="hdrProject" style="font-size:12px;color:rgba(255,255,255,0.6)">No project loaded</span>
-    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Back to Portal</button>
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div class="hdr-title">Domain Configurator v2.0</div>
+  <div class="hdr-right">
+    <span id="hdrProj" style="font-size:12px;color:rgba(255,255,255,0.5)">No project loaded</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
   </div>
 </div>
 
-<!-- STEPPER -->
 <div class="stepper">
-  <div class="step active" id="step-tab-1" onclick="goStep(1)">
-    <div class="step__num">1</div> Project & Domain
-  </div>
-  <div class="step__arrow">›</div>
-  <div class="step" id="step-tab-2" onclick="goStep(2)">
-    <div class="step__num">2</div> Personas
-  </div>
-  <div class="step__arrow">›</div>
-  <div class="step" id="step-tab-3" onclick="goStep(3)">
-    <div class="step__num">3</div> Use Cases
-  </div>
-  <div class="step__arrow">›</div>
-  <div class="step" id="step-tab-4" onclick="goStep(4)">
-    <div class="step__num">4</div> Volumetrics
-  </div>
-  <div class="step__arrow">›</div>
-  <div class="step" id="step-tab-5" onclick="goStep(5)">
-    <div class="step__num">5</div> Domain Specifics
-  </div>
-  <div class="step__arrow">›</div>
-  <div class="step" id="step-tab-6" onclick="goStep(6)">
-    <div class="step__num">6</div> Infrastructure
-  </div>
-  <div class="step__arrow">›</div>
-  <div class="step" id="step-tab-7" onclick="goStep(7)">
-    <div class="step__num">7</div> Review & Export
-  </div>
+  <div class="step active" id="s-tab-1" onclick="goStep(1)"><div class="step__num">1</div>Project & Domain</div>
+  <div class="step__arr">›</div>
+  <div class="step" id="s-tab-2" onclick="goStep(2)"><div class="step__num">2</div>Personas</div>
+  <div class="step__arr">›</div>
+  <div class="step" id="s-tab-3" onclick="goStep(3)"><div class="step__num">3</div>Use Cases</div>
+  <div class="step__arr">›</div>
+  <div class="step" id="s-tab-4" onclick="goStep(4)"><div class="step__num">4</div>Volumetrics</div>
+  <div class="step__arr">›</div>
+  <div class="step" id="s-tab-5" onclick="goStep(5)"><div class="step__num">5</div>Domain Specifics</div>
+  <div class="step__arr">›</div>
+  <div class="step" id="s-tab-6" onclick="goStep(6)"><div class="step__num">6</div>Infrastructure</div>
+  <div class="step__arr">›</div>
+  <div class="step" id="s-tab-7" onclick="goStep(7)"><div class="step__num">7</div>Review & Export</div>
 </div>
 
-<div class="dc-body">
-<div class="dc-main">
+<div class="body">
+<div class="main">
 
-<!-- STEP 1: PROJECT & DOMAIN -->
-<div class="step-panel active" id="panel-1">
-  <div class="card">
-    <div class="card-title">Project & Domain</div>
-    <div class="card-sub">Define the project context and select the primary domain for this engagement</div>
+<!-- ── STEP 1 ── -->
+<div class="sp act" id="sp-1">
+<div class="card">
+  <div class="card-title">Project & Domain</div>
+  <div class="card-sub">Define the project context, select the domain, and set the architecture tier</div>
 
-    <div class="card-section">
-      <div class="section-label">Project Details</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="req">Project Name</label>
-          <input type="text" id="f-name" placeholder="e.g. MDoNER GeoAI Platform" oninput="syncField('name',this.value)">
-        </div>
-        <div class="form-group">
-          <label class="req">Customer / Organisation</label>
-          <input type="text" id="f-customer" placeholder="e.g. Ministry of DONER" oninput="syncField('customer',this.value)">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Opportunity Type</label>
-          <select id="f-opptype" onchange="syncField('opportunityType',this.value)">
-            <option value="standard">Standard</option>
-            <option value="strategic">Strategic / Flagship</option>
-            <option value="pilot">Pilot / POC</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Domain Complexity</label>
-          <select id="f-complexity" onchange="syncField('domainComplexity',this.value)">
-            <option value="single">Single Domain</option>
-            <option value="multi">Multi-Domain</option>
-            <option value="sovereign">Sovereign / National</option>
-          </select>
-        </div>
-      </div>
+  <div class="sec">
+    <div class="sec-label">Project Details</div>
+    <div class="row2">
+      <div class="fg"><label class="req">Project Name</label>
+        <input type="text" id="f-name" placeholder="e.g. MDoNER GeoAI Platform" oninput="P.name=this.value;sync()"></div>
+      <div class="fg"><label class="req">Customer / Organisation</label>
+        <input type="text" id="f-cust" placeholder="e.g. Ministry of DONER" oninput="P.customer=this.value;sync()"></div>
     </div>
-
-    <div class="card-section">
-      <div class="section-label">Primary Domain</div>
-      <div class="domain-cards">
-        <div class="domain-card geo" id="dc-geo" onclick="selectDomain('geospatial')">
-          <div class="domain-card__icon">🛰️</div>
-          <div class="domain-card__name">Geospatial AI</div>
-          <div class="domain-card__desc">Earth observation, satellite imagery analysis, mapping, GIS-enabled AI for civilian government and national agencies</div>
-          <div class="domain-card__check">✓</div>
-        </div>
-        <div class="domain-card def" id="dc-def" onclick="selectDomain('defence')">
-          <div class="domain-card__icon">🛡️</div>
-          <div class="domain-card__name">Defence & Security</div>
-          <div class="domain-card__desc">ISR, C4ISR integration, border surveillance, target detection and military intelligence for defence establishments</div>
-          <div class="domain-card__check">✓</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card-section">
-      <div class="section-label">Architecture Tier</div>
-      <div class="tier-cards">
-        <div class="tier-card" id="tc-C1" onclick="selectTier('C1')">
-          <div class="tier-card__code">C1</div>
-          <div class="tier-card__name">Edge</div>
-          <div class="tier-card__range">&lt;10 kW</div>
-        </div>
-        <div class="tier-card" id="tc-C2" onclick="selectTier('C2')">
-          <div class="tier-card__code">C2</div>
-          <div class="tier-card__name">Enterprise</div>
-          <div class="tier-card__range">10–80 kW</div>
-        </div>
-        <div class="tier-card" id="tc-C3" onclick="selectTier('C3')">
-          <div class="tier-card__code">C3</div>
-          <div class="tier-card__name">National</div>
-          <div class="tier-card__range">80 kW–1 MW</div>
-        </div>
-        <div class="tier-card" id="tc-C4" onclick="selectTier('C4')">
-          <div class="tier-card__code">C4</div>
-          <div class="tier-card__name">Hyperscale</div>
-          <div class="tier-card__range">1 MW+</div>
-        </div>
-      </div>
-      <div class="form-hint">Select the architecture tier that best matches the intended deployment scale</div>
-    </div>
-
-    <div class="step-nav">
-      <div></div>
-      <button class="btn btn-primary btn-lg" onclick="nextStep(1)">Next: Personas →</button>
+    <div class="row2">
+      <div class="fg"><label>Opportunity Type</label>
+        <select onchange="P.opportunityType=this.value;sync()">
+          <option value="standard">Standard</option>
+          <option value="strategic">Strategic / Flagship</option>
+          <option value="pilot">Pilot / POC</option>
+        </select></div>
+      <div class="fg"><label>Domain Complexity</label>
+        <select onchange="P.domainComplexity=this.value;sync()">
+          <option value="single">Single Domain</option>
+          <option value="multi">Multi-Domain</option>
+          <option value="sovereign">Sovereign / National</option>
+        </select></div>
     </div>
   </div>
-</div>
 
-<!-- STEP 2: PERSONAS -->
-<div class="step-panel" id="panel-2">
-  <div class="card">
-    <div class="card-title">Personas</div>
-    <div class="card-sub">Select all user personas who will interact with or benefit from the AI platform</div>
-    <div id="persona-count" class="selected-count">0 personas selected</div>
-    <div class="persona-list" id="persona-list"></div>
-    <div class="step-nav">
-      <button class="btn btn-outline" onclick="prevStep(2)">← Back</button>
-      <button class="btn btn-primary btn-lg" onclick="nextStep(2)">Next: Use Cases →</button>
+  <div class="sec">
+    <div class="sec-label">Primary Domain</div>
+    <div class="domain-grid">
+      <div class="domain-card geo" id="dc-geo" onclick="selDomain('geospatial')">
+        <div class="domain-card__icon">🛰️</div>
+        <div class="domain-card__name">Geospatial AI</div>
+        <div class="domain-card__desc">Earth observation, satellite imagery analysis, mapping and GIS-enabled AI for civilian government and national agencies</div>
+        <div class="domain-card__chk">✓</div>
+      </div>
+      <div class="domain-card def" id="dc-def" onclick="selDomain('defence')">
+        <div class="domain-card__icon">🛡️</div>
+        <div class="domain-card__name">Defence & Security</div>
+        <div class="domain-card__desc">ISR, C4ISR integration, border surveillance, target detection and military intelligence for defence establishments</div>
+        <div class="domain-card__chk">✓</div>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- STEP 3: USE CASES -->
-<div class="step-panel" id="panel-3">
-  <div class="card">
-    <div class="card-title">Use Cases</div>
-    <div class="card-sub">Select all AI use cases required for this deployment. Each use case influences hardware sizing and model requirements.</div>
-    <div id="uc-count" class="selected-count">0 use cases selected</div>
-    <div class="uc-filter" id="uc-filter"></div>
-    <div class="uc-list" id="uc-list"></div>
-    <div class="step-nav">
-      <button class="btn btn-outline" onclick="prevStep(3)">← Back</button>
-      <button class="btn btn-primary btn-lg" onclick="nextStep(3)">Next: Volumetrics →</button>
+  <div class="sec">
+    <div class="sec-label">Architecture Tier</div>
+    <div class="tier-grid">
+      <div class="tier-card" id="tc-C1" onclick="selTier('C1')"><div class="tier-card__code">C1</div><div class="tier-card__name">Edge</div><div class="tier-card__range">&lt;10 kW</div></div>
+      <div class="tier-card" id="tc-C2" onclick="selTier('C2')"><div class="tier-card__code">C2</div><div class="tier-card__name">Enterprise</div><div class="tier-card__range">10–80 kW</div></div>
+      <div class="tier-card" id="tc-C3" onclick="selTier('C3')"><div class="tier-card__code">C3</div><div class="tier-card__name">National</div><div class="tier-card__range">80 kW–1 MW</div></div>
+      <div class="tier-card" id="tc-C4" onclick="selTier('C4')"><div class="tier-card__code">C4</div><div class="tier-card__name">Hyperscale</div><div class="tier-card__range">1 MW+</div></div>
     </div>
+    <div class="hint">Select the tier that best matches the intended deployment scale</div>
+  </div>
+
+  <div class="step-nav"><div></div>
+    <button class="btn btn-primary btn-lg" onclick="nextStep(1)">Next: Personas →</button>
   </div>
 </div>
-
-<!-- STEP 4: VOLUMETRICS -->
-<div class="step-panel" id="panel-4">
-  <div class="card">
-    <div class="card-title">Volumetrics</div>
-    <div class="card-sub">Define the scale and throughput requirements. These figures drive hardware sizing in the Inferencing Factory.</div>
-
-    <div class="card-section">
-      <div class="section-label">Users & Concurrency</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Total Users</label>
-          <div class="input-with-unit">
-            <input type="number" id="f-totalUsers" placeholder="e.g. 500" min="1" oninput="syncVol('totalUsers',this.value)">
-            <div class="unit">users</div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Concurrent Users (peak)</label>
-          <div class="input-with-unit">
-            <input type="number" id="f-concurrentUsers" placeholder="e.g. 50" min="1" oninput="syncVol('concurrentUsers',this.value)">
-            <div class="unit">users</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card-section">
-      <div class="section-label">Data Processing</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Images / Scenes per Day</label>
-          <div class="input-with-unit">
-            <input type="number" id="f-imagesPerDay" placeholder="e.g. 1000" min="0" oninput="syncVol('imagesPerDay',this.value)">
-            <div class="unit">images/day</div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Data Ingested per Day</label>
-          <div class="input-with-unit">
-            <input type="number" id="f-dataPerDay" placeholder="e.g. 500" min="0" oninput="syncVol('dataIngestedPerDay',this.value)">
-            <div class="unit">GB/day</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card-section">
-      <div class="section-label">Inference Requirements</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Inference Requests per Second (peak)</label>
-          <div class="input-with-unit">
-            <input type="number" id="f-inferenceRPS" placeholder="e.g. 100" min="0" oninput="syncVol('inferenceRPS',this.value)">
-            <div class="unit">req/s</div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Acceptable Latency (p95)</label>
-          <div class="input-with-unit">
-            <input type="number" id="f-latency" placeholder="e.g. 500" min="0" oninput="syncVol('latencyP95ms',this.value)">
-            <div class="unit">ms</div>
-          </div>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Batch Processing Window</label>
-          <select id="f-batchWindow" onchange="syncVol('batchWindow',this.value)">
-            <option value="">— Select —</option>
-            <option value="realtime">Real-time (no batch)</option>
-            <option value="15min">15 minutes</option>
-            <option value="hourly">Hourly</option>
-            <option value="daily">Daily / overnight</option>
-            <option value="weekly">Weekly</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Data Retention Period</label>
-          <select id="f-retention" onchange="syncVol('dataRetention',this.value)">
-            <option value="">— Select —</option>
-            <option value="30days">30 days</option>
-            <option value="90days">90 days</option>
-            <option value="1year">1 year</option>
-            <option value="3years">3 years</option>
-            <option value="7years">7 years (regulatory)</option>
-            <option value="indefinite">Indefinite</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- VOLUMETRICS CHART -->
-    <div class="card-section">
-      <div class="section-label">Scale Profile</div>
-      <div class="chart-wrap">
-        <canvas id="volChart"></canvas>
-      </div>
-    </div>
-
-    <div class="step-nav">
-      <button class="btn btn-outline" onclick="prevStep(4)">← Back</button>
-      <button class="btn btn-primary btn-lg" onclick="nextStep(4)">Next: Domain Specifics →</button>
-    </div>
-  </div>
 </div>
 
-<!-- STEP 5: DOMAIN SPECIFICS -->
-<div class="step-panel" id="panel-5">
-  <div class="card">
-    <div class="card-title">Domain Specifics</div>
-    <div class="card-sub" id="domain-specifics-sub">Domain-specific configuration fields</div>
-    <div id="domain-specifics-content"></div>
-    <div class="step-nav">
-      <button class="btn btn-outline" onclick="prevStep(5)">← Back</button>
-      <button class="btn btn-primary btn-lg" onclick="nextStep(5)">Next: Infrastructure →</button>
+<!-- ── STEP 2 ── -->
+<div class="sp" id="sp-2">
+<div class="card">
+  <div class="card-title">Personas</div>
+  <div class="card-sub">Select all user personas who will interact with or benefit from the AI platform. Add custom personas as needed.</div>
+  <div class="cnt-badge" id="p-cnt">0 personas selected</div>
+  <div id="persona-list"></div>
+
+  <div style="margin-top:12px;">
+    <button class="btn btn-outline btn-sm" onclick="toggleAddPersona()">+ Add Custom Persona</button>
+  </div>
+  <div class="add-persona-form" id="add-persona-form">
+    <div class="sec-label" style="margin-bottom:10px">Custom Persona</div>
+    <div class="emoji-row" id="emoji-row"></div>
+    <div class="row2">
+      <div class="fg"><label class="req">Persona Name</label>
+        <input type="text" id="cp-name" placeholder="e.g. Policy Analyst"></div>
+      <div class="fg"><label>Technical Profile</label>
+        <select id="cp-profile">
+          <option value="business">Business / Non-technical</option>
+          <option value="analyst">Analyst / Semi-technical</option>
+          <option value="technical">Technical / IT</option>
+          <option value="engineer">Engineer / Data Scientist</option>
+        </select></div>
     </div>
+    <div class="fg"><label>Description</label>
+      <textarea id="cp-desc" placeholder="Describe this persona's role and how they use the AI platform"></textarea></div>
+    <div class="row2">
+      <div class="fg"><label>Primary Workload</label>
+        <select id="cp-workload">
+          <option value="realtime">Real-time / Interactive</option>
+          <option value="batch">Batch / Scheduled</option>
+          <option value="mixed">Mixed</option>
+        </select></div>
+      <div class="fg"><label>Latency Sensitivity</label>
+        <select id="cp-latency">
+          <option value="low">Low (hours acceptable)</option>
+          <option value="medium">Medium (minutes)</option>
+          <option value="high">High (seconds)</option>
+          <option value="critical">Critical (sub-second)</option>
+        </select></div>
+    </div>
+    <button class="btn btn-teal btn-sm" onclick="addCustomPersona()">Add Persona</button>
+    <button class="btn btn-outline btn-sm" onclick="toggleAddPersona()" style="margin-left:8px">Cancel</button>
+  </div>
+
+  <div class="step-nav">
+    <button class="btn btn-outline" onclick="prevStep(2)">← Back</button>
+    <button class="btn btn-primary btn-lg" onclick="nextStep(2)">Next: Use Cases →</button>
   </div>
 </div>
+</div>
 
-<!-- STEP 6: INFRASTRUCTURE -->
-<div class="step-panel" id="panel-6">
-  <div class="card">
-    <div class="card-title">Infrastructure Preferences</div>
-    <div class="card-sub">Define connectivity, resilience, and operational requirements</div>
+<!-- ── STEP 3 ── -->
+<div class="sp" id="sp-3">
+<div class="card">
+  <div class="card-title">Use Cases</div>
+  <div class="card-sub">Select all AI use cases required. Each use case shows the personas it serves. Filter by category or by selected personas.</div>
+  <div class="cnt-badge" id="uc-cnt">0 use cases selected</div>
+  <div class="uc-filters" id="uc-filters"></div>
+  <div id="uc-list"></div>
+  <div class="step-nav">
+    <button class="btn btn-outline" onclick="prevStep(3)">← Back</button>
+    <button class="btn btn-primary btn-lg" onclick="nextStep(3)">Next: Volumetrics →</button>
+  </div>
+</div>
+</div>
 
-    <div class="card-section">
-      <div class="section-label">Connectivity & Deployment</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Deployment Model</label>
-          <select id="f-deployment" onchange="syncInfra('deploymentModel',this.value)">
-            <option value="">— Select —</option>
-            <option value="onprem">On-Premises (air-gapped)</option>
-            <option value="onprem-connected">On-Premises (connected)</option>
-            <option value="private-cloud">Private Cloud</option>
-            <option value="hybrid">Hybrid</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Connectivity to HQ / Cloud</label>
-          <select id="f-connectivity" onchange="syncInfra('connectivity',this.value)">
-            <option value="">— Select —</option>
-            <option value="airgapped">Air-gapped (no external)</option>
-            <option value="leased-line">Leased Line / MPLS</option>
-            <option value="internet">Internet / VPN</option>
-            <option value="satellite">Satellite Link</option>
-            <option value="mixed">Mixed / Site-dependent</option>
-          </select>
-        </div>
-      </div>
+<!-- ── STEP 4 ── -->
+<div class="sp" id="sp-4">
+<div class="card">
+  <div class="card-title">Volumetrics — Per Persona</div>
+  <div class="card-sub">Define throughput and scale requirements for each selected persona. The system aggregates these to determine total platform load.</div>
+  <div class="alert alert-info">ℹ These figures feed directly into the AI Inferencing Factory for GPU and hardware sizing.</div>
+  <div id="vol-table-wrap"></div>
+
+  <div class="vol-agg" id="vol-agg">
+    <div class="vol-agg-title">Aggregated System Load</div>
+    <div class="vol-agg-grid">
+      <div class="vol-agg-item"><div class="vol-agg-val" id="agg-users">0</div><div class="vol-agg-lbl">Total Concurrent Users</div></div>
+      <div class="vol-agg-item"><div class="vol-agg-val" id="agg-rps">0</div><div class="vol-agg-lbl">Total Inference Req/s</div></div>
+      <div class="vol-agg-item"><div class="vol-agg-val" id="agg-lat">—</div><div class="vol-agg-lbl">Tightest Latency Req.</div></div>
     </div>
+  </div>
 
-    <div class="card-section">
-      <div class="section-label">Resilience & Availability</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Availability Requirement</label>
-          <select id="f-availability" onchange="syncInfra('availability',this.value)">
-            <option value="">— Select —</option>
-            <option value="99">99% (standard)</option>
-            <option value="99.5">99.5%</option>
-            <option value="99.9">99.9% (high availability)</option>
-            <option value="99.99">99.99% (mission-critical)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Disaster Recovery RTO</label>
-          <select id="f-rto" onchange="syncInfra('rto',this.value)">
-            <option value="">— Select —</option>
-            <option value="24h">24 hours</option>
-            <option value="4h">4 hours</option>
-            <option value="1h">1 hour</option>
-            <option value="15min">15 minutes</option>
-            <option value="immediate">Near-immediate (hot standby)</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Number of Sites</label>
-          <select id="f-sites" onchange="syncInfra('sites',this.value)">
-            <option value="">— Select —</option>
-            <option value="1">Single site</option>
-            <option value="2">2 sites (primary + DR)</option>
-            <option value="3-5">3–5 sites (hub + spokes)</option>
-            <option value="6-20">6–20 sites (regional)</option>
-            <option value="20+">20+ sites (national)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Hub-Spoke-Edge Architecture</label>
-          <select id="f-topology" onchange="syncInfra('topology',this.value)">
-            <option value="">— Select —</option>
-            <option value="single">Single node / flat</option>
-            <option value="hub-spoke">Hub and spoke</option>
-            <option value="hub-spoke-edge">Hub, spoke, and edge</option>
-            <option value="mesh">Mesh / federated</option>
-          </select>
-        </div>
-      </div>
+  <div class="sec" style="margin-top:20px;">
+    <div class="sec-label">Data Scale</div>
+    <div class="row3">
+      <div class="fg"><label>Images / Scenes per Day</label>
+        <div class="unit-wrap"><input type="number" id="f-img" placeholder="e.g. 1000" min="0" oninput="P.volumetrics.imagesPerDay=+this.value;syncAgg()">
+          <div class="unit">img/day</div></div></div>
+      <div class="fg"><label>Data Ingested per Day</label>
+        <div class="unit-wrap"><input type="number" id="f-data" placeholder="e.g. 500" min="0" oninput="P.volumetrics.dataGBPerDay=+this.value;syncAgg()">
+          <div class="unit">GB/day</div></div></div>
+      <div class="fg"><label>Data Retention</label>
+        <select onchange="P.volumetrics.retention=this.value">
+          <option value="">— Select —</option>
+          <option value="30d">30 days</option>
+          <option value="90d">90 days</option>
+          <option value="1y">1 year</option>
+          <option value="3y">3 years</option>
+          <option value="7y">7 years (regulatory)</option>
+          <option value="indefinite">Indefinite</option>
+        </select></div>
     </div>
-
-    <div class="card-section">
-      <div class="section-label">Security & Compliance</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Data Classification</label>
-          <select id="f-dataclass" onchange="syncInfra('dataClassification',this.value)">
-            <option value="">— Select —</option>
-            <option value="public">Public / Open</option>
-            <option value="restricted">Restricted</option>
-            <option value="confidential">Confidential</option>
-            <option value="secret">Secret</option>
-            <option value="top-secret">Top Secret</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Regulatory Framework</label>
-          <select id="f-regulatory" onchange="syncInfra('regulatoryFramework',this.value)">
-            <option value="">— Select —</option>
-            <option value="none">No specific framework</option>
-            <option value="meity">MeitY Guidelines</option>
-            <option value="cert-in">CERT-In Compliance</option>
-            <option value="nciipc">NCIIPC Requirements</option>
-            <option value="dpp">Defence Procurement Procedure</option>
-            <option value="bis">BIS Certification Required</option>
-          </select>
-        </div>
-      </div>
+    <div class="row2">
+      <div class="fg"><label>Batch Processing Window</label>
+        <select onchange="P.volumetrics.batchWindow=this.value">
+          <option value="">— Select —</option>
+          <option value="realtime">Real-time (no batch)</option>
+          <option value="15min">15 minutes</option>
+          <option value="hourly">Hourly</option>
+          <option value="daily">Daily / overnight</option>
+          <option value="weekly">Weekly</option>
+        </select></div>
+      <div class="fg"><label>Peak Load Period</label>
+        <select onchange="P.volumetrics.peakPeriod=this.value">
+          <option value="">— Select —</option>
+          <option value="business">Business hours only</option>
+          <option value="extended">Extended hours (07:00–22:00)</option>
+          <option value="247">24 × 7 (mission-critical)</option>
+          <option value="event">Event-driven (disaster response)</option>
+        </select></div>
     </div>
+  </div>
 
-    <div class="card-section">
-      <div class="section-label">Power & Physical</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Available Power (primary site)</label>
-          <div class="input-with-unit">
-            <input type="number" id="f-power" placeholder="e.g. 200" min="0" oninput="syncInfra('availablePowerKW',this.value)">
-            <div class="unit">kW</div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Cooling Preference</label>
-          <select id="f-cooling" onchange="syncInfra('coolingPreference',this.value)">
-            <option value="">— Select —</option>
-            <option value="air">Air cooling (standard)</option>
-            <option value="dlc">Direct Liquid Cooling (DLC)</option>
-            <option value="immersion">Immersion cooling</option>
-            <option value="mixed">Mixed (DLC + air)</option>
-          </select>
-        </div>
-      </div>
+  <!-- CHART -->
+  <div class="sec">
+    <div class="sec-label">Scale Profile</div>
+    <div class="chart-wrap"><canvas id="volChart"></canvas></div>
+  </div>
+
+  <div class="step-nav">
+    <button class="btn btn-outline" onclick="prevStep(4)">← Back</button>
+    <button class="btn btn-primary btn-lg" onclick="nextStep(4)">Next: Domain Specifics →</button>
+  </div>
+</div>
+</div>
+
+<!-- ── STEP 5 ── -->
+<div class="sp" id="sp-5">
+<div class="card">
+  <div class="card-title">Domain Specifics</div>
+  <div class="card-sub" id="ds-sub">Domain-specific configuration</div>
+  <div id="ds-content"></div>
+  <div class="step-nav">
+    <button class="btn btn-outline" onclick="prevStep(5)">← Back</button>
+    <button class="btn btn-primary btn-lg" onclick="nextStep(5)">Next: Infrastructure →</button>
+  </div>
+</div>
+</div>
+
+<!-- ── STEP 6 ── -->
+<div class="sp" id="sp-6">
+<div class="card">
+  <div class="card-title">Infrastructure — Site-wise Configuration</div>
+  <div class="card-sub">Define infrastructure requirements for each site in your deployment topology. Power requirements are computed from the BOM in the Inferencing Factory — not entered here.</div>
+  <div class="alert alert-warn">⚠ Power capacity is part of datacenter preparation and is not captured here. The Inferencing Factory BOM will compute the kW requirement per site based on selected hardware.</div>
+
+  <div class="sec">
+    <div class="sec-label">Deployment Topology</div>
+    <div class="row2">
+      <div class="fg"><label>Topology Type</label>
+        <select id="f-topo" onchange="P.infrastructure.topology=this.value;renderSiteTabs()">
+          <option value="">— Select —</option>
+          <option value="single">Single Site</option>
+          <option value="hub-spoke">Hub and Spoke</option>
+          <option value="hub-spoke-edge">Hub, Spoke, and Edge</option>
+          <option value="mesh">Mesh / Federated</option>
+        </select></div>
+      <div class="fg"><label>Number of Sites (total)</label>
+        <select onchange="P.infrastructure.totalSites=this.value">
+          <option value="">— Select —</option>
+          <option value="1">1 site</option>
+          <option value="2">2 sites</option>
+          <option value="3-5">3–5 sites</option>
+          <option value="6-20">6–20 sites</option>
+          <option value="20+">20+ sites</option>
+        </select></div>
     </div>
+  </div>
 
-    <div class="step-nav">
-      <button class="btn btn-outline" onclick="prevStep(6)">← Back</button>
-      <button class="btn btn-teal btn-lg" onclick="nextStep(6)">Review & Export →</button>
+  <div class="sec">
+    <div class="sec-label">Site-wise Configuration</div>
+    <div class="site-tabs" id="site-tabs"></div>
+    <div id="site-panels">
+      <div class="alert alert-info">ℹ Select a topology above to configure each site type.</div>
+    </div>
+  </div>
+
+  <div class="step-nav">
+    <button class="btn btn-outline" onclick="prevStep(6)">← Back</button>
+    <button class="btn btn-teal btn-lg" onclick="nextStep(6)">Review & Export →</button>
+  </div>
+</div>
+</div>
+
+<!-- ── STEP 7 ── -->
+<div class="sp" id="sp-7">
+<div class="card">
+  <div class="card-title">Review & Export</div>
+  <div class="card-sub">Review the complete Project Definition and export for use in the Inferencing Factory and Document Factory</div>
+  <div class="alert alert-ok">✅ Project Definition File is complete. Review and export when satisfied.</div>
+  <div class="sec"><div class="sec-label">Project Summary</div><div id="rev-summary"></div></div>
+  <div class="sec"><div class="sec-label">Use Case Coverage</div><div class="chart-wrap" style="height:260px"><canvas id="radarChart"></canvas></div></div>
+  <div class="sec"><div class="sec-label">Export</div>
+    <div class="out-grid">
+      <div class="out-card" onclick="exportJSON()"><div class="out-card__icon">📄</div><div class="out-card__lbl">Project Definition File</div><div class="out-card__desc">JSON for Inferencing Factory & Document Factory</div></div>
+      <div class="out-card" onclick="exportTxt()"><div class="out-card__icon">📋</div><div class="out-card__lbl">Requirements Summary</div><div class="out-card__desc">Plain text for sharing and sign-off</div></div>
+    </div>
+  </div>
+  <div class="sec"><div class="sec-label">JSON Preview</div><div class="json-out" id="json-prev"></div></div>
+  <div class="step-nav">
+    <button class="btn btn-outline" onclick="prevStep(7)">← Back</button>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-secondary" onclick="savePortal()">💾 Save to Portal</button>
+      <button class="btn btn-primary btn-lg" onclick="exportJSON()">⬇ Export JSON</button>
     </div>
   </div>
 </div>
-
-<!-- STEP 7: REVIEW & EXPORT -->
-<div class="step-panel" id="panel-7">
-  <div class="card">
-    <div class="card-title">Review & Export</div>
-    <div class="card-sub">Review the Project Definition and export for use in the Inferencing Factory and Document Factory</div>
-
-    <div class="alert alert-success">✅ Project Definition File is ready. Review below and export when satisfied.</div>
-
-    <!-- SUMMARY TABLE -->
-    <div class="card-section">
-      <div class="section-label">Project Summary</div>
-      <div id="review-summary"></div>
-    </div>
-
-    <!-- USE CASE RADAR -->
-    <div class="card-section">
-      <div class="section-label">Use Case Coverage</div>
-      <div class="chart-wrap" style="height:280px">
-        <canvas id="radarChart"></canvas>
-      </div>
-    </div>
-
-    <!-- EXPORT OPTIONS -->
-    <div class="card-section">
-      <div class="section-label">Export Options</div>
-      <div class="output-grid">
-        <div class="output-card" onclick="exportJSON()">
-          <div class="output-card__icon">📄</div>
-          <div class="output-card__label">Project Definition File</div>
-          <div class="output-card__desc">JSON file for Inferencing Factory and Document Factory</div>
-        </div>
-        <div class="output-card" onclick="exportSummaryTxt()">
-          <div class="output-card__icon">📋</div>
-          <div class="output-card__label">Requirements Summary</div>
-          <div class="output-card__desc">Plain text summary for sharing and review</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- JSON PREVIEW -->
-    <div class="card-section">
-      <div class="section-label">JSON Preview</div>
-      <div class="json-output" id="json-preview"></div>
-    </div>
-
-    <div class="step-nav">
-      <button class="btn btn-outline" onclick="prevStep(7)">← Back</button>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-secondary" onclick="saveToPortal()">💾 Save to Portal</button>
-        <button class="btn btn-primary btn-lg" onclick="exportJSON()">⬇ Export JSON</button>
-      </div>
-    </div>
-  </div>
 </div>
 
-</div><!-- /dc-main -->
+</div><!-- /main -->
 
 <!-- SIDEBAR -->
-<div class="dc-sidebar">
-
-  <!-- COMPLETION -->
-  <div class="sidebar-panel">
-    <div class="sidebar-panel__title">📊 Completion</div>
-    <div class="progress-ring">
-      <div class="progress-item">
-        <div class="progress-item__label"><span>Project & Domain</span><span class="progress-item__pct" id="p1-pct">0%</span></div>
-        <div class="progress-bar"><div class="progress-fill" id="p1-bar" style="width:0%"></div></div>
-      </div>
-      <div class="progress-item">
-        <div class="progress-item__label"><span>Personas</span><span class="progress-item__pct" id="p2-pct">0%</span></div>
-        <div class="progress-bar"><div class="progress-fill blue" id="p2-bar" style="width:0%"></div></div>
-      </div>
-      <div class="progress-item">
-        <div class="progress-item__label"><span>Use Cases</span><span class="progress-item__pct" id="p3-pct">0%</span></div>
-        <div class="progress-bar"><div class="progress-fill orange" id="p3-bar" style="width:0%"></div></div>
-      </div>
-      <div class="progress-item">
-        <div class="progress-item__label"><span>Volumetrics</span><span class="progress-item__pct" id="p4-pct">0%</span></div>
-        <div class="progress-bar"><div class="progress-fill" id="p4-bar" style="width:0%"></div></div>
-      </div>
-      <div class="progress-item">
-        <div class="progress-item__label"><span>Infrastructure</span><span class="progress-item__pct" id="p6-pct">0%</span></div>
-        <div class="progress-bar"><div class="progress-fill blue" id="p6-bar" style="width:0%"></div></div>
-      </div>
-    </div>
+<div class="sidebar">
+  <div class="sb-panel">
+    <div class="sb-title">📊 Completion</div>
+    <div class="prog-item"><div class="prog-lbl"><span>Project & Domain</span><span id="pr1">0%</span></div><div class="prog-bar"><div class="prog-fill" id="pb1" style="width:0"></div></div></div>
+    <div class="prog-item"><div class="prog-lbl"><span>Personas</span><span id="pr2">0%</span></div><div class="prog-bar"><div class="prog-fill b" id="pb2" style="width:0"></div></div></div>
+    <div class="prog-item"><div class="prog-lbl"><span>Use Cases</span><span id="pr3">0%</span></div><div class="prog-bar"><div class="prog-fill o" id="pb3" style="width:0"></div></div></div>
+    <div class="prog-item"><div class="prog-lbl"><span>Volumetrics</span><span id="pr4">0%</span></div><div class="prog-bar"><div class="prog-fill" id="pb4" style="width:0"></div></div></div>
+    <div class="prog-item"><div class="prog-lbl"><span>Infrastructure</span><span id="pr6">0%</span></div><div class="prog-bar"><div class="prog-fill b" id="pb6" style="width:0"></div></div></div>
   </div>
-
-  <!-- LIVE SUMMARY -->
-  <div class="sidebar-panel">
-    <div class="sidebar-panel__title">📝 Project Summary</div>
-    <div id="live-summary">
-      <div style="font-size:12px;color:var(--mid);text-align:center;padding:12px">Fill in Step 1 to see summary</div>
-    </div>
+  <div class="sb-panel">
+    <div class="sb-title">📝 Summary</div>
+    <div id="sb-sum"><div style="font-size:12px;color:var(--mid);text-align:center;padding:10px">Fill Step 1 to see summary</div></div>
   </div>
-
-  <!-- SELECTED USE CASES -->
-  <div class="sidebar-panel" id="uc-sidebar" style="display:none">
-    <div class="sidebar-panel__title">⚡ Selected Use Cases</div>
-    <div id="uc-sidebar-list"></div>
+  <div class="sb-panel" id="sb-uc-panel" style="display:none">
+    <div class="sb-title">⚡ Selected Use Cases</div>
+    <div id="sb-uc-list"></div>
   </div>
-
 </div>
-</div><!-- /dc-body -->
+</div><!-- /body -->
 
 <script>
-// ── DATA STORE ────────────────────────────────────────────────
-const project = {
-  meta: { id: 'proj_' + Date.now(), version: '1.0', createdAt: new Date().toISOString(), tool: 'ATLAS Domain Configurator v1.0' },
-  name: '', customer: '', opportunityType: 'standard', domainComplexity: 'single',
-  domain: '', tier: '',
-  personas: [],
-  useCases: [],
-  volumetrics: {},
-  domainSpecifics: {},
-  infrastructure: {}
+// ── PROJECT STATE ─────────────────────────────────────────────
+const P = {
+  meta:{ id:'proj_'+Date.now(), version:'2.0', tool:'ATLAS Domain Configurator v2.0', createdAt:new Date().toISOString() },
+  name:'', customer:'', opportunityType:'standard', domainComplexity:'single',
+  domain:'', tier:'',
+  personas:[],          // [{id,icon,name,desc,profile,workload,latency,custom}]
+  useCases:[],          // [id,...]
+  volumetrics:{
+    byPersona:{},       // {personaId:{concurrentUsers,inferenceRPS,latencyMs,notes}}
+    imagesPerDay:null, dataGBPerDay:null, retention:'', batchWindow:'', peakPeriod:''
+  },
+  domainSpecifics:{
+    satelliteSources:[] // [{name,resolution,revisit,bands,dailyGB}]
+  },
+  infrastructure:{
+    topology:'', totalSites:'',
+    sites:{}            // {hub:{...},spoke:{...},edge:{...}}
+  }
 }
 
 // ── REFERENCE DATA ────────────────────────────────────────────
-const PERSONAS = {
-  geospatial: [
-    { id: 'analyst', icon: '🔍', name: 'Geospatial Analyst', desc: 'Analyses satellite and aerial imagery for insights and change detection' },
-    { id: 'planner', icon: '🗺️', name: 'Urban / Regional Planner', desc: 'Uses AI-generated maps and analysis for land use and development planning' },
-    { id: 'disaster', icon: '🚨', name: 'Disaster Management Officer', desc: 'Uses real-time AI analysis for flood, fire, and disaster response coordination' },
-    { id: 'agri', icon: '🌾', name: 'Agriculture Officer', desc: 'Monitors crop health, soil conditions, and yield predictions via satellite data' },
-    { id: 'forest', icon: '🌳', name: 'Forest / Environment Officer', desc: 'Tracks deforestation, forest cover change, and environmental compliance' },
-    { id: 'infra', icon: '🏗️', name: 'Infrastructure Manager', desc: 'Monitors pipelines, roads, and civil infrastructure via satellite surveillance' },
-    { id: 'ministry', icon: '🏛️', name: 'Ministry / Policy Official', desc: 'Consumes reports and dashboards for policy decisions and fund allocation' },
-    { id: 'data-sci', icon: '💻', name: 'Data Scientist / ML Engineer', desc: 'Trains, fine-tunes, and deploys AI models for geospatial tasks' }
+const DEFAULT_PERSONAS = {
+  geospatial:[
+    {id:'geo-analyst',icon:'🔍',name:'Geospatial Analyst',desc:'Analyses satellite and aerial imagery for insights and change detection',profile:'analyst',workload:'batch',latency:'medium'},
+    {id:'geo-planner',icon:'🗺️',name:'Urban / Regional Planner',desc:'Uses AI-generated maps and analysis for land use and development planning',profile:'analyst',workload:'batch',latency:'low'},
+    {id:'geo-disaster',icon:'🚨',name:'Disaster Management Officer',desc:'Uses real-time AI analysis for flood, fire, and disaster response coordination',profile:'analyst',workload:'realtime',latency:'critical'},
+    {id:'geo-agri',icon:'🌾',name:'Agriculture Officer',desc:'Monitors crop health, soil conditions, and yield predictions via satellite data',profile:'business',workload:'batch',latency:'low'},
+    {id:'geo-forest',icon:'🌳',name:'Forest / Environment Officer',desc:'Tracks deforestation, forest cover change, and environmental compliance',profile:'analyst',workload:'batch',latency:'low'},
+    {id:'geo-infra',icon:'🏗️',name:'Infrastructure Manager',desc:'Monitors pipelines, roads, and civil infrastructure via satellite surveillance',profile:'analyst',workload:'mixed',latency:'medium'},
+    {id:'geo-ministry',icon:'🏛️',name:'Ministry / Policy Official',desc:'Consumes reports and dashboards for policy decisions and fund allocation',profile:'business',workload:'batch',latency:'low'},
+    {id:'geo-mleng',icon:'💻',name:'Data Scientist / ML Engineer',desc:'Trains, fine-tunes, and deploys AI models for geospatial tasks',profile:'engineer',workload:'mixed',latency:'medium'}
   ],
-  defence: [
-    { id: 'isr-analyst', icon: '👁️', name: 'ISR Analyst', desc: 'Analyses intelligence, surveillance, and reconnaissance data from multiple sensors' },
-    { id: 'ops-commander', icon: '⭐', name: 'Operations Commander', desc: 'Uses AI-generated threat assessments and situational awareness dashboards' },
-    { id: 'signals', icon: '📡', name: 'Signals Intelligence Officer', desc: 'Processes electronic and signals intelligence with AI-assisted pattern detection' },
-    { id: 'logistics', icon: '📦', name: 'Logistics Officer', desc: 'Optimises supply chain, maintenance schedules, and asset tracking via AI' },
-    { id: 'cyber', icon: '🔒', name: 'Cyber Intelligence Analyst', desc: 'Uses AI for threat detection, anomaly identification, and network monitoring' },
-    { id: 'uav', icon: '🚁', name: 'UAV / Drone Operator', desc: 'Operates AI-assisted drone surveillance and autonomous mission planning' },
-    { id: 'terrain', icon: '🗻', name: 'Terrain & Mapping Specialist', desc: 'Uses AI for terrain analysis, route planning, and 3D mapping from satellite data' },
-    { id: 'ml-eng-def', icon: '🔬', name: 'AI/ML Engineer (Defence)', desc: 'Develops and maintains AI models in a secure, air-gapped environment' }
+  defence:[
+    {id:'def-isr',icon:'👁️',name:'ISR Analyst',desc:'Analyses intelligence, surveillance, and reconnaissance data from multiple sensors',profile:'analyst',workload:'realtime',latency:'critical'},
+    {id:'def-cmd',icon:'⭐',name:'Operations Commander',desc:'Uses AI-generated threat assessments and situational awareness dashboards',profile:'business',workload:'realtime',latency:'high'},
+    {id:'def-sig',icon:'📡',name:'Signals Intelligence Officer',desc:'Processes electronic and signals intelligence with AI-assisted pattern detection',profile:'analyst',workload:'realtime',latency:'high'},
+    {id:'def-log',icon:'📦',name:'Logistics Officer',desc:'Optimises supply chain, maintenance schedules, and asset tracking via AI',profile:'analyst',workload:'batch',latency:'low'},
+    {id:'def-cyber',icon:'🔒',name:'Cyber Intelligence Analyst',desc:'Uses AI for threat detection, anomaly identification, and network monitoring',profile:'technical',workload:'realtime',latency:'high'},
+    {id:'def-uav',icon:'🚁',name:'UAV / Drone Operator',desc:'Operates AI-assisted drone surveillance and autonomous mission planning',profile:'technical',workload:'realtime',latency:'critical'},
+    {id:'def-terrain',icon:'🗻',name:'Terrain & Mapping Specialist',desc:'Uses AI for terrain analysis, route planning, and 3D mapping',profile:'analyst',workload:'mixed',latency:'medium'},
+    {id:'def-mleng',icon:'🔬',name:'AI/ML Engineer (Defence)',desc:'Develops and maintains AI models in a secure, air-gapped environment',profile:'engineer',workload:'mixed',latency:'medium'}
   ]
 }
 
 const USE_CASES = {
-  geospatial: [
-    { id: 'sat-image', name: 'Satellite Image Analysis', desc: 'Automated classification and analysis of multispectral satellite imagery', model: 'Vision Transformer', workload: 'Batch + Real-time', latency: 'Medium', category: 'Core' },
-    { id: 'change-det', name: 'Change Detection', desc: 'Temporal analysis to detect land use change, construction, deforestation', model: 'CNN / ViT', workload: 'Batch', latency: 'Low', category: 'Core' },
-    { id: 'crop-monitor', name: 'Crop Health Monitoring', desc: 'NDVI-based crop stress detection, yield estimation, disease identification', model: 'Spectral CNN', workload: 'Batch', latency: 'Low', category: 'Agriculture' },
-    { id: 'flood-map', name: 'Flood Mapping & Prediction', desc: 'Near real-time flood extent mapping from SAR and optical imagery', model: 'Semantic Segmentation', workload: 'Real-time', latency: 'High', category: 'Disaster' },
-    { id: 'urban-sprawl', name: 'Urban Sprawl Detection', desc: 'Automated urban growth tracking and encroachment identification', model: 'CNN Classifier', workload: 'Batch', latency: 'Low', category: 'Urban' },
-    { id: 'road-extract', name: 'Road Network Extraction', desc: 'Automated extraction and updating of road networks from satellite imagery', model: 'U-Net', workload: 'Batch', latency: 'Low', category: 'Infrastructure' },
-    { id: 'disaster-assess', name: 'Disaster Damage Assessment', desc: 'Post-event damage assessment for buildings, infrastructure, and agriculture', model: 'Change Detection CNN', workload: 'Real-time', latency: 'High', category: 'Disaster' },
-    { id: 'forest-cover', name: 'Forest Cover Analysis', desc: 'Tree cover mapping, deforestation alerts, carbon stock estimation', model: 'Random Forest + DL', workload: 'Batch', latency: 'Low', category: 'Environment' },
-    { id: 'pipeline-mon', name: 'Pipeline / Infrastructure Monitoring', desc: 'AI-based anomaly detection for pipelines, power lines, and critical infrastructure', model: 'Anomaly Detection', workload: 'Batch', latency: 'Medium', category: 'Infrastructure' },
-    { id: 'soil-health', name: 'Soil Health Mapping', desc: 'Soil type classification, moisture estimation, and fertility mapping', model: 'Spectral Analysis ML', workload: 'Batch', latency: 'Low', category: 'Agriculture' }
+  geospatial:[
+    {id:'geo-sat',name:'Satellite Image Analysis',desc:'Automated classification and analysis of multispectral satellite imagery',model:'Vision Transformer',workload:'Batch+RT',latency:'Medium',category:'Core',personas:['geo-analyst','geo-mleng']},
+    {id:'geo-chg',name:'Change Detection',desc:'Temporal analysis to detect land use change, construction, deforestation',model:'CNN / ViT',workload:'Batch',latency:'Low',category:'Core',personas:['geo-analyst','geo-forest','geo-planner']},
+    {id:'geo-crop',name:'Crop Health Monitoring',desc:'NDVI-based crop stress detection, yield estimation, disease identification',model:'Spectral CNN',workload:'Batch',latency:'Low',category:'Agriculture',personas:['geo-agri']},
+    {id:'geo-flood',name:'Flood Mapping & Prediction',desc:'Near real-time flood extent mapping from SAR and optical imagery',model:'Semantic Segmentation',workload:'Real-time',latency:'Critical',category:'Disaster',personas:['geo-disaster','geo-ministry']},
+    {id:'geo-urban',name:'Urban Sprawl Detection',desc:'Automated urban growth tracking and encroachment identification',model:'CNN Classifier',workload:'Batch',latency:'Low',category:'Urban',personas:['geo-planner','geo-ministry']},
+    {id:'geo-road',name:'Road Network Extraction',desc:'Automated extraction and updating of road networks from satellite imagery',model:'U-Net',workload:'Batch',latency:'Low',category:'Infrastructure',personas:['geo-infra','geo-planner']},
+    {id:'geo-damage',name:'Disaster Damage Assessment',desc:'Post-event damage assessment for buildings, infrastructure, and agriculture',model:'Change Detection CNN',workload:'Real-time',latency:'Critical',category:'Disaster',personas:['geo-disaster','geo-ministry']},
+    {id:'geo-forest',name:'Forest Cover Analysis',desc:'Tree cover mapping, deforestation alerts, carbon stock estimation',model:'Random Forest + DL',workload:'Batch',latency:'Low',category:'Environment',personas:['geo-forest']},
+    {id:'geo-pipe',name:'Pipeline / Infrastructure Monitoring',desc:'AI-based anomaly detection for pipelines, power lines, and critical infrastructure',model:'Anomaly Detection',workload:'Batch',latency:'Medium',category:'Infrastructure',personas:['geo-infra']},
+    {id:'geo-soil',name:'Soil Health Mapping',desc:'Soil type classification, moisture estimation, and fertility mapping',model:'Spectral ML',workload:'Batch',latency:'Low',category:'Agriculture',personas:['geo-agri']}
   ],
-  defence: [
-    { id: 'isr-auto', name: 'ISR Automation', desc: 'Automated processing and prioritisation of ISR data from multiple sources', model: 'Multi-Modal Fusion', workload: 'Real-time', latency: 'Critical', category: 'Core ISR' },
-    { id: 'target-det', name: 'Target Detection & Classification', desc: 'AI-based identification and classification of vehicles, installations, and personnel', model: 'Object Detection CNN', workload: 'Real-time', latency: 'Critical', category: 'Core ISR' },
-    { id: 'border-surv', name: 'Border Surveillance', desc: 'Continuous AI monitoring of border areas with automated alert generation', model: 'Anomaly Detection', workload: 'Real-time', latency: 'High', category: 'Surveillance' },
-    { id: 'uav-analysis', name: 'UAV Image Analysis', desc: 'Real-time processing of video and imagery from unmanned aerial systems', model: 'Video CNN', workload: 'Real-time', latency: 'Critical', category: 'Core ISR' },
-    { id: 'terrain-ai', name: 'Terrain Analysis & Route Planning', desc: 'AI-assisted terrain classification, obstacle detection, and optimal route generation', model: 'GeoSpatial ML', workload: 'Batch + Real-time', latency: 'Medium', category: 'Operations' },
-    { id: 'threat-class', name: 'Threat Classification', desc: 'Multi-source fusion for automated threat level assessment and classification', model: 'Ensemble Classifier', workload: 'Real-time', latency: 'Critical', category: 'Core ISR' },
-    { id: 'log-optim', name: 'Logistics Optimisation', desc: 'AI-driven supply chain optimisation, predictive maintenance scheduling', model: 'Reinforcement Learning', workload: 'Batch', latency: 'Low', category: 'Operations' },
-    { id: 'pred-maint', name: 'Predictive Maintenance', desc: 'Equipment failure prediction for vehicles, aircraft, and weapons systems', model: 'Time Series LSTM', workload: 'Continuous', latency: 'Medium', category: 'Operations' },
-    { id: 'c4isr', name: 'C4ISR Integration', desc: 'AI layer over command, control, communications, and intelligence systems', model: 'Multi-Modal LLM', workload: 'Real-time', latency: 'High', category: 'Command' },
-    { id: 'anomaly-det', name: 'Anomaly Detection', desc: 'Detection of unusual patterns in sensor data, network traffic, and behaviour', model: 'Autoencoder / Statistical', workload: 'Real-time', latency: 'High', category: 'Surveillance' }
+  defence:[
+    {id:'def-isr-auto',name:'ISR Automation',desc:'Automated processing and prioritisation of ISR data from multiple sources',model:'Multi-Modal Fusion',workload:'Real-time',latency:'Critical',category:'Core ISR',personas:['def-isr','def-cmd']},
+    {id:'def-target',name:'Target Detection & Classification',desc:'AI-based identification and classification of vehicles, installations, personnel',model:'Object Detection CNN',workload:'Real-time',latency:'Critical',category:'Core ISR',personas:['def-isr','def-uav']},
+    {id:'def-border',name:'Border Surveillance',desc:'Continuous AI monitoring of border areas with automated alert generation',model:'Anomaly Detection',workload:'Real-time',latency:'High',category:'Surveillance',personas:['def-isr','def-cmd']},
+    {id:'def-uav-analysis',name:'UAV Image Analysis',desc:'Real-time processing of video and imagery from unmanned aerial systems',model:'Video CNN',workload:'Real-time',latency:'Critical',category:'Core ISR',personas:['def-uav','def-isr']},
+    {id:'def-terrain',name:'Terrain Analysis & Route Planning',desc:'AI-assisted terrain classification, obstacle detection, and route generation',model:'GeoSpatial ML',workload:'Batch+RT',latency:'Medium',category:'Operations',personas:['def-terrain','def-cmd']},
+    {id:'def-threat',name:'Threat Classification',desc:'Multi-source fusion for automated threat level assessment and classification',model:'Ensemble Classifier',workload:'Real-time',latency:'Critical',category:'Core ISR',personas:['def-isr','def-cmd','def-sig']},
+    {id:'def-log',name:'Logistics Optimisation',desc:'AI-driven supply chain optimisation, predictive maintenance scheduling',model:'Reinforcement Learning',workload:'Batch',latency:'Low',category:'Operations',personas:['def-log']},
+    {id:'def-maint',name:'Predictive Maintenance',desc:'Equipment failure prediction for vehicles, aircraft, and weapons systems',model:'Time Series LSTM',workload:'Continuous',latency:'Medium',category:'Operations',personas:['def-log']},
+    {id:'def-c4isr',name:'C4ISR Integration',desc:'AI layer over command, control, communications, and intelligence systems',model:'Multi-Modal LLM',workload:'Real-time',latency:'High',category:'Command',personas:['def-cmd','def-isr','def-sig']},
+    {id:'def-anomaly',name:'Anomaly Detection',desc:'Detection of unusual patterns in sensor data, network traffic, and behaviour',model:'Autoencoder',workload:'Real-time',latency:'High',category:'Surveillance',personas:['def-cyber','def-sig']}
   ]
 }
 
-// ── STATE ─────────────────────────────────────────────────────
-let currentStep = 1
-let volChartInst = null, radarChartInst = null
+// ── STEP NAV ──────────────────────────────────────────────────
+let curStep = 1
+let volChartInst = null, radarInst = null
+let selectedEmoji = '👤'
 
-// ── FIELD SYNC ────────────────────────────────────────────────
-function syncField(key, val) {
-  project[key] = val
-  updateSidebar()
-  updateProgress()
+function goStep(n){
+  curStep = n
+  document.querySelectorAll('.sp').forEach(el=>el.classList.remove('act'))
+  document.getElementById('sp-'+n).classList.add('act')
+  document.querySelectorAll('.step').forEach((el,i)=>{
+    el.classList.remove('active','done')
+    if(i+1===n) el.classList.add('active')
+    else if(i+1<n) el.classList.add('done')
+  })
+  if(n===2) renderPersonas()
+  if(n===3) renderUCs()
+  if(n===4){renderVolTable();setTimeout(drawVolChart,150)}
+  if(n===5) renderDS()
+  if(n===7) renderReview()
+  window.scrollTo(0,0)
 }
 
-function syncVol(key, val) {
-  project.volumetrics[key] = val === '' ? null : Number(val) || val
-  updateProgress()
-  updateVolChart()
+function nextStep(cur){
+  if(cur===1){
+    if(!P.name){alert('Kindly enter a project name.');return}
+    if(!P.domain){alert('Kindly select a domain.');return}
+    if(!P.tier){alert('Kindly select an architecture tier.');return}
+  }
+  if(cur===2&&P.personas.length===0){if(!confirm('No personas selected. Continue anyway?'))return}
+  if(cur===3&&P.useCases.length===0){if(!confirm('No use cases selected. Continue anyway?'))return}
+  goStep(cur+1)
+}
+function prevStep(cur){goStep(cur-1)}
+
+// ── DOMAIN / TIER ─────────────────────────────────────────────
+function selDomain(d){
+  P.domain=d; P.personas=[]; P.useCases=[]
+  document.querySelectorAll('.domain-card').forEach(el=>el.classList.remove('sel'))
+  document.getElementById('dc-'+(d==='geospatial'?'geo':'def')).classList.add('sel')
+  sync()
 }
 
-function syncInfra(key, val) {
-  project.infrastructure[key] = val
-  updateProgress()
-}
-
-function syncDomSpec(key, val) {
-  project.domainSpecifics[key] = val
-}
-
-// ── DOMAIN SELECTION ─────────────────────────────────────────
-function selectDomain(domain) {
-  project.domain = domain
-  document.querySelectorAll('.domain-card').forEach(el => el.classList.remove('selected'))
-  document.getElementById('dc-' + (domain === 'geospatial' ? 'geo' : 'def')).classList.add('selected')
-  updateSidebar()
-  updateProgress()
-  renderPersonas()
-  renderUseCases()
-  renderDomainSpecifics()
-}
-
-// ── TIER SELECTION ────────────────────────────────────────────
-function selectTier(tier) {
-  project.tier = tier
-  document.querySelectorAll('.tier-card').forEach(el => el.classList.remove('selected'))
-  document.getElementById('tc-' + tier).classList.add('selected')
-  updateSidebar()
-  updateProgress()
+function selTier(t){
+  P.tier=t
+  document.querySelectorAll('.tier-card').forEach(el=>el.classList.remove('sel'))
+  document.getElementById('tc-'+t).classList.add('sel')
+  sync()
 }
 
 // ── PERSONAS ──────────────────────────────────────────────────
-function renderPersonas() {
-  const domain = project.domain || 'geospatial'
-  const list = PERSONAS[domain] || []
+function renderPersonas(){
+  const domain = P.domain||'geospatial'
+  const defaults = DEFAULT_PERSONAS[domain]||[]
+  const allPersonas = [...defaults, ...P.personas.filter(p=>p.custom)]
   const container = document.getElementById('persona-list')
-  container.innerHTML = list.map(p => `
-    <div class="persona-item ${project.personas.includes(p.id) ? 'selected' : ''}" onclick="togglePersona('${p.id}')">
+  container.innerHTML = allPersonas.map(p=>`
+    <div class="persona-item ${P.personas.find(x=>x.id===p.id)?'sel':''}" onclick="togglePersona('${p.id}')">
       <div class="persona-icon">${p.icon}</div>
       <div class="persona-info">
-        <div class="persona-name">${p.name}</div>
+        <div class="persona-name">${p.name}${p.custom?` <span class="badge b-blue">Custom</span>`:''}</div>
         <div class="persona-desc">${p.desc}</div>
+        <div style="margin-top:4px;display:flex;gap:6px">
+          <span class="badge b-navy">${p.workload}</span>
+          <span class="badge b-teal">${p.latency} latency</span>
+        </div>
       </div>
-      <div class="persona-check"></div>
+      <div class="persona-chk">✓</div>
+      ${p.custom?`<button class="btn-icon" onclick="event.stopPropagation();removeCustomPersona('${p.id}')">✕</button>`:''}
     </div>`).join('')
-  updatePersonaCount()
+  updatePersonaCnt()
 }
 
-function togglePersona(id) {
-  const idx = project.personas.indexOf(id)
-  if (idx > -1) project.personas.splice(idx, 1)
-  else project.personas.push(id)
+function togglePersona(id){
+  const domain = P.domain||'geospatial'
+  const defaults = DEFAULT_PERSONAS[domain]||[]
+  const all = [...defaults,...P.personas.filter(p=>p.custom)]
+  const p = all.find(x=>x.id===id)
+  if(!p) return
+  const idx = P.personas.findIndex(x=>x.id===id)
+  if(idx>-1) P.personas.splice(idx,1)
+  else P.personas.push(p)
   renderPersonas()
-  updateProgress()
+  renderVolTable()
+  sync()
 }
 
-function updatePersonaCount() {
-  const el = document.getElementById('persona-count')
-  const n = project.personas.length
-  el.textContent = n + ' persona' + (n !== 1 ? 's' : '') + ' selected'
+function updatePersonaCnt(){
+  const n=P.personas.length
+  document.getElementById('p-cnt').textContent=n+' persona'+(n!==1?'s':'')+' selected'
+}
+
+function toggleAddPersona(){
+  const f=document.getElementById('add-persona-form')
+  f.classList.toggle('open')
+}
+
+function addCustomPersona(){
+  const name=document.getElementById('cp-name').value.trim()
+  if(!name){alert('Kindly enter a persona name.');return}
+  const p={
+    id:'custom_'+Date.now(), icon:selectedEmoji, name,
+    desc:document.getElementById('cp-desc').value.trim()||'Custom persona',
+    profile:document.getElementById('cp-profile').value,
+    workload:document.getElementById('cp-workload').value,
+    latency:document.getElementById('cp-latency').value,
+    custom:true
+  }
+  P.personas.push(p)
+  document.getElementById('cp-name').value=''
+  document.getElementById('cp-desc').value=''
+  document.getElementById('add-persona-form').classList.remove('open')
+  renderPersonas()
+  renderVolTable()
+  sync()
+}
+
+function removeCustomPersona(id){
+  P.personas = P.personas.filter(p=>p.id!==id)
+  renderPersonas()
+  renderVolTable()
+  sync()
+}
+
+// Emoji picker
+const EMOJIS=['👤','👩‍💼','👨‍💼','🧑‍💻','👩‍🔬','👨‍🔬','🧑‍✈️','👮','🧑‍🌾','🧑‍🏭','🧑‍⚕️','🎖️','🧑‍💼','📊','🔭','🛡️']
+window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('emoji-row').innerHTML = EMOJIS.map(e=>
+    `<div class="emoji-btn ${e===selectedEmoji?'sel':''}" onclick="pickEmoji('${e}')">${e}</div>`
+  ).join('')
+  sync()
+})
+function pickEmoji(e){
+  selectedEmoji=e
+  document.querySelectorAll('.emoji-btn').forEach(el=>{el.classList.remove('sel');if(el.textContent===e)el.classList.add('sel')})
 }
 
 // ── USE CASES ─────────────────────────────────────────────────
-let ucFilter = 'All'
+let ucFilter='All'
 
-function renderUseCases() {
-  const domain = project.domain || 'geospatial'
-  const ucs = USE_CASES[domain] || []
-  const cats = ['All', ...new Set(ucs.map(u => u.category))]
+function renderUCs(){
+  const domain = P.domain||'geospatial'
+  const ucs = USE_CASES[domain]||[]
+  const cats = ['All','Persona-Relevant',...new Set(ucs.map(u=>u.category))]
+  const selPersonaIds = P.personas.map(p=>p.id)
 
-  // Filters
-  document.getElementById('uc-filter').innerHTML = cats.map(c =>
-    `<div class="filter-btn ${ucFilter === c ? 'active' : ''}" onclick="setUcFilter('${c}')">${c}</div>`
+  document.getElementById('uc-filters').innerHTML = cats.map(c=>
+    `<div class="f-btn ${ucFilter===c?'act':''}" onclick="setUCFilter('${c}')">${c}</div>`
   ).join('')
 
-  // List
-  const filtered = ucFilter === 'All' ? ucs : ucs.filter(u => u.category === ucFilter)
-  document.getElementById('uc-list').innerHTML = filtered.map(u => `
-    <div class="uc-item ${project.useCases.includes(u.id) ? 'selected' : ''}" onclick="toggleUC('${u.id}')">
-      <div class="uc-check"></div>
-      <div class="uc-info">
+  let filtered = ucs
+  if(ucFilter==='Persona-Relevant' && selPersonaIds.length>0)
+    filtered = ucs.filter(u=>u.personas.some(pid=>selPersonaIds.includes(pid)))
+  else if(ucFilter!=='All' && ucFilter!=='Persona-Relevant')
+    filtered = ucs.filter(u=>u.category===ucFilter)
+
+  const selPersonaNames = P.personas.map(p=>p.name)
+  document.getElementById('uc-list').innerHTML = filtered.map(u=>{
+    const relPersonas = (DEFAULT_PERSONAS[domain]||[]).filter(p=>u.personas.includes(p.id)).map(p=>p.name)
+    const relCustom = P.personas.filter(p=>p.custom && u.personas.includes(p.id)).map(p=>p.name)
+    const allRel = [...relPersonas,...relCustom]
+    return `
+    <div class="uc-item ${P.useCases.includes(u.id)?'sel':''}" onclick="toggleUC('${u.id}')">
+      <div class="uc-chk">✓</div>
+      <div class="uc-body">
         <div class="uc-name">${u.name}</div>
         <div class="uc-desc">${u.desc}</div>
-        <div class="uc-tags">
-          <span class="tag model">🤖 ${u.model}</span>
-          <span class="tag workload">⚡ ${u.workload}</span>
-          <span class="tag latency">⏱ ${u.latency} priority</span>
+        ${allRel.length>0?`<div class="uc-personas">👥 Serves: ${allRel.join(', ')}</div>`:''}
+        <div class="tags">
+          <span class="tag tag-model">🤖 ${u.model}</span>
+          <span class="tag tag-wl">⚡ ${u.workload}</span>
+          <span class="tag tag-lat">⏱ ${u.latency} priority</span>
         </div>
       </div>
-    </div>`).join('')
+    </div>`
+  }).join('')||`<div style="text-align:center;color:var(--mid);padding:24px;font-size:13px">No use cases match this filter.</div>`
 
-  updateUCCount()
+  updateUCCnt()
   updateUCSidebar()
 }
 
-function setUcFilter(cat) {
-  ucFilter = cat
-  renderUseCases()
+function setUCFilter(c){ucFilter=c;renderUCs()}
+
+function toggleUC(id){
+  const idx=P.useCases.indexOf(id)
+  if(idx>-1) P.useCases.splice(idx,1)
+  else P.useCases.push(id)
+  renderUCs()
+  sync()
 }
 
-function toggleUC(id) {
-  const idx = project.useCases.indexOf(id)
-  if (idx > -1) project.useCases.splice(idx, 1)
-  else project.useCases.push(id)
-  renderUseCases()
-  updateProgress()
-  if (currentStep === 7) renderReview()
+function updateUCCnt(){
+  const n=P.useCases.length
+  document.getElementById('uc-cnt').textContent=n+' use case'+(n!==1?'s':'')+' selected'
 }
 
-function updateUCCount() {
-  const el = document.getElementById('uc-count')
-  const n = project.useCases.length
-  el.textContent = n + ' use case' + (n !== 1 ? 's' : '') + ' selected'
-}
-
-function updateUCSidebar() {
-  const domain = project.domain || 'geospatial'
-  const allUCs = USE_CASES[domain] || []
-  const selected = allUCs.filter(u => project.useCases.includes(u.id))
-  const sidebar = document.getElementById('uc-sidebar')
-  const list = document.getElementById('uc-sidebar-list')
-  if (selected.length === 0) { sidebar.style.display = 'none'; return }
-  sidebar.style.display = 'block'
-  list.innerHTML = selected.map(u =>
-    `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--light);color:var(--dark);font-weight:500">${u.name}</div>`
+function updateUCSidebar(){
+  const domain=P.domain||'geospatial'
+  const all=USE_CASES[domain]||[]
+  const sel=all.filter(u=>P.useCases.includes(u.id))
+  const panel=document.getElementById('sb-uc-panel')
+  if(sel.length===0){panel.style.display='none';return}
+  panel.style.display='block'
+  document.getElementById('sb-uc-list').innerHTML=sel.map(u=>
+    `<div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--light);font-weight:500">${u.name}</div>`
   ).join('')
 }
 
-// ── DOMAIN SPECIFICS ─────────────────────────────────────────
-function renderDomainSpecifics() {
-  const domain = project.domain
-  const sub = document.getElementById('domain-specifics-sub')
-  const content = document.getElementById('domain-specifics-content')
+// ── VOLUMETRICS PER PERSONA ────────────────────────────────────
+function renderVolTable(){
+  const wrap=document.getElementById('vol-table-wrap')
+  if(P.personas.length===0){
+    wrap.innerHTML=`<div class="alert alert-info">ℹ Select personas in Step 2 to configure per-persona volumetrics.</div>`
+    return
+  }
+  if(!P.volumetrics.byPersona) P.volumetrics.byPersona={}
+  P.personas.forEach(p=>{
+    if(!P.volumetrics.byPersona[p.id])
+      P.volumetrics.byPersona[p.id]={concurrentUsers:'',inferenceRPS:'',latencyMs:'',notes:''}
+  })
+  wrap.innerHTML=`
+    <table class="vol-table">
+      <thead><tr>
+        <th>Persona</th>
+        <th>Concurrent Users</th>
+        <th>Inference Req/s</th>
+        <th>Max Latency (ms)</th>
+        <th>Notes</th>
+      </tr></thead>
+      <tbody>
+      ${P.personas.map(p=>`
+        <tr>
+          <td><strong>${p.icon} ${p.name}</strong><br><span style="font-size:10px;color:var(--mid)">${p.workload} · ${p.latency} latency</span></td>
+          <td><input type="number" min="0" value="${P.volumetrics.byPersona[p.id].concurrentUsers||''}" placeholder="e.g. 20" onchange="setVol('${p.id}','concurrentUsers',this.value)"></td>
+          <td><input type="number" min="0" value="${P.volumetrics.byPersona[p.id].inferenceRPS||''}" placeholder="e.g. 10" onchange="setVol('${p.id}','inferenceRPS',this.value)"></td>
+          <td><input type="number" min="0" value="${P.volumetrics.byPersona[p.id].latencyMs||''}" placeholder="e.g. 500" onchange="setVol('${p.id}','latencyMs',this.value)"></td>
+          <td><input type="text" value="${P.volumetrics.byPersona[p.id].notes||''}" placeholder="Optional notes" onchange="setVol('${p.id}','notes',this.value)"></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`
+  syncAgg()
+}
 
-  if (domain === 'geospatial') {
-    sub.textContent = 'Geospatial AI specific configuration — satellite data, imagery types, and GIS requirements'
-    content.innerHTML = `
-      <div class="card-section">
-        <div class="section-label">Satellite & Imagery</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Primary Data Source</label>
-            <select onchange="syncDomSpec('dataSource',this.value)">
-              <option value="">— Select —</option>
-              <option value="sentinel">Sentinel-1/2 (ESA, free)</option>
-              <option value="cartosat">Cartosat (ISRO)</option>
-              <option value="resourcesat">Resourcesat (ISRO)</option>
-              <option value="commercial">Commercial (Maxar, Planet)</option>
-              <option value="mixed">Mixed sources</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Imagery Resolution</label>
-            <select onchange="syncDomSpec('imageryResolution',this.value)">
-              <option value="">— Select —</option>
-              <option value="vhr">Very High Res (&lt;1m)</option>
-              <option value="hr">High Res (1–5m)</option>
-              <option value="mr">Medium Res (5–30m)</option>
-              <option value="lr">Low Res (&gt;30m)</option>
-              <option value="mixed">Mixed resolution</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Revisit Frequency Required</label>
-            <select onchange="syncDomSpec('revisitFrequency',this.value)">
-              <option value="">— Select —</option>
-              <option value="realtime">Near real-time (&lt;1hr)</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="seasonal">Seasonal</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Spectral Bands Required</label>
-            <select onchange="syncDomSpec('spectralBands',this.value)">
-              <option value="">— Select —</option>
-              <option value="rgb">RGB only</option>
-              <option value="multispectral">Multispectral</option>
-              <option value="hyperspectral">Hyperspectral</option>
-              <option value="sar">SAR (Synthetic Aperture Radar)</option>
-              <option value="mixed">Mixed / multiple</option>
-            </select>
-          </div>
-        </div>
+function setVol(pid,key,val){
+  if(!P.volumetrics.byPersona[pid]) P.volumetrics.byPersona[pid]={}
+  P.volumetrics.byPersona[pid][key] = isNaN(val)||val===''?val:+val
+  syncAgg()
+}
+
+function syncAgg(){
+  const byP = P.volumetrics.byPersona||{}
+  const rows = Object.values(byP)
+  const totalUsers = rows.reduce((s,r)=>s+(+r.concurrentUsers||0),0)
+  const totalRPS = rows.reduce((s,r)=>s+(+r.inferenceRPS||0),0)
+  const lats = rows.map(r=>+r.latencyMs).filter(v=>v>0)
+  const tightestLat = lats.length>0?Math.min(...lats):null
+  document.getElementById('agg-users').textContent=totalUsers||0
+  document.getElementById('agg-rps').textContent=totalRPS||0
+  document.getElementById('agg-lat').textContent=tightestLat?tightestLat+'ms':'—'
+  P.volumetrics.aggregated={totalConcurrentUsers:totalUsers,totalInferenceRPS:totalRPS,tightestLatencyMs:tightestLat}
+  drawVolChart()
+  sync()
+}
+
+// ── VOL CHART ─────────────────────────────────────────────────
+function drawVolChart(){
+  const ctx=document.getElementById('volChart')
+  if(!ctx) return
+  const byP=P.volumetrics.byPersona||{}
+  const labels=P.personas.map(p=>p.icon+' '+p.name.split(' ')[0])
+  const users=P.personas.map(p=>+(byP[p.id]?.concurrentUsers)||0)
+  const rps=P.personas.map(p=>+(byP[p.id]?.inferenceRPS)||0)
+  if(volChartInst) volChartInst.destroy()
+  volChartInst=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Concurrent Users',data:users,backgroundColor:'rgba(0,40,112,0.75)',borderRadius:4},
+      {label:'Inference Req/s',data:rps,backgroundColor:'rgba(255,85,57,0.75)',borderRadius:4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11}}}},
+      scales:{y:{beginAtZero:true,grid:{color:'#f0f0f5'},ticks:{font:{size:11}}},x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}}}
+    }
+  })
+}
+
+// ── DOMAIN SPECIFICS ──────────────────────────────────────────
+function renderDS(){
+  const domain=P.domain
+  const sub=document.getElementById('ds-sub')
+  const content=document.getElementById('ds-content')
+  if(!P.domainSpecifics.satelliteSources) P.domainSpecifics.satelliteSources=[]
+
+  if(domain==='geospatial'){
+    sub.textContent='Satellite data sources (add each separately) and GIS integration requirements'
+    content.innerHTML=`
+      <div class="sec">
+        <div class="sec-label">Satellite & Imagery Sources</div>
+        <div class="alert alert-info">ℹ Add each satellite data source separately. Multiple sources can be active simultaneously with different characteristics.</div>
+        <table class="sat-table" id="sat-table">
+          <thead><tr>
+            <th>Source Name</th><th>Resolution</th><th>Revisit Freq.</th><th>Spectral Bands</th><th>Est. Daily Volume</th><th></th>
+          </tr></thead>
+          <tbody id="sat-tbody"></tbody>
+        </table>
+        <button class="btn btn-outline btn-sm" onclick="addSatSource()">+ Add Satellite Source</button>
       </div>
-      <div class="card-section">
-        <div class="section-label">GIS & Integration</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Existing GIS Platform</label>
-            <select onchange="syncDomSpec('gisPlatform',this.value)">
+      <div class="sec">
+        <div class="sec-label">GIS & Integration</div>
+        <div class="row2">
+          <div class="fg"><label>Existing GIS Platform</label>
+            <select onchange="P.domainSpecifics.gisPlatform=this.value">
               <option value="">— Select —</option>
               <option value="arcgis">ArcGIS (ESRI)</option>
               <option value="qgis">QGIS (open source)</option>
@@ -1029,359 +959,396 @@ function renderDomainSpecifics() {
               <option value="nic-gis">NIC GIS Platform</option>
               <option value="custom">Custom / bespoke</option>
               <option value="none">None currently</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Output Format Required</label>
-            <select onchange="syncDomSpec('outputFormat',this.value)">
+            </select></div>
+          <div class="fg"><label>Output Format Required</label>
+            <select onchange="P.domainSpecifics.outputFormat=this.value">
               <option value="">— Select —</option>
               <option value="geotiff">GeoTIFF</option>
               <option value="shapefile">Shapefile / GeoJSON</option>
-              <option value="wms">WMS / WFS (web services)</option>
-              <option value="dashboard">Interactive dashboard</option>
+              <option value="wms">WMS / WFS web services</option>
+              <option value="dashboard">Interactive Dashboard</option>
               <option value="api">REST API</option>
               <option value="all">All of the above</option>
-            </select>
-          </div>
+            </select></div>
+        </div>
+        <div class="row2">
+          <div class="fg"><label>Ground Truth / Field Data Integration</label>
+            <select onchange="P.domainSpecifics.groundTruth=this.value">
+              <option value="">— Select —</option>
+              <option value="none">Not required</option>
+              <option value="periodic">Periodic field surveys</option>
+              <option value="iot">IoT / sensor feeds</option>
+              <option value="crowdsource">Crowdsourced / citizen science</option>
+            </select></div>
+          <div class="fg"><label>Model Training Data Source</label>
+            <select onchange="P.domainSpecifics.trainingData=this.value">
+              <option value="">— Select —</option>
+              <option value="public">Public datasets (Copernicus, USGS)</option>
+              <option value="isro">ISRO / NRSC data</option>
+              <option value="proprietary">Proprietary / classified</option>
+              <option value="mixed">Mixed sources</option>
+            </select></div>
         </div>
       </div>`
-  } else if (domain === 'defence') {
-    sub.textContent = 'Defence and security specific configuration — classification, C4ISR integration, and compliance requirements'
-    content.innerHTML = `
-      <div class="card-section">
-        <div class="section-label">Classification & Clearance</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>System Classification Level</label>
-            <select onchange="syncDomSpec('classificationLevel',this.value)">
+    renderSatTable()
+
+  } else if(domain==='defence'){
+    sub.textContent='Defence and security specific configuration — classification, C4ISR integration, and compliance requirements'
+    content.innerHTML=`
+      <div class="sec">
+        <div class="sec-label">Classification & Access Control</div>
+        <div class="row2">
+          <div class="fg"><label>System Classification Level</label>
+            <select onchange="P.domainSpecifics.classificationLevel=this.value">
               <option value="">— Select —</option>
               <option value="unclassified">Unclassified</option>
               <option value="restricted">Restricted</option>
               <option value="confidential">Confidential</option>
               <option value="secret">Secret</option>
               <option value="top-secret">Top Secret</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Operates Air-Gapped</label>
-            <select onchange="syncDomSpec('airGapped',this.value)">
+            </select></div>
+          <div class="fg"><label>Network Isolation Required</label>
+            <select onchange="P.domainSpecifics.airGapped=this.value">
               <option value="">— Select —</option>
-              <option value="full">Fully air-gapped (no external)</option>
-              <option value="partial">Partially connected (controlled)</option>
-              <option value="connected">Connected (secured network)</option>
-            </select>
-          </div>
+              <option value="full">Fully air-gapped (no external connectivity)</option>
+              <option value="partial">Partially connected (controlled gateway)</option>
+              <option value="connected">Connected (secured defence network)</option>
+            </select></div>
         </div>
       </div>
-      <div class="card-section">
-        <div class="section-label">C4ISR & Systems Integration</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Existing C4ISR System</label>
-            <select onchange="syncDomSpec('c4isrSystem',this.value)">
+      <div class="sec">
+        <div class="sec-label">C4ISR & Sensor Integration</div>
+        <div class="row2">
+          <div class="fg"><label>Existing C4ISR System</label>
+            <select onchange="P.domainSpecifics.c4isrSystem=this.value">
               <option value="">— Select —</option>
               <option value="drdo">DRDO developed system</option>
-              <option value="imported">Imported system</option>
+              <option value="imported">Imported / legacy system</option>
               <option value="custom">Custom / bespoke</option>
               <option value="none">None currently</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Sensor Integration</label>
-            <select onchange="syncDomSpec('sensorTypes',this.value)">
+            </select></div>
+          <div class="fg"><label>Sensor Types to Integrate</label>
+            <select onchange="P.domainSpecifics.sensorTypes=this.value">
               <option value="">— Select —</option>
               <option value="optical">Optical / EO only</option>
               <option value="radar">Radar / SAR</option>
               <option value="elint">ELINT / SIGINT</option>
               <option value="uav">UAV / Drone feeds</option>
               <option value="multi">Multi-sensor fusion</option>
-            </select>
-          </div>
+            </select></div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Compliance Framework</label>
-            <select onchange="syncDomSpec('defenceCompliance',this.value)">
+      </div>
+      <div class="sec">
+        <div class="sec-label">Procurement & Compliance</div>
+        <div class="row2">
+          <div class="fg"><label>Procurement Framework</label>
+            <select onchange="P.domainSpecifics.procurementFramework=this.value">
               <option value="">— Select —</option>
               <option value="dpp">Defence Procurement Procedure (DPP)</option>
               <option value="dar">Defence Acquisition Regulations</option>
-              <option value="itar">ITAR / Export Control</option>
-              <option value="indigent">Indigenisation / Make in India</option>
-              <option value="all">Multiple frameworks</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Indigenisation Requirement</label>
-            <select onchange="syncDomSpec('indigenisation',this.value)">
+              <option value="gem">Government e-Marketplace (GeM)</option>
+              <option value="other">Other / to be determined</option>
+            </select></div>
+          <div class="fg"><label>Indigenisation Requirement</label>
+            <select onchange="P.domainSpecifics.indigenisation=this.value">
               <option value="">— Select —</option>
-              <option value="none">No requirement</option>
-              <option value="preferred">Preferred but not mandatory</option>
-              <option value="mandatory">Mandatory (Atmanirbhar)</option>
-              <option value="idef">IDEF Category</option>
-            </select>
-          </div>
+              <option value="none">No specific requirement</option>
+              <option value="preferred">Preferred — Atmanirbhar Bharat</option>
+              <option value="mandatory">Mandatory — specific IDEF category</option>
+            </select></div>
         </div>
       </div>`
   } else {
-    sub.textContent = 'Select a domain in Step 1 to see domain-specific fields'
-    content.innerHTML = `<div class="alert alert-info">ℹ Kindly select a domain in Step 1 first.</div>`
+    content.innerHTML=`<div class="alert alert-info">ℹ Kindly select a domain in Step 1 first.</div>`
   }
 }
 
-// ── VOLUMETRICS CHART ─────────────────────────────────────────
-function updateVolChart() {
-  const ctx = document.getElementById('volChart')
-  if (!ctx) return
-  const v = project.volumetrics
-  const vals = [
-    Math.min(100, (v.concurrentUsers || 0) / 5),
-    Math.min(100, (v.imagesPerDay || 0) / 100),
-    Math.min(100, (v.dataIngestedPerDay || 0) / 10),
-    Math.min(100, (v.inferenceRPS || 0) / 5),
-    Math.min(100, v.latencyP95ms ? (1000 - Math.min(1000, v.latencyP95ms)) / 10 : 0)
-  ]
-  if (volChartInst) volChartInst.destroy()
-  volChartInst = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['Concurrent\nUsers', 'Images\n/Day', 'Data\nGB/Day', 'Inference\nReq/s', 'Latency\n(inverse)'],
-      datasets: [{ label: 'Scale (normalised)', data: vals, backgroundColor: ['#002870','#1C38F5','#00B290','#FFB600','#FF5539'], borderRadius: 6 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(0) + ' / 100' } } },
-      scales: { y: { beginAtZero: true, max: 100, grid: { color: '#f0f0f5' }, ticks: { font: { size: 11 } } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } }
-    }
-  })
-}
-
-// ── RADAR CHART ───────────────────────────────────────────────
-function renderRadarChart() {
-  const ctx = document.getElementById('radarChart')
-  if (!ctx) return
-  const domain = project.domain || 'geospatial'
-  const allUCs = USE_CASES[domain] || []
-  const cats = [...new Set(allUCs.map(u => u.category))]
-  const scores = cats.map(cat => {
-    const catUCs = allUCs.filter(u => u.category === cat)
-    const selected = catUCs.filter(u => project.useCases.includes(u.id)).length
-    return Math.round((selected / catUCs.length) * 100)
-  })
-  if (radarChartInst) radarChartInst.destroy()
-  radarChartInst = new Chart(ctx, {
-    type: 'radar',
-    data: {
-      labels: cats,
-      datasets: [{
-        label: 'Coverage %',
-        data: scores,
-        backgroundColor: 'rgba(28,56,245,0.1)',
-        borderColor: '#1C38F5',
-        borderWidth: 2,
-        pointBackgroundColor: '#1C38F5',
-        pointRadius: 4
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 25, font: { size: 10 } }, pointLabels: { font: { size: 11, weight: '600' } } } }
-    }
-  })
-}
-
-// ── SIDEBAR UPDATES ───────────────────────────────────────────
-function updateSidebar() {
-  const s = document.getElementById('live-summary')
-  if (!project.name && !project.domain) {
-    s.innerHTML = `<div style="font-size:12px;color:var(--mid);text-align:center;padding:12px">Fill in Step 1 to see summary</div>`
+function renderSatTable(){
+  const tbody=document.getElementById('sat-tbody')
+  if(!tbody) return
+  if(P.domainSpecifics.satelliteSources.length===0){
+    tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--mid);padding:16px;font-size:12px">No satellite sources added yet. Click "+ Add Satellite Source" below.</td></tr>`
     return
   }
-  const domainLabel = project.domain === 'geospatial' ? '🛰️ Geospatial AI' : project.domain === 'defence' ? '🛡️ Defence' : '—'
-  const items = [
-    { label: 'Project', value: project.name || '—' },
-    { label: 'Customer', value: project.customer || '—' },
-    { label: 'Domain', value: domainLabel },
-    { label: 'Tier', value: project.tier || '—' },
-    { label: 'Type', value: project.opportunityType || '—' },
-    { label: 'Personas', value: project.personas.length + ' selected' },
-    { label: 'Use Cases', value: project.useCases.length + ' selected' }
-  ]
-  s.innerHTML = items.map(i => `
-    <div class="summary-item">
-      <span class="summary-item__label">${i.label}</span>
-      <span class="summary-item__value">${i.value}</span>
-    </div>`).join('')
-  document.getElementById('hdrProject').textContent = project.name || 'New Project'
+  tbody.innerHTML=P.domainSpecifics.satelliteSources.map((s,i)=>`
+    <tr>
+      <td><input type="text" value="${s.name||''}" placeholder="e.g. Sentinel-2" onchange="updSat(${i},'name',this.value)"></td>
+      <td><select onchange="updSat(${i},'resolution',this.value)">
+        <option value="">—</option>
+        <option ${s.resolution==='vhr'?'selected':''} value="vhr">VHR &lt;1m</option>
+        <option ${s.resolution==='hr'?'selected':''} value="hr">HR 1–5m</option>
+        <option ${s.resolution==='mr'?'selected':''} value="mr">MR 5–30m</option>
+        <option ${s.resolution==='lr'?'selected':''} value="lr">LR &gt;30m</option>
+      </select></td>
+      <td><select onchange="updSat(${i},'revisit',this.value)">
+        <option value="">—</option>
+        <option ${s.revisit==='realtime'?'selected':''} value="realtime">&lt;1 hr</option>
+        <option ${s.revisit==='daily'?'selected':''} value="daily">Daily</option>
+        <option ${s.revisit==='weekly'?'selected':''} value="weekly">Weekly</option>
+        <option ${s.revisit==='monthly'?'selected':''} value="monthly">Monthly</option>
+      </select></td>
+      <td><select onchange="updSat(${i},'bands',this.value)">
+        <option value="">—</option>
+        <option ${s.bands==='rgb'?'selected':''} value="rgb">RGB</option>
+        <option ${s.bands==='ms'?'selected':''} value="ms">Multispectral</option>
+        <option ${s.bands==='hs'?'selected':''} value="hs">Hyperspectral</option>
+        <option ${s.bands==='sar'?'selected':''} value="sar">SAR</option>
+      </select></td>
+      <td><div class="unit-wrap"><input type="number" min="0" value="${s.dailyGB||''}" placeholder="e.g. 50" onchange="updSat(${i},'dailyGB',+this.value)"><div class="unit" style="font-size:10px">GB/day</div></div></td>
+      <td><button class="btn-icon" onclick="removeSat(${i})">✕</button></td>
+    </tr>`).join('')
 }
 
-// ── PROGRESS ──────────────────────────────────────────────────
-function updateProgress() {
-  const p1 = [project.name, project.customer, project.domain, project.tier].filter(Boolean).length / 4 * 100
-  const p2 = Math.min(100, project.personas.length / 2 * 100)
-  const p3 = Math.min(100, project.useCases.length / 3 * 100)
-  const v = project.volumetrics
-  const p4 = [v.concurrentUsers, v.imagesPerDay, v.inferenceRPS, v.latencyP95ms].filter(Boolean).length / 4 * 100
-  const inf = project.infrastructure
-  const p6 = [inf.deploymentModel, inf.availability, inf.dataClassification, inf.topology].filter(Boolean).length / 4 * 100
+function addSatSource(){
+  if(!P.domainSpecifics.satelliteSources) P.domainSpecifics.satelliteSources=[]
+  P.domainSpecifics.satelliteSources.push({name:'',resolution:'',revisit:'',bands:'',dailyGB:null})
+  renderSatTable()
+}
+function updSat(i,k,v){P.domainSpecifics.satelliteSources[i][k]=v}
+function removeSat(i){P.domainSpecifics.satelliteSources.splice(i,1);renderSatTable()}
 
-  const set = (id, pct) => {
-    const rounded = Math.round(pct)
-    document.getElementById(id + '-pct').textContent = rounded + '%'
-    document.getElementById(id + '-bar').style.width = rounded + '%'
+// ── INFRASTRUCTURE SITE-WISE ──────────────────────────────────
+function renderSiteTabs(){
+  const topo=P.infrastructure.topology
+  const tabs=document.getElementById('site-tabs')
+  const panels=document.getElementById('site-panels')
+  if(!topo){
+    tabs.innerHTML=''
+    panels.innerHTML=`<div class="alert alert-info">ℹ Select a topology above to configure each site type.</div>`
+    return
   }
-  set('p1', p1); set('p2', p2); set('p3', p3); set('p4', p4); set('p6', p6)
+  let sites=[]
+  if(topo==='single') sites=['Primary Site']
+  else if(topo==='hub-spoke') sites=['Hub Site','Spoke Sites']
+  else if(topo==='hub-spoke-edge') sites=['Hub Site','Spoke Sites','Edge Sites']
+  else if(topo==='mesh') sites=['Node Configuration (applies to all nodes)']
+
+  tabs.innerHTML=sites.map((s,i)=>
+    `<div class="site-tab ${i===0?'act':''}" id="stab-${i}" onclick="showSiteTab(${i})">${s}</div>`
+  ).join('')
+  panels.innerHTML=sites.map((s,i)=>
+    `<div class="site-panel ${i===0?'act':''}" id="spanel-${i}">${sitePanelHTML(s,i)}</div>`
+  ).join('')
+}
+
+function showSiteTab(n){
+  document.querySelectorAll('.site-tab').forEach((el,i)=>{el.classList.toggle('act',i===n)})
+  document.querySelectorAll('.site-panel').forEach((el,i)=>{el.classList.toggle('act',i===n)})
+}
+
+function sitePanelHTML(siteType,idx){
+  const k='site_'+idx
+  if(!P.infrastructure.sites[k]) P.infrastructure.sites[k]={siteType}
+  const s=P.infrastructure.sites[k]
+  return `
+    <div class="row2">
+      <div class="fg"><label>Connectivity</label>
+        <select onchange="setSite('${k}','connectivity',this.value)">
+          <option value="">— Select —</option>
+          <option ${s.connectivity==='airgapped'?'sel':''} value="airgapped">Air-gapped (no external)</option>
+          <option ${s.connectivity==='leased'?'sel':''} value="leased">Leased Line / MPLS</option>
+          <option ${s.connectivity==='internet'?'sel':''} value="internet">Internet / VPN</option>
+          <option ${s.connectivity==='satellite'?'sel':''} value="satellite">Satellite Link</option>
+          <option ${s.connectivity==='mixed'?'sel':''} value="mixed">Mixed / site-dependent</option>
+        </select></div>
+      <div class="fg"><label>Availability Requirement</label>
+        <select onchange="setSite('${k}','availability',this.value)">
+          <option value="">— Select —</option>
+          <option value="99">99% — Standard</option>
+          <option value="99.5">99.5%</option>
+          <option value="99.9">99.9% — High Availability</option>
+          <option value="99.99">99.99% — Mission Critical</option>
+        </select></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Data Classification at this Site</label>
+        <select onchange="setSite('${k}','dataClassification',this.value)">
+          <option value="">— Select —</option>
+          <option value="public">Public / Open</option>
+          <option value="restricted">Restricted</option>
+          <option value="confidential">Confidential</option>
+          <option value="secret">Secret</option>
+        </select></div>
+      <div class="fg"><label>Cooling Preference</label>
+        <select onchange="setSite('${k}','cooling',this.value)">
+          <option value="">— Select —</option>
+          <option value="air">Air cooling (standard)</option>
+          <option value="dlc">Direct Liquid Cooling (DLC)</option>
+          <option value="mixed">Mixed (DLC + air)</option>
+        </select></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Physical Space</label>
+        <select onchange="setSite('${k}','space',this.value)">
+          <option value="">— Select —</option>
+          <option value="server-room">Server room (existing)</option>
+          <option value="dc-new">New purpose-built DC</option>
+          <option value="modular">Modular datacenter</option>
+          <option value="colocation">Co-location facility</option>
+        </select></div>
+      <div class="fg"><label>DR / Backup for this Site</label>
+        <select onchange="setSite('${k}','drBackup',this.value)">
+          <option value="">— Select —</option>
+          <option value="none">No DR at this site</option>
+          <option value="local">Local backup only</option>
+          <option value="remote">Remote DR to hub</option>
+          <option value="hot">Hot standby</option>
+        </select></div>
+    </div>
+    <div class="fg"><label>Additional Notes for this Site</label>
+      <textarea placeholder="Any site-specific constraints, existing infrastructure, or special requirements" onchange="setSite('${k}','notes',this.value)"></textarea></div>
+    <div class="alert alert-warn" style="margin-top:0">
+      ⚡ Power requirement for this site will be computed by the Inferencing Factory based on the hardware BOM — not entered here.
+    </div>`
+}
+
+function setSite(k,field,val){
+  if(!P.infrastructure.sites[k]) P.infrastructure.sites[k]={}
+  P.infrastructure.sites[k][field]=val
+  sync()
+}
+
+// ── SYNC & PROGRESS ───────────────────────────────────────────
+function sync(){
+  // Summary sidebar
+  const s=document.getElementById('sb-sum')
+  if(!P.name&&!P.domain){
+    s.innerHTML=`<div style="font-size:11px;color:var(--mid);text-align:center;padding:10px">Fill Step 1 to see summary</div>`
+  } else {
+    const items=[
+      {l:'Project',v:P.name||'—'},
+      {l:'Customer',v:P.customer||'—'},
+      {l:'Domain',v:P.domain==='geospatial'?'🛰️ Geospatial':P.domain==='defence'?'🛡️ Defence':'—'},
+      {l:'Tier',v:P.tier||'—'},
+      {l:'Personas',v:P.personas.length+' selected'},
+      {l:'Use Cases',v:P.useCases.length+' selected'},
+      {l:'Agg. Users',v:(P.volumetrics.aggregated?.totalConcurrentUsers||0).toString()},
+      {l:'Agg. RPS',v:(P.volumetrics.aggregated?.totalInferenceRPS||0).toString()}
+    ]
+    s.innerHTML=items.map(i=>`<div class="sum-item"><span class="sum-lbl">${i.l}</span><span class="sum-val">${i.v}</span></div>`).join('')
+  }
+  document.getElementById('hdrProj').textContent=P.name||'New Project'
+
+  // Progress bars
+  const p1=[P.name,P.customer,P.domain,P.tier].filter(Boolean).length/4*100
+  const p2=Math.min(100,P.personas.length/2*100)
+  const p3=Math.min(100,P.useCases.length/3*100)
+  const byP=Object.values(P.volumetrics.byPersona||{})
+  const p4=byP.length>0?Math.min(100,byP.filter(r=>r.concurrentUsers).length/byP.length*100):0
+  const sites=Object.values(P.infrastructure.sites||{})
+  const p6=P.infrastructure.topology?(sites.length>0?Math.min(100,sites.filter(s=>s.connectivity).length/sites.length*100):20):0
+
+  const set=(id,pct)=>{
+    const r=Math.round(pct)
+    document.getElementById('pr'+id).textContent=r+'%'
+    document.getElementById('pb'+id).style.width=r+'%'
+  }
+  set(1,p1);set(2,p2);set(3,p3);set(4,p4);set(6,p6)
 }
 
 // ── REVIEW ────────────────────────────────────────────────────
-function renderReview() {
-  const domain = project.domain || 'geospatial'
-  const allUCs = USE_CASES[domain] || []
-  const allPersonas = PERSONAS[domain] || []
-  const selectedUCs = allUCs.filter(u => project.useCases.includes(u.id))
-  const selectedPersonas = allPersonas.filter(p => project.personas.includes(p.id))
+function renderReview(){
+  const domain=P.domain||'geospatial'
+  const allUCs=USE_CASES[domain]||[]
+  const selUCs=allUCs.filter(u=>P.useCases.includes(u.id))
+  const agg=P.volumetrics.aggregated||{}
 
-  document.getElementById('review-summary').innerHTML = `
-    <div class="summary-item"><span class="summary-item__label">Project</span><span class="summary-item__value">${project.name || '—'}</span></div>
-    <div class="summary-item"><span class="summary-item__label">Customer</span><span class="summary-item__value">${project.customer || '—'}</span></div>
-    <div class="summary-item"><span class="summary-item__label">Domain</span><span class="summary-item__value">${domain === 'geospatial' ? '🛰️ Geospatial AI' : '🛡️ Defence'}</span></div>
-    <div class="summary-item"><span class="summary-item__label">Tier</span><span class="summary-item__value">${project.tier || '—'}</span></div>
-    <div class="summary-item"><span class="summary-item__label">Type</span><span class="summary-item__value">${project.opportunityType} / ${project.domainComplexity}</span></div>
-    <div class="summary-item"><span class="summary-item__label">Personas</span><span class="summary-item__value teal">${selectedPersonas.map(p => p.name).join(', ') || '—'}</span></div>
-    <div class="summary-item"><span class="summary-item__label">Use Cases</span><span class="summary-item__value">${selectedUCs.length} selected</span></div>
-    <div class="summary-item"><span class="summary-item__label">Concurrent Users</span><span class="summary-item__value">${project.volumetrics.concurrentUsers || '—'}</span></div>
-    <div class="summary-item"><span class="summary-item__label">Inference RPS</span><span class="summary-item__value">${project.volumetrics.inferenceRPS || '—'}</span></div>
-    <div class="summary-item"><span class="summary-item__label">Deployment</span><span class="summary-item__value">${project.infrastructure.deploymentModel || '—'}</span></div>
-    <div class="summary-item"><span class="summary-item__label">Availability</span><span class="summary-item__value">${project.infrastructure.availability ? project.infrastructure.availability + '%' : '—'}</span></div>
-    <div class="summary-item"><span class="summary-item__label">Data Classification</span><span class="summary-item__value orange">${project.infrastructure.dataClassification || '—'}</span></div>`
+  document.getElementById('rev-summary').innerHTML=`
+    <div class="sum-item"><span class="sum-lbl">Project</span><span class="sum-val">${P.name||'—'}</span></div>
+    <div class="sum-item"><span class="sum-lbl">Customer</span><span class="sum-val">${P.customer||'—'}</span></div>
+    <div class="sum-item"><span class="sum-lbl">Domain</span><span class="sum-val">${domain==='geospatial'?'🛰️ Geospatial AI':'🛡️ Defence & Security'}</span></div>
+    <div class="sum-item"><span class="sum-lbl">Architecture Tier</span><span class="sum-val">${P.tier||'—'}</span></div>
+    <div class="sum-item"><span class="sum-lbl">Opportunity Type</span><span class="sum-val">${P.opportunityType} / ${P.domainComplexity}</span></div>
+    <div class="sum-item"><span class="sum-lbl">Personas</span><span class="sum-val t">${P.personas.length} selected</span></div>
+    <div class="sum-item"><span class="sum-lbl">Use Cases</span><span class="sum-val">${selUCs.length} selected</span></div>
+    <div class="sum-item"><span class="sum-lbl">Total Concurrent Users</span><span class="sum-val">${agg.totalConcurrentUsers||0}</span></div>
+    <div class="sum-item"><span class="sum-lbl">Total Inference RPS</span><span class="sum-val">${agg.totalInferenceRPS||0}</span></div>
+    <div class="sum-item"><span class="sum-lbl">Tightest Latency</span><span class="sum-val o">${agg.tightestLatencyMs?agg.tightestLatencyMs+'ms':'—'}</span></div>
+    <div class="sum-item"><span class="sum-lbl">Topology</span><span class="sum-val">${P.infrastructure.topology||'—'}</span></div>`
 
-  document.getElementById('json-preview').textContent = JSON.stringify(project, null, 2)
-  renderRadarChart()
+  document.getElementById('json-prev').textContent=JSON.stringify(P,null,2)
+  renderRadar()
+}
+
+function renderRadar(){
+  const ctx=document.getElementById('radarChart')
+  if(!ctx) return
+  const domain=P.domain||'geospatial'
+  const allUCs=USE_CASES[domain]||[]
+  const cats=[...new Set(allUCs.map(u=>u.category))]
+  const scores=cats.map(cat=>{
+    const catUCs=allUCs.filter(u=>u.category===cat)
+    const sel=catUCs.filter(u=>P.useCases.includes(u.id)).length
+    return Math.round(sel/catUCs.length*100)
+  })
+  if(radarInst) radarInst.destroy()
+  radarInst=new Chart(ctx,{
+    type:'radar',
+    data:{labels:cats,datasets:[{label:'Coverage %',data:scores,backgroundColor:'rgba(28,56,245,0.1)',borderColor:'#1C38F5',borderWidth:2,pointBackgroundColor:'#1C38F5',pointRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:25,font:{size:10}},pointLabels:{font:{size:11,weight:'600'}}}}}
+  })
 }
 
 // ── EXPORT ────────────────────────────────────────────────────
-function exportJSON() {
-  project.meta.exportedAt = new Date().toISOString()
-  const filename = (project.name || 'ATLAS-Project').replace(/\s+/g, '-') + '-v1.0-' + new Date().toISOString().slice(0,10) + '.json'
-  const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
+function exportJSON(){
+  P.meta.exportedAt=new Date().toISOString()
+  const fname=(P.name||'ATLAS-Project').replace(/\s+/g,'-')+'-v2.0-'+new Date().toISOString().slice(0,10)+'.json'
+  const blob=new Blob([JSON.stringify(P,null,2)],{type:'application/json'})
+  const url=URL.createObjectURL(blob)
+  const a=document.createElement('a')
+  a.href=url;a.download=fname;a.click();URL.revokeObjectURL(url)
 }
 
-function exportSummaryTxt() {
-  const domain = project.domain || 'geospatial'
-  const allUCs = USE_CASES[domain] || []
-  const allPersonas = PERSONAS[domain] || []
-  const selectedUCs = allUCs.filter(u => project.useCases.includes(u.id))
-  const selectedPersonas = allPersonas.filter(p => project.personas.includes(p.id))
-  const lines = [
-    'ATLAS PROJECT DEFINITION SUMMARY',
-    '================================',
-    `Project: ${project.name}`,
-    `Customer: ${project.customer}`,
-    `Domain: ${domain}`,
-    `Architecture Tier: ${project.tier}`,
-    `Opportunity Type: ${project.opportunityType}`,
+function exportTxt(){
+  const domain=P.domain||'geospatial'
+  const allUCs=USE_CASES[domain]||[]
+  const selUCs=allUCs.filter(u=>P.useCases.includes(u.id))
+  const agg=P.volumetrics.aggregated||{}
+  const lines=[
+    'ATLAS PROJECT DEFINITION SUMMARY — v2.0',
+    '=========================================',
+    `Project:        ${P.name}`,
+    `Customer:       ${P.customer}`,
+    `Domain:         ${domain}`,
+    `Tier:           ${P.tier}`,
+    `Type:           ${P.opportunityType} / ${P.domainComplexity}`,
+    `Generated:      ${new Date().toLocaleString('en-IN')}`,
     '',
-    'PERSONAS',
-    ...selectedPersonas.map(p => `- ${p.name}`),
+    'PERSONAS ('+P.personas.length+')',
+    ...P.personas.map(p=>`  - ${p.name} [${p.workload}, ${p.latency} latency]`),
     '',
-    'USE CASES',
-    ...selectedUCs.map(u => `- ${u.name} (${u.model}, ${u.workload})`),
+    'USE CASES ('+selUCs.length+')',
+    ...selUCs.map(u=>`  - ${u.name} (${u.model}, ${u.workload})`),
     '',
-    'VOLUMETRICS',
-    `- Concurrent Users: ${project.volumetrics.concurrentUsers || 'N/A'}`,
-    `- Images/Day: ${project.volumetrics.imagesPerDay || 'N/A'}`,
-    `- Data Ingested/Day: ${project.volumetrics.dataIngestedPerDay || 'N/A'} GB`,
-    `- Inference RPS: ${project.volumetrics.inferenceRPS || 'N/A'}`,
-    `- Latency P95: ${project.volumetrics.latencyP95ms || 'N/A'} ms`,
+    'AGGREGATED VOLUMETRICS',
+    `  Total Concurrent Users:  ${agg.totalConcurrentUsers||0}`,
+    `  Total Inference Req/s:   ${agg.totalInferenceRPS||0}`,
+    `  Tightest Latency Req:    ${agg.tightestLatencyMs?agg.tightestLatencyMs+'ms':'N/A'}`,
+    `  Images/Day:              ${P.volumetrics.imagesPerDay||'N/A'}`,
+    `  Data Ingested/Day:       ${P.volumetrics.dataGBPerDay||'N/A'} GB`,
     '',
     'INFRASTRUCTURE',
-    `- Deployment: ${project.infrastructure.deploymentModel || 'N/A'}`,
-    `- Availability: ${project.infrastructure.availability || 'N/A'}%`,
-    `- Data Classification: ${project.infrastructure.dataClassification || 'N/A'}`,
-    `- Topology: ${project.infrastructure.topology || 'N/A'}`,
+    `  Topology:                ${P.infrastructure.topology||'N/A'}`,
+    `  Total Sites:             ${P.infrastructure.totalSites||'N/A'}`,
     '',
-    `Generated: ${new Date().toLocaleString('en-IN')}`
+    'NOTE: Power requirements are computed by the Inferencing Factory from the hardware BOM.'
   ]
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = (project.name || 'ATLAS') + '-Summary.txt'; a.click()
-  URL.revokeObjectURL(url)
+  const blob=new Blob([lines.join('\n')],{type:'text/plain'})
+  const url=URL.createObjectURL(blob)
+  const a=document.createElement('a')
+  a.href=url;a.download=(P.name||'ATLAS')+'-Requirements.txt';a.click();URL.revokeObjectURL(url)
 }
 
-function saveToPortal() {
-  const projects = JSON.parse(localStorage.getItem('atlas_projects') || '[]')
-  const existing = projects.findIndex(p => p.id === project.meta.id)
-  const entry = { id: project.meta.id, name: project.name, customer: project.customer, domain: project.domain, tier: project.tier, status: 'draft', useCasesCount: project.useCases.length, definition: project }
-  if (existing > -1) projects[existing] = entry
-  else projects.push(entry)
-  localStorage.setItem('atlas_projects', JSON.stringify(projects))
+function savePortal(){
+  const all=JSON.parse(localStorage.getItem('atlas_projects')||'[]')
+  const idx=all.findIndex(p=>p.id===P.meta.id)
+  const entry={id:P.meta.id,name:P.name,customer:P.customer,domain:P.domain,tier:P.tier,
+    status:'draft',useCasesCount:P.useCases.length,personasCount:P.personas.length,definition:P}
+  if(idx>-1) all[idx]=entry; else all.push(entry)
+  localStorage.setItem('atlas_projects',JSON.stringify(all))
   alert('Project saved to portal successfully.')
 }
-
-// ── NAVIGATION ────────────────────────────────────────────────
-function goStep(n) {
-  currentStep = n
-  document.querySelectorAll('.step-panel').forEach(el => el.classList.remove('active'))
-  document.getElementById('panel-' + n).classList.add('active')
-  document.querySelectorAll('.step').forEach((el, i) => {
-    el.classList.remove('active', 'done')
-    if (i + 1 === n) el.classList.add('active')
-    else if (i + 1 < n) el.classList.add('done')
-  })
-  if (n === 2) renderPersonas()
-  if (n === 3) renderUseCases()
-  if (n === 4) setTimeout(updateVolChart, 100)
-  if (n === 5) renderDomainSpecifics()
-  if (n === 7) renderReview()
-  window.scrollTo(0, 0)
-}
-
-function nextStep(current) {
-  if (current === 1) {
-    if (!project.name) { alert('Kindly enter a project name.'); return }
-    if (!project.domain) { alert('Kindly select a domain.'); return }
-    if (!project.tier) { alert('Kindly select an architecture tier.'); return }
-  }
-  if (current === 2 && project.personas.length === 0) {
-    if (!confirm('No personas selected. Continue anyway?')) return
-  }
-  if (current === 3 && project.useCases.length === 0) {
-    if (!confirm('No use cases selected. Continue anyway?')) return
-  }
-  goStep(current + 1)
-}
-
-function prevStep(current) { goStep(current - 1) }
-
-// ── INIT ──────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
-  updateProgress()
-  updateSidebar()
-  // Load project from portal if passed via URL param
-  const params = new URLSearchParams(window.location.search)
-  const pid = params.get('project')
-  if (pid) {
-    const projects = JSON.parse(localStorage.getItem('atlas_projects') || '[]')
-    const found = projects.find(p => p.id === pid)
-    if (found && found.definition) {
-      Object.assign(project, found.definition)
-      document.getElementById('f-name').value = project.name || ''
-      document.getElementById('f-customer').value = project.customer || ''
-      document.getElementById('f-opptype').value = project.opportunityType || 'standard'
-      document.getElementById('f-complexity').value = project.domainComplexity || 'single'
-      if (project.domain) selectDomain(project.domain)
-      if (project.tier) selectTier(project.tier)
-      updateSidebar()
-      updateProgress()
-    }
-  }
-})
 </script>
 </body>
 </html>
-
