@@ -1,1 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — AI Portfolio Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;
+  --teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFFFFF;--light:#F5F5F7;--mid:#B4B4BE;
+  --dark:#282832;--black:#0A0A0F;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.12);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.18);
+  --r:8px;--r-sm:6px;--r-lg:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+
+/* HEADER */
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:100;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-center{font-size:13px;color:rgba(255,255,255,0.65);font-weight:500;}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-secondary{background:var(--navy);color:var(--white);}
+.btn-secondary:hover{background:#001d5c;}
+.btn-ghost{background:transparent;color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.1);color:var(--white);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-lg{padding:12px 24px;font-size:14px;}
+
+/* CONTEXT BAR */
+.ctx{background:var(--white);border-bottom:1px solid #e0e0e8;padding:8px 24px;display:flex;align-items:center;gap:16px;font-size:12px;}
+.ctx-label{font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;font-size:10px;}
+.ctx-val{font-weight:600;color:var(--dark);}
+.ctx-sep{color:var(--mid);}
+.ctx-count{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.activated-badge{background:var(--orange);color:var(--white);font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;}
+
+/* TOOLBAR */
+.toolbar{background:var(--white);border-bottom:1px solid #e0e0e8;padding:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.toolbar-group{display:flex;align-items:center;gap:8px;}
+.toolbar-label{font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.5px;}
+.filter-btn{font-size:11px;font-weight:600;padding:5px 12px;border-radius:12px;border:1px solid #d0d0d8;background:var(--white);color:var(--mid);cursor:pointer;transition:all 0.15s;}
+.filter-btn:hover{border-color:var(--navy);color:var(--navy);}
+.filter-btn.act{background:var(--navy);color:var(--white);border-color:var(--navy);}
+.filter-btn.act.explore{background:#1C38F5;border-color:#1C38F5;}
+.filter-btn.act.pilot{background:#00B290;border-color:#00B290;}
+.filter-btn.act.train{background:#3C00B4;border-color:#3C00B4;}
+.filter-btn.act.run{background:#FF5539;border-color:#FF5539;}
+.filter-btn.act.govern{background:#FFB600;border-color:#FFB600;color:var(--dark);}
+.search-wrap{margin-left:auto;position:relative;}
+.search-wrap input{padding:7px 12px 7px 32px;border:1px solid #d0d0d8;border-radius:20px;font-size:12px;font-family:inherit;width:220px;outline:none;transition:border-color 0.15s;}
+.search-wrap input:focus{border-color:var(--blue);}
+.search-wrap::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;}
+
+/* MAIN LAYOUT */
+.layout{display:grid;grid-template-columns:1fr 300px;gap:0;min-height:calc(100vh - 140px);}
+.portfolio-area{padding:24px;overflow-y:auto;}
+.value-panel{background:var(--white);border-left:1px solid #e0e0e8;padding:20px;overflow-y:auto;position:sticky;top:52px;height:calc(100vh - 52px);}
+
+/* STAGE SECTION */
+.stage-section{margin-bottom:32px;}
+.stage-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--light);}
+.stage-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;color:var(--white);}
+.stage-pill.explore{background:var(--blue);}
+.stage-pill.pilot{background:var(--teal);}
+.stage-pill.train{background:var(--indigo);}
+.stage-pill.run{background:var(--orange);}
+.stage-pill.govern{background:var(--amber);color:var(--dark);}
+.stage-mindset{font-size:12px;color:var(--mid);font-style:italic;margin-left:4px;}
+.stage-meta{margin-left:auto;font-size:11px;color:var(--mid);}
+.stage-count{font-size:11px;font-weight:600;color:var(--mid);margin-left:8px;}
+
+/* PORTFOLIO GRID */
+.portfolio-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+
+/* PORTFOLIO CARD */
+.p-card{background:var(--white);border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;cursor:pointer;transition:all 0.18s;position:relative;overflow:hidden;}
+.p-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--mid);transition:all 0.2s;}
+.p-card.explore::before{background:var(--blue);}
+.p-card.pilot::before{background:var(--teal);}
+.p-card.train::before{background:var(--indigo);}
+.p-card.run::before{background:var(--orange);}
+.p-card.govern::before{background:var(--amber);}
+.p-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);}
+.p-card.activated{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,85,57,0.15),var(--shadow-md);}
+.p-card.activated::after{content:'✓';position:absolute;top:10px;right:10px;width:20px;height:20px;border-radius:50%;background:var(--orange);color:var(--white);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.p-card__icon{font-size:22px;margin-bottom:8px;}
+.p-card__name{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:4px;line-height:1.3;}
+.p-card__value{font-size:11px;color:var(--mid);line-height:1.4;margin-bottom:8px;}
+.p-card__meta{display:flex;gap:6px;flex-wrap:wrap;}
+.tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;}
+.tag-hw{background:rgba(60,0,180,0.08);color:var(--indigo);}
+.tag-sw{background:rgba(28,56,245,0.08);color:var(--blue);}
+.tag-svc{background:rgba(0,178,144,0.08);color:var(--teal);}
+.tag-size{background:rgba(0,40,112,0.08);color:var(--navy);}
+.p-card__archetypes{margin-top:8px;padding-top:8px;border-top:1px solid var(--light);display:flex;gap:4px;flex-wrap:wrap;}
+.archetype-dot{width:8px;height:8px;border-radius:50%;display:inline-block;title:'';}
+.archetype-dot.q1{background:#1C38F5;}
+.archetype-dot.q2{background:#3C00B4;}
+.archetype-dot.q3{background:#00B290;}
+.archetype-dot.q4{background:#FF5539;}
+.archetype-label{font-size:10px;color:var(--mid);}
+
+/* VALUE MAP PANEL */
+.vp-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.vp-sub{font-size:11px;color:var(--mid);margin-bottom:16px;}
+.vp-empty{text-align:center;padding:32px 16px;color:var(--mid);}
+.vp-empty__icon{font-size:40px;margin-bottom:12px;}
+.vp-empty__text{font-size:12px;line-height:1.6;}
+.vp-section{margin-bottom:16px;}
+.vp-section-title{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;justify-content:space-between;}
+.vp-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--r-sm);background:var(--light);margin-bottom:6px;font-size:12px;}
+.vp-item__icon{font-size:14px;flex-shrink:0;}
+.vp-item__name{font-weight:600;color:var(--dark);flex:1;min-width:0;}
+.vp-item__remove{color:var(--mid);cursor:pointer;font-size:14px;flex-shrink:0;transition:color 0.15s;}
+.vp-item__remove:hover{color:var(--orange);}
+.vp-stage-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:6px;flex-shrink:0;}
+.vp-stage-badge.explore{background:rgba(28,56,245,0.1);color:var(--blue);}
+.vp-stage-badge.pilot{background:rgba(0,178,144,0.1);color:var(--teal);}
+.vp-stage-badge.train{background:rgba(60,0,180,0.1);color:var(--indigo);}
+.vp-stage-badge.run{background:rgba(255,85,57,0.1);color:var(--orange);}
+.vp-stage-badge.govern{background:rgba(255,182,0,0.15);color:#9a7000;}
+.vp-actions{display:flex;flex-direction:column;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--light);}
+.vp-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;}
+.vp-stat{background:var(--light);border-radius:var(--r-sm);padding:10px;text-align:center;}
+.vp-stat__val{font-size:22px;font-weight:900;color:var(--navy);}
+.vp-stat__lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+.vp-stat__val.orange{color:var(--orange);}
+.chart-wrap{height:160px;position:relative;margin-bottom:12px;}
+
+/* DETAIL MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;display:none;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--white);border-radius:var(--r-lg);max-width:560px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow-lg);}
+.modal-hdr{padding:20px 24px;border-bottom:1px solid var(--light);display:flex;align-items:center;gap:12px;}
+.modal-hdr__icon{font-size:28px;}
+.modal-hdr__title{font-size:17px;font-weight:700;color:var(--navy);}
+.modal-hdr__close{margin-left:auto;background:none;border:none;font-size:20px;cursor:pointer;color:var(--mid);padding:4px;}
+.modal-hdr__close:hover{color:var(--dark);}
+.modal-body{padding:20px 24px;}
+.modal-section{margin-bottom:16px;}
+.modal-section-title{font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+.modal-section p{font-size:13px;color:var(--dark);line-height:1.6;}
+.outcomes-list{list-style:none;display:flex;flex-direction:column;gap:6px;}
+.outcomes-list li{font-size:12px;color:var(--dark);padding:6px 10px;background:var(--light);border-radius:var(--r-sm);display:flex;align-items:flex-start;gap:8px;}
+.outcomes-list li::before{content:'→';color:var(--teal);font-weight:700;flex-shrink:0;}
+.modal-tags{display:flex;gap:8px;flex-wrap:wrap;}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--light);display:flex;gap:10px;justify-content:flex-end;}
+
+/* OPPORTUNITY MODAL */
+.opp-form .fg{margin-bottom:14px;}
+.opp-form label{display:block;font-size:11px;font-weight:700;color:var(--dark);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;}
+.opp-form label.req::after{content:' *';color:var(--orange);}
+.opp-form input,.opp-form select,.opp-form textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);}
+.opp-form input:focus,.opp-form select:focus,.opp-form textarea:focus{outline:none;border-color:var(--blue);}
+.opp-form textarea{resize:vertical;min-height:70px;}
+
+/* EMPTY STATE */
+.empty-stage{padding:20px;text-align:center;color:var(--mid);font-size:12px;}
+
+/* HIDDEN */
+.hidden{display:none !important;}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;}
+  .value-panel{position:relative;height:auto;border-left:none;border-top:1px solid #e0e0e8;}
+  .portfolio-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div class="hdr-center">AI Portfolio Portal</div>
+  <div class="hdr-right">
+    <span id="hdrCtx" style="font-size:12px;color:rgba(255,255,255,0.5)">No project loaded</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+  </div>
+</div>
+
+<div class="ctx">
+  <span class="ctx-label">Opportunity</span>
+  <span class="ctx-val" id="ctxOpp">None selected</span>
+  <span class="ctx-sep">·</span>
+  <span class="ctx-label">Customer</span>
+  <span class="ctx-val" id="ctxCust">—</span>
+  <span class="ctx-sep">·</span>
+  <span class="ctx-label">Segment</span>
+  <span class="ctx-val" id="ctxSeg">—</span>
+  <div class="ctx-count">
+    <span style="font-size:12px;color:var(--mid)">Items activated:</span>
+    <span class="activated-badge" id="activatedCount">0</span>
+    <button class="btn btn-outline btn-sm" onclick="showNewOpportunity()">+ New Opportunity</button>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="toolbar-group">
+    <span class="toolbar-label">Stage</span>
+    <div class="filter-btn act" id="f-all" onclick="setFilter('stage','all')">All</div>
+    <div class="filter-btn explore" id="f-explore" onclick="setFilter('stage','explore')">1 · Explore</div>
+    <div class="filter-btn pilot" id="f-pilot" onclick="setFilter('stage','pilot')">2 · Pilot</div>
+    <div class="filter-btn train" id="f-train" onclick="setFilter('stage','train')">3 · Train</div>
+    <div class="filter-btn run" id="f-run" onclick="setFilter('stage','run')">4 · Run</div>
+    <div class="filter-btn govern" id="f-govern" onclick="setFilter('stage','govern')">5 · Govern</div>
+  </div>
+  <div class="toolbar-group">
+    <span class="toolbar-label">Segment</span>
+    <div class="filter-btn" id="f-q1" onclick="setFilter('segment','Q1')">Q1</div>
+    <div class="filter-btn" id="f-q2" onclick="setFilter('segment','Q2')">Q2</div>
+    <div class="filter-btn" id="f-q3" onclick="setFilter('segment','Q3')">Q3</div>
+    <div class="filter-btn" id="f-q4" onclick="setFilter('segment','Q4')">Q4</div>
+  </div>
+  <div class="toolbar-group">
+    <span class="toolbar-label">Show</span>
+    <div class="filter-btn" id="f-activated" onclick="setFilter('show','activated')">Activated Only</div>
+    <div class="filter-btn" id="f-clear" onclick="clearAll()" style="color:var(--orange);border-color:var(--orange)">Clear All</div>
+  </div>
+  <div class="search-wrap">
+    <input type="text" id="searchInput" placeholder="Search portfolio items..." oninput="renderPortfolio()">
+  </div>
+</div>
+
+<div class="layout">
+<div class="portfolio-area" id="portfolioArea"></div>
+
+<!-- VALUE MAP PANEL -->
+<div class="value-panel">
+  <div class="vp-title">Value Map</div>
+  <div class="vp-sub">Activated items build the customer value narrative</div>
+
+  <div id="vp-empty" class="vp-empty">
+    <div class="vp-empty__icon">🗺️</div>
+    <div class="vp-empty__text">Click portfolio items to activate them.<br>Your value map builds here.</div>
+  </div>
+
+  <div id="vp-content" style="display:none">
+    <div class="vp-stats">
+      <div class="vp-stat"><div class="vp-stat__val orange" id="vp-count">0</div><div class="vp-stat__lbl">Items Activated</div></div>
+      <div class="vp-stat"><div class="vp-stat__val" id="vp-stages">0</div><div class="vp-stat__lbl">Stages Covered</div></div>
+    </div>
+    <div class="chart-wrap"><canvas id="stageChart"></canvas></div>
+    <div id="vp-items"></div>
+    <div class="vp-actions">
+      <button class="btn btn-primary" onclick="generateValueMap()">📄 Generate Value Map PDF</button>
+      <button class="btn btn-teal" onclick="showCreateOpportunity()">🎯 Create RAC Opportunity</button>
+      <button class="btn btn-secondary" onclick="exportValueMapJSON()">⬇ Export Value Map JSON</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-hdr__icon" id="m-icon"></div>
+      <div>
+        <div class="modal-hdr__title" id="m-title"></div>
+        <div id="m-stage-badge"></div>
+      </div>
+      <button class="modal-hdr__close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-section-title">Value Proposition</div>
+        <p id="m-value"></p>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title">Business Outcomes</div>
+        <ul class="outcomes-list" id="m-outcomes"></ul>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title">Applicable Customer Segments</div>
+        <div class="modal-tags" id="m-segments"></div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title">Portfolio Metadata</div>
+        <div class="modal-tags" id="m-tags"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">Close</button>
+      <button class="btn btn-primary" id="m-activate-btn" onclick="toggleFromModal()"></button>
+    </div>
+  </div>
+</div>
+
+<!-- OPPORTUNITY MODAL -->
+<div class="modal-overlay" id="oppModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-hdr__icon">🎯</div>
+      <div class="modal-hdr__title">Create RAC Opportunity</div>
+      <button class="modal-hdr__close" onclick="document.getElementById('oppModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body opp-form">
+      <div class="fg"><label class="req">Opportunity Name</label>
+        <input type="text" id="opp-name" placeholder="e.g. MDoNER GeoAI Platform — Phase 1"></div>
+      <div class="fg"><label class="req">Customer / Organisation</label>
+        <input type="text" id="opp-cust" placeholder="e.g. Ministry of DONER"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="fg"><label class="req">Opportunity Type</label>
+          <select id="opp-type">
+            <option value="standard">Standard</option>
+            <option value="strategic">Strategic / Flagship</option>
+            <option value="pilot">Pilot / POC</option>
+          </select></div>
+        <div class="fg"><label>Domain Complexity</label>
+          <select id="opp-complexity">
+            <option value="single">Single Domain</option>
+            <option value="multi">Multi-Domain</option>
+            <option value="sovereign">Sovereign / National</option>
+          </select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="fg"><label>Estimated Deal Size</label>
+          <select id="opp-size">
+            <option value="">— Select —</option>
+            <option value="S">S — &lt;₹5 crore</option>
+            <option value="M">M — ₹5–25 crore</option>
+            <option value="L">L — ₹25–100 crore</option>
+            <option value="XL">XL — &gt;₹100 crore</option>
+          </select></div>
+        <div class="fg"><label>Customer Segment</label>
+          <select id="opp-segment">
+            <option value="">— Select —</option>
+            <option value="Q1">Q1 — AI Startups & Research Labs</option>
+            <option value="Q2">Q2 — Hyperscale AI Builders</option>
+            <option value="Q3">Q3 — Enterprise AI Explorers</option>
+            <option value="Q4">Q4 — Enterprise AI Transformers</option>
+          </select></div>
+      </div>
+      <div class="fg"><label>Notes / Context</label>
+        <textarea id="opp-notes" placeholder="Key context, entry point, buying trigger..."></textarea></div>
+      <div id="opp-items-summary" style="background:var(--light);border-radius:var(--r-sm);padding:12px;font-size:12px;color:var(--dark)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('oppModal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="createOpportunity()">Create in RAC Pipeline</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── PORTFOLIO DATA ────────────────────────────────────────────
+const PORTFOLIO = [
+  // STAGE 1: EXPLORE
+  {id:'e1',stage:'explore',icon:'🔍',name:'AI Readiness Assessment',
+   value:'Structured evaluation of an organisation\'s data, infrastructure, skills, and governance readiness to deploy on-premises AI.',
+   outcomes:['Clear readiness score across 6 dimensions','Prioritised gap analysis with remediation roadmap','Business case inputs for AI investment decision','Board-ready summary presentation'],
+   type:'SVC',size:'S–M',segments:['Q1','Q3'],
+   tags:['Advisory','Assessment','SVC 80%']},
+  {id:'e2',stage:'explore',icon:'🗄️',name:'Data Estate Planning & Preparation',
+   value:'Assessment and preparation of data infrastructure — cataloguing, quality, lineage, and pipeline design — to support AI model training and inference at scale.',
+   outcomes:['Data catalogue and quality baseline','AI-ready data pipeline architecture','Data governance framework','Storage architecture recommendation'],
+   type:'SVC',size:'S–M',segments:['Q1','Q3','Q4'],
+   tags:['Data Services','Advisory','SVC 80%']},
+  {id:'e3',stage:'explore',icon:'🏢',name:'Datacenter Design & Build',
+   value:'End-to-end design and construction of AI-optimised datacenter infrastructure — power, cooling (DLC), networking, and physical security — for on-premises AI deployments.',
+   outcomes:['Full DC design with power and cooling specifications','DLC implementation for high-density GPU racks','Network topology design (InfiniBand / RoCE)','Commissioning and handover'],
+   type:'SVC',size:'XL',segments:['Q2','Q4'],
+   tags:['DC Services','HW','DLC','265kW Racks']},
+  {id:'e4',stage:'explore',icon:'🔐',name:'AI Security Assessment & Architecture',
+   value:'Comprehensive security architecture for on-premises AI — covering data classification, model access control, network segmentation, and compliance alignment.',
+   outcomes:['AI threat model and risk register','Security architecture blueprint','Compliance gap analysis (CERT-In, NCIIPC)','Zero-trust AI access framework'],
+   type:'SVC',size:'S–M',segments:['Q1','Q2','Q3','Q4'],
+   tags:['Security','Advisory','SVC 80%']},
+
+  // STAGE 2: PILOT
+  {id:'p1',stage:'pilot',icon:'🧪',name:'AI Proof-of-Concept Lab',
+   value:'A rapid, time-boxed PoC environment — hardware, software, and services — to validate a specific AI use case with real customer data before full commitment.',
+   outcomes:['Working PoC in 4–12 weeks','Validated performance benchmarks','Business case with measured ROI','Go/no-go recommendation with evidence'],
+   type:'HW+SVC',size:'S',segments:['Q1','Q3'],
+   tags:['PoC','HW 50% SW 15% SVC 35%','Pilot']},
+  {id:'p2',stage:'pilot',icon:'☁️',name:'Private Cloud & MLOps Platform',
+   value:'On-premises private cloud and MLOps platform enabling model versioning, experiment tracking, pipeline orchestration, and deployment lifecycle management.',
+   outcomes:['Fully operational MLOps platform','CI/CD for model development','Model registry and versioning','Experiment tracking and reproducibility'],
+   type:'SW',size:'M–L',segments:['Q1','Q3','Q4'],
+   tags:['Software','MLOps','Platform']},
+  {id:'p3',stage:'pilot',icon:'📦',name:'GenAI-in-a-Box',
+   value:'Pre-configured, ready-to-deploy GenAI appliance with selected foundational models, RAG capability, and API gateway — operational within days.',
+   outcomes:['Day-1 GenAI capability on-premises','Pre-integrated LLM + RAG + gateway','Customer-facing API in days, not months','Zero cloud dependency'],
+   type:'HW+SW',size:'S–M',segments:['Q1','Q3'],
+   tags:['Appliance','GenAI','Quick Deploy']},
+  {id:'p4',stage:'pilot',icon:'🎓',name:'AI Skills Academy & Team Building',
+   value:'Structured training and capability building programme — from AI literacy for leadership to hands-on ML engineering for technical teams.',
+   outcomes:['AI literacy across leadership','Practical ML skills for technical team','Internal AI champion network','Ongoing learning curriculum'],
+   type:'SVC',size:'S–M',segments:['Q1','Q3','Q4'],
+   tags:['Training','Enablement','SVC']},
+
+  // STAGE 3: TRAIN
+  {id:'t1',stage:'train',icon:'🖥️',name:'GPU Training Clusters',
+   value:'High-density GPU cluster infrastructure — H100/H200/B200, NVLink, InfiniBand NDR — designed and built for large-scale model training and fine-tuning workloads.',
+   outcomes:['Purpose-built training infrastructure','Optimised GPU interconnect (NVLink/IB)','Thermal design for 265kW rack density','Benchmark-validated performance'],
+   type:'HW',size:'L–XL',segments:['Q1','Q2','Q4'],
+   tags:['Hardware','GPU','H100/H200/B200','HW 70%']},
+  {id:'t2',stage:'train',icon:'🏭',name:'Multi-Purpose AI Factory',
+   value:'Converged infrastructure supporting training, fine-tuning, and inference workloads simultaneously — optimised for multi-tenant AI platform operations.',
+   outcomes:['Unified training + inference infrastructure','Multi-tenant workload isolation','Dynamic resource allocation','Capacity planning framework'],
+   type:'HW+SW',size:'L–XL',segments:['Q2','Q4'],
+   tags:['Hardware','Software','AI Factory','Multi-tenant']},
+  {id:'t3',stage:'train',icon:'💾',name:'Tiered Storage Architecture',
+   value:'High-performance, AI-optimised storage architecture — NVMe hot tier, parallel file system warm tier, and object storage cold tier — designed for AI training data pipelines.',
+   outcomes:['Sub-millisecond model checkpoint I/O','Petabyte-scale training data management','Automated data tiering','POSIX + object storage unified namespace'],
+   type:'HW+SW',size:'M–L',segments:['Q1','Q2','Q3','Q4'],
+   tags:['Storage','NVMe','Parallel FS','HW+SW']},
+  {id:'t4',stage:'train',icon:'⚗️',name:'Fine-Tuning & Training Stack',
+   value:'Full software stack for model fine-tuning and training — including distributed training frameworks, PEFT/LoRA tooling, data preprocessing pipelines, and evaluation harnesses.',
+   outcomes:['Distributed training across GPU nodes','PEFT/LoRA fine-tuning capability','Automated data preprocessing pipelines','Model evaluation and benchmarking'],
+   type:'SW',size:'M',segments:['Q1','Q2','Q4'],
+   tags:['Software','Fine-Tuning','Training','PyTorch/JAX']},
+  {id:'t5',stage:'train',icon:'🛡️',name:'AI Infrastructure & Network Security',
+   value:'Security hardening of AI training infrastructure — network segmentation, GPU telemetry, model watermarking, and data exfiltration controls for sensitive training environments.',
+   outcomes:['Air-gap capable training environment','GPU-level telemetry and anomaly detection','Model IP protection controls','Compliance-ready security posture'],
+   type:'SW+SVC',size:'M',segments:['Q1','Q2','Q3','Q4'],
+   tags:['Security','Network','HW+SW+SVC']},
+
+  // STAGE 4: RUN
+  {id:'r1',stage:'run',icon:'⚡',name:'Purpose-Built Inference Factory',
+   value:'Optimised inference infrastructure — L40S/H100/A100, TensorRT, vLLM, Triton — engineered for high-throughput, low-latency model serving at enterprise and national scale.',
+   outcomes:['10,000+ inference req/s per cluster','Sub-100ms p99 latency at scale','Multi-model serving with dynamic batching','Auto-scaling within on-prem constraints'],
+   type:'HW+SW',size:'M–XL',segments:['Q1','Q2','Q3','Q4'],
+   tags:['Inference','GPU','vLLM','Triton','HW+SW']},
+  {id:'r2',stage:'run',icon:'🔍',name:'Enterprise RAG Platform',
+   value:'Production-grade Retrieval-Augmented Generation platform — document ingestion, vector indexing, semantic search, and LLM integration — deployed fully on-premises.',
+   outcomes:['Secure on-prem document Q&A','Multi-source knowledge base integration','Hallucination reduction via grounding','Enterprise SSO and access control'],
+   type:'SW',size:'M–L',segments:['Q3','Q4'],
+   tags:['Software','RAG','GenAI','On-Prem']},
+  {id:'r3',stage:'run',icon:'🛠️',name:'Use Case & Application Development',
+   value:'End-to-end development of AI-powered applications — from requirements through deployment — on top of the customer\'s on-premises AI platform.',
+   outcomes:['Production AI applications deployed','Domain-specific model integration','API layer for enterprise integration','Handover with full documentation'],
+   type:'SVC',size:'M–L',segments:['Q3','Q4'],
+   tags:['SI','Application Dev','Domain AI','SVC']},
+  {id:'r4',stage:'run',icon:'🔒',name:'Model & Data Security Suite',
+   value:'Runtime security for AI in production — model access control, prompt injection defence, output filtering, data lineage tracking, and PII protection.',
+   outcomes:['Runtime prompt injection protection','PII detection and redaction','Model access policy enforcement','AI audit trail for compliance'],
+   type:'SW',size:'M',segments:['Q2','Q3','Q4'],
+   tags:['Security','Runtime AI','SW']},
+  {id:'r5',stage:'run',icon:'📱',name:'Edge AI Inference Appliance',
+   value:'Ruggedised, low-power edge AI appliance — Jetson/L4 class — for inference at the point of need: field, factory floor, vehicle, or remote site.',
+   outcomes:['Offline-capable AI at the edge','&lt;50W inference in ruggedised form factor','Central model update via secure OTA','Integration with hub-spoke architecture'],
+   type:'HW',size:'S–M',segments:['Q1','Q3','Q4'],
+   tags:['Edge','Jetson','Hardware','Appliance']},
+
+  // STAGE 5: GOVERN & SCALE
+  {id:'g1',stage:'govern',icon:'📊',name:'AI Governance & Observability',
+   value:'Platform for governing AI in production — model drift detection, performance monitoring, bias auditing, explainability dashboards, and regulatory reporting.',
+   outcomes:['Model drift alerts and auto-retraining triggers','Bias detection across protected attributes','Explainability reports for regulators','Unified AI observability dashboard'],
+   type:'SW',size:'M',segments:['Q2','Q3','Q4'],
+   tags:['Governance','Observability','SW','Compliance']},
+  {id:'g2',stage:'govern',icon:'🆔',name:'AI Access Control & Identity',
+   value:'Identity and access management layer for AI platforms — RBAC, model-level permissions, API key governance, and integration with enterprise IAM (LDAP/AD).',
+   outcomes:['Model-level RBAC enforced','Enterprise IAM integration (LDAP/AD)','API key governance and rotation','Access audit trail for compliance'],
+   type:'SW',size:'S–M',segments:['Q2','Q3','Q4'],
+   tags:['IAM','Access Control','SW','Security']},
+  {id:'g3',stage:'govern',icon:'💰',name:'FinOps for AI Infrastructure',
+   value:'Cost visibility, chargeback, and optimisation tooling for on-premises AI — GPU utilisation dashboards, showback reporting, and capacity planning analytics.',
+   outcomes:['Per-project GPU cost visibility','Chargeback to business units','Underutilisation alerts','Capacity planning with demand forecasting'],
+   type:'SW',size:'S–M',segments:['Q2','Q3','Q4'],
+   tags:['FinOps','Cost Optimisation','SW']},
+  {id:'g4',stage:'govern',icon:'🤝',name:'Managed AI Platform & ELA',
+   value:'Long-term managed services and enterprise licence agreement — covering platform operations, model updates, security patching, and SLA-backed support.',
+   outcomes:['Guaranteed SLA for AI platform uptime','Proactive model and platform updates','24×7 NOC/SOC coverage option','Predictable annual cost structure'],
+   type:'SVC+SW',size:'L–XL',segments:['Q2','Q3','Q4'],
+   tags:['Managed Services','ELA','AMC','Multi-year']},
+  {id:'g5',stage:'govern',icon:'🏆',name:'AI CoE & Enablement Programme',
+   value:'Establishment and ongoing support of an internal AI Centre of Excellence — governance framework, playbooks, community of practice, and enablement curriculum.',
+   outcomes:['Functioning AI CoE within 6 months','AI governance playbooks and standards','Internal community of practice','Executive AI literacy programme'],
+   type:'SVC',size:'M',segments:['Q3','Q4'],
+   tags:['Enablement','CoE','SVC','Transformation']},
+  {id:'g6',stage:'govern',icon:'⚙️',name:'Infrastructure Optimisation',
+   value:'Ongoing tuning and optimisation of AI infrastructure — GPU utilisation, network throughput, storage I/O, and power efficiency — to maximise ROI from existing assets.',
+   outcomes:['GPU utilisation improvement (target &gt;80%)','Network throughput optimisation','Storage I/O tuning for AI workloads','Power efficiency reporting'],
+   type:'SVC',size:'S–M',segments:['Q2','Q3','Q4'],
+   tags:['Optimisation','Performance','SVC']},
+
+  // Item 26 — Sovereign AI Platform (domain-specific)
+  {id:'s1',stage:'govern',icon:'🌐',name:'Sovereign AI Platform',
+   value:'End-to-end sovereign AI infrastructure — air-gapped, nationally controlled, and compliance-ready — for government and defence deployments requiring full data sovereignty.',
+   outcomes:['100% on-premises, zero cloud dependency','CERT-In and NCIIPC compliance ready','Air-gapped model training and inference','National AI governance framework overlay'],
+   type:'HW+SW+SVC',size:'XL',segments:['Q3','Q4'],
+   tags:['Sovereign AI','Defence','Government','COMPASS']}
+]
+
+const STAGE_META = {
+  explore:{label:'1 · Explore',mindset:'"Are we ready to build this on-prem?"',color:'#1C38F5',timeline:'3–6 months'},
+  pilot:{label:'2 · Pilot',mindset:'"Let\'s prove this works — in our walls."',color:'#00B290',timeline:'4–12 weeks'},
+  train:{label:'3 · Train',mindset:'"We\'re committed. Build the real machine."',color:'#3C00B4',timeline:'6–18 months'},
+  run:{label:'4 · Run',mindset:'"Models are ready. Put them to work."',color:'#FF5539',timeline:'Ongoing'},
+  govern:{label:'5 · Govern & Scale',mindset:'"AI is live. Prove it\'s safe and scale it."',color:'#FFB600',timeline:'3–5 years'}
+}
+
+const SEGMENT_LABELS = {
+  Q1:'Q1 · AI Startups & Research Labs',
+  Q2:'Q2 · Hyperscale AI Builders',
+  Q3:'Q3 · Enterprise AI Explorers',
+  Q4:'Q4 · Enterprise AI Transformers'
+}
+
+// ── STATE ─────────────────────────────────────────────────────
+let activated = new Set()
+let filters = {stage:'all', segment:null, show:null}
+let currentModalId = null
+let stageChartInst = null
+let currentOpp = JSON.parse(localStorage.getItem('atlas_current_opp') || 'null')
+
+// ── RENDER PORTFOLIO ──────────────────────────────────────────
+function renderPortfolio(){
+  const search = document.getElementById('searchInput').value.toLowerCase()
+  const stages = ['explore','pilot','train','run','govern']
+  const area = document.getElementById('portfolioArea')
+
+  let html = ''
+  stages.forEach(stage => {
+    if(filters.stage !== 'all' && filters.stage !== stage) return
+
+    let items = PORTFOLIO.filter(p => p.stage === stage)
+
+    // Segment filter
+    if(filters.segment) items = items.filter(p => p.segments.includes(filters.segment))
+
+    // Show activated only
+    if(filters.show === 'activated') items = items.filter(p => activated.has(p.id))
+
+    // Search
+    if(search) items = items.filter(p =>
+      p.name.toLowerCase().includes(search) ||
+      p.value.toLowerCase().includes(search) ||
+      p.tags.some(t => t.toLowerCase().includes(search))
+    )
+
+    if(items.length === 0) return
+
+    const meta = STAGE_META[stage]
+    html += `
+      <div class="stage-section">
+        <div class="stage-header">
+          <div class="stage-pill ${stage}">${meta.label}</div>
+          <div class="stage-mindset">${meta.mindset}</div>
+          <div class="stage-meta">${meta.timeline} · ${items.length} item${items.length!==1?'s':''}</div>
+        </div>
+        <div class="portfolio-grid">
+          ${items.map(p => cardHTML(p)).join('')}
+        </div>
+      </div>`
+  })
+
+  if(!html) html = `<div style="text-align:center;padding:60px;color:var(--mid)">
+    <div style="font-size:40px;margin-bottom:12px">🔎</div>
+    <div style="font-size:14px">No portfolio items match your current filters.</div>
+    <button class="btn btn-outline btn-sm" style="margin-top:16px" onclick="resetFilters()">Reset Filters</button>
+  </div>`
+
+  area.innerHTML = html
+}
+
+function cardHTML(p){
+  const isAct = activated.has(p.id)
+  const segDots = p.segments.map(s =>
+    `<span class="archetype-dot ${s.toLowerCase()}" title="${SEGMENT_LABELS[s]}"></span>`
+  ).join('')
+  return `
+    <div class="p-card ${p.stage} ${isAct ? 'activated' : ''}" onclick="handleCardClick('${p.id}')">
+      <div class="p-card__icon">${p.icon}</div>
+      <div class="p-card__name">${p.name}</div>
+      <div class="p-card__value">${p.value.slice(0,90)}${p.value.length>90?'…':''}</div>
+      <div class="p-card__meta">
+        <span class="tag tag-${p.type.toLowerCase().split('+')[0]}">${p.type}</span>
+        <span class="tag tag-size">${p.size}</span>
+      </div>
+      <div class="p-card__archetypes">
+        ${segDots}
+        <span class="archetype-label" style="margin-left:4px">${p.segments.join(', ')}</span>
+      </div>
+    </div>`
+}
+
+// ── CARD INTERACTION ──────────────────────────────────────────
+function handleCardClick(id){
+  openModal(id)
+}
+
+function toggleActivated(id){
+  if(activated.has(id)) activated.delete(id)
+  else activated.add(id)
+  renderPortfolio()
+  updateValueMap()
+  updateActivatedCount()
+}
+
+function updateActivatedCount(){
+  document.getElementById('activatedCount').textContent = activated.size
+}
+
+// ── FILTERS ───────────────────────────────────────────────────
+function setFilter(type, val){
+  if(type === 'stage'){
+    filters.stage = val
+    document.querySelectorAll('.toolbar [id^="f-"]:not(#f-activated):not(#f-clear):not(#f-q1):not(#f-q2):not(#f-q3):not(#f-q4)').forEach(el => {
+      el.classList.remove('act')
+      // remove stage-specific active colours
+      el.classList.remove('explore','pilot','train','run','govern')
+    })
+    const el = document.getElementById('f-' + (val === 'all' ? 'all' : val))
+    if(el){ el.classList.add('act'); if(val!=='all') el.classList.add(val) }
+  }
+  if(type === 'segment'){
+    if(filters.segment === val) { filters.segment = null; document.getElementById('f-'+val.toLowerCase()).classList.remove('act') }
+    else {
+      filters.segment = val
+      document.querySelectorAll('#f-q1,#f-q2,#f-q3,#f-q4').forEach(el => el.classList.remove('act'))
+      document.getElementById('f-'+val.toLowerCase()).classList.add('act')
+    }
+  }
+  if(type === 'show'){
+    if(filters.show === val) { filters.show = null; document.getElementById('f-activated').classList.remove('act') }
+    else { filters.show = val; document.getElementById('f-activated').classList.add('act') }
+  }
+  renderPortfolio()
+}
+
+function resetFilters(){
+  filters = {stage:'all', segment:null, show:null}
+  document.querySelectorAll('.filter-btn').forEach(el => el.classList.remove('act','explore','pilot','train','run','govern'))
+  document.getElementById('f-all').classList.add('act')
+  document.getElementById('searchInput').value = ''
+  renderPortfolio()
+}
+
+function clearAll(){
+  if(activated.size === 0) return
+  if(!confirm('Clear all activated items?')) return
+  activated.clear()
+  renderPortfolio()
+  updateValueMap()
+  updateActivatedCount()
+}
+
+// ── VALUE MAP ─────────────────────────────────────────────────
+function updateValueMap(){
+  const empty = document.getElementById('vp-empty')
+  const content = document.getElementById('vp-content')
+
+  if(activated.size === 0){
+    empty.style.display = 'block'
+    content.style.display = 'none'
+    return
+  }
+
+  empty.style.display = 'none'
+  content.style.display = 'block'
+
+  // Stats
+  const items = PORTFOLIO.filter(p => activated.has(p.id))
+  const stagesUsed = new Set(items.map(p => p.stage)).size
+  document.getElementById('vp-count').textContent = activated.size
+  document.getElementById('vp-stages').textContent = stagesUsed
+
+  // Stage chart
+  const stages = ['explore','pilot','train','run','govern']
+  const stageCounts = stages.map(s => items.filter(p => p.stage === s).length)
+  const stageColors = ['#1C38F5','#00B290','#3C00B4','#FF5539','#FFB600']
+  const ctx = document.getElementById('stageChart')
+  if(stageChartInst) stageChartInst.destroy()
+  stageChartInst = new Chart(ctx, {
+    type:'doughnut',
+    data:{
+      labels:['Explore','Pilot','Train','Run','Govern'],
+      datasets:[{data:stageCounts, backgroundColor:stageColors, borderWidth:2, borderColor:['#fff']}]
+    },
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'right', labels:{font:{size:10}, boxWidth:12}}}}
+  })
+
+  // Items by stage
+  const itemsHTML = stages.map(stage => {
+    const stageItems = items.filter(p => p.stage === stage)
+    if(stageItems.length === 0) return ''
+    const meta = STAGE_META[stage]
+    return `
+      <div class="vp-section">
+        <div class="vp-section-title">
+          <span>${meta.label}</span>
+          <span>${stageItems.length}</span>
+        </div>
+        ${stageItems.map(p => `
+          <div class="vp-item">
+            <div class="vp-item__icon">${p.icon}</div>
+            <div class="vp-item__name">${p.name}</div>
+            <span class="vp-stage-badge ${stage}">${stage}</span>
+            <span class="vp-item__remove" onclick="toggleActivated('${p.id}')">✕</span>
+          </div>`).join('')}
+      </div>`
+  }).join('')
+
+  document.getElementById('vp-items').innerHTML = itemsHTML
+}
+
+// ── MODAL ─────────────────────────────────────────────────────
+function openModal(id){
+  const p = PORTFOLIO.find(x => x.id === id)
+  if(!p) return
+  currentModalId = id
+  const meta = STAGE_META[p.stage]
+  document.getElementById('m-icon').textContent = p.icon
+  document.getElementById('m-title').textContent = p.name
+  document.getElementById('m-stage-badge').innerHTML = `<span class="vp-stage-badge ${p.stage}">${meta.label}</span>`
+  document.getElementById('m-value').textContent = p.value
+  document.getElementById('m-outcomes').innerHTML = p.outcomes.map(o => `<li>${o}</li>`).join('')
+  document.getElementById('m-segments').innerHTML = p.segments.map(s =>
+    `<span class="tag" style="background:var(--light);color:var(--dark)">${SEGMENT_LABELS[s]}</span>`
+  ).join('')
+  document.getElementById('m-tags').innerHTML = p.tags.map(t =>
+    `<span class="tag tag-size">${t}</span>`
+  ).join('')
+
+  const isAct = activated.has(id)
+  const btn = document.getElementById('m-activate-btn')
+  btn.textContent = isAct ? '✕ Deactivate' : '✓ Activate for this Opportunity'
+  btn.className = isAct ? 'btn btn-outline' : 'btn btn-primary'
+
+  document.getElementById('detailModal').classList.add('open')
+}
+
+function toggleFromModal(){
+  if(!currentModalId) return
+  toggleActivated(currentModalId)
+  const isAct = activated.has(currentModalId)
+  const btn = document.getElementById('m-activate-btn')
+  btn.textContent = isAct ? '✕ Deactivate' : '✓ Activate for this Opportunity'
+  btn.className = isAct ? 'btn btn-outline' : 'btn btn-primary'
+}
+
+function closeModal(){
+  document.getElementById('detailModal').classList.remove('open')
+  currentModalId = null
+}
+
+// ── OPPORTUNITY ───────────────────────────────────────────────
+function showNewOpportunity(){
+  document.getElementById('oppModal').classList.add('open')
+  document.getElementById('opp-name').value = ''
+  document.getElementById('opp-cust').value = ''
+  updateOppItemsSummary()
+}
+
+function showCreateOpportunity(){
+  if(activated.size === 0){alert('Kindly activate at least one portfolio item first.');return}
+  document.getElementById('oppModal').classList.add('open')
+  updateOppItemsSummary()
+}
+
+function updateOppItemsSummary(){
+  const items = PORTFOLIO.filter(p => activated.has(p.id))
+  const el = document.getElementById('opp-items-summary')
+  if(items.length === 0){
+    el.innerHTML = '<span style="color:var(--mid)">No portfolio items activated yet. Activate items from the portfolio to include them in this opportunity.</span>'
+  } else {
+    el.innerHTML = `<strong>${items.length} portfolio items</strong> will be linked to this opportunity:<br><span style="color:var(--mid)">${items.map(p=>p.name).join(' · ')}</span>`
+  }
+}
+
+function createOpportunity(){
+  const name = document.getElementById('opp-name').value.trim()
+  const customer = document.getElementById('opp-cust').value.trim()
+  if(!name || !customer){alert('Kindly enter an opportunity name and customer.');return}
+
+  const items = PORTFOLIO.filter(p => activated.has(p.id))
+  const opp = {
+    id:'opp_'+Date.now(),
+    name, customer,
+    type:document.getElementById('opp-type').value,
+    complexity:document.getElementById('opp-complexity').value,
+    size:document.getElementById('opp-size').value,
+    segment:document.getElementById('opp-segment').value,
+    notes:document.getElementById('opp-notes').value,
+    portfolioItems:items.map(p=>p.id),
+    portfolioItemNames:items.map(p=>p.name),
+    status:'prospect',
+    stage:'prospect',
+    createdAt:new Date().toISOString(),
+    valueMap:{activatedCount:items.length, stagesCovered:[...new Set(items.map(p=>p.stage))]}
+  }
+
+  // Save to localStorage
+  const opps = JSON.parse(localStorage.getItem('atlas_opportunities')||'[]')
+  opps.push(opp)
+  localStorage.setItem('atlas_opportunities', JSON.stringify(opps))
+  localStorage.setItem('atlas_current_opp', JSON.stringify(opp))
+  currentOpp = opp
+
+  // Update context bar
+  updateContextBar()
+
+  document.getElementById('oppModal').classList.remove('open')
+  alert(`Opportunity "${name}" created successfully in the RAC pipeline with ${items.length} portfolio items linked.`)
+}
+
+function updateContextBar(){
+  if(currentOpp){
+    document.getElementById('ctxOpp').textContent = currentOpp.name
+    document.getElementById('ctxCust').textContent = currentOpp.customer
+    document.getElementById('ctxSeg').textContent = currentOpp.segment || '—'
+    document.getElementById('hdrCtx').textContent = currentOpp.name
+  }
+}
+
+// ── EXPORT ────────────────────────────────────────────────────
+function generateValueMap(){
+  const items = PORTFOLIO.filter(p => activated.has(p.id))
+  if(items.length === 0){alert('Kindly activate portfolio items first.');return}
+  const stages = ['explore','pilot','train','run','govern']
+  const lines = [
+    'ATLAS VALUE MAP',
+    '===============',
+    currentOpp ? `Opportunity: ${currentOpp.name}` : 'Opportunity: (not yet created)',
+    currentOpp ? `Customer: ${currentOpp.customer}` : '',
+    `Generated: ${new Date().toLocaleString('en-IN')}`,
+    `Activated Items: ${items.length}`,
+    '',
+    ...stages.flatMap(stage => {
+      const stageItems = items.filter(p => p.stage === stage)
+      if(stageItems.length === 0) return []
+      return [
+        `${STAGE_META[stage].label.toUpperCase()}`,
+        ...stageItems.flatMap(p => [
+          `  ${p.icon} ${p.name} (${p.type} · ${p.size})`,
+          `     Value: ${p.value}`,
+          `     Outcomes: ${p.outcomes.slice(0,2).join(' | ')}`,
+          ''
+        ])
+      ]
+    })
+  ]
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = (currentOpp?.customer || 'ATLAS') + '-ValueMap-' + new Date().toISOString().slice(0,10) + '.txt'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportValueMapJSON(){
+  const items = PORTFOLIO.filter(p => activated.has(p.id))
+  const data = {
+    exportedAt: new Date().toISOString(),
+    opportunity: currentOpp,
+    activatedItems: items,
+    summary:{
+      totalItems: items.length,
+      byStage: Object.fromEntries(['explore','pilot','train','run','govern'].map(s => [s, items.filter(p=>p.stage===s).length])),
+      byType: Object.fromEntries([...new Set(items.map(p=>p.type))].map(t => [t, items.filter(p=>p.type===t).length])),
+      segmentsCovered: [...new Set(items.flatMap(p=>p.segments))]
+    }
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'ValueMap-' + new Date().toISOString().slice(0,10) + '.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  renderPortfolio()
+  updateValueMap()
+  updateContextBar()
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal() })
+
+  // Load activated from current opp if available
+  if(currentOpp && currentOpp.portfolioItems){
+    currentOpp.portfolioItems.forEach(id => activated.add(id))
+    renderPortfolio()
+    updateValueMap()
+    updateActivatedCount()
+  }
+})
+</script>
+</body>
+</html>
 
