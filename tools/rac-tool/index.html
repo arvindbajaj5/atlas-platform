@@ -1,1 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — RAC Pipeline Tool v2.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;
+  --teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;
+  --dark:#282832;--black:#0A0A0F;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.12);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.18);
+  --r:8px;--r-sm:6px;--r-lg:12px;
+
+  /* Stage colours */
+  --s-prospect:#6366F1;
+  --s-qualify:#1C38F5;
+  --s-instantiate:#00B290;
+  --s-size:#FFB600;
+  --s-propose:#FF5539;
+  --s-win:#10B981;
+  --s-deliver:#3C00B4;
+  --s-renew:#002870;
+  --s-lost:#DC2626;
+  --s-hold:#B4B4BE;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+
+/* HEADER */
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:200;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;letter-spacing:0.5px;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-secondary{background:var(--navy);color:var(--white);}
+.btn-secondary:hover{background:#001d5c;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-danger{background:#DC2626;color:var(--white);}
+.btn-danger:hover{background:#b91c1c;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-lg{padding:12px 24px;font-size:14px;}
+.btn-icon{background:transparent;border:1px solid #d0d0d8;border-radius:var(--r-sm);padding:5px 8px;cursor:pointer;font-size:13px;color:var(--mid);transition:all 0.15s;}
+.btn-icon:hover{border-color:var(--navy);color:var(--navy);}
+
+/* TOP TOOLBAR */
+.toolbar{background:var(--white);border-bottom:1px solid #e0e0e8;padding:10px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.toolbar-title{font-size:14px;font-weight:700;color:var(--navy);}
+.view-btns{display:flex;gap:0;border:1px solid #d0d0d8;border-radius:var(--r-sm);overflow:hidden;}
+.view-btn{padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;border:none;background:var(--white);color:var(--mid);transition:all 0.15s;}
+.view-btn.act{background:var(--navy);color:var(--white);}
+.filter-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto;}
+.f-select{font-size:11px;padding:5px 8px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-family:inherit;color:var(--dark);background:var(--white);}
+.search-box{position:relative;}
+.search-box input{padding:6px 10px 6px 28px;border:1px solid #d0d0d8;border-radius:16px;font-size:11px;font-family:inherit;width:180px;outline:none;}
+.search-box input:focus{border-color:var(--blue);}
+.search-box::before{content:'🔍';position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;}
+
+/* PIPELINE STAGES BAR */
+.pipeline-bar{background:var(--white);border-bottom:1px solid #e0e0e8;padding:0 24px;display:flex;overflow-x:auto;gap:0;}
+.pipe-stage{display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:11px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;transition:all 0.15s;white-space:nowrap;flex-shrink:0;}
+.pipe-stage:hover{color:var(--dark);}
+.pipe-stage.act{color:var(--navy);border-bottom-color:var(--orange);}
+.pipe-stage__dot{width:8px;height:8px;border-radius:50%;}
+.pipe-stage__count{background:var(--light);color:var(--mid);font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;min-width:20px;text-align:center;}
+.pipe-stage.act .pipe-stage__count{background:var(--orange);color:var(--white);}
+
+/* VIEWS */
+.view{display:none;padding:24px;}
+.view.act{display:block;}
+
+/* KANBAN */
+.kanban{display:flex;gap:16px;overflow-x:auto;padding-bottom:8px;min-height:500px;}
+.kanban-col{min-width:240px;max-width:260px;flex-shrink:0;}
+.kanban-col__hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.kanban-col__title{font-size:12px;font-weight:700;color:var(--dark);display:flex;align-items:center;gap:6px;}
+.kanban-col__dot{width:8px;height:8px;border-radius:50%;}
+.kanban-col__count{font-size:10px;font-weight:700;color:var(--mid);background:var(--light);padding:2px 7px;border-radius:8px;}
+.kanban-col__body{display:flex;flex-direction:column;gap:10px;min-height:100px;}
+
+/* OPP CARD */
+.opp-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:14px;cursor:pointer;transition:all 0.18s;position:relative;overflow:hidden;}
+.opp-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.opp-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px);}
+.opp-card__name{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:3px;line-height:1.3;}
+.opp-card__customer{font-size:11px;color:var(--mid);margin-bottom:8px;}
+.opp-card__meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.opp-card__footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--light);}
+.opp-card__age{font-size:10px;color:var(--mid);}
+.opp-card__size{font-size:11px;font-weight:700;color:var(--navy);}
+.opp-card__tools{display:flex;gap:4px;}
+
+/* LIST VIEW */
+.list-table{width:100%;border-collapse:collapse;}
+.list-table th{text-align:left;padding:8px 12px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.3px;background:var(--white);border-bottom:2px solid #e0e0e8;position:sticky;top:0;}
+.list-table td{padding:10px 12px;border-bottom:1px solid var(--light);font-size:12px;cursor:pointer;}
+.list-table tr:hover td{background:rgba(28,56,245,0.02);}
+.list-table tr.lost td{opacity:0.5;}
+
+/* DASHBOARD */
+.dash-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.dash-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;box-shadow:var(--shadow);}
+.dash-stat{font-size:28px;font-weight:900;color:var(--navy);}
+.dash-stat.orange{color:var(--orange);}
+.dash-stat.teal{color:var(--teal);}
+.dash-lbl{font-size:11px;color:var(--mid);margin-top:4px;}
+.dash-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.chart-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;box-shadow:var(--shadow);}
+.chart-card-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:14px;}
+.chart-wrap{position:relative;height:200px;}
+
+/* TAGS / BADGES */
+.tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;}
+.tag-size-s{background:rgba(0,40,112,0.08);color:var(--navy);}
+.tag-size-m{background:rgba(28,56,245,0.08);color:var(--blue);}
+.tag-size-l{background:rgba(0,178,144,0.08);color:var(--teal);}
+.tag-size-xl{background:rgba(255,85,57,0.12);color:var(--orange);}
+.tag-type-standard{background:var(--light);color:var(--mid);}
+.tag-type-strategic{background:rgba(60,0,180,0.1);color:var(--indigo);}
+.tag-type-pilot{background:rgba(255,182,0,0.1);color:#9a7000;}
+.tag-seg{background:rgba(0,40,112,0.06);color:var(--navy);}
+.tag-domain-geo{background:rgba(28,56,245,0.08);color:var(--blue);}
+.tag-domain-def{background:rgba(60,0,180,0.08);color:var(--indigo);}
+.stage-pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;color:var(--white);}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:none;align-items:flex-start;justify-content:flex-end;padding:0;}
+.overlay.open{display:flex;}
+.drawer{background:var(--white);width:520px;max-width:100%;height:100vh;overflow-y:auto;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;}
+.drawer-hdr{padding:20px 24px;border-bottom:1px solid var(--light);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--white);z-index:10;}
+.drawer-hdr__title{font-size:16px;font-weight:700;color:var(--navy);flex:1;}
+.drawer-hdr__close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--mid);padding:4px;}
+.drawer-hdr__close:hover{color:var(--dark);}
+.drawer-body{padding:20px 24px;flex:1;}
+.drawer-footer{padding:16px 24px;border-top:1px solid var(--light);display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:var(--white);}
+
+/* FORM */
+.fg{margin-bottom:16px;}
+.fg:last-child{margin-bottom:0;}
+label{display:block;font-size:10px;font-weight:700;color:var(--dark);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;}
+label.req::after{content:' *';color:var(--orange);}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);appearance:none;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(28,56,245,0.08);}
+textarea{resize:vertical;min-height:70px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.sec-label{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;margin-top:20px;padding-bottom:6px;border-bottom:1px solid var(--light);}
+.sec-label:first-child{margin-top:0;}
+
+/* ACTIVITY FEED */
+.activity-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--light);font-size:12px;}
+.activity-item:last-child{border-bottom:none;}
+.activity-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:4px;}
+.activity-text{flex:1;color:var(--dark);line-height:1.4;}
+.activity-time{font-size:10px;color:var(--mid);flex-shrink:0;}
+
+/* NEXT ACTIONS */
+.next-action{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e8;border-radius:var(--r);margin-bottom:8px;font-size:12px;cursor:pointer;transition:all 0.15s;}
+.next-action:hover{border-color:var(--teal);background:rgba(0,178,144,0.03);}
+.next-action__icon{font-size:18px;flex-shrink:0;}
+.next-action__label{font-weight:600;color:var(--dark);}
+.next-action__desc{font-size:11px;color:var(--mid);}
+.next-action__arrow{margin-left:auto;color:var(--mid);}
+.next-action.done{opacity:0.5;}
+.next-action.done .next-action__icon::after{content:' ✓';}
+
+/* PORTFOLIO ITEMS MINI */
+.port-items{display:flex;flex-wrap:wrap;gap:6px;}
+.port-tag{font-size:10px;font-weight:600;padding:3px 8px;border-radius:8px;background:rgba(0,40,112,0.06);color:var(--navy);}
+
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:var(--r);font-size:12px;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-ok{background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.25);color:#007a60;}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.3);color:#9a7000;}
+
+/* STAGE PROGRESS */
+.stage-progress{display:flex;align-items:center;gap:0;margin-bottom:16px;overflow-x:auto;}
+.sp-step{display:flex;align-items:center;}
+.sp-dot{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--white);flex-shrink:0;cursor:pointer;transition:all 0.15s;}
+.sp-dot:hover{transform:scale(1.1);}
+.sp-line{height:2px;width:20px;background:var(--light);flex-shrink:0;}
+.sp-dot.done{background:var(--teal);}
+.sp-dot.current{background:var(--orange);box-shadow:0 0 0 4px rgba(255,85,57,0.2);}
+.sp-dot.future{background:var(--mid);}
+.sp-label{font-size:9px;font-weight:600;text-align:center;color:var(--mid);margin-top:3px;}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:60px 24px;color:var(--mid);}
+.empty__icon{font-size:48px;margin-bottom:16px;}
+.empty__title{font-size:16px;font-weight:700;color:var(--dark);margin-bottom:8px;}
+.empty__desc{font-size:13px;line-height:1.6;}
+
+@media(max-width:900px){
+  .dash-grid{grid-template-columns:1fr 1fr;}
+  .dash-charts{grid-template-columns:1fr;}
+  .drawer{width:100%;}
+  .kanban{flex-direction:column;}
+  .kanban-col{min-width:100%;max-width:100%;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.65)">RAC Pipeline</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">v2.0</span>
+    <button class="btn btn-primary btn-sm" onclick="openNewOpp()">+ New Opportunity</button>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+  </div>
+</div>
+
+<!-- PIPELINE STAGE FILTER BAR -->
+<div class="pipeline-bar" id="pipeline-bar"></div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="toolbar-title" id="toolbar-title">All Opportunities</div>
+  <div class="view-btns">
+    <button class="view-btn act" id="vb-kanban" onclick="setView('kanban')">Kanban</button>
+    <button class="view-btn" id="vb-list" onclick="setView('list')">List</button>
+    <button class="view-btn" id="vb-dashboard" onclick="setView('dashboard')">Dashboard</button>
+  </div>
+  <div class="filter-row">
+    <select class="f-select" id="f-type" onchange="applyFilters()">
+      <option value="">All Types</option>
+      <option value="standard">Standard</option>
+      <option value="strategic">Strategic</option>
+      <option value="pilot">Pilot / POC</option>
+    </select>
+    <select class="f-select" id="f-size" onchange="applyFilters()">
+      <option value="">All Sizes</option>
+      <option value="S" id="sz-s">S</option>
+      <option value="M" id="sz-m">M</option>
+      <option value="L" id="sz-l">L</option>
+      <option value="XL" id="sz-xl">XL</option>
+    </select>
+    <select class="f-select" id="f-owner" onchange="applyFilters()">
+      <option value="">All Owners</option>
+    </select>
+    <div class="search-box">
+      <input type="text" id="f-search" placeholder="Search…" oninput="applyFilters()">
+    </div>
+    <select class="f-select" id="currency-sel" onchange="setCurrency(this.value)" title="Currency">
+      <option value="USD">$ USD</option>
+      <option value="INR">₹ INR</option>
+      <option value="EUR">€ EUR</option>
+      <option value="GBP">£ GBP</option>
+      <option value="AED">د.إ AED</option>
+      <option value="SGD">S$ SGD</option>
+    </select>
+    <button class="btn btn-outline btn-sm" onclick="importFromPortal()">⬇ Import from Portfolio Portal</button>
+  </div>
+</div>
+
+<!-- VIEWS -->
+<div class="view act" id="view-kanban"></div>
+<div class="view" id="view-list"></div>
+<div class="view" id="view-dashboard"></div>
+
+<!-- OPP DRAWER -->
+<div class="overlay" id="oppDrawer">
+  <div class="drawer">
+    <div class="drawer-hdr">
+      <div>
+        <div class="drawer-hdr__title" id="drawer-title">New Opportunity</div>
+        <div id="drawer-sub" style="font-size:11px;color:var(--mid)"></div>
+      </div>
+      <button class="drawer-hdr__close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+    <div class="drawer-footer" id="drawer-footer"></div>
+  </div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────
+const STAGES = [
+  {id:'all',    label:'All',       color:'#B4B4BE'},
+  {id:'prospect',  label:'Prospect',  color:'#6366F1'},
+  {id:'qualify',   label:'Qualify',   color:'#1C38F5'},
+  {id:'instantiate',label:'Instantiate',color:'#00B290'},
+  {id:'size',      label:'Size',      color:'#FFB600'},
+  {id:'propose',   label:'Propose',   color:'#FF5539'},
+  {id:'win',       label:'Win & Scope',color:'#10B981'},
+  {id:'deliver',   label:'Deliver',   color:'#3C00B4'},
+  {id:'renew',     label:'Renew',     color:'#002870'},
+  {id:'lost',      label:'Lost',      color:'#DC2626'},
+  {id:'hold',      label:'On Hold',   color:'#B4B4BE'},
+]
+
+const STAGE_ACTIONS = {
+  prospect:    [{icon:'🗺️',label:'Generate Value Map',    desc:'Open Portfolio Portal to activate items',tool:'portfolio-portal'},
+                {icon:'📋',label:'Log Qualification Call',desc:'Record initial discovery call notes'}],
+  qualify:     [{icon:'⚙️',label:'Run Domain Configurator',desc:'Capture use cases, personas, volumetrics',tool:'domain-configurator'},
+                {icon:'📊',label:'Qualification Scorecard',desc:'Score this opportunity on 6 dimensions'}],
+  instantiate: [{icon:'🏭',label:'Open Inferencing Factory',desc:'Size hardware from project definition',tool:'inferencing-factory'},
+                {icon:'📄',label:'Generate Requirements Doc',desc:'Export structured requirements for customer sign-off'}],
+  size:        [{icon:'📋',label:'Open Deal Analysis Tool',desc:'Build commercial model and P&L',tool:'deal-analysis'},
+                {icon:'🎯',label:'Benchmark Run',desc:'Schedule performance benchmark for customer'}],
+  propose:     [{icon:'📝',label:'Generate Proposal',desc:'Create high-level proposal document'},
+                {icon:'🌐',label:'Vision Document',desc:'Required for Strategic / Sovereign deals'}],
+  win:         [{icon:'📃',label:'Generate SOW',desc:'Create Statement of Work'},
+                {icon:'🏗️',label:'Technical Architecture Doc',desc:'Detailed technical specification'}],
+  deliver:     [{icon:'📈',label:'Open HPC Monitoring',desc:'Live cluster performance dashboard',tool:'hpc-monitoring'},
+                {icon:'🧭',label:'COMPASS Governance',desc:'Token governance and workload scheduling',tool:'compass'}],
+  renew:       [{icon:'🔄',label:'AMC Renewal Proposal',desc:'Generate renewal proposal from Deal Analysis'},
+                {icon:'📊',label:'Usage Report',desc:'Generate consumption and ROI report'}],
+}
+
+// SIZE_LABELS are generated dynamically via getSizeLabel()
+const TYPE_COLORS = {standard:'var(--mid)', strategic:'var(--indigo)', pilot:'#9a7000'}
+
+
+// ── CURRENCY ENGINE ──────────────────────────────────────────
+const CURRENCIES = {
+  INR: { symbol: '₹', name: 'Indian Rupee',    units: 'Cr',  unitVal: 1e7,  sizes: { S:'<5Cr', M:'5–25Cr', L:'25–100Cr', XL:'>100Cr' } },
+  USD: { symbol: '$', name: 'US Dollar',        units: 'M',   unitVal: 1e6,  sizes: { S:'<0.5M', M:'0.5–3M', L:'3–12M', XL:'>12M' } },
+  EUR: { symbol: '€', name: 'Euro',             units: 'M',   unitVal: 1e6,  sizes: { S:'<0.5M', M:'0.5–3M', L:'3–12M', XL:'>12M' } },
+  GBP: { symbol: '£', name: 'British Pound',    units: 'M',   unitVal: 1e6,  sizes: { S:'<0.5M', M:'0.5–3M', L:'3–12M', XL:'>12M' } },
+  AED: { symbol: 'د.إ', name: 'UAE Dirham',    units: 'M',   unitVal: 1e6,  sizes: { S:'<2M', M:'2–10M', L:'10–50M', XL:'>50M' } },
+  SGD: { symbol: 'S$', name: 'Singapore Dollar',units: 'M',   unitVal: 1e6,  sizes: { S:'<0.5M', M:'0.5–4M', L:'4–15M', XL:'>15M' } },
+}
+
+// SIZE approximate midpoints for weighted pipeline calculation (in currency units)
+const SIZE_MIDS = { S: 0.3, M: 2, L: 8, XL: 20 }  // in M/Cr units
+
+function getCurrency() {
+  return CURRENCIES[localStorage.getItem('atlas_currency') || 'USD'] || CURRENCIES['USD']
+}
+
+function setCurrency(code) {
+  localStorage.setItem('atlas_currency', code)
+  updateSizeFilterLabels()
+  renderCurrentView()
+}
+
+function getSizeLabel(size) {
+  const c = getCurrency()
+  return `${size} ${c.symbol}${c.sizes[size] || '—'}`
+}
+
+function formatValue(units) {
+  const c = getCurrency()
+  return `${c.symbol}${units.toFixed(1)}${c.units}`
+}
+
+function updateSizeFilterLabels() {
+  const c = getCurrency()
+  const sel = document.getElementById('f-size')
+  if (!sel) return
+  sel.innerHTML = `<option value="">All Sizes</option>` +
+    ['S','M','L','XL'].map(s => `<option value="${s}">${getSizeLabel(s)}</option>`).join('')
+}
+
+// ── STATE ─────────────────────────────────────────────────────
+let OPPS = JSON.parse(localStorage.getItem('atlas_rac_opps') || '[]')
+let filteredOpps = []
+let currentView = 'kanban'
+let stageFilter = 'all'
+let currentOppId = null
+let editMode = false
+let dashCharts = {}
+
+// ── PERSISTENCE ───────────────────────────────────────────────
+function save() {
+  localStorage.setItem('atlas_rac_opps', JSON.stringify(OPPS))
+}
+
+// ── IMPORT FROM PORTFOLIO PORTAL ──────────────────────────────
+function importFromPortal() {
+  const opps = JSON.parse(localStorage.getItem('atlas_opportunities') || '[]')
+  if (opps.length === 0) { alert('No opportunities found in Portfolio Portal. Create one there first.'); return }
+  let imported = 0
+  opps.forEach(o => {
+    if (!OPPS.find(x => x.sourceId === o.id)) {
+      OPPS.push({
+        id: 'rac_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+        sourceId: o.id,
+        name: o.name,
+        customer: o.customer,
+        type: o.type || 'standard',
+        complexity: o.complexity || 'single',
+        size: o.size || 'M',
+        segment: o.segment || '',
+        domain: o.portfolioItems?.some(id=>id.startsWith('def')) ? 'defence' : 'geospatial',
+        stage: 'prospect',
+        owner: 'Sales',
+        probability: 10,
+        expectedCloseDate: '',
+        notes: o.notes || '',
+        portfolioItems: o.portfolioItemNames || [],
+        activities: [{
+          ts: new Date().toISOString(),
+          text: `Imported from Portfolio Portal. ${(o.portfolioItemNames||[]).length} portfolio items linked.`
+        }],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        flags: { visionDocRequired: o.type==='strategic' || o.complexity==='sovereign', compassRequired: o.complexity==='sovereign' }
+      })
+      imported++
+    }
+  })
+  save()
+  render()
+  alert(imported > 0 ? `${imported} opportunit${imported>1?'ies':'y'} imported successfully.` : 'All Portfolio Portal opportunities are already in the pipeline.')
+}
+
+// ── STAGE FILTER BAR ──────────────────────────────────────────
+function renderPipelineBar() {
+  const bar = document.getElementById('pipeline-bar')
+  bar.innerHTML = STAGES.map(s => {
+    const count = s.id === 'all' ? OPPS.filter(o=>o.stage!=='lost'&&o.stage!=='hold').length : OPPS.filter(o=>o.stage===s.id).length
+    return `
+      <div class="pipe-stage ${stageFilter===s.id?'act':''}" onclick="setStage('${s.id}')">
+        <div class="pipe-stage__dot" style="background:${s.color}"></div>
+        ${s.label}
+        <div class="pipe-stage__count">${count}</div>
+      </div>`
+  }).join('')
+}
+
+function setStage(id) {
+  stageFilter = id
+  renderPipelineBar()
+  applyFilters()
+  document.getElementById('toolbar-title').textContent = id === 'all' ? 'All Opportunities' : STAGES.find(s=>s.id===id)?.label + ' Stage'
+}
+
+// ── FILTERS ───────────────────────────────────────────────────
+function applyFilters() {
+  const type = document.getElementById('f-type').value
+  const size = document.getElementById('f-size').value
+  const owner = document.getElementById('f-owner').value
+  const search = document.getElementById('f-search').value.toLowerCase()
+
+  filteredOpps = OPPS.filter(o => {
+    if (stageFilter !== 'all' && o.stage !== stageFilter) return false
+    if (type && o.type !== type) return false
+    if (size && o.size !== size) return false
+    if (owner && o.owner !== owner) return false
+    if (search && !o.name.toLowerCase().includes(search) && !o.customer.toLowerCase().includes(search)) return false
+    return true
+  })
+  renderCurrentView()
+}
+
+// ── VIEW SWITCHING ────────────────────────────────────────────
+function setView(v) {
+  currentView = v
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('act'))
+  document.querySelectorAll('.view-btn').forEach(el=>el.classList.remove('act'))
+  document.getElementById('view-'+v).classList.add('act')
+  document.getElementById('vb-'+v).classList.add('act')
+  renderCurrentView()
+}
+
+function renderCurrentView() {
+  if (currentView === 'kanban') renderKanban()
+  else if (currentView === 'list') renderList()
+  else if (currentView === 'dashboard') renderDashboard()
+}
+
+// ── KANBAN ────────────────────────────────────────────────────
+function renderKanban() {
+  const stages = STAGES.filter(s=>s.id!=='all')
+  const view = document.getElementById('view-kanban')
+
+  if (OPPS.length === 0) {
+    view.innerHTML = `
+      <div class="empty">
+        <div class="empty__icon">🎯</div>
+        <div class="empty__title">No opportunities yet</div>
+        <div class="empty__desc">Click "+ New Opportunity" to create one, or import from the Portfolio Portal.</div>
+        <div style="margin-top:20px;display:flex;gap:10px;justify-content:center">
+          <button class="btn btn-primary" onclick="openNewOpp()">+ New Opportunity</button>
+          <button class="btn btn-outline" onclick="importFromPortal()">⬇ Import from Portfolio Portal</button>
+        </div>
+      </div>`
+    return
+  }
+
+  view.innerHTML = `<div class="kanban">${stages.map(s => {
+    const colOpps = filteredOpps.filter(o=>o.stage===s.id)
+    return `
+      <div class="kanban-col">
+        <div class="kanban-col__hdr">
+          <div class="kanban-col__title">
+            <div class="kanban-col__dot" style="background:${s.color}"></div>
+            ${s.label}
+          </div>
+          <div class="kanban-col__count">${colOpps.length}</div>
+        </div>
+        <div class="kanban-col__body">
+          ${colOpps.map(o=>oppCardHTML(o,s)).join('')}
+          ${colOpps.length===0?`<div style="font-size:11px;color:var(--mid);text-align:center;padding:20px 0;border:2px dashed #e0e0e8;border-radius:var(--r);">Empty</div>`:''}
+        </div>
+      </div>`
+  }).join('')}</div>`
+}
+
+function oppCardHTML(o, s) {
+  const age = Math.floor((Date.now() - new Date(o.createdAt))/86400000)
+  return `
+    <div class="opp-card" onclick="openOpp('${o.id}')" style="border-top-color:${s.color};border-top-width:3px;">
+      <div class="opp-card__name">${o.name}</div>
+      <div class="opp-card__customer">${o.customer}</div>
+      <div class="opp-card__meta">
+        <span class="tag tag-type-${o.type}">${o.type}</span>
+        <span class="tag tag-size-${o.size?.toLowerCase()}">${o.size||'—'}</span>
+        ${o.domain?`<span class="tag tag-domain-${o.domain==='geospatial'?'geo':'def'}">${o.domain==='geospatial'?'🛰️':'🛡️'}</span>`:''}
+      </div>
+      <div class="opp-card__footer">
+        <span class="opp-card__age">${age}d ago</span>
+        <span class="opp-card__size">${o.probability||0}% prob.</span>
+      </div>
+    </div>`
+}
+
+// ── LIST VIEW ─────────────────────────────────────────────────
+function renderList() {
+  const view = document.getElementById('view-list')
+  if (filteredOpps.length === 0) {
+    view.innerHTML = `<div class="empty"><div class="empty__icon">🔍</div><div class="empty__title">No results</div></div>`
+    return
+  }
+  view.innerHTML = `
+    <table class="list-table">
+      <thead><tr>
+        <th>Opportunity</th><th>Customer</th><th>Stage</th><th>Type</th>
+        <th>Size</th><th>Domain</th><th>Owner</th><th>Probability</th><th>Close Date</th>
+      </tr></thead>
+      <tbody>
+        ${filteredOpps.map(o => {
+          const s = STAGES.find(x=>x.id===o.stage)||STAGES[0]
+          return `<tr class="${o.stage==='lost'?'lost':''}" onclick="openOpp('${o.id}')">
+            <td><strong>${o.name}</strong></td>
+            <td>${o.customer}</td>
+            <td><span class="stage-pill" style="background:${s.color}">${s.label}</span></td>
+            <td><span class="tag tag-type-${o.type}">${o.type}</span></td>
+            <td><span class="tag tag-size-${o.size?.toLowerCase()}">${o.size||'—'}</span></td>
+            <td>${o.domain==='geospatial'?'🛰️ Geo':o.domain==='defence'?'🛡️ Def':'—'}</td>
+            <td>${o.owner||'—'}</td>
+            <td>${o.probability||0}%</td>
+            <td>${o.expectedCloseDate||'—'}</td>
+          </tr>`
+        }).join('')}
+      </tbody>
+    </table>`
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+function renderDashboard() {
+  const view = document.getElementById('view-dashboard')
+  const active = OPPS.filter(o=>!['lost','hold'].includes(o.stage))
+  const totalProb = active.reduce((s,o)=>{
+    const mid = SIZE_MIDS[o.size] || 2
+    return s + mid*(o.probability||0)/100
+  },0)
+
+  view.innerHTML = `
+    <div class="dash-grid">
+      <div class="dash-card"><div class="dash-stat orange">${OPPS.length}</div><div class="dash-lbl">Total Opportunities</div></div>
+      <div class="dash-card"><div class="dash-stat">${active.length}</div><div class="dash-lbl">Active Pipeline</div></div>
+      <div class="dash-card"><div class="dash-stat teal">${formatValue(totalProb)}</div><div class="dash-lbl">Weighted Pipeline Value (est.)</div></div>
+      <div class="dash-card"><div class="dash-stat">${OPPS.filter(o=>o.stage==='win').length}</div><div class="dash-lbl">Won This Quarter</div></div>
+    </div>
+    <div class="dash-charts">
+      <div class="chart-card"><div class="chart-card-title">Pipeline by Stage</div><div class="chart-wrap"><canvas id="dc-stage"></canvas></div></div>
+      <div class="chart-card"><div class="chart-card-title">Opportunities by Type</div><div class="chart-wrap"><canvas id="dc-type"></canvas></div></div>
+      <div class="chart-card"><div class="chart-card-title">By Size</div><div class="chart-wrap"><canvas id="dc-size"></canvas></div></div>
+      <div class="chart-card"><div class="chart-card-title">By Domain</div><div class="chart-wrap"><canvas id="dc-domain"></canvas></div></div>
+    </div>`
+
+  setTimeout(() => {
+    const stages = STAGES.filter(s=>s.id!=='all'&&s.id!=='hold')
+    drawChart('dc-stage','doughnut',stages.map(s=>s.label),stages.map(s=>OPPS.filter(o=>o.stage===s.id).length),stages.map(s=>s.color))
+    drawChart('dc-type','pie',['Standard','Strategic','Pilot'],['standard','strategic','pilot'].map(t=>OPPS.filter(o=>o.type===t).length),['#B4B4BE','#3C00B4','#FFB600'])
+    drawChart('dc-size','bar',['S','M','L','XL'],['S','M','L','XL'].map(s=>OPPS.filter(o=>o.size===s).length),['#002870','#1C38F5','#00B290','#FF5539'])
+    drawChart('dc-domain','pie',['Geospatial','Defence','Other'],['geospatial','defence',''].map(d=>OPPS.filter(o=>o.domain===d||(d===''&&!o.domain)).length),['#1C38F5','#3C00B4','#B4B4BE'])
+  },50)
+}
+
+function drawChart(id, type, labels, data, colors) {
+  const ctx = document.getElementById(id)
+  if (!ctx) return
+  if (dashCharts[id]) dashCharts[id].destroy()
+  dashCharts[id] = new Chart(ctx, {
+    type,
+    data:{labels,datasets:[{data,backgroundColor:colors,borderRadius:type==='bar'?4:0,borderWidth:type==='bar'?0:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:type==='bar'?'none':'right',labels:{font:{size:10},boxWidth:10}}},
+      scales:type==='bar'?{y:{beginAtZero:true,grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9}}}}:undefined
+    }
+  })
+}
+
+// ── OPP DRAWER ────────────────────────────────────────────────
+function openOpp(id) {
+  const o = OPPS.find(x=>x.id===id)
+  if (!o) return
+  currentOppId = id
+  editMode = false
+  renderDrawer(o)
+  document.getElementById('oppDrawer').classList.add('open')
+}
+
+function openNewOpp() {
+  currentOppId = null
+  editMode = true
+  renderNewOppForm()
+  document.getElementById('oppDrawer').classList.add('open')
+}
+
+function closeDrawer() {
+  document.getElementById('oppDrawer').classList.remove('open')
+  currentOppId = null
+}
+
+function renderDrawer(o) {
+  const s = STAGES.find(x=>x.id===o.stage)||STAGES[1]
+  document.getElementById('drawer-title').textContent = o.name
+  document.getElementById('drawer-sub').textContent = o.customer + ' · ' + s.label
+
+  // Stage progress
+  const stageOrder = ['prospect','qualify','instantiate','size','propose','win','deliver','renew']
+  const curIdx = stageOrder.indexOf(o.stage)
+  const stageProg = stageOrder.map((sid,i) => {
+    const st = STAGES.find(x=>x.id===sid)
+    const cls = i < curIdx ? 'done' : i === curIdx ? 'current' : 'future'
+    return `<div class="sp-step">
+      <div>
+        <div class="sp-dot ${cls}" style="${cls==='current'?`background:${st?.color}`:(cls==='done'?'background:var(--teal)':'')}" title="${st?.label}" onclick="moveToStage('${sid}')">
+          ${cls==='done'?'✓':i+1}
+        </div>
+        <div class="sp-label">${st?.label?.split(' ')[0]||''}</div>
+      </div>
+      ${i<stageOrder.length-1?'<div class="sp-line"></div>':''}
+    </div>`
+  }).join('')
+
+  // Next actions for current stage
+  const actions = STAGE_ACTIONS[o.stage] || []
+  const actionsHTML = actions.map(a => `
+    <div class="next-action" onclick="${a.tool?`openTool('${a.tool}','${o.id}')`:''}">
+      <div class="next-action__icon">${a.icon}</div>
+      <div>
+        <div class="next-action__label">${a.label}</div>
+        <div class="next-action__desc">${a.desc}</div>
+      </div>
+      <div class="next-action__arrow">→</div>
+    </div>`).join('')
+
+  // Portfolio items
+  const portHTML = o.portfolioItems?.length > 0
+    ? `<div class="port-items">${o.portfolioItems.map(p=>`<span class="port-tag">${p}</span>`).join('')}</div>`
+    : '<span style="font-size:12px;color:var(--mid)">None linked — activate from Portfolio Portal</span>'
+
+  // Activity
+  const actHTML = (o.activities||[]).slice().reverse().map(a => `
+    <div class="activity-item">
+      <div class="activity-dot"></div>
+      <div class="activity-text">${a.text}</div>
+      <div class="activity-time">${new Date(a.ts).toLocaleDateString('en-IN')}</div>
+    </div>`).join('') || '<div style="font-size:12px;color:var(--mid)">No activity yet.</div>'
+
+  // Flags
+  const flagsHTML = []
+  if (o.flags?.visionDocRequired) flagsHTML.push(`<span class="tag" style="background:rgba(60,0,180,0.1);color:var(--indigo)">📋 Vision Doc Required</span>`)
+  if (o.flags?.compassRequired) flagsHTML.push(`<span class="tag" style="background:rgba(0,178,144,0.1);color:var(--teal)">🧭 COMPASS Required</span>`)
+
+  document.getElementById('drawer-body').innerHTML = `
+    <div class="sec-label">Stage Progress</div>
+    <div class="stage-progress">${stageProg}</div>
+
+    ${flagsHTML.length>0?`<div style="display:flex;gap:8px;margin-bottom:16px">${flagsHTML.join('')}</div>`:''}
+
+    <div class="sec-label">Opportunity Details</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      <div><div style="font-size:10px;color:var(--mid);font-weight:700;text-transform:uppercase;margin-bottom:2px">Customer</div><div style="font-size:13px;font-weight:600">${o.customer}</div></div>
+      <div><div style="font-size:10px;color:var(--mid);font-weight:700;text-transform:uppercase;margin-bottom:2px">Type</div><div><span class="tag tag-type-${o.type}">${o.type}</span></div></div>
+      <div><div style="font-size:10px;color:var(--mid);font-weight:700;text-transform:uppercase;margin-bottom:2px">Deal Size</div><div style="font-size:13px;font-weight:600">${o.size||'—'}</div></div>
+      <div><div style="font-size:10px;color:var(--mid);font-weight:700;text-transform:uppercase;margin-bottom:2px">Probability</div><div style="font-size:13px;font-weight:600">${o.probability||0}%</div></div>
+      <div><div style="font-size:10px;color:var(--mid);font-weight:700;text-transform:uppercase;margin-bottom:2px">Domain</div><div style="font-size:13px">${o.domain==='geospatial'?'🛰️ Geospatial':o.domain==='defence'?'🛡️ Defence':'—'}</div></div>
+      <div><div style="font-size:10px;color:var(--mid);font-weight:700;text-transform:uppercase;margin-bottom:2px">Owner</div><div style="font-size:13px">${o.owner||'—'}</div></div>
+      <div><div style="font-size:10px;color:var(--mid);font-weight:700;text-transform:uppercase;margin-bottom:2px">Complexity</div><div style="font-size:13px">${o.complexity||'—'}</div></div>
+      <div><div style="font-size:10px;color:var(--mid);font-weight:700;text-transform:uppercase;margin-bottom:2px">Close Date</div><div style="font-size:13px">${o.expectedCloseDate||'—'}</div></div>
+    </div>
+    ${o.notes?`<div style="font-size:12px;color:var(--dark);background:var(--light);padding:10px;border-radius:var(--r);margin-bottom:16px">${o.notes}</div>`:''}
+
+    <div class="sec-label">Next Actions — ${s.label}</div>
+    ${actionsHTML || '<div style="font-size:12px;color:var(--mid)">No defined next actions for this stage.</div>'}
+
+    <div class="sec-label" style="margin-top:20px">Portfolio Items Linked (${o.portfolioItems?.length||0})</div>
+    ${portHTML}
+
+    <div class="sec-label" style="margin-top:20px">Add Activity Note</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <input type="text" id="activity-input" placeholder="Log a call, meeting, or update…" style="flex:1">
+      <button class="btn btn-teal btn-sm" onclick="addActivity('${o.id}')">Add</button>
+    </div>
+
+    <div class="sec-label">Activity Feed</div>
+    ${actHTML}
+  `
+
+  document.getElementById('drawer-footer').innerHTML = `
+    <button class="btn btn-outline btn-sm" onclick="deleteOpp('${o.id}')">🗑 Delete</button>
+    <button class="btn btn-outline" onclick="renderEditForm('${o.id}')">✏️ Edit</button>
+    ${curIdx < stageOrder.length-1 && o.stage!=='lost' ? `<button class="btn btn-teal" onclick="advanceStage('${o.id}')">→ Advance Stage</button>` : ''}
+    <button class="btn btn-primary" onclick="markLost('${o.id}')">✕ Mark Lost</button>
+  `
+}
+
+function renderNewOppForm(prefill) {
+  const o = prefill || {}
+  document.getElementById('drawer-title').textContent = prefill ? 'Edit Opportunity' : 'New Opportunity'
+  document.getElementById('drawer-sub').textContent = ''
+  document.getElementById('drawer-body').innerHTML = `
+    <div class="sec-label">Opportunity Details</div>
+    <div class="fg"><label class="req">Opportunity Name</label><input type="text" id="f-oname" value="${o.name||''}" placeholder="e.g. MDoNER GeoAI Platform — Phase 1"></div>
+    <div class="fg"><label class="req">Customer / Organisation</label><input type="text" id="f-ocust" value="${o.customer||''}" placeholder="e.g. Ministry of DONER"></div>
+    <div class="row2">
+      <div class="fg"><label>Opportunity Type</label>
+        <select id="f-otype">
+          ${['standard','strategic','pilot'].map(t=>`<option value="${t}" ${o.type===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
+        </select></div>
+      <div class="fg"><label>Domain Complexity</label>
+        <select id="f-ocomp">
+          ${['single','multi','sovereign'].map(c=>`<option value="${c}" ${o.complexity===c?'selected':''}>${c.charAt(0).toUpperCase()+c.slice(1)}</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Deal Size</label>
+        <select id="f-osize">
+          <option value="">— Select —</option>
+          ${['S','M','L','XL'].map(s=>`<option value="${s}" ${o.size===s?'selected':''}>${getSizeLabel(s)}</option>`).join('')}
+        </select></div>
+      <div class="fg"><label>Customer Segment</label>
+        <select id="f-oseg">
+          <option value="">— Select —</option>
+          ${['Q1','Q2','Q3','Q4'].map(q=>`<option value="${q}" ${o.segment===q?'selected':''}>${q}</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Domain</label>
+        <select id="f-odom">
+          <option value="">— Select —</option>
+          <option value="geospatial" ${o.domain==='geospatial'?'selected':''}>🛰️ Geospatial AI</option>
+          <option value="defence" ${o.domain==='defence'?'selected':''}>🛡️ Defence</option>
+          <option value="other" ${o.domain==='other'?'selected':''}>Other</option>
+        </select></div>
+      <div class="fg"><label>Pipeline Stage</label>
+        <select id="f-ostage">
+          ${STAGES.filter(s=>!['all','lost','hold'].includes(s.id)).map(s=>`<option value="${s.id}" ${o.stage===s.id?'selected':''}>${s.label}</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Win Probability (%)</label><input type="number" id="f-oprob" value="${o.probability||10}" min="0" max="100"></div>
+      <div class="fg"><label>Expected Close Date</label><input type="date" id="f-oclose" value="${o.expectedCloseDate||''}"></div>
+    </div>
+    <div class="fg"><label>Owner</label><input type="text" id="f-oowner" value="${o.owner||'Sales'}" placeholder="e.g. Sales, Presales"></div>
+    <div class="fg"><label>Notes / Context</label><textarea id="f-onotes" placeholder="Entry point, buying trigger, key contacts, context…">${o.notes||''}</textarea></div>
+  `
+  document.getElementById('drawer-footer').innerHTML = `
+    <button class="btn btn-outline" onclick="${o.id?`openOpp('${o.id}')`:' closeDrawer()'}">Cancel</button>
+    <button class="btn btn-primary" onclick="${o.id?`saveEditOpp('${o.id}')`:' createOpp()'}">${o.id?'Save Changes':'Create Opportunity'}</button>
+  `
+}
+
+function renderEditForm(id) {
+  const o = OPPS.find(x=>x.id===id)
+  if (!o) return
+  renderNewOppForm(o)
+}
+
+function createOpp() {
+  const name = document.getElementById('f-oname').value.trim()
+  const customer = document.getElementById('f-ocust').value.trim()
+  if (!name || !customer) { alert('Kindly enter a name and customer.'); return }
+  const type = document.getElementById('f-otype').value
+  const complexity = document.getElementById('f-ocomp').value
+  const o = {
+    id: 'rac_' + Date.now(),
+    name, customer, type, complexity,
+    size: document.getElementById('f-osize').value,
+    segment: document.getElementById('f-oseg').value,
+    domain: document.getElementById('f-odom').value,
+    stage: document.getElementById('f-ostage').value,
+    probability: +document.getElementById('f-oprob').value||10,
+    expectedCloseDate: document.getElementById('f-oclose').value,
+    owner: document.getElementById('f-oowner').value||'Sales',
+    notes: document.getElementById('f-onotes').value,
+    portfolioItems:[],
+    activities:[{ts:new Date().toISOString(),text:'Opportunity created in RAC pipeline.'}],
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString(),
+    flags:{
+      visionDocRequired: type==='strategic'||complexity==='sovereign',
+      compassRequired: complexity==='sovereign'
+    }
+  }
+  OPPS.push(o)
+  save()
+  render()
+  openOpp(o.id)
+}
+
+function saveEditOpp(id) {
+  const o = OPPS.find(x=>x.id===id)
+  if (!o) return
+  const name = document.getElementById('f-oname').value.trim()
+  const customer = document.getElementById('f-ocust').value.trim()
+  if (!name || !customer) { alert('Kindly enter a name and customer.'); return }
+  const type = document.getElementById('f-otype').value
+  const complexity = document.getElementById('f-ocomp').value
+  Object.assign(o, {
+    name, customer, type, complexity,
+    size: document.getElementById('f-osize').value,
+    segment: document.getElementById('f-oseg').value,
+    domain: document.getElementById('f-odom').value,
+    stage: document.getElementById('f-ostage').value,
+    probability: +document.getElementById('f-oprob').value||o.probability,
+    expectedCloseDate: document.getElementById('f-oclose').value,
+    owner: document.getElementById('f-oowner').value||o.owner,
+    notes: document.getElementById('f-onotes').value,
+    updatedAt: new Date().toISOString(),
+    flags:{ visionDocRequired:type==='strategic'||complexity==='sovereign', compassRequired:complexity==='sovereign' }
+  })
+  o.activities.push({ts:new Date().toISOString(),text:'Opportunity details updated.'})
+  save(); render(); openOpp(id)
+}
+
+function advanceStage(id) {
+  const o = OPPS.find(x=>x.id===id)
+  if (!o) return
+  const order = ['prospect','qualify','instantiate','size','propose','win','deliver','renew']
+  const idx = order.indexOf(o.stage)
+  if (idx < order.length-1) {
+    const next = order[idx+1]
+    o.stage = next
+    o.activities.push({ts:new Date().toISOString(),text:`Advanced to ${STAGES.find(s=>s.id===next)?.label} stage.`})
+    o.updatedAt = new Date().toISOString()
+    save(); render(); openOpp(id)
+  }
+}
+
+function moveToStage(stage) {
+  if (!currentOppId) return
+  const o = OPPS.find(x=>x.id===currentOppId)
+  if (!o) return
+  o.stage = stage
+  o.activities.push({ts:new Date().toISOString(),text:`Moved to ${STAGES.find(s=>s.id===stage)?.label} stage.`})
+  o.updatedAt = new Date().toISOString()
+  save(); render(); openOpp(currentOppId)
+}
+
+function markLost(id) {
+  if (!confirm('Mark this opportunity as lost?')) return
+  const o = OPPS.find(x=>x.id===id)
+  if (!o) return
+  o.stage = 'lost'
+  o.activities.push({ts:new Date().toISOString(),text:'Marked as lost.'})
+  o.updatedAt = new Date().toISOString()
+  save(); render(); closeDrawer()
+}
+
+function deleteOpp(id) {
+  if (!confirm('Permanently delete this opportunity?')) return
+  OPPS = OPPS.filter(x=>x.id!==id)
+  save(); render(); closeDrawer()
+}
+
+function addActivity(id) {
+  const inp = document.getElementById('activity-input')
+  const text = inp.value.trim()
+  if (!text) return
+  const o = OPPS.find(x=>x.id===id)
+  if (!o) return
+  o.activities.push({ts:new Date().toISOString(),text})
+  o.updatedAt = new Date().toISOString()
+  inp.value = ''
+  save(); openOpp(id)
+}
+
+function openTool(tool, oppId) {
+  const toolPaths = {
+    'portfolio-portal': '../portfolio-portal/',
+    'domain-configurator': '../domain-configurator/',
+    'inferencing-factory': '../inferencing-factory/',
+    'deal-analysis': '../deal-analysis/',
+    'hpc-monitoring': '../hpc-monitoring/',
+    'compass': '../compass/',
+  }
+  const path = toolPaths[tool]
+  if (path) window.open(path + (oppId ? '?opp='+oppId : ''), '_blank')
+}
+
+// ── OWNER FILTER POPULATE ─────────────────────────────────────
+function populateOwnerFilter() {
+  const owners = [...new Set(OPPS.map(o=>o.owner).filter(Boolean))]
+  const sel = document.getElementById('f-owner')
+  sel.innerHTML = `<option value="">All Owners</option>` + owners.map(o=>`<option value="${o}">${o}</option>`).join('')
+}
+
+// ── MAIN RENDER ───────────────────────────────────────────────
+function render() {
+  populateOwnerFilter()
+  renderPipelineBar()
+  applyFilters()
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  // Seed with sample data if empty
+  if (OPPS.length === 0) {
+    OPPS = [
+      {id:'demo1',name:'MDoNER GeoAI Platform — NE India',customer:'Ministry of DONER',type:'strategic',complexity:'sovereign',size:'XL',segment:'Q4',domain:'geospatial',stage:'qualify',probability:25,expectedCloseDate:'2026-09-30',owner:'Sales',notes:'Strategic flagship. Vision Doc and COMPASS required.',portfolioItems:['AI Readiness Assessment','Datacenter Design & Build','Purpose-Built Inference Factory','Enterprise RAG Platform','Sovereign AI Platform'],activities:[{ts:new Date().toISOString(),text:'Imported from Portfolio Portal. 5 portfolio items linked.'},{ts:new Date(Date.now()-86400000*3).toISOString(),text:'Discovery call completed. CIO and data team attended.'}],createdAt:new Date(Date.now()-86400000*10).toISOString(),updatedAt:new Date().toISOString(),flags:{visionDocRequired:true,compassRequired:true}},
+      {id:'demo2',name:'Border Surveillance AI — Rajasthan',customer:'BSF Command',type:'standard',complexity:'single',size:'L',segment:'Q3',domain:'defence',stage:'size',probability:45,expectedCloseDate:'2026-07-31',owner:'Presales',notes:'Air-gapped deployment. CERT-In compliance required.',portfolioItems:['Purpose-Built Inference Factory','Edge AI Inference Appliance','AI Security Assessment & Architecture'],activities:[{ts:new Date().toISOString(),text:'Domain Configurator completed. Project definition file exported.'}],createdAt:new Date(Date.now()-86400000*20).toISOString(),updatedAt:new Date().toISOString(),flags:{visionDocRequired:false,compassRequired:false}},
+      {id:'demo3',name:'AI PoC — Crop Monitoring',customer:'ICAR',type:'pilot',complexity:'single',size:'S',segment:'Q1',domain:'geospatial',stage:'propose',probability:70,expectedCloseDate:'2026-06-15',owner:'Sales',notes:'Quick win. 8-week PoC timeline.',portfolioItems:['AI Proof-of-Concept Lab','Crop Health Monitoring'],activities:[{ts:new Date().toISOString(),text:'BOM complete. Proposal being drafted.'}],createdAt:new Date(Date.now()-86400000*30).toISOString(),updatedAt:new Date().toISOString(),flags:{visionDocRequired:false,compassRequired:false}},
+    ]
+    save()
+  }
+  // Init currency selector
+  const savedCurrency = localStorage.getItem('atlas_currency') || 'USD'
+  const currSel = document.getElementById('currency-sel')
+  if (currSel) currSel.value = savedCurrency
+  updateSizeFilterLabels()
+  render()
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer() })
+})
+</script>
+</body>
+</html>
 
