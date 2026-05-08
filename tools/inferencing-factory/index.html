@@ -1,1 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — AI Inferencing Factory v3.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;
+  --teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;
+  --dark:#282832;--black:#0A0A0F;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.12);
+  --r:8px;--r-sm:6px;--r-lg:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+
+/* HEADER */
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-right{display:flex;align-items:center;gap:12px;}
+.hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;letter-spacing:0.5px;}
+
+/* IMPORT BANNER */
+.import-banner{background:linear-gradient(135deg,var(--navy),var(--blue));padding:20px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.import-banner.loaded{background:linear-gradient(135deg,#005a3c,var(--teal));}
+.import-icon{font-size:32px;}
+.import-text{flex:1;min-width:200px;}
+.import-text h2{font-size:15px;font-weight:700;color:var(--white);margin-bottom:3px;}
+.import-text p{font-size:12px;color:rgba(255,255,255,0.7);}
+.import-actions{display:flex;gap:10px;flex-wrap:wrap;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+
+/* PROJECT CONTEXT BAR */
+.ctx-bar{background:var(--white);border-bottom:1px solid #e0e0e8;padding:10px 24px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.ctx-item{display:flex;align-items:center;gap:6px;font-size:12px;}
+.ctx-label{font-weight:700;color:var(--mid);text-transform:uppercase;font-size:10px;letter-spacing:0.5px;}
+.ctx-val{font-weight:600;color:var(--dark);}
+.ctx-badge{background:rgba(0,178,144,0.1);color:var(--teal);font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;}
+
+/* TABS */
+.tabs{background:var(--white);border-bottom:2px solid #e0e0e8;padding:0 24px;display:flex;gap:0;overflow-x:auto;}
+.tab{padding:12px 18px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;white-space:nowrap;}
+.tab.act{color:var(--navy);border-bottom-color:var(--orange);}
+.tab:hover{color:var(--navy);}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:1fr 320px;gap:0;min-height:calc(100vh - 180px);}
+.main-area{padding:24px;overflow-y:auto;}
+.right-panel{background:var(--white);border-left:1px solid #e0e0e8;padding:20px;overflow-y:auto;}
+
+/* CARDS */
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card:last-child{margin-bottom:0;}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:16px;}
+.sec-label{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--light);}
+
+/* WORKLOAD CARDS */
+.wl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.wl-card{background:var(--white);border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;position:relative;transition:all 0.15s;}
+.wl-card.active{border-color:var(--blue);}
+.wl-card.warn{border-color:var(--amber);}
+.wl-card.ok{border-color:var(--teal);}
+.wl-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r-lg) var(--r-lg) 0 0;}
+.wl-card.active::before{background:var(--blue);}
+.wl-card.warn::before{background:var(--amber);}
+.wl-card.ok::before{background:var(--teal);}
+.wl-title{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:4px;}
+.wl-subtitle{font-size:11px;color:var(--mid);margin-bottom:10px;}
+.wl-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
+.wl-metric{background:var(--light);border-radius:var(--r-sm);padding:6px 8px;text-align:center;}
+.wl-metric-val{font-size:15px;font-weight:900;color:var(--navy);}
+.wl-metric-lbl{font-size:9px;color:var(--mid);margin-top:1px;}
+.wl-metric-val.orange{color:var(--orange);}
+.wl-metric-val.teal{color:var(--teal);}
+.wl-metric-val.red{color:#DC2626;}
+
+/* GPU SELECT */
+.gpu-select{margin-top:8px;}
+.gpu-row{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;margin-bottom:6px;}
+.gpu-row select,.gpu-row input{font-size:11px;padding:4px 6px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-family:inherit;width:100%;}
+.gpu-row select:focus,.gpu-row input:focus{outline:none;border-color:var(--blue);}
+.gpu-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;}
+.gpu-tag.dlc{background:rgba(28,56,245,0.1);color:var(--blue);}
+.gpu-tag.ac{background:rgba(0,178,144,0.1);color:var(--teal);}
+
+/* BOM TABLE */
+.bom-table{width:100%;border-collapse:collapse;font-size:12px;}
+.bom-table th{text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
+.bom-table td{padding:7px 10px;border-bottom:1px solid var(--light);}
+.bom-table tr.total td{background:rgba(0,40,112,0.04);font-weight:700;color:var(--navy);}
+.bom-table tr:last-child td{border-bottom:none;}
+
+/* SUMMARY PANEL */
+.sum-stat{text-align:center;padding:12px;background:var(--light);border-radius:var(--r);margin-bottom:10px;}
+.sum-stat-val{font-size:24px;font-weight:900;color:var(--navy);}
+.sum-stat-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+.sum-stat-val.orange{color:var(--orange);}
+.sum-stat-val.teal{color:var(--teal);}
+.sum-item{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--light);font-size:11px;}
+.sum-item:last-child{border-bottom:none;}
+.sum-item-lbl{color:var(--mid);}
+.sum-item-val{font-weight:600;color:var(--dark);}
+
+/* FORM */
+label{display:block;font-size:10px;font-weight:700;color:var(--dark);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.3px;}
+select,input[type=number],input[type=text]{width:100%;padding:7px 10px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:inherit;color:var(--dark);appearance:none;}
+select:focus,input:focus{outline:none;border-color:var(--blue);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.fg{margin-bottom:12px;}
+
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:var(--r);font-size:12px;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-ok{background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.25);color:#007a60;}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.3);color:#9a7000;}
+.alert-err{background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);color:#DC2626;}
+
+/* TAB PANELS */
+.tp{display:none;}
+.tp.act{display:block;}
+
+/* CHART */
+.chart-wrap{position:relative;height:200px;}
+
+/* POWER SUMMARY */
+.power-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.power-cell{background:var(--light);border-radius:var(--r);padding:12px;text-align:center;}
+.power-val{font-size:20px;font-weight:900;color:var(--navy);}
+.power-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+
+/* BADGES */
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;}
+.b-navy{background:rgba(0,40,112,0.1);color:var(--navy);}
+.b-teal{background:rgba(0,178,144,0.12);color:var(--teal);}
+.b-orange{background:rgba(255,85,57,0.12);color:var(--orange);}
+.b-blue{background:rgba(28,56,245,0.1);color:var(--blue);}
+
+/* JSON */
+.json-out{background:var(--black);border-radius:var(--r);padding:14px;font-family:'Roboto Mono',monospace;font-size:11px;color:#a8ff78;line-height:1.6;overflow:auto;max-height:300px;white-space:pre;}
+
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;}
+  .right-panel{border-left:none;border-top:1px solid #e0e0e8;}
+  .wl-grid{grid-template-columns:1fr;}
+  .power-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.65);">AI Inferencing Factory</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">v3.0 · Domain-Aware</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+  </div>
+</div>
+
+<!-- IMPORT BANNER -->
+<div class="import-banner" id="importBanner">
+  <div class="import-icon" id="importIcon">📂</div>
+  <div class="import-text">
+    <h2 id="importTitle">Load Project Definition File</h2>
+    <p id="importDesc">Upload a JSON from the Domain Configurator, or this tool will auto-detect if one was saved in this session.</p>
+  </div>
+  <div class="import-actions">
+    <label class="btn btn-primary" style="cursor:pointer">
+      ⬆ Upload JSON
+      <input type="file" accept=".json" style="display:none" onchange="handleImport(event)">
+    </label>
+    <button class="btn btn-ghost" onclick="checkLocalStorage()">🔍 Detect from Session</button>
+    <button class="btn btn-ghost" onclick="loadSampleProject()">📋 Load Sample</button>
+  </div>
+</div>
+
+<!-- CONTEXT BAR -->
+<div class="ctx-bar" id="ctxBar" style="display:none">
+  <div class="ctx-item"><span class="ctx-label">Project</span><span class="ctx-val" id="ctxProject">—</span></div>
+  <div class="ctx-item"><span class="ctx-label">Customer</span><span class="ctx-val" id="ctxCustomer">—</span></div>
+  <div class="ctx-item"><span class="ctx-label">Domain</span><span class="ctx-val" id="ctxDomain">—</span></div>
+  <div class="ctx-item"><span class="ctx-label">Tier</span><span class="ctx-badge" id="ctxTier">—</span></div>
+  <div class="ctx-item"><span class="ctx-label">Personas</span><span class="ctx-val" id="ctxPersonas">—</span></div>
+  <div class="ctx-item"><span class="ctx-label">Use Cases</span><span class="ctx-val" id="ctxUseCases">—</span></div>
+  <div style="margin-left:auto;display:flex;gap:8px">
+    <button class="btn btn-outline btn-sm" onclick="resetProject()">✕ Clear Project</button>
+    <button class="btn btn-teal btn-sm" onclick="exportBOM()">⬇ Export BOM</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab act" id="t-workloads" onclick="showTab('workloads')">⚡ Workload Sizing</div>
+  <div class="tab" id="t-bom" onclick="showTab('bom')">📋 Bill of Materials</div>
+  <div class="tab" id="t-power" onclick="showTab('power')">⚡ Power & Cooling</div>
+  <div class="tab" id="t-network" onclick="showTab('network')">🌐 Network Fabric</div>
+  <div class="tab" id="t-export" onclick="showTab('export')">📄 Export & Handoff</div>
+</div>
+
+<div class="layout">
+<div class="main-area">
+
+<!-- TAB: WORKLOADS -->
+<div class="tp act" id="tp-workloads">
+  <div id="no-project-msg" class="alert alert-info">
+    ℹ Load a Project Definition File above to auto-populate workloads from your Domain Configurator session. Or use the GPU Configuration panel on the right to manually configure.
+  </div>
+  <div id="workload-area" style="display:none">
+    <div class="alert alert-ok" id="import-ok-msg" style="display:none">
+      ✅ Project loaded. Workloads auto-populated from Domain Configurator. GPU assignments auto-suggested — adjust as needed.
+    </div>
+    <div class="wl-grid" id="wl-grid"></div>
+  </div>
+  
+  <!-- Manual add -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">+ Add Workload</div>
+    <div class="card-sub">Manually add a workload or override auto-populated ones</div>
+    <div class="row2">
+      <div class="fg">
+        <label>Workload Type</label>
+        <select id="mw-type">
+          <option value="inference-llm">LLM Inference</option>
+          <option value="inference-vision">Vision / VLM Inference</option>
+          <option value="inference-embed">Embedding Generation</option>
+          <option value="batch-processing">Batch Processing</option>
+          <option value="rag-pipeline">RAG Pipeline</option>
+          <option value="training">Fine-tuning / Training</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Workload Name</label>
+        <input type="text" id="mw-name" placeholder="e.g. Satellite Image Classifier">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="fg">
+        <label>Concurrent Users / RPS</label>
+        <input type="number" id="mw-rps" placeholder="e.g. 50" min="1">
+      </div>
+      <div class="fg">
+        <label>Latency Target (ms)</label>
+        <input type="number" id="mw-latency" placeholder="e.g. 500" min="10">
+      </div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="addManualWorkload()">+ Add Workload</button>
+  </div>
+</div>
+
+<!-- TAB: BOM -->
+<div class="tp" id="tp-bom">
+  <div class="card">
+    <div class="card-title">Bill of Materials</div>
+    <div class="card-sub">Hardware sizing computed from workload configuration</div>
+    <table class="bom-table" id="bom-table">
+      <thead><tr>
+        <th>Component</th><th>Specification</th><th>Qty</th><th>Unit</th><th>Total</th>
+      </tr></thead>
+      <tbody id="bom-tbody">
+        <tr><td colspan="5" style="text-align:center;color:var(--mid);padding:20px">Load a project to generate BOM</td></tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="card">
+    <div class="card-title">Software Stack (Annual)</div>
+    <div class="card-sub">Recommended software components based on domain and use cases</div>
+    <table class="bom-table" id="sw-table">
+      <thead><tr><th>Software</th><th>Category</th><th>License</th><th>Qty</th><th>Annual Cost</th></tr></thead>
+      <tbody id="sw-tbody">
+        <tr><td colspan="5" style="text-align:center;color:var(--mid);padding:20px">Load a project to generate software stack</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TAB: POWER -->
+<div class="tp" id="tp-power">
+  <div class="card">
+    <div class="card-title">Power & Cooling Summary</div>
+    <div class="card-sub">Computed from GPU TDP, server density, and PUE assumptions. Site preparation scope — not a BOM input.</div>
+    <div class="alert alert-warn" style="margin-bottom:16px">
+      ⚡ Power requirements are outputs for DC preparation planning — they do not appear in the procurement BOM. Share with the facilities team.
+    </div>
+    <div class="power-grid" id="power-grid">
+      <div class="power-cell"><div class="power-val">—</div><div class="power-lbl">Total IT Load (kW)</div></div>
+      <div class="power-cell"><div class="power-val">—</div><div class="power-lbl">DLC Racks (260kW)</div></div>
+      <div class="power-cell"><div class="power-val">—</div><div class="power-lbl">AC Racks (90kW)</div></div>
+      <div class="power-cell"><div class="power-val">—</div><div class="power-lbl">Annual Energy (MWh)</div></div>
+      <div class="power-cell"><div class="power-val">—</div><div class="power-lbl">Cooling Approach</div></div>
+      <div class="power-cell"><div class="power-val">—</div><div class="power-lbl">Facility PUE</div></div>
+    </div>
+    <div class="sec-label">Per-Site Breakdown</div>
+    <div id="power-site-detail" style="font-size:12px;color:var(--mid)">Load a project to see per-site power breakdown.</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Cooling Profile</div>
+    <div class="chart-wrap"><canvas id="powerChart"></canvas></div>
+  </div>
+</div>
+
+<!-- TAB: NETWORK -->
+<div class="tp" id="tp-network">
+  <div class="card">
+    <div class="card-title">Network Fabric Sizing</div>
+    <div class="card-sub">East-West (GPU scale-out) and North-South (client traffic) switch and cable requirements</div>
+    <div id="network-content" style="font-size:12px;color:var(--mid)">Load a project to compute network fabric sizing.</div>
+  </div>
+</div>
+
+<!-- TAB: EXPORT -->
+<div class="tp" id="tp-export">
+  <div class="card">
+    <div class="card-title">Export & Handoff</div>
+    <div class="card-sub">Export the complete sizing output for use in proposals, procurement, and document generation</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="border:1px solid #e0e0e8;border-radius:var(--r);padding:16px;text-align:center;cursor:pointer;transition:all 0.15s" onclick="exportBOM()" onmouseover="this.style.borderColor='var(--orange)'" onmouseout="this.style.borderColor='#e0e0e8'">
+        <div style="font-size:26px;margin-bottom:8px">📄</div>
+        <div style="font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px">Sizing Output JSON</div>
+        <div style="font-size:11px;color:var(--mid)">Full BOM + power + network for Document Factory</div>
+      </div>
+      <div style="border:1px solid #e0e0e8;border-radius:var(--r);padding:16px;text-align:center;cursor:pointer;transition:all 0.15s" onclick="exportSummaryTxt()" onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='#e0e0e8'">
+        <div style="font-size:26px;margin-bottom:8px">📋</div>
+        <div style="font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px">Sizing Summary</div>
+        <div style="font-size:11px;color:var(--mid)">Plain text for presales review and sign-off</div>
+      </div>
+    </div>
+    <div class="sec-label">JSON Preview</div>
+    <div class="json-out" id="json-preview">Load a project to see export preview.</div>
+  </div>
+</div>
+
+</div><!-- /main-area -->
+
+<!-- RIGHT PANEL -->
+<div class="right-panel">
+  <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:12px;">📊 Sizing Summary</div>
+  
+  <div class="sum-stat">
+    <div class="sum-stat-val orange" id="s-gpus">—</div>
+    <div class="sum-stat-lbl">Total GPUs (all workloads)</div>
+  </div>
+  <div class="sum-stat">
+    <div class="sum-stat-val" id="s-servers">—</div>
+    <div class="sum-stat-lbl">Total Servers</div>
+  </div>
+  <div class="sum-stat">
+    <div class="sum-stat-val teal" id="s-power">—</div>
+    <div class="sum-stat-lbl">IT Power (kW)</div>
+  </div>
+  
+  <div style="font-size:12px;font-weight:700;color:var(--navy);margin:16px 0 10px;">🔧 Global GPU Settings</div>
+  <div class="fg">
+    <label>Default GPU for LLM / Vision</label>
+    <select id="g-llm-gpu" onchange="updateGlobalGPU()">
+      <option value="B200">NVIDIA B200 (192GB HBM3e)</option>
+      <option value="B300">NVIDIA B300 (288GB)</option>
+      <option value="H200">NVIDIA H200 SXM (141GB)</option>
+      <option value="MI325X">AMD MI325X (288GB)</option>
+      <option value="MI350X">AMD MI350X (288GB)</option>
+    </select>
+  </div>
+  <div class="fg">
+    <label>Default GPU for Vision / Embedding</label>
+    <select id="g-light-gpu" onchange="updateGlobalGPU()">
+      <option value="L40S">NVIDIA L40S (48GB)</option>
+      <option value="L4">NVIDIA L4 (24GB)</option>
+      <option value="B200">NVIDIA B200 (192GB)</option>
+    </select>
+  </div>
+  <div class="fg">
+    <label>Quantization</label>
+    <select id="g-quant" onchange="recalcAll()">
+      <option value="fp8">FP8 (recommended)</option>
+      <option value="fp16">FP16</option>
+      <option value="int4">INT4</option>
+    </select>
+  </div>
+  <div class="fg">
+    <label>Serving Engine</label>
+    <select id="g-engine" onchange="recalcAll()">
+      <option value="vllm">vLLM</option>
+      <option value="trt">TensorRT-LLM</option>
+      <option value="sglang">SGLang</option>
+      <option value="triton">Triton</option>
+    </select>
+  </div>
+  <div class="fg">
+    <label>HA Multiplier</label>
+    <select id="g-ha" onchange="recalcAll()">
+      <option value="1.0">Best Effort (1.0×)</option>
+      <option value="1.2" selected>Business Critical (1.2×)</option>
+      <option value="1.5">Mission Critical (1.5×)</option>
+    </select>
+  </div>
+
+  <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="recalcAll()">🔄 Recalculate</button>
+
+  <div style="font-size:12px;font-weight:700;color:var(--navy);margin:16px 0 10px;">📈 Scale Profile</div>
+  <div class="chart-wrap" style="height:160px"><canvas id="scaleChart"></canvas></div>
+
+  <div style="font-size:12px;font-weight:700;color:var(--navy);margin:16px 0 10px;">📝 Project Details</div>
+  <div id="project-details">
+    <div style="font-size:11px;color:var(--mid)">No project loaded</div>
+  </div>
+</div>
+</div>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────
+let PROJECT = null   // loaded Project Definition File
+let WORKLOADS = []   // [{id, name, type, rps, latencyMs, gpu, gpuCount, servers, pwKw, fromProject}]
+let scaleChartInst = null, powerChartInst = null
+
+// ── GPU DATA (condensed) ──────────────────────────────────────
+const GPUS = {
+  B200:  {n:'NVIDIA B200',  hbm:192, tdp:1000, fp8:4500, cool:'dlc', usd:37500, mx:8},
+  B300:  {n:'NVIDIA B300',  hbm:288, tdp:1200, fp8:5600, cool:'dlc', usd:45000, mx:8},
+  H200:  {n:'NVIDIA H200',  hbm:141, tdp:700,  fp8:1979, cool:'dlc', usd:30000, mx:8},
+  MI325X:{n:'AMD MI325X',   hbm:288, tdp:750,  fp8:2600, cool:'dlc', usd:22000, mx:8},
+  MI350X:{n:'AMD MI350X',   hbm:288, tdp:800,  fp8:3600, cool:'dlc', usd:28000, mx:8},
+  L40S:  {n:'NVIDIA L40S',  hbm:48,  tdp:350,  fp8:733,  cool:'ac',  usd:8000,  mx:8},
+  L4:    {n:'NVIDIA L4',    hbm:24,  tdp:72,   fp8:242,  cool:'ac',  usd:3000,  mx:8},
+}
+
+const GPU_KEYS = Object.keys(GPUS)
+
+// ── USE CASE → GPU MAPPING ────────────────────────────────────
+const UC_GPU_HINT = {
+  // Geospatial
+  'geo-sat':   {gpu:'B200', light:'L40S'}, // satellite image analysis — large batches
+  'geo-chg':   {gpu:'L40S', light:'L40S'}, // change detection — batch
+  'geo-crop':  {gpu:'L40S', light:'L40S'},
+  'geo-flood': {gpu:'B200', light:'L40S'}, // real-time — needs speed
+  'geo-urban': {gpu:'L40S', light:'L40S'},
+  'geo-road':  {gpu:'L40S', light:'L40S'},
+  'geo-damage':{gpu:'B200', light:'L40S'},
+  'geo-forest':{gpu:'L40S', light:'L40S'},
+  'geo-pipe':  {gpu:'L40S', light:'L40S'},
+  'geo-soil':  {gpu:'L40S', light:'L40S'},
+  // Defence
+  'def-isr-auto':{gpu:'B200', light:'B200'}, // critical latency
+  'def-target': {gpu:'B200', light:'L40S'},
+  'def-border': {gpu:'B200', light:'L40S'},
+  'def-uav-analysis':{gpu:'B200', light:'B200'},
+  'def-terrain':{gpu:'L40S', light:'L40S'},
+  'def-threat': {gpu:'B200', light:'B200'},
+  'def-log':    {gpu:'L40S', light:'L40S'},
+  'def-maint':  {gpu:'L40S', light:'L40S'},
+  'def-c4isr':  {gpu:'B200', light:'B200'},
+  'def-anomaly':{gpu:'L40S', light:'L40S'},
+}
+
+// ── IMPORT / DETECTION ────────────────────────────────────────
+function handleImport(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result)
+      loadProject(data)
+    } catch(err) {
+      alert('Invalid JSON file. Please upload a Project Definition File from the Domain Configurator.')
+    }
+  }
+  reader.readAsText(file)
+}
+
+function checkLocalStorage() {
+  // Check for project saved from Domain Configurator or Portal
+  const keys = ['atlas_last_project','atlas_projects']
+  let found = null
+  
+  // Try direct project first
+  const direct = localStorage.getItem('atlas_last_project')
+  if (direct) {
+    try { found = JSON.parse(direct); } catch(e) {}
+  }
+  
+  // Try projects list — get most recent with domain
+  if (!found) {
+    const list = localStorage.getItem('atlas_projects')
+    if (list) {
+      try {
+        const projects = JSON.parse(list)
+        const withDef = projects.filter(p => p.definition && p.definition.domain)
+        if (withDef.length > 0) found = withDef[withDef.length - 1].definition
+      } catch(e) {}
+    }
+  }
+  
+  if (found) {
+    loadProject(found)
+  } else {
+    alert('No project found in this session. Please upload a JSON file from the Domain Configurator, or click "Load Sample" to see an example.')
+  }
+}
+
+function loadProject(data) {
+  PROJECT = data
+  
+  // Update banner
+  const banner = document.getElementById('importBanner')
+  banner.classList.add('loaded')
+  document.getElementById('importIcon').textContent = '✅'
+  document.getElementById('importTitle').textContent = `Project loaded: ${data.name || 'Unnamed'}`
+  document.getElementById('importDesc').textContent = `${data.domain || '—'} · ${(data.useCases||[]).length} use cases · ${(data.personas||[]).length} personas`
+  
+  // Show context bar
+  document.getElementById('ctxBar').style.display = 'flex'
+  document.getElementById('ctxProject').textContent = data.name || '—'
+  document.getElementById('ctxCustomer').textContent = data.customer || '—'
+  document.getElementById('ctxDomain').textContent = data.domain === 'geospatial' ? '🛰️ Geospatial AI' : data.domain === 'defence' ? '🛡️ Defence' : data.domain || '—'
+  document.getElementById('ctxTier').textContent = data.tier || '—'
+  document.getElementById('ctxPersonas').textContent = (data.personas||[]).length + ' personas'
+  document.getElementById('ctxUseCases').textContent = (data.useCases||[]).length + ' use cases'
+  
+  // Update project details panel
+  document.getElementById('project-details').innerHTML = `
+    <div class="sum-item"><span class="sum-item-lbl">Type</span><span class="sum-item-val">${data.opportunityType||'—'}</span></div>
+    <div class="sum-item"><span class="sum-item-lbl">Complexity</span><span class="sum-item-val">${data.domainComplexity||'—'}</span></div>
+    <div class="sum-item"><span class="sum-item-lbl">Concurrent Users</span><span class="sum-item-val">${data.volumetrics?.aggregated?.totalConcurrentUsers||'—'}</span></div>
+    <div class="sum-item"><span class="sum-item-lbl">Total Inf. RPS</span><span class="sum-item-val">${data.volumetrics?.aggregated?.totalInferenceRPS||'—'}</span></div>
+    <div class="sum-item"><span class="sum-item-lbl">Tightest Latency</span><span class="sum-item-val">${data.volumetrics?.aggregated?.tightestLatencyMs ? data.volumetrics.aggregated.tightestLatencyMs+'ms' : '—'}</span></div>
+    <div class="sum-item"><span class="sum-item-lbl">Topology</span><span class="sum-item-val">${data.infrastructure?.topology||'—'}</span></div>
+  `
+  
+  // Auto-generate workloads from use cases
+  autoPopulateWorkloads(data)
+  
+  // Show workload area
+  document.getElementById('no-project-msg').style.display = 'none'
+  document.getElementById('workload-area').style.display = 'block'
+  document.getElementById('import-ok-msg').style.display = 'flex'
+  
+  // Recalculate everything
+  recalcAll()
+}
+
+function autoPopulateWorkloads(data) {
+  WORKLOADS = []
+  const useCases = data.useCases || []
+  const agg = data.volumetrics?.aggregated || {}
+  const byPersona = data.volumetrics?.byPersona || {}
+  const llmGpu = document.getElementById('g-llm-gpu').value
+  const lightGpu = document.getElementById('g-light-gpu').value
+  
+  if (useCases.length === 0) return
+  
+  // Distribute load across use cases
+  const totalRPS = agg.totalInferenceRPS || Math.max(useCases.length * 10, 10)
+  const tightestLat = agg.tightestLatencyMs || 500
+  
+  useCases.forEach((ucId, idx) => {
+    const hint = UC_GPU_HINT[ucId] || {gpu: llmGpu, light: lightGpu}
+    
+    // Classify: real-time vs batch
+    const isRT = ucId.includes('flood') || ucId.includes('damage') || ucId.includes('isr') || 
+                 ucId.includes('target') || ucId.includes('border') || ucId.includes('uav') || 
+                 ucId.includes('threat') || ucId.includes('c4isr') || ucId.includes('anomaly')
+    
+    const isBatch = ucId.includes('crop') || ucId.includes('urban') || ucId.includes('road') || 
+                    ucId.includes('forest') || ucId.includes('soil') || ucId.includes('chg') ||
+                    ucId.includes('log') || ucId.includes('maint') || ucId.includes('terrain') ||
+                    ucId.includes('pipe')
+    
+    const ucRPS = Math.max(1, Math.round(totalRPS / useCases.length))
+    const ucLatency = isRT ? Math.min(tightestLat, 300) : (isBatch ? 5000 : tightestLat)
+    
+    const gpu = isRT ? (hint.gpu || llmGpu) : (hint.light || lightGpu)
+    
+    WORKLOADS.push({
+      id: 'wl_' + ucId,
+      name: ucIdToName(ucId),
+      type: isBatch ? 'batch' : (isRT ? 'realtime' : 'mixed'),
+      ucId,
+      rps: ucRPS,
+      latencyMs: ucLatency,
+      gpu,
+      gpuCount: 0, // computed
+      servers: 0,
+      pwKw: 0,
+      fromProject: true
+    })
+  })
+}
+
+function ucIdToName(id) {
+  const names = {
+    'geo-sat': 'Satellite Image Analysis',
+    'geo-chg': 'Change Detection',
+    'geo-crop': 'Crop Health Monitoring',
+    'geo-flood': 'Flood Mapping',
+    'geo-urban': 'Urban Sprawl Detection',
+    'geo-road': 'Road Network Extraction',
+    'geo-damage': 'Disaster Damage Assessment',
+    'geo-forest': 'Forest Cover Analysis',
+    'geo-pipe': 'Infrastructure Monitoring',
+    'geo-soil': 'Soil Health Mapping',
+    'def-isr-auto': 'ISR Automation',
+    'def-target': 'Target Detection',
+    'def-border': 'Border Surveillance',
+    'def-uav-analysis': 'UAV Image Analysis',
+    'def-terrain': 'Terrain Analysis',
+    'def-threat': 'Threat Classification',
+    'def-log': 'Logistics Optimisation',
+    'def-maint': 'Predictive Maintenance',
+    'def-c4isr': 'C4ISR Integration',
+    'def-anomaly': 'Anomaly Detection',
+  }
+  return names[id] || id
+}
+
+function loadSampleProject() {
+  const sample = {
+    name: 'MDoNER GeoAI Platform — Phase 1',
+    customer: 'Ministry of DONER',
+    domain: 'geospatial',
+    tier: 'C3',
+    opportunityType: 'strategic',
+    domainComplexity: 'sovereign',
+    personas: [
+      {id:'geo-analyst',name:'Geospatial Analyst'},
+      {id:'geo-disaster',name:'Disaster Management Officer'},
+      {id:'geo-ministry',name:'Ministry / Policy Official'},
+      {id:'geo-mleng',name:'Data Scientist / ML Engineer'}
+    ],
+    useCases: ['geo-sat','geo-flood','geo-chg','geo-damage','geo-forest','geo-urban'],
+    volumetrics: {
+      byPersona: {
+        'geo-analyst': {concurrentUsers:20, inferenceRPS:10, latencyMs:500},
+        'geo-disaster': {concurrentUsers:5, inferenceRPS:50, latencyMs:200},
+        'geo-ministry': {concurrentUsers:10, inferenceRPS:2, latencyMs:2000},
+        'geo-mleng': {concurrentUsers:5, inferenceRPS:5, latencyMs:1000}
+      },
+      aggregated: {totalConcurrentUsers:40, totalInferenceRPS:67, tightestLatencyMs:200},
+      imagesPerDay: 2000,
+      dataGBPerDay: 500,
+      retention: '3y',
+      peakPeriod: '247'
+    },
+    domainSpecifics: {
+      satelliteSources: [
+        {name:'Sentinel-2', resolution:'mr', revisit:'daily', bands:'ms', dailyGB:120},
+        {name:'Cartosat-3', resolution:'hr', revisit:'daily', bands:'rgb', dailyGB:80}
+      ],
+      gisPlatform: 'bhuvan',
+      outputFormat: 'all'
+    },
+    infrastructure: {
+      topology: 'hub-spoke-edge',
+      totalSites: '6-20',
+      sites: {
+        site_0: {siteType:'Hub Site', connectivity:'leased', availability:'99.9', dataClassification:'confidential', cooling:'dlc'},
+        site_1: {siteType:'Spoke Sites', connectivity:'internet', availability:'99.5', dataClassification:'restricted', cooling:'air'},
+        site_2: {siteType:'Edge Sites', connectivity:'satellite', availability:'99', dataClassification:'restricted', cooling:'air'}
+      }
+    }
+  }
+  loadProject(sample)
+}
+
+// ── SIZING ENGINE ─────────────────────────────────────────────
+function sizeWorkload(wl) {
+  const gpu = GPUS[wl.gpu]
+  if (!gpu) return {gpuCount:1, servers:1, pwKw:1}
+  
+  const quant = document.getElementById('g-quant').value
+  const ha = parseFloat(document.getElementById('g-ha').value)
+  
+  // TPS per GPU (simplified from v2.2 logic)
+  const baseTPS = (gpu.fp8 || 500) * (quant === 'fp16' ? 0.5 : quant === 'int4' ? 1.3 : 1) * 0.85
+  
+  // GPUs needed for throughput
+  const gpuForRPS = Math.max(1, Math.ceil(wl.rps / Math.max(baseTPS / 100, 1)))
+  
+  // GPUs needed for memory (assume 70B model default for LLM, 7B for vision)
+  const modelGB = wl.type === 'batch' ? 7 : 70
+  const vram = quant === 'fp16' ? modelGB * 2 : modelGB
+  const gpuForMem = Math.max(1, Math.ceil(vram / (gpu.hbm * 0.85)))
+  
+  const rawGPUs = Math.max(gpuForRPS, gpuForMem)
+  const gpuCount = Math.ceil(rawGPUs * ha)
+  const gpusPerServer = Math.min(8, gpu.mx)
+  const servers = Math.ceil(gpuCount / gpusPerServer)
+  const pwKw = servers * (gpusPerServer * gpu.tdp + 700) * 1.1 / 1000 // GPU + 2x CPU + overhead
+  
+  return {gpuCount, servers, pwKw: Math.round(pwKw * 10) / 10}
+}
+
+function recalcAll() {
+  if (WORKLOADS.length === 0) {
+    updateSummary(0, 0, 0)
+    return
+  }
+  
+  WORKLOADS.forEach(wl => {
+    const sized = sizeWorkload(wl)
+    wl.gpuCount = sized.gpuCount
+    wl.servers = sized.servers
+    wl.pwKw = sized.pwKw
+  })
+  
+  renderWorkloadCards()
+  updateSummary(
+    WORKLOADS.reduce((s,w) => s + w.gpuCount, 0),
+    WORKLOADS.reduce((s,w) => s + w.servers, 0),
+    WORKLOADS.reduce((s,w) => s + w.pwKw, 0)
+  )
+  renderBOM()
+  renderPower()
+  renderNetwork()
+  renderExport()
+  drawScaleChart()
+}
+
+function updateSummary(gpus, servers, pwKw) {
+  document.getElementById('s-gpus').textContent = gpus || '—'
+  document.getElementById('s-servers').textContent = servers || '—'
+  document.getElementById('s-power').textContent = pwKw ? pwKw.toFixed(0) + ' kW' : '—'
+}
+
+// ── WORKLOAD CARDS ────────────────────────────────────────────
+function renderWorkloadCards() {
+  const grid = document.getElementById('wl-grid')
+  if (WORKLOADS.length === 0) { grid.innerHTML = ''; return }
+  
+  grid.innerHTML = WORKLOADS.map((wl, i) => {
+    const gpu = GPUS[wl.gpu] || {}
+    const statusClass = wl.latencyMs < 500 ? 'active' : (wl.latencyMs < 2000 ? 'warn' : 'ok')
+    const typeLabel = wl.type === 'realtime' ? '⚡ Real-time' : wl.type === 'batch' ? '📦 Batch' : '🔄 Mixed'
+    
+    return `
+    <div class="wl-card ${statusClass}">
+      <div class="wl-title">${wl.name}</div>
+      <div class="wl-subtitle">${typeLabel} · ${wl.latencyMs}ms target</div>
+      <div class="wl-metrics">
+        <div class="wl-metric"><div class="wl-metric-val orange">${wl.gpuCount}</div><div class="wl-metric-lbl">GPUs</div></div>
+        <div class="wl-metric"><div class="wl-metric-val">${wl.servers}</div><div class="wl-metric-lbl">Servers</div></div>
+        <div class="wl-metric"><div class="wl-metric-val teal">${wl.pwKw}</div><div class="wl-metric-lbl">kW IT</div></div>
+        <div class="wl-metric"><div class="wl-metric-val">${wl.rps}</div><div class="wl-metric-lbl">RPS</div></div>
+      </div>
+      <div class="gpu-select">
+        <div class="gpu-row">
+          <select onchange="setWLGPU(${i},this.value)">
+            ${GPU_KEYS.map(k => `<option value="${k}" ${k===wl.gpu?'selected':''}>${GPUS[k].n} (${GPUS[k].hbm}GB)</option>`).join('')}
+          </select>
+          <span class="gpu-tag ${gpu.cool==='dlc'?'dlc':'ac'}">${gpu.cool?.toUpperCase()||'AC'}</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <div style="flex:1"><label style="margin-bottom:2px">RPS</label><input type="number" value="${wl.rps}" min="1" onchange="setWLParam(${i},'rps',+this.value)"></div>
+          <div style="flex:1"><label style="margin-bottom:2px">Latency (ms)</label><input type="number" value="${wl.latencyMs}" min="10" onchange="setWLParam(${i},'latencyMs',+this.value)"></div>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;justify-content:flex-end">
+        <button style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--mid)" onclick="removeWL(${i})">✕ Remove</button>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function setWLGPU(i, gpu) {
+  WORKLOADS[i].gpu = gpu
+  recalcAll()
+}
+
+function setWLParam(i, key, val) {
+  WORKLOADS[i][key] = val
+  recalcAll()
+}
+
+function removeWL(i) {
+  WORKLOADS.splice(i, 1)
+  recalcAll()
+}
+
+function addManualWorkload() {
+  const name = document.getElementById('mw-name').value.trim() || 'Custom Workload'
+  const type = document.getElementById('mw-type').value
+  const rps = +document.getElementById('mw-rps').value || 10
+  const lat = +document.getElementById('mw-latency').value || 500
+  const llmGpu = document.getElementById('g-llm-gpu').value
+  
+  WORKLOADS.push({id:'wl_manual_'+Date.now(), name, type, rps, latencyMs:lat, gpu:llmGpu, gpuCount:0, servers:0, pwKw:0, fromProject:false})
+  
+  document.getElementById('mw-name').value = ''
+  document.getElementById('mw-rps').value = ''
+  document.getElementById('mw-latency').value = ''
+  
+  if (WORKLOADS.length > 0) {
+    document.getElementById('no-project-msg').style.display = 'none'
+    document.getElementById('workload-area').style.display = 'block'
+  }
+  recalcAll()
+}
+
+function updateGlobalGPU() {
+  // Update all auto-suggested GPUs but leave manually overridden ones
+  if (!PROJECT) { recalcAll(); return }
+  autoPopulateWorkloads(PROJECT)
+  recalcAll()
+}
+
+// ── BOM ───────────────────────────────────────────────────────
+function renderBOM() {
+  const tbody = document.getElementById('bom-tbody')
+  if (WORKLOADS.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--mid);padding:20px">Load a project to generate BOM</td></tr>'
+    return
+  }
+  
+  // Aggregate GPUs by type
+  const gpuAgg = {}
+  WORKLOADS.forEach(wl => {
+    const key = wl.gpu
+    if (!gpuAgg[key]) gpuAgg[key] = {count:0, gpu:GPUS[wl.gpu]}
+    gpuAgg[key].count += wl.gpuCount
+  })
+  
+  const totalServers = WORKLOADS.reduce((s,w) => s+w.servers, 0)
+  const commonServers = 12 // router, LB, k8s, monitoring
+  const totalServersFull = totalServers + commonServers
+  
+  // Storage (rough estimate)
+  const storTB = PROJECT ? Math.max(50, (PROJECT.volumetrics?.dataGBPerDay||100) * 90 / 1000 * 2) : 100
+  
+  const rows = []
+  
+  // GPU rows
+  Object.entries(gpuAgg).forEach(([k,v]) => {
+    const unitUSD = v.gpu?.usd || 0
+    const totalUSD = v.count * unitUSD
+    rows.push(`<tr>
+      <td><b>${v.gpu?.n||k}</b></td>
+      <td>${v.gpu?.hbm}GB HBM · ${v.gpu?.cool?.toUpperCase()} · ${v.gpu?.tdp}W TDP</td>
+      <td>${v.count}</td>
+      <td>GPU</td>
+      <td>$${(totalUSD/1e6).toFixed(2)}M est.</td>
+    </tr>`)
+  })
+  
+  // Server chassis
+  rows.push(`<tr>
+    <td><b>Server Chassis</b></td><td>DLC/AC-ready, 8× GPU configuration</td>
+    <td>${totalServersFull}</td><td>Servers</td><td>~$${(totalServersFull*12000/1e6).toFixed(2)}M est.</td>
+  </tr>`)
+  
+  // CPUs
+  rows.push(`<tr>
+    <td><b>AMD EPYC 9965 Turin</b></td><td>192-core, 2× per server</td>
+    <td>${totalServersFull*2}</td><td>CPUs</td><td>~$${(totalServersFull*2*14000/1e6).toFixed(2)}M est.</td>
+  </tr>`)
+  
+  // DRAM
+  rows.push(`<tr>
+    <td><b>DDR5 128GB DIMMs</b></td><td>8× per server (1TB per node)</td>
+    <td>${totalServersFull*8}</td><td>DIMMs</td><td>~$${(totalServersFull*8*300/1e6).toFixed(2)}M est.</td>
+  </tr>`)
+  
+  // NICs
+  const nicPorts = Math.ceil(WORKLOADS.reduce((s,w)=>s+w.servers,0) * 4)
+  rows.push(`<tr>
+    <td><b>InfiniBand NDR 400G NICs</b></td><td>2–4× per server</td>
+    <td>${nicPorts}</td><td>NICs</td><td>~$${(nicPorts*3000/1e6).toFixed(2)}M est.</td>
+  </tr>`)
+  
+  // Storage
+  rows.push(`<tr>
+    <td><b>Tiered Storage</b></td><td>NVMe hot + HDD warm + Object cold</td>
+    <td>${Math.ceil(storTB)}</td><td>TB total</td><td>~$${(storTB*100/1e6).toFixed(2)}M est.</td>
+  </tr>`)
+  
+  // DLC racks
+  const pwKwTotal = WORKLOADS.reduce((s,w)=>s+w.pwKw,0)
+  const dlcRacks = Math.ceil(pwKwTotal*0.8/260)
+  const acRacks = Math.ceil(pwKwTotal*0.2/90) + 2
+  rows.push(`<tr>
+    <td><b>DLC Racks (260kW)</b></td><td>High-density GPU racks with CDU</td>
+    <td>${dlcRacks}</td><td>Racks</td><td>~$${(dlcRacks*85000/1e6).toFixed(2)}M est.</td>
+  </tr>`)
+  rows.push(`<tr>
+    <td><b>AC Racks (90kW)</b></td><td>Standard racks for CPU/common infra</td>
+    <td>${acRacks}</td><td>Racks</td><td>~$${(acRacks*35000/1e6).toFixed(2)}M est.</td>
+  </tr>`)
+  
+  // Total
+  const totalGPUCost = Object.entries(gpuAgg).reduce((s,[k,v])=>s+v.count*(v.gpu?.usd||0),0)
+  const totalEst = totalGPUCost + totalServersFull*26000 + nicPorts*3000 + storTB*100 + (dlcRacks*85000+acRacks*35000)
+  rows.push(`<tr class="total">
+    <td colspan="4">TOTAL BOM ESTIMATE (Hardware)</td>
+    <td>~$${(totalEst/1e6).toFixed(2)}M</td>
+  </tr>`)
+  
+  tbody.innerHTML = rows.join('')
+  
+  // Software stack
+  const domain = PROJECT?.domain || 'general'
+  const swItems = [
+    {n:'RHEL / Ubuntu Pro', cat:'OS', lic:'per-server', qty:totalServersFull, usd:1500},
+    {n:'NVIDIA AI Enterprise', cat:'AI Platform', lic:'per-GPU', qty:Object.values(gpuAgg).reduce((s,v)=>s+v.count,0), usd:4500},
+    {n:'Kubernetes + KServe', cat:'Orchestration', lic:'flat', qty:1, usd:0},
+    {n:'vLLM / TRT-LLM', cat:'Inference Engine', lic:'flat', qty:1, usd:0},
+    {n:'MLflow + Model Registry', cat:'MLOps', lic:'flat', qty:1, usd:12000},
+    {n:'Prometheus + Grafana', cat:'Monitoring', lic:'flat', qty:1, usd:0},
+    {n:'Vault (Secrets)', cat:'Security', lic:'flat', qty:1, usd:0},
+    {n:'NVIDIA UFM (IB Fabric)', cat:'Network Mgmt', lic:'flat', qty:1, usd:15000},
+    ...(domain==='geospatial'?[
+      {n:'PostGIS + STAC Server', cat:'Geospatial Platform', lic:'flat', qty:1, usd:0},
+      {n:'QGIS/Bhuvan Integration', cat:'GIS Layer', lic:'flat', qty:1, usd:0},
+      {n:'Milvus (Vector DB)', cat:'RAG', lic:'flat', qty:1, usd:0},
+    ]:[]),
+    ...(domain==='defence'?[
+      {n:'Air-Gap Security Suite', cat:'Security', lic:'flat', qty:1, usd:25000},
+      {n:'C4ISR Integration Layer', cat:'Integration', lic:'flat', qty:1, usd:0},
+    ]:[]),
+  ]
+  
+  const swTbody = document.getElementById('sw-tbody')
+  swTbody.innerHTML = swItems.map(s => {
+    const annual = s.qty * s.usd
+    return `<tr>
+      <td><b>${s.n}</b></td><td>${s.cat}</td><td>${s.lic}</td>
+      <td>${s.qty}</td>
+      <td>${annual>0?'$'+(annual/1e3).toFixed(0)+'K/yr':'Open Source'}</td>
+    </tr>`
+  }).join('')
+}
+
+// ── POWER ─────────────────────────────────────────────────────
+function renderPower() {
+  const pwTotal = WORKLOADS.reduce((s,w)=>s+w.pwKw,0)
+  const dlcRacks = Math.ceil(pwTotal*0.8/260)
+  const acRacks = Math.ceil(pwTotal*0.2/90) + 2
+  const cooling = dlcRacks > 0 ? 'DLC + AC' : 'Air Cooling'
+  const pue = dlcRacks > 0 ? 1.1 : 1.3
+  const annual = Math.round(pwTotal * pue * 8760 / 1000)
+  
+  const cells = [
+    [pwTotal.toFixed(0)+' kW','Total IT Load'],
+    [dlcRacks,'DLC Racks (260kW)'],
+    [acRacks,'AC Racks (90kW)'],
+    [annual+' MWh','Annual Energy'],
+    [cooling,'Cooling Approach'],
+    ['PUE '+pue,'Facility Target'],
+  ]
+  
+  document.getElementById('power-grid').innerHTML = cells.map(([v,l]) => `
+    <div class="power-cell"><div class="power-val">${v}</div><div class="power-lbl">${l}</div></div>
+  `).join('')
+  
+  // Site breakdown
+  const sites = PROJECT?.infrastructure?.sites || {}
+  const siteKeys = Object.keys(sites)
+  if (siteKeys.length > 0) {
+    document.getElementById('power-site-detail').innerHTML = siteKeys.map(k => {
+      const s = sites[k]
+      return `<div style="padding:8px 0;border-bottom:1px solid var(--light);display:flex;justify-content:space-between">
+        <span style="font-weight:600">${s.siteType||k}</span>
+        <span style="color:var(--mid)">${s.cooling==='dlc'?'DLC recommended':'AC cooling'} · ${s.connectivity||'—'}</span>
+      </div>`
+    }).join('')
+  } else {
+    document.getElementById('power-site-detail').innerHTML = '<span style="color:var(--mid)">No site topology data in project.</span>'
+  }
+  
+  // Power chart
+  const ctx = document.getElementById('powerChart')
+  if (powerChartInst) powerChartInst.destroy()
+  const labels = WORKLOADS.map(w => w.name.split(' ').slice(0,2).join(' '))
+  const data = WORKLOADS.map(w => w.pwKw)
+  powerChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'IT Power (kW)',
+        data,
+        backgroundColor: WORKLOADS.map(w => GPUS[w.gpu]?.cool==='dlc' ? '#1C38F5' : '#00B290'),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {legend:{display:false}},
+      scales: {
+        y: {title:{display:true,text:'kW',font:{size:10}}, grid:{color:'#f0f0f5'}},
+        x: {grid:{display:false}, ticks:{font:{size:9},maxRotation:30}}
+      }
+    }
+  })
+}
+
+// ── NETWORK ───────────────────────────────────────────────────
+function renderNetwork() {
+  const totalGPUs = WORKLOADS.reduce((s,w)=>s+w.gpuCount,0)
+  const totalServers = WORKLOADS.reduce((s,w)=>s+w.servers,0) + 12
+  const nicPorts = totalGPUs * 2
+  const ewLeaf = Math.ceil(nicPorts/64)
+  const ewSpine = Math.max(2, Math.ceil(ewLeaf/4))
+  const nsLeaf = Math.max(2, Math.ceil(totalServers/32))
+  const nsSpine = Math.max(1, Math.ceil(nsLeaf/4))
+  const totalSw = ewLeaf + ewSpine + nsLeaf + nsSpine
+  const cables = nicPorts + ewLeaf*ewSpine + totalServers + nsLeaf*nsSpine
+  
+  document.getElementById('network-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div>
+        <div class="sec-label">East-West (GPU Scale-Out)</div>
+        <div class="sum-item"><span class="sum-item-lbl">Fabric</span><span class="sum-item-val">InfiniBand NDR 400G</span></div>
+        <div class="sum-item"><span class="sum-item-lbl">Leaf Switches</span><span class="sum-item-val">${ewLeaf}× 64-port</span></div>
+        <div class="sum-item"><span class="sum-item-lbl">Spine Switches</span><span class="sum-item-val">${ewSpine}×</span></div>
+        <div class="sum-item"><span class="sum-item-lbl">GPU NIC Ports</span><span class="sum-item-val">${nicPorts}</span></div>
+        <div class="sum-item"><span class="sum-item-lbl">ISL Cables</span><span class="sum-item-val">${ewLeaf*ewSpine}× AOC</span></div>
+      </div>
+      <div>
+        <div class="sec-label">North-South (Client Traffic)</div>
+        <div class="sum-item"><span class="sum-item-lbl">Fabric</span><span class="sum-item-val">100GbE Ethernet</span></div>
+        <div class="sum-item"><span class="sum-item-lbl">Leaf Switches</span><span class="sum-item-val">${nsLeaf}× 32-port</span></div>
+        <div class="sum-item"><span class="sum-item-lbl">Spine / Border</span><span class="sum-item-val">${nsSpine}×</span></div>
+        <div class="sum-item"><span class="sum-item-lbl">Server Ports</span><span class="sum-item-val">${totalServers}</span></div>
+        <div class="sum-item"><span class="sum-item-lbl">ISL Cables</span><span class="sum-item-val">${nsLeaf*nsSpine}× DAC</span></div>
+      </div>
+    </div>
+    <div class="sec-label">Totals</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="wl-metric"><div class="wl-metric-val orange">${totalSw}</div><div class="wl-metric-lbl">Total Switches</div></div>
+      <div class="wl-metric"><div class="wl-metric-val">${cables}</div><div class="wl-metric-lbl">Total Cables</div></div>
+      <div class="wl-metric"><div class="wl-metric-val teal">${totalGPUs}</div><div class="wl-metric-lbl">GPU Ports</div></div>
+    </div>
+  `
+}
+
+// ── EXPORT ────────────────────────────────────────────────────
+function renderExport() {
+  const output = buildExportData()
+  document.getElementById('json-preview').textContent = JSON.stringify(output, null, 2)
+}
+
+function buildExportData() {
+  const totalGPUs = WORKLOADS.reduce((s,w)=>s+w.gpuCount,0)
+  const totalServers = WORKLOADS.reduce((s,w)=>s+w.servers,0)
+  const pwTotal = WORKLOADS.reduce((s,w)=>s+w.pwKw,0)
+  
+  return {
+    meta: {
+      tool: 'ATLAS AI Inferencing Factory v3.0',
+      exportedAt: new Date().toISOString(),
+      project: PROJECT?.name || 'Manual',
+      customer: PROJECT?.customer || '—',
+      domain: PROJECT?.domain || '—',
+    },
+    sizing: {
+      totalGPUs,
+      totalServers,
+      itPowerKW: Math.round(pwTotal*10)/10,
+      dlcRacks: Math.ceil(pwTotal*0.8/260),
+      acRacks: Math.ceil(pwTotal*0.2/90)+2,
+      storageTB: Math.ceil((PROJECT?.volumetrics?.dataGBPerDay||100)*90/1000*2),
+    },
+    workloads: WORKLOADS.map(wl => ({
+      name: wl.name,
+      type: wl.type,
+      gpu: GPUS[wl.gpu]?.n || wl.gpu,
+      gpuCount: wl.gpuCount,
+      servers: wl.servers,
+      rps: wl.rps,
+      latencyMs: wl.latencyMs,
+      itPowerKW: wl.pwKw,
+    })),
+    projectDefinition: PROJECT || null,
+  }
+}
+
+function exportBOM() {
+  if (WORKLOADS.length === 0) { alert('Add workloads first.'); return }
+  const data = buildExportData()
+  const name = (PROJECT?.name || 'ATLAS-Sizing').replace(/\s+/g,'-')
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = name + '-InferencingFactory-v3.json'; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportSummaryTxt() {
+  const totalGPUs = WORKLOADS.reduce((s,w)=>s+w.gpuCount,0)
+  const totalServers = WORKLOADS.reduce((s,w)=>s+w.servers,0)
+  const pwTotal = WORKLOADS.reduce((s,w)=>s+w.pwKw,0)
+  const lines = [
+    'ATLAS AI INFERENCING FACTORY — SIZING SUMMARY v3.0',
+    '=====================================================',
+    `Project:    ${PROJECT?.name||'Manual'}`,
+    `Customer:   ${PROJECT?.customer||'—'}`,
+    `Domain:     ${PROJECT?.domain||'—'}`,
+    `Generated:  ${new Date().toLocaleString('en-IN')}`,
+    '',
+    'TOTALS',
+    `  Total GPUs:          ${totalGPUs}`,
+    `  Total Servers:       ${totalServers}`,
+    `  IT Power:            ${pwTotal.toFixed(0)} kW`,
+    `  DLC Racks (260kW):   ${Math.ceil(pwTotal*0.8/260)}`,
+    `  AC Racks (90kW):     ${Math.ceil(pwTotal*0.2/90)+2}`,
+    '',
+    'WORKLOADS',
+    ...WORKLOADS.map(w => `  - ${w.name}: ${w.gpuCount} ${GPUS[w.gpu]?.n||w.gpu}, ${w.servers} servers, ${w.pwKw}kW`),
+    '',
+    'NOTE: Power figures are for DC preparation — not procurement BOM.',
+  ]
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = (PROJECT?.name||'ATLAS')+'-Sizing-Summary.txt'; a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ── CHARTS ────────────────────────────────────────────────────
+function drawScaleChart() {
+  const ctx = document.getElementById('scaleChart')
+  if (!ctx) return
+  if (scaleChartInst) scaleChartInst.destroy()
+  if (WORKLOADS.length === 0) return
+  
+  const labels = WORKLOADS.map(w => w.name.split(' ')[0])
+  scaleChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {label:'GPUs', data:WORKLOADS.map(w=>w.gpuCount), backgroundColor:'rgba(255,85,57,0.75)', borderRadius:3},
+        {label:'Servers', data:WORKLOADS.map(w=>w.servers), backgroundColor:'rgba(0,40,112,0.75)', borderRadius:3},
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},
+      scales:{
+        y:{beginAtZero:true,grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},
+        x:{grid:{display:false},ticks:{font:{size:9},maxRotation:25}}
+      }
+    }
+  })
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'))
+  document.querySelectorAll('.tp').forEach(p=>p.classList.remove('act'))
+  document.getElementById('t-'+name).classList.add('act')
+  document.getElementById('tp-'+name).classList.add('act')
+  if (name==='power') setTimeout(()=>renderPower(),50)
+  if (name==='export') renderExport()
+}
+
+function resetProject() {
+  PROJECT = null; WORKLOADS = []
+  document.getElementById('ctxBar').style.display = 'none'
+  document.getElementById('no-project-msg').style.display = 'block'
+  document.getElementById('workload-area').style.display = 'none'
+  document.getElementById('import-ok-msg').style.display = 'none'
+  document.getElementById('importBanner').classList.remove('loaded')
+  document.getElementById('importIcon').textContent = '📂'
+  document.getElementById('importTitle').textContent = 'Load Project Definition File'
+  document.getElementById('importDesc').textContent = 'Upload a JSON from the Domain Configurator, or this tool will auto-detect if one was saved in this session.'
+  document.getElementById('project-details').innerHTML = '<div style="font-size:11px;color:var(--mid)">No project loaded</div>'
+  updateSummary(0,0,0)
+  renderBOM()
+  if (scaleChartInst) { scaleChartInst.destroy(); scaleChartInst=null }
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  // Auto-detect project from localStorage
+  checkLocalStorage()
+})
+</script>
+</body>
+</html>
 
