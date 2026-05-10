@@ -1,1 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — Vision Document Factory</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;
+  --teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;
+  --dark:#282832;--black:#0A0A0F;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.12);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.18);
+  --r:8px;--r-sm:6px;--r-lg:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+
+/* HEADER */
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.hdr-badge{background:rgba(60,0,180,0.3);color:#c4b5fd;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;letter-spacing:0.5px;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-secondary{background:var(--navy);color:var(--white);}
+.btn-secondary:hover{background:#001d5c;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-indigo{background:var(--indigo);color:var(--white);}
+.btn-indigo:hover{background:#2d0090;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-lg{padding:12px 24px;font-size:14px;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+
+/* LAYOUT */
+.page{display:grid;grid-template-columns:380px 1fr;min-height:calc(100vh - 52px);}
+.left-panel{background:var(--white);border-right:1px solid #e0e0e8;padding:24px;overflow-y:auto;}
+.right-panel{padding:24px;overflow-y:auto;background:var(--light);}
+
+/* CARDS */
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card:last-child{margin-bottom:0;}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:16px;}
+.sec-label{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--light);}
+
+/* FORM */
+.fg{margin-bottom:14px;}
+.fg:last-child{margin-bottom:0;}
+label{display:block;font-size:10px;font-weight:700;color:var(--dark);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.3px;}
+label.req::after{content:' *';color:var(--orange);}
+input[type=text],textarea,select{width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);appearance:none;}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(28,56,245,0.08);}
+textarea{resize:vertical;min-height:80px;line-height:1.5;}
+
+/* IMPORT */
+.import-zone{border:2px dashed #d0d0d8;border-radius:var(--r-lg);padding:20px;text-align:center;cursor:pointer;transition:all 0.15s;margin-bottom:16px;}
+.import-zone:hover{border-color:var(--blue);background:rgba(28,56,245,0.02);}
+.import-zone.loaded{border-color:var(--teal);border-style:solid;background:rgba(0,178,144,0.04);}
+.import-zone__icon{font-size:28px;margin-bottom:8px;}
+.import-zone__title{font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px;}
+.import-zone__sub{font-size:11px;color:var(--mid);}
+
+/* PROJECT SUMMARY */
+.proj-summary{background:rgba(0,40,112,0.04);border:1px solid rgba(0,40,112,0.15);border-radius:var(--r);padding:12px;margin-bottom:14px;}
+.proj-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(0,40,112,0.08);}
+.proj-row:last-child{border-bottom:none;}
+.proj-lbl{color:var(--mid);font-weight:500;}
+.proj-val{color:var(--dark);font-weight:600;text-align:right;}
+
+/* API KEY */
+.api-status{display:flex;align-items:center;gap:6px;font-size:11px;margin-top:6px;}
+.api-dot{width:8px;height:8px;border-radius:50%;}
+.api-dot.ok{background:var(--teal);}
+.api-dot.missing{background:var(--orange);}
+
+/* PROGRESS */
+.gen-progress{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;text-align:center;margin-bottom:16px;}
+.progress-bar{height:6px;background:var(--light);border-radius:3px;overflow:hidden;margin:12px 0;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--indigo),var(--blue));border-radius:3px;transition:width 0.4s ease;animation:pulse 1.5s ease infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
+.progress-step{font-size:12px;color:var(--mid);margin-top:6px;}
+
+/* DOCUMENT PREVIEW */
+.doc-preview{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);box-shadow:var(--shadow-md);overflow:hidden;}
+.doc-header{background:var(--navy);padding:20px 32px;position:relative;}
+.doc-header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:4px;background:var(--orange);}
+.doc-watermark{background:rgba(255,85,57,0.1);border:1px solid rgba(255,85,57,0.3);color:var(--orange);font-size:10px;font-weight:700;padding:3px 10px;border-radius:8px;display:inline-block;letter-spacing:1px;margin-bottom:12px;}
+.doc-title{font-size:22px;font-weight:900;color:var(--white);margin-bottom:4px;line-height:1.3;}
+.doc-meta{font-size:11px;color:rgba(255,255,255,0.6);}
+.doc-body{padding:32px;}
+.doc-section{margin-bottom:28px;}
+.doc-section:last-child{margin-bottom:0;}
+.doc-section-title{font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--orange);}
+.doc-text{font-size:14px;line-height:1.8;color:var(--dark);}
+.doc-text p{margin-bottom:12px;}
+.doc-text p:last-child{margin-bottom:0;}
+.doc-footer{background:var(--light);border-top:1px solid #e0e0e8;padding:16px 32px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--mid);}
+
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:var(--r);font-size:12px;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-ok{background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.25);color:#007a60;}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.3);color:#9a7000;}
+.alert-err{background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);color:#DC2626;}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:60px 24px;color:var(--mid);}
+.empty__icon{font-size:56px;margin-bottom:16px;opacity:0.5;}
+.empty__title{font-size:16px;font-weight:700;color:var(--dark);margin-bottom:8px;}
+.empty__desc{font-size:13px;line-height:1.6;max-width:320px;margin:0 auto;}
+
+/* TABS */
+.tabs{display:flex;gap:0;border-bottom:2px solid #e0e0e8;margin-bottom:20px;}
+.tab{padding:9px 16px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
+.tab.act{color:var(--navy);border-bottom-color:var(--orange);}
+
+/* ACTION BAR */
+.action-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+
+/* EDITABLE */
+.editable-section{border:2px solid transparent;border-radius:var(--r);padding:4px;transition:border-color 0.15s;cursor:text;}
+.editable-section:hover{border-color:rgba(28,56,245,0.2);}
+.editable-section:focus-within{border-color:var(--blue);}
+.editable-section [contenteditable]{outline:none;min-height:20px;}
+
+@media(max-width:900px){
+  .page{grid-template-columns:1fr;}
+  .left-panel{border-right:none;border-bottom:1px solid #e0e0e8;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.65)">Document Factory — Vision Document</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">Claude API</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+  </div>
+</div>
+
+<div class="page">
+
+<!-- LEFT PANEL: INPUTS -->
+<div class="left-panel">
+
+  <!-- IMPORT PROJECT -->
+  <div class="card">
+    <div class="card-title">Project Definition File</div>
+    <div class="card-sub">Upload a JSON from the Domain Configurator, or fill in manually below</div>
+
+    <div class="import-zone" id="importZone" onclick="document.getElementById('fileInput').click()">
+      <input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleImport(event)">
+      <div class="import-zone__icon" id="importIcon">📂</div>
+      <div class="import-zone__title" id="importTitle">Upload Project Definition File</div>
+      <div class="import-zone__sub" id="importSub">Click to select .json file</div>
+    </div>
+
+    <div id="proj-summary" style="display:none">
+      <div class="proj-summary" id="proj-summary-content"></div>
+      <button class="btn btn-outline btn-sm" onclick="clearProject()">✕ Clear Project</button>
+    </div>
+  </div>
+
+  <!-- DOCUMENT CONTEXT -->
+  <div class="card">
+    <div class="card-title">Vision Document Context</div>
+    <div class="card-sub">Provide context that Claude will use to personalise the document</div>
+
+    <div class="sec-label">From Your Organisation</div>
+    <div class="fg"><label class="req">Your Company Name</label>
+      <input type="text" id="ctx-ourCompany" placeholder="e.g. XYZ Technologies Ltd." value=""></div>
+    <div class="fg"><label class="req">Your CEO Name</label>
+      <input type="text" id="ctx-ourCEO" placeholder="e.g. Rajesh Kumar"></div>
+    <div class="fg"><label>Your CEO Title</label>
+      <input type="text" id="ctx-ourCEOTitle" placeholder="e.g. Managing Director & CEO" value="Managing Director & CEO"></div>
+
+    <div class="sec-label" style="margin-top:16px">About the Customer</div>
+    <div class="fg"><label class="req">Customer Organisation</label>
+      <input type="text" id="ctx-custOrg" placeholder="e.g. Ministry of DONER"></div>
+    <div class="fg"><label>Customer CEO / Decision Maker Name</label>
+      <input type="text" id="ctx-custCEO" placeholder="e.g. Secretary, Ministry of DONER"></div>
+    <div class="fg"><label>Customer CEO Title</label>
+      <input type="text" id="ctx-custTitle" placeholder="e.g. Secretary to the Government of India"></div>
+
+    <div class="sec-label" style="margin-top:16px">The Vision</div>
+    <div class="fg"><label>The Transformational Outcome (1–2 sentences)</label>
+      <textarea id="ctx-vision" placeholder="e.g. A sovereign AI-powered geospatial intelligence platform that enables the Ministry to monitor and develop the North-East with precision, speed, and data confidence." rows="3"></textarea></div>
+    <div class="fg"><label>Why Now — The Compelling Context</label>
+      <textarea id="ctx-whyNow" placeholder="e.g. India's ambition for North-East transformation, the convergence of satellite data and AI, and the Ministry's mandate under PM's NE Vision 2047..." rows="3"></textarea></div>
+    <div class="fg"><label>Strategic Importance (internal note for Claude)</label>
+      <textarea id="ctx-strategic" placeholder="e.g. Flagship project for the company, sovereign AI angle, potential to expand to other ministries..." rows="2"></textarea></div>
+
+    <div class="sec-label" style="margin-top:16px">Tone & Style</div>
+    <div class="fg"><label>Tone</label>
+      <select id="ctx-tone">
+        <option value="formal-strategic">Formal & Strategic (default)</option>
+        <option value="visionary-narrative">Visionary & Narrative</option>
+        <option value="technical-credible">Technical & Credible</option>
+        <option value="partnership-warm">Partnership & Warm</option>
+      </select></div>
+    <div class="fg"><label>Document Length</label>
+      <select id="ctx-length">
+        <option value="concise">Concise (3–4 pages)</option>
+        <option value="standard" selected>Standard (4–6 pages)</option>
+        <option value="comprehensive">Comprehensive (6–8 pages)</option>
+      </select></div>
+  </div>
+
+  <!-- API KEY -->
+  <div class="card">
+    <div class="card-title">Claude API Key</div>
+    <div class="card-sub">Required for document generation. Stored locally only.</div>
+    <div class="fg">
+      <input type="password" id="apiKey" placeholder="sk-ant-..." oninput="checkAPIKey()">
+      <div class="api-status" id="apiStatus">
+        <div class="api-dot missing" id="apiDot"></div>
+        <span id="apiStatusText">No API key set</span>
+      </div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="saveAPIKey()">Save Key</button>
+  </div>
+
+  <!-- GENERATE -->
+  <button class="btn btn-indigo btn-lg" style="width:100%;justify-content:center" onclick="generateDocument()">
+    ✨ Generate Vision Document
+  </button>
+
+</div><!-- /left-panel -->
+
+<!-- RIGHT PANEL: PREVIEW -->
+<div class="right-panel" id="rightPanel">
+  <div class="empty">
+    <div class="empty__icon">📄</div>
+    <div class="empty__title">Vision Document Preview</div>
+    <div class="empty__desc">Fill in the context on the left and click Generate. Claude will write a CEO-to-CEO Vision Document tailored to your project.</div>
+  </div>
+</div>
+
+</div><!-- /page -->
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────
+let PROJECT = null
+let GENERATED_DOC = null
+
+// ── IMPORT PROJECT ────────────────────────────────────────────
+function handleImport(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result)
+      loadProject(data)
+    } catch {
+      showAlert('rightPanel', 'err', 'Invalid JSON file. Please upload a Project Definition File from the Domain Configurator.')
+    }
+  }
+  reader.readAsText(file)
+}
+
+function loadProject(data) {
+  PROJECT = data
+
+  // Update import zone
+  const zone = document.getElementById('importZone')
+  zone.classList.add('loaded')
+  document.getElementById('importIcon').textContent = '✅'
+  document.getElementById('importTitle').textContent = data.name || 'Project Loaded'
+  document.getElementById('importSub').textContent = `${data.domain || '—'} · ${data.tier || '—'} · ${(data.useCases || []).length} use cases`
+
+  // Show summary
+  document.getElementById('proj-summary').style.display = 'block'
+  document.getElementById('proj-summary-content').innerHTML = [
+    ['Project', data.name || '—'],
+    ['Customer', data.customer || '—'],
+    ['Domain', data.domain === 'geospatial' ? '🛰️ Geospatial AI' : data.domain === 'defence' ? '🛡️ Defence' : data.domain || '—'],
+    ['Tier', data.tier || '—'],
+    ['Type', `${data.opportunityType || '—'} / ${data.domainComplexity || '—'}`],
+    ['Use Cases', (data.useCases || []).length + ' selected'],
+    ['Personas', (data.personas || []).length + ' selected'],
+  ].map(([l, v]) => `<div class="proj-row"><span class="proj-lbl">${l}</span><span class="proj-val">${v}</span></div>`).join('')
+
+  // Auto-fill context fields if empty
+  if (!document.getElementById('ctx-custOrg').value && data.customer)
+    document.getElementById('ctx-custOrg').value = data.customer
+}
+
+function clearProject() {
+  PROJECT = null
+  document.getElementById('importZone').classList.remove('loaded')
+  document.getElementById('importIcon').textContent = '📂'
+  document.getElementById('importTitle').textContent = 'Upload Project Definition File'
+  document.getElementById('importSub').textContent = 'Click to select .json file'
+  document.getElementById('proj-summary').style.display = 'none'
+  document.getElementById('fileInput').value = ''
+}
+
+// ── API KEY ───────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('atlas_api_key')
+  if (saved) {
+    document.getElementById('apiKey').value = saved
+    checkAPIKey()
+  }
+})
+
+function checkAPIKey() {
+  const key = document.getElementById('apiKey').value.trim()
+  const dot = document.getElementById('apiDot')
+  const txt = document.getElementById('apiStatusText')
+  if (key.startsWith('sk-ant-') && key.length > 20) {
+    dot.className = 'api-dot ok'
+    txt.textContent = 'API key set ✓'
+  } else if (key.length > 0) {
+    dot.className = 'api-dot missing'
+    txt.textContent = 'Key format looks incorrect (should start with sk-ant-)'
+  } else {
+    dot.className = 'api-dot missing'
+    txt.textContent = 'No API key set'
+  }
+}
+
+function saveAPIKey() {
+  const key = document.getElementById('apiKey').value.trim()
+  if (key) { localStorage.setItem('atlas_api_key', key); checkAPIKey() }
+}
+
+// ── VALIDATION ────────────────────────────────────────────────
+function validate() {
+  const required = [
+    ['ctx-ourCompany', 'Your company name'],
+    ['ctx-ourCEO', 'Your CEO name'],
+    ['ctx-custOrg', 'Customer organisation'],
+  ]
+  for (const [id, label] of required) {
+    if (!document.getElementById(id).value.trim()) {
+      alert(`Kindly fill in: ${label}`)
+      document.getElementById(id).focus()
+      return false
+    }
+  }
+  const key = document.getElementById('apiKey').value.trim()
+  if (!key || !key.startsWith('sk-ant-')) {
+    alert('Kindly enter a valid Anthropic API key (starting with sk-ant-)')
+    document.getElementById('apiKey').focus()
+    return false
+  }
+  return true
+}
+
+// ── GENERATE ──────────────────────────────────────────────────
+async function generateDocument() {
+  if (!validate()) return
+
+  const ctx = {
+    ourCompany: document.getElementById('ctx-ourCompany').value.trim(),
+    ourCEO: document.getElementById('ctx-ourCEO').value.trim(),
+    ourCEOTitle: document.getElementById('ctx-ourCEOTitle').value.trim() || 'Managing Director & CEO',
+    custOrg: document.getElementById('ctx-custOrg').value.trim(),
+    custCEO: document.getElementById('ctx-custCEO').value.trim(),
+    custTitle: document.getElementById('ctx-custTitle').value.trim(),
+    vision: document.getElementById('ctx-vision').value.trim(),
+    whyNow: document.getElementById('ctx-whyNow').value.trim(),
+    strategic: document.getElementById('ctx-strategic').value.trim(),
+    tone: document.getElementById('ctx-tone').value,
+    length: document.getElementById('ctx-length').value,
+  }
+
+  const apiKey = document.getElementById('apiKey').value.trim()
+  showProgress()
+
+  // Build the prompt
+  const prompt = buildPrompt(ctx)
+
+  try {
+    updateProgress(20, 'Connecting to Claude...')
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        system: `You are a senior strategic communications writer specialising in CEO-to-CEO vision documents for AI and technology infrastructure engagements. You write with authority, clarity, and strategic depth. Your documents are concise, powerful, and free of jargon. You write in formal Indian English — precise, dignified, and never using Americanisms. You never use marketing superlatives. You write as if the CEO of ${ctx.ourCompany} is personally addressing ${ctx.custCEO || 'the senior leadership'} of ${ctx.custOrg}.`,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+
+    updateProgress(70, 'Generating Vision Document...')
+
+    if (!response.ok) {
+      const err = await response.json()
+      throw new Error(err.error?.message || 'API request failed')
+    }
+
+    const data = await response.json()
+    const raw = data.content?.[0]?.text || ''
+
+    updateProgress(90, 'Formatting document...')
+
+    // Parse the structured response
+    const doc = parseDocumentResponse(raw, ctx)
+    GENERATED_DOC = doc
+
+    updateProgress(100, 'Complete.')
+    setTimeout(() => renderDocument(doc, ctx), 400)
+
+  } catch (err) {
+    showError(err.message)
+  }
+}
+
+function buildPrompt(ctx) {
+  const toneGuide = {
+    'formal-strategic': 'Formal and strategic. Authoritative but never arrogant. Written as a peer addressing a peer.',
+    'visionary-narrative': 'Visionary and narrative. Story-driven, paints a picture of the future. Inspires action.',
+    'technical-credible': 'Technical and credible. Grounded in specifics, demonstrates deep understanding. Builds confidence.',
+    'partnership-warm': 'Partnership-oriented and warm. Emphasises shared mission and long-term relationship.'
+  }
+  const lengthGuide = {
+    'concise': '3 to 4 pages (approximately 600–900 words of body content)',
+    'standard': '4 to 6 pages (approximately 900–1400 words of body content)',
+    'comprehensive': '6 to 8 pages (approximately 1400–1900 words of body content)'
+  }
+
+  const projectContext = PROJECT ? `
+PROJECT DEFINITION FILE (from Domain Configurator):
+- Project Name: ${PROJECT.name || '—'}
+- Customer: ${PROJECT.customer || '—'}
+- Domain: ${PROJECT.domain || '—'}
+- Architecture Tier: ${PROJECT.tier || '—'}
+- Opportunity Type: ${PROJECT.opportunityType || '—'} / ${PROJECT.domainComplexity || '—'}
+- Selected Use Cases: ${(PROJECT.useCases || []).join(', ') || 'Not specified'}
+- Number of Personas: ${(PROJECT.personas || []).length}
+- Infrastructure Topology: ${PROJECT.infrastructure?.topology || 'Not specified'}
+- Data Classification: ${PROJECT.infrastructure?.sites?.site_0?.dataClassification || 'Not specified'}
+` : 'No Project Definition File uploaded. Use the context provided below.'
+
+  return `Write a Vision Document for the following engagement. This is a CEO-to-CEO document — it is NOT a proposal, NOT a technical specification, and NOT a commercial offer. It is a strategic narrative that establishes the vision, builds conviction, and invites a partnership conversation.
+
+DOCUMENT SPECIFICATIONS:
+- Tone: ${toneGuide[ctx.tone]}
+- Length: ${lengthGuide[ctx.length]}
+- Language: Formal Indian English. No Americanisms. No marketing superlatives. No jargon.
+- Audience: ${ctx.custCEO || 'Senior Leadership'}, ${ctx.custTitle || ctx.custOrg}
+- Author voice: ${ctx.ourCEO}, ${ctx.ourCEOTitle}, ${ctx.ourCompany}
+
+ENGAGEMENT CONTEXT:
+- Our Company: ${ctx.ourCompany}
+- Our CEO: ${ctx.ourCEO}, ${ctx.ourCEOTitle}
+- Customer Organisation: ${ctx.custOrg}
+- Customer Decision Maker: ${ctx.custCEO || 'Senior Leadership'} ${ctx.custTitle ? `(${ctx.custTitle})` : ''}
+- Transformational Vision: ${ctx.vision || 'To be determined from project context'}
+- Why Now: ${ctx.whyNow || 'To be inferred from project context'}
+- Strategic Importance: ${ctx.strategic || 'Strategic flagship engagement'}
+
+${projectContext}
+
+DOCUMENT STRUCTURE — Output EXACTLY in this format with these section markers:
+
+[SECTION: THE OPPORTUNITY]
+Write 2–3 paragraphs about the moment and the opportunity. What is happening in India / this sector that makes this the right time. Reference the organisation's mandate and the broader national context. Do not mention our company yet.
+
+[SECTION: THE VISION]
+Write 2–3 paragraphs describing what success looks like. Paint a picture of the transformed state — what the organisation will be able to do, see, and achieve. Make it aspirational but grounded. Reference specific outcomes relevant to their domain.
+
+[SECTION: THE PLATFORM]
+Write 2–3 paragraphs describing our proposed platform at a high level. No specs, no pricing, no product names. Focus on what it enables, not what it contains. Use phrases like "a sovereign AI infrastructure", "an intelligence layer", "a capability platform". Connect it directly to the vision above.
+
+[SECTION: WHY NOW, WHY US]
+Write 1–2 paragraphs on why this moment is right and why ${ctx.ourCompany} is the right partner. Be specific but not boastful. Reference our OEM position, our domain experience, our commitment to Indian manufacturing / sovereignty if relevant. No client names or testimonials.
+
+[SECTION: THE PARTNERSHIP]
+Write 1–2 paragraphs on how we propose to work together. Reference a phased approach, shared milestones, long-term commitment. Close with a call to action — a meeting, a workshop, a next step. The tone should feel like one leader writing to another.
+
+[CLOSING]
+Write a dignified, warm closing paragraph — 3–5 sentences. From ${ctx.ourCEO} to ${ctx.custCEO || 'the reader'}. Express conviction, respect, and readiness to proceed.
+
+Remember: This document should feel like it was written by a human being, not generated. Each paragraph should flow naturally from the one before it. The document as a whole should tell a coherent story with a clear arc: from the challenge, to the vision, to the solution, to the partnership.`
+}
+
+function parseDocumentResponse(raw, ctx) {
+  const sections = {}
+  const markers = ['THE OPPORTUNITY', 'THE VISION', 'THE PLATFORM', 'WHY NOW, WHY US', 'THE PARTNERSHIP', 'CLOSING']
+
+  markers.forEach((marker, i) => {
+    const startTag = `[SECTION: ${marker}]`
+    const altTag = `[${marker}]`
+    const nextMarker = markers[i + 1]
+
+    let start = raw.indexOf(startTag)
+    if (start === -1) start = raw.indexOf(altTag)
+    if (start === -1) { sections[marker] = ''; return }
+
+    start += (raw.indexOf(startTag) !== -1 ? startTag : altTag).length
+
+    let end = raw.length
+    if (nextMarker) {
+      const nextStart = raw.indexOf(`[SECTION: ${nextMarker}]`)
+      const nextAlt = raw.indexOf(`[${nextMarker}]`)
+      if (nextStart !== -1) end = nextStart
+      else if (nextAlt !== -1) end = nextAlt
+    }
+
+    sections[marker] = raw.slice(start, end).trim()
+  })
+
+  return {
+    title: `A Vision for ${ctx.custOrg}`,
+    subtitle: ctx.vision || 'A Strategic Partnership Proposal',
+    date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+    sections,
+    ctx,
+    raw
+  }
+}
+
+// ── RENDER ────────────────────────────────────────────────────
+function renderDocument(doc, ctx) {
+  const panel = document.getElementById('rightPanel')
+
+  panel.innerHTML = `
+    <div class="action-bar">
+      <button class="btn btn-primary" onclick="generateDocument()">↺ Regenerate</button>
+      <button class="btn btn-teal" onclick="exportTxt()">⬇ Export TXT</button>
+      <button class="btn btn-secondary" onclick="copyToClipboard()">📋 Copy All</button>
+      <button class="btn btn-outline" onclick="printDocument()">🖨 Print / PDF</button>
+      <span style="margin-left:auto;font-size:11px;color:var(--mid)">DRAFT — Review before sending</span>
+    </div>
+
+    <div class="alert alert-warn">
+      ⚠ This is an AI-generated draft. Review and personalise before sending. Pricing, commitments, and legal language must be verified separately.
+    </div>
+
+    <div class="doc-preview" id="docPreview">
+
+      <div class="doc-header">
+        <div class="doc-watermark">DRAFT — NOT FOR DISTRIBUTION</div>
+        <div class="doc-title">${doc.title}</div>
+        <div class="doc-meta">${doc.subtitle}</div>
+        <div class="doc-meta" style="margin-top:6px">${doc.date} · Prepared by ${ctx.ourCompany}</div>
+      </div>
+
+      <div class="doc-body">
+        ${renderSections(doc)}
+
+        <div class="doc-section" style="margin-top:32px;padding-top:20px;border-top:2px solid var(--light)">
+          <div style="font-size:13px;font-weight:600;color:var(--dark);margin-bottom:4px">${ctx.ourCEO}</div>
+          <div style="font-size:11px;color:var(--mid)">${ctx.ourCEOTitle}</div>
+          <div style="font-size:11px;color:var(--mid)">${ctx.ourCompany}</div>
+        </div>
+      </div>
+
+      <div class="doc-footer">
+        <span>Strictly Private & Confidential</span>
+        <span>${ctx.ourCompany} · ${doc.date}</span>
+        <span>ATLAS Document Factory v1.0</span>
+      </div>
+    </div>`
+}
+
+function renderSections(doc) {
+  const sectionConfig = [
+    { key: 'THE OPPORTUNITY', label: 'The Opportunity' },
+    { key: 'THE VISION', label: 'The Vision' },
+    { key: 'THE PLATFORM', label: 'The Platform' },
+    { key: 'WHY NOW, WHY US', label: 'Why Now — Why Us' },
+    { key: 'THE PARTNERSHIP', label: 'The Partnership' },
+    { key: 'CLOSING', label: '' },
+  ]
+
+  return sectionConfig.map(s => {
+    const content = doc.sections[s.key] || ''
+    if (!content) return ''
+
+    // Convert paragraphs
+    const paragraphs = content.split('\n').filter(p => p.trim()).map(p =>
+      `<p>${p.trim()}</p>`
+    ).join('')
+
+    if (s.key === 'CLOSING') {
+      return `<div class="doc-section" style="font-style:italic">
+        <div class="doc-text" style="color:var(--navy)">${paragraphs}</div>
+      </div>`
+    }
+
+    return `<div class="doc-section">
+      <div class="doc-section-title">${s.label}</div>
+      <div class="doc-text">${paragraphs}</div>
+    </div>`
+  }).join('')
+}
+
+// ── PROGRESS ──────────────────────────────────────────────────
+function showProgress() {
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="gen-progress">
+      <div style="font-size:40px;margin-bottom:12px">✨</div>
+      <div style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px">Generating Vision Document</div>
+      <div style="font-size:12px;color:var(--mid)">Claude is writing your CEO-to-CEO document...</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:10%"></div></div>
+      <div class="progress-step" id="progressStep">Preparing context...</div>
+    </div>`
+}
+
+function updateProgress(pct, msg) {
+  const fill = document.getElementById('progressFill')
+  const step = document.getElementById('progressStep')
+  if (fill) fill.style.width = pct + '%'
+  if (step) step.textContent = msg
+}
+
+function showError(msg) {
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="alert alert-err">
+      ❌ Generation failed: ${msg}
+      <br><br>Common causes: Invalid API key, network issue, or API quota exceeded.
+    </div>
+    <button class="btn btn-outline" onclick="resetPanel()">← Try Again</button>`
+}
+
+function resetPanel() {
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="empty">
+      <div class="empty__icon">📄</div>
+      <div class="empty__title">Vision Document Preview</div>
+      <div class="empty__desc">Fill in the context on the left and click Generate.</div>
+    </div>`
+}
+
+// ── EXPORT ────────────────────────────────────────────────────
+function exportTxt() {
+  if (!GENERATED_DOC) { alert('Generate a document first.'); return }
+  const doc = GENERATED_DOC
+  const ctx = doc.ctx
+  const sectionOrder = ['THE OPPORTUNITY', 'THE VISION', 'THE PLATFORM', 'WHY NOW, WHY US', 'THE PARTNERSHIP', 'CLOSING']
+  const sectionLabels = {
+    'THE OPPORTUNITY': 'THE OPPORTUNITY',
+    'THE VISION': 'THE VISION',
+    'THE PLATFORM': 'THE PLATFORM',
+    'WHY NOW, WHY US': 'WHY NOW — WHY US',
+    'THE PARTNERSHIP': 'THE PARTNERSHIP',
+    'CLOSING': ''
+  }
+
+  const lines = [
+    'DRAFT — NOT FOR DISTRIBUTION',
+    '='.repeat(60),
+    '',
+    doc.title.toUpperCase(),
+    doc.subtitle,
+    '',
+    `Date: ${doc.date}`,
+    `Prepared by: ${ctx.ourCompany}`,
+    `From: ${ctx.ourCEO}, ${ctx.ourCEOTitle}`,
+    `To: ${ctx.custCEO || 'Senior Leadership'}, ${ctx.custOrg}`,
+    '',
+    '='.repeat(60),
+    '',
+    ...sectionOrder.flatMap(k => {
+      const content = doc.sections[k]
+      if (!content) return []
+      const label = sectionLabels[k]
+      return label
+        ? [label, '-'.repeat(label.length), '', content, '']
+        : ['', content, '']
+    }),
+    '—',
+    ctx.ourCEO,
+    ctx.ourCEOTitle,
+    ctx.ourCompany,
+    '',
+    'Strictly Private & Confidential',
+    `Generated by ATLAS Document Factory · ${doc.date}`,
+  ]
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const filename = `VisionDocument-${ctx.custOrg.replace(/\s+/g, '-')}-${new Date().toISOString().slice(0,10)}.txt`
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function copyToClipboard() {
+  if (!GENERATED_DOC) { alert('Generate a document first.'); return }
+  const text = document.getElementById('docPreview')?.innerText || ''
+  navigator.clipboard.writeText(text).then(() => alert('Document copied to clipboard.'))
+}
+
+function printDocument() {
+  if (!GENERATED_DOC) { alert('Generate a document first.'); return }
+  window.print()
+}
+
+function showAlert(panelId, type, msg) {
+  const panel = document.getElementById(panelId)
+  const alert = document.createElement('div')
+  alert.className = `alert alert-${type}`
+  alert.textContent = msg
+  panel.prepend(alert)
+  setTimeout(() => alert.remove(), 5000)
+}
+</script>
+
+<style>
+@media print {
+  .hdr,.left-panel,.action-bar,.alert { display:none!important; }
+  .page { grid-template-columns:1fr; }
+  .right-panel { padding:0; }
+  .doc-preview { box-shadow:none; border:none; }
+}
+</style>
+
+</body>
+</html>
 
