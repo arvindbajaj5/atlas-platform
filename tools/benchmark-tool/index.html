@@ -1,1 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — Benchmark Tool v1.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;
+  --teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;
+  --dark:#282832;--black:#0A0A0F;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.12);
+  --r:8px;--r-sm:6px;--r-lg:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
 
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:100;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.hdr-badge{background:rgba(255,182,0,0.2);color:var(--amber);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-amber{background:var(--amber);color:var(--dark);}
+.btn-amber:hover{background:#e6a400;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-lg{padding:12px 24px;font-size:14px;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+
+/* CTX BAR */
+.ctx-bar{background:var(--white);border-bottom:1px solid #e0e0e8;padding:8px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:12px;}
+.ctx-lbl{font-weight:700;color:var(--mid);text-transform:uppercase;font-size:10px;letter-spacing:0.5px;}
+.ctx-val{font-weight:600;color:var(--dark);}
+.ctx-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;}
+
+/* TABS */
+.tabs{background:var(--white);border-bottom:2px solid #e0e0e8;padding:0 24px;display:flex;overflow-x:auto;}
+.tab{padding:12px 18px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;white-space:nowrap;}
+.tab.act{color:var(--navy);border-bottom-color:var(--orange);}
+.tab:hover{color:var(--navy);}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:1fr 300px;gap:0;min-height:calc(100vh - 140px);}
+.main{padding:24px;overflow-y:auto;}
+.sidebar{background:var(--white);border-left:1px solid #e0e0e8;padding:20px;overflow-y:auto;}
+
+/* CARDS */
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card:last-child{margin-bottom:0;}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:16px;}
+.sec-label{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--light);}
+
+/* FORMS */
+.fg{margin-bottom:14px;}
+.fg:last-child{margin-bottom:0;}
+label{display:block;font-size:10px;font-weight:700;color:var(--dark);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.3px;}
+input[type=text],input[type=number],select,textarea{width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:inherit;color:var(--dark);appearance:none;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;}
+
+/* BENCHMARK TABLE */
+.bm-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;}
+.bm-table th{text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
+.bm-table td{padding:8px 10px;border-bottom:1px solid var(--light);vertical-align:middle;}
+.bm-table tr:hover td{background:rgba(28,56,245,0.02);}
+.bm-table input,.bm-table select{width:100%;padding:5px 7px;font-size:11px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-family:inherit;}
+.bm-table input:focus,.bm-table select:focus{outline:none;border-color:var(--blue);}
+.bm-table tr.total-row td{background:rgba(0,40,112,0.04);font-weight:700;color:var(--navy);}
+
+/* CONFIDENCE */
+.conf-dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.conf-green{background:var(--teal);}
+.conf-amber{background:var(--amber);}
+.conf-red{background:#DC2626;}
+.conf-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;}
+.conf-badge.measured{background:rgba(0,178,144,0.1);color:var(--teal);}
+.conf-badge.estimated{background:rgba(255,182,0,0.12);color:#9a7000;}
+.conf-badge.extrapolated{background:rgba(220,38,38,0.08);color:#DC2626;}
+
+/* GPU CARDS */
+.gpu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px;}
+.gpu-card{border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:14px;cursor:pointer;transition:all 0.15s;position:relative;}
+.gpu-card:hover{border-color:var(--navy);}
+.gpu-card.sel{border-color:var(--orange);background:rgba(255,85,57,0.03);}
+.gpu-card.sel::after{content:'✓';position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;background:var(--orange);color:var(--white);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.gpu-card__name{font-size:12px;font-weight:700;color:var(--dark);margin-bottom:6px;}
+.gpu-card__specs{font-size:10px;color:var(--mid);line-height:1.6;}
+.gpu-card__tps{font-size:16px;font-weight:900;color:var(--navy);margin-top:6px;}
+.gpu-card__tps span{font-size:10px;font-weight:400;color:var(--mid);}
+
+/* WORKLOAD SELECTOR */
+.wl-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.wl-chip{padding:5px 12px;border-radius:12px;border:1px solid #d0d0d8;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;color:var(--mid);}
+.wl-chip:hover{border-color:var(--navy);color:var(--navy);}
+.wl-chip.sel{background:var(--navy);color:var(--white);border-color:var(--navy);}
+
+/* SCRIPT OUTPUT */
+.script-out{background:var(--black);border-radius:var(--r);padding:16px;font-family:'Roboto Mono',monospace;font-size:11px;color:#a8ff78;line-height:1.7;overflow:auto;max-height:400px;white-space:pre;}
+.script-comment{color:#7fdbca;}
+.script-cmd{color:#f8f8f2;}
+
+/* LOG ENTRY */
+.log-entry{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px;margin-bottom:10px;}
+.log-entry__hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.log-entry__title{font-size:13px;font-weight:700;color:var(--dark);}
+.log-entry__meta{font-size:10px;color:var(--mid);}
+.log-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.log-metric{text-align:center;background:var(--light);border-radius:var(--r-sm);padding:8px;}
+.log-metric-val{font-size:16px;font-weight:900;color:var(--navy);}
+.log-metric-lbl{font-size:9px;color:var(--mid);margin-top:2px;}
+
+/* EXTRAPOLATION */
+.extrap-result{background:rgba(0,40,112,0.04);border:1px solid rgba(0,40,112,0.15);border-radius:var(--r);padding:14px;margin-top:12px;}
+.extrap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
+.extrap-cell{text-align:center;}
+.extrap-val{font-size:18px;font-weight:900;color:var(--navy);}
+.extrap-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+
+/* SIDEBAR */
+.sb-stat{background:var(--light);border-radius:var(--r);padding:12px;text-align:center;margin-bottom:10px;}
+.sb-val{font-size:22px;font-weight:900;color:var(--navy);}
+.sb-val.orange{color:var(--orange);}
+.sb-val.teal{color:var(--teal);}
+.sb-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+.sb-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--light);font-size:11px;}
+.sb-item:last-child{border-bottom:none;}
+.sb-item-lbl{color:var(--mid);}
+.sb-item-val{font-weight:600;color:var(--dark);}
+
+/* CHART */
+.chart-wrap{position:relative;height:220px;}
+
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:var(--r);font-size:12px;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-ok{background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.25);color:#007a60;}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.3);color:#9a7000;}
+
+/* TP */
+.tp{display:none;}
+.tp.act{display:block;}
+
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;}
+  .sidebar{border-left:none;border-top:1px solid #e0e0e8;}
+  .gpu-grid{grid-template-columns:1fr 1fr;}
+  .log-metrics{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.65)">Benchmark Tool</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">v1.0 · Presales</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+  </div>
+</div>
+
+<!-- CTX BAR -->
+<div class="ctx-bar">
+  <span class="ctx-lbl">Project</span><span class="ctx-val" id="ctxProject">No project loaded</span>
+  <span style="color:var(--mid)">·</span>
+  <span class="ctx-lbl">GPU</span><span class="ctx-val" id="ctxGPU">—</span>
+  <span style="color:var(--mid)">·</span>
+  <span class="ctx-lbl">Workload</span><span class="ctx-val" id="ctxWorkload">—</span>
+  <span style="color:var(--mid)">·</span>
+  <span class="ctx-lbl">Runs Logged</span><span class="ctx-val" id="ctxRuns">0</span>
+  <div style="margin-left:auto;display:flex;gap:8px">
+    <label class="btn btn-outline btn-sm" style="cursor:pointer">⬆ Load Project JSON<input type="file" accept=".json" style="display:none" onchange="loadProjectFile(event)"></label>
+    <button class="btn btn-primary btn-sm" onclick="exportReport()">⬇ Export Report</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab act" id="t-data" onclick="showTab('data')">1 · Data Collation</div>
+  <div class="tab" id="t-override" onclick="showTab('override')">2 · Manual Override</div>
+  <div class="tab" id="t-script" onclick="showTab('script')">3 · Run Scripts</div>
+  <div class="tab" id="t-logs" onclick="showTab('logs')">4 · Run Logs</div>
+  <div class="tab" id="t-extrap" onclick="showTab('extrap')">5 · Extrapolation</div>
+</div>
+
+<div class="layout">
+<div class="main">
+
+<!-- TAB 1: DATA COLLATION -->
+<div class="tp act" id="tp-data">
+  <div class="card">
+    <div class="card-title">Benchmark Configuration</div>
+    <div class="card-sub">Define the hardware and workload being benchmarked. This configuration flows into all other tabs.</div>
+
+    <div class="sec-label">Hardware Under Test</div>
+    <div class="gpu-grid" id="gpu-grid"></div>
+
+    <div class="row2">
+      <div class="fg">
+        <label>Quantization</label>
+        <select id="cfg-quant" onchange="syncConfig()">
+          <option value="fp8">FP8</option>
+          <option value="fp16">FP16</option>
+          <option value="bf16">BF16</option>
+          <option value="int4">INT4</option>
+          <option value="int8">INT8</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Serving Engine</label>
+        <select id="cfg-engine" onchange="syncConfig()">
+          <option value="vllm">vLLM</option>
+          <option value="trt">TensorRT-LLM</option>
+          <option value="sglang">SGLang</option>
+          <option value="triton">Triton Inference Server</option>
+          <option value="ollama">Ollama</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="sec-label" style="margin-top:4px">Workload Type</div>
+    <div class="wl-chips" id="wl-chips"></div>
+
+    <div class="row3">
+      <div class="fg">
+        <label>Model Name / Size</label>
+        <select id="cfg-model" onchange="syncConfig()">
+          <option value="llama3-8b">Llama 3.1 8B</option>
+          <option value="llama3-70b">Llama 3.1 70B</option>
+          <option value="llama3-405b">Llama 3.1 405B</option>
+          <option value="mistral-7b">Mistral 7B</option>
+          <option value="mixtral-8x7b">Mixtral 8×7B</option>
+          <option value="qwen2-72b">Qwen2.5 72B</option>
+          <option value="deepseek-67b">DeepSeek 67B</option>
+          <option value="custom">Custom / Other</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Input Token Length (avg)</label>
+        <input type="number" id="cfg-inputLen" value="512" min="1" oninput="syncConfig()">
+      </div>
+      <div class="fg">
+        <label>Output Token Length (avg)</label>
+        <input type="number" id="cfg-outputLen" value="256" min="1" oninput="syncConfig()">
+      </div>
+    </div>
+    <div class="row3">
+      <div class="fg">
+        <label>Concurrency / Batch Size</label>
+        <input type="number" id="cfg-batch" value="32" min="1" oninput="syncConfig()">
+      </div>
+      <div class="fg">
+        <label>Number of GPUs</label>
+        <input type="number" id="cfg-gpuCount" value="8" min="1" max="512" oninput="syncConfig()">
+      </div>
+      <div class="fg">
+        <label>Test Duration (minutes)</label>
+        <input type="number" id="cfg-duration" value="30" min="1" oninput="syncConfig()">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Reference Benchmark Data</div>
+    <div class="card-sub">Curated from MLPerf v4.1, vLLM benchmarks, TRT-LLM GitHub, and AMD published results. Last updated May 2026.</div>
+    <div class="alert alert-info">🟢 Measured = confirmed lab run · 🟡 Estimated = vendor spec / interpolated · 🔴 Extrapolated = proxy calculation</div>
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase">Filter:</span>
+      <select class="f-select" id="ref-filter-gpu" onchange="filterRefTable()" style="font-size:11px;padding:4px 8px;width:auto">
+        <option value="">All GPUs</option>
+        <option value="B200">B200</option>
+        <option value="B300">B300</option>
+        <option value="H200">H200</option>
+        <option value="H100">H100</option>
+        <option value="L40S">L40S</option>
+        <option value="MI325X">MI325X</option>
+        <option value="MI300X">MI300X</option>
+      </select>
+      <select class="f-select" id="ref-filter-model" onchange="filterRefTable()" style="font-size:11px;padding:4px 8px;width:auto">
+        <option value="">All Models</option>
+        <option value="llama3-8b">Llama 3.1 8B</option>
+        <option value="llama3-70b">Llama 3.1 70B</option>
+        <option value="llama3-405b">Llama 3.1 405B</option>
+        <option value="mistral-7b">Mistral 7B</option>
+        <option value="mixtral-8x7b">Mixtral 8×7B</option>
+      </select>
+      <select class="f-select" id="ref-filter-conf" onchange="filterRefTable()" style="font-size:11px;padding:4px 8px;width:auto">
+        <option value="">All Confidence</option>
+        <option value="measured">🟢 Measured only</option>
+        <option value="estimated">🟡 Estimated only</option>
+      </select>
+      <span id="ref-count" style="font-size:11px;color:var(--mid)"></span>
+      <button class="btn btn-outline btn-sm" onclick="useAsTarget()" style="margin-left:auto">Use Selected as Target →</button>
+    </div>
+    <table class="bm-table" id="ref-table">
+      <thead><tr>
+        <th>Source</th><th>GPU</th><th>Model</th><th>Quant</th>
+        <th>TPS (output)</th><th>TTFT (ms)</th><th>Latency p95 (ms)</th><th>GPU Count</th><th>Confidence</th>
+      </tr></thead>
+      <tbody id="ref-tbody"></tbody>
+    </table>
+    <button class="btn btn-outline btn-sm" onclick="addRefRow()">+ Add Reference</button>
+  </div>
+</div>
+
+<!-- TAB 2: MANUAL OVERRIDE -->
+<div class="tp" id="tp-override">
+  <div class="card">
+    <div class="card-title">Manual Override — Expected Performance</div>
+    <div class="card-sub">Override the auto-computed benchmark targets with your own values. Overrides are flagged in all outputs.</div>
+    <div class="alert alert-warn">⚠ Manual overrides replace computed values. Ensure these are based on real data before use in a customer presentation.</div>
+
+    <div class="sec-label">Performance Targets</div>
+    <div class="row2">
+      <div class="fg">
+        <label>Target TPS (output tokens/sec)</label>
+        <input type="number" id="ov-tps" placeholder="e.g. 1200" min="1">
+      </div>
+      <div class="fg">
+        <label>Time to First Token (ms)</label>
+        <input type="number" id="ov-ttft" placeholder="e.g. 85" min="1">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="fg">
+        <label>Latency p50 (ms)</label>
+        <input type="number" id="ov-lat50" placeholder="e.g. 120" min="1">
+      </div>
+      <div class="fg">
+        <label>Latency p95 (ms)</label>
+        <input type="number" id="ov-lat95" placeholder="e.g. 320" min="1">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="fg">
+        <label>Throughput (req/s at concurrency)</label>
+        <input type="number" id="ov-rps" placeholder="e.g. 45" min="1">
+      </div>
+      <div class="fg">
+        <label>GPU Memory Utilisation (%)</label>
+        <input type="number" id="ov-memUtil" placeholder="e.g. 87" min="1" max="100">
+      </div>
+    </div>
+
+    <div class="sec-label" style="margin-top:4px">Override Justification</div>
+    <div class="fg">
+      <label>Source / Justification (required for override)</label>
+      <textarea id="ov-justification" placeholder="e.g. Based on internal lab run on 8× H200 SXM, vLLM 0.4.3, Llama 3.1 70B FP8, 2026-04-15. Results validated by presales team." rows="3"></textarea>
+    </div>
+    <div class="fg">
+      <label>Override Confidence</label>
+      <select id="ov-confidence">
+        <option value="measured">🟢 Measured — from confirmed benchmark run</option>
+        <option value="estimated">🟡 Estimated — from vendor spec or interpolation</option>
+        <option value="extrapolated">🔴 Extrapolated — calculated from proxy data</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-primary" onclick="applyOverride()">Apply Override</button>
+      <button class="btn btn-outline" onclick="clearOverride()">Clear Override</button>
+    </div>
+    <div id="override-status" style="margin-top:10px;font-size:12px;color:var(--mid)"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Active Values</div>
+    <div class="card-sub">Currently active performance targets used in scripts and extrapolation</div>
+    <table class="bm-table">
+      <thead><tr><th>Metric</th><th>Computed</th><th>Override</th><th>Active</th><th>Source</th></tr></thead>
+      <tbody id="active-values-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TAB 3: RUN SCRIPTS -->
+<div class="tp" id="tp-script">
+  <div c
