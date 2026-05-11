@@ -10,7 +10,12 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);}
 
-/* LOGIN */
+
+/* LOGO */
+.hdr-logo{height:28px;max-width:100px;object-fit:contain;border-radius:3px;}
+.hdr-logo-wrap{display:flex;align-items:center;gap:12px;}
+
+  /* LOGIN */
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy);}
 .login-card{background:var(--white);border-radius:12px;padding:40px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
 .login-mark{font-size:28px;font-weight:900;color:var(--navy);letter-spacing:4px;text-align:center;margin-bottom:4px;}
@@ -152,7 +157,10 @@ tr:hover td{background:rgba(0,0,0,0.02);}
 <!-- APP -->
 <div class="app" id="appWrap">
   <header>
-    <div class="hdr-mark">ATL<span>A</span>S</div>
+    <div class="hdr-logo-wrap">
+      <img id="hdrLogo" class="hdr-logo" src="" alt="" style="display:none">
+      <div class="hdr-mark">ATL<span>A</span>S</div>
+    </div>
     <div class="hdr-right">
       <div class="hdr-user" id="hdrName">—</div>
       <div class="hdr-role" id="hdrRole">—</div>
@@ -220,6 +228,40 @@ let user=null, project=null
 const projects = JSON.parse(localStorage.getItem('atlas_projects')||'[]')
 function saveProjects(){ localStorage.setItem('atlas_projects',JSON.stringify(projects)) }
 
+
+// ── LOGO ──────────────────────────────────────────────────────
+function loadLogo(){
+  const logo=localStorage.getItem('atlas_logo')
+  const img=document.getElementById('hdrLogo')
+  if(logo&&img){img.src=logo;img.style.display='block'}
+  else if(img){img.style.display='none'}
+}
+
+function saveLogo(dataUrl){
+  localStorage.setItem('atlas_logo',dataUrl)
+  loadLogo()
+}
+
+function handleLogoUpload(evt){
+  const file=evt.target.files[0];if(!file)return
+  if(file.size>200000){alert('Logo file is too large. Kindly use a file under 200KB.');return}
+  const r=new FileReader()
+  r.onload=e=>{
+    saveLogo(e.target.result)
+    const prev=document.getElementById('logo-preview')
+    const wrap=document.getElementById('logo-preview-wrap')
+    if(prev&&wrap){prev.src=e.target.result;wrap.style.display='block'}
+    alert('Logo saved successfully.')
+  }
+  r.readAsDataURL(file)
+}
+
+function removeLogo(){
+  localStorage.removeItem('atlas_logo')
+  loadLogo()
+  alert('Logo removed.')
+}
+
 // ── AUTH ──────────────────────────────────────────────────────
 function doLogin(){
   const name=document.getElementById('loginName').value.trim()
@@ -232,7 +274,7 @@ function doLogin(){
   document.getElementById('appWrap').className='app active'
   document.getElementById('hdrName').textContent=name
   document.getElementById('hdrRole').textContent=ROLES[role].label
-  renderSidebar();renderHome()
+  renderSidebar();renderHome();loadLogo()
 }
 
 function doLogout(){
@@ -460,6 +502,19 @@ function showSettings(){
     <div class="ph-title" style="margin-bottom:4px">⚙️ Settings</div>
     <div class="ph-sub">Business Head access only</div>
     <div class="card" style="max-width:520px">
+      <div class="card-title">Company Logo</div>
+      <div class="card-sub">Displayed in the portal masthead. PNG, JPG, or SVG. Recommended height: 32px. Stored in this browser only.</div>
+      <div id="logo-preview-wrap" style="margin-bottom:12px;display:none">
+        <img id="logo-preview" style="height:40px;border:1px solid #e0e0e8;border-radius:4px;padding:4px;background:var(--navy)">
+      </div>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer;width:auto;display:inline-flex">
+        ⬆ Upload Logo
+        <input type="file" accept="image/*" style="display:none" onchange="handleLogoUpload(event)">
+      </label>
+      <button class="btn btn-sm" style="margin-left:8px;color:#DC2626;border:1px solid #DC2626;background:transparent" onclick="removeLogo()">Remove</button>
+      <div class="form-hint" style="margin-top:8px">Best results with a white or transparent background logo on dark backgrounds.</div>
+    </div>
+    <div class="card" style="max-width:520px">
       <div class="card-title">AI Configuration</div>
       <div class="card-sub">Anthropic API key for Document Factory and Vision Document generation</div>
       <label>Anthropic API Key</label>
@@ -484,6 +539,10 @@ function showSettings(){
     </div>`
   const k=localStorage.getItem('atlas_api_key')
   if(k) document.getElementById('apiKey').value=k
+  const logo=localStorage.getItem('atlas_logo')
+  const prev=document.getElementById('logo-preview')
+  const wrap=document.getElementById('logo-preview-wrap')
+  if(logo&&prev&&wrap){prev.src=logo;wrap.style.display='block'}
 }
 
 function saveKey(){
@@ -512,7 +571,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       document.getElementById('appWrap').className='app active'
       document.getElementById('hdrName').textContent=user.name
       document.getElementById('hdrRole').textContent=ROLES[user.role].label
-      renderSidebar();renderHome()
+      renderSidebar();renderHome();loadLogo()
     }catch(e){localStorage.removeItem('atlas_user')}
   }
 })
