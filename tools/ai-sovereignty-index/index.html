@@ -95,9 +95,22 @@ body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);m
 .empty__title{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:8px;}
 @media(max-width:1100px){.page{grid-template-columns:220px 1fr;}.right{display:none;}}
 @media(max-width:768px){.page{grid-template-columns:1fr;}.left{border-right:none;border-bottom:1px solid #e0e0e8;}.year-grid{grid-template-columns:1fr;}}
+
+/* ATLAS SHARED CONTEXT BAR */
+.atlas-ctx{background:#001d5c;border-bottom:2px solid #FF5539;padding:0 20px;height:32px;display:flex;align-items:center;gap:0;font-family:'Roboto',sans-serif;font-size:11px;}
+.atlas-ctx__back{color:rgba(255,255,255,0.7);text-decoration:none;font-weight:600;padding:0 12px 0 0;border-right:1px solid rgba(255,255,255,0.15);margin-right:12px;display:flex;align-items:center;gap:4px;transition:color 0.15s;}
+.atlas-ctx__back:hover{color:#FF5539;}
+.atlas-ctx__sep{color:rgba(255,255,255,0.25);margin:0 8px;}
+.atlas-ctx__lbl{color:rgba(255,255,255,0.45);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-size:9px;}
+.atlas-ctx__val{color:rgba(255,255,255,0.85);font-weight:600;margin-left:5px;}
+.atlas-ctx__tool{margin-left:auto;color:rgba(255,255,255,0.45);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+.atlas-ctx__proj-dot{width:6px;height:6px;border-radius:50%;background:#00B290;margin-right:4px;flex-shrink:0;}
+
 </style>
 </head>
 <body>
+<div class="atlas-ctx" id="atlasCtxBar"><span class="atlas-ctx__tool">AI Sovereignty Index</span></div>
+
 <div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S</div>
   <div style="font-size:13px;color:rgba(255,255,255,0.65)">AI Sovereignty Index</div>
@@ -277,4 +290,331 @@ function addProposal(preset){
 function selectProposal(idx){
   CURRENT=idx;const p=PROPOSALS[idx]
   document.getElementById('empty-state').style.display='none'
-  document.getElementById('editor').style
+  document.getElementById('editor').style.display='block'
+  document.getElementById('prop-name').value=p.name
+  ;['y1','y3','y6'].forEach(yr=>['asi','api','pvs'].forEach(d=>{document.getElementById(`${yr}-${d}`).value=p[yr][d]}))
+  updateData();renderList()
+}
+
+function updateData(){
+  if(CURRENT===null)return
+  const p=PROPOSALS[CURRENT]
+  p.name=document.getElementById('prop-name').value||'Unnamed'
+  ;['y1','y3','y6'].forEach(yr=>['asi','api','pvs'].forEach(d=>{
+    const v=Math.min(10,Math.max(0,parseFloat(document.getElementById(`${yr}-${d}`).value)||0))
+    p[yr][d]=v
+    document.getElementById(`bar-${yr}-${d}`).style.width=(v/10*100)+'%'
+  }))
+  const s=calcLASI(p),cls=classify(s)
+  document.getElementById('sb-lasi').textContent=s.lasi.toFixed(1)
+  document.getElementById('sb-asi').textContent=s.asi.toFixed(1)
+  document.getElementById('sb-api').textContent=s.api.toFixed(1)
+  document.getElementById('sb-pvs').textContent=s.pvs.toFixed(1)
+  const tag=document.getElementById('sb-tag');tag.textContent=cls.label;tag.className='score-tag '+cls.cls
+  const dlt=(a,b,k)=>{const d=b[k]-a[k];return(d>=0?'+':'')+d.toFixed(1)}
+  document.getElementById('sb-deltas').innerHTML=`
+    <div class="sb-item"><span class="sb-item-lbl">ASI Y1→Y3</span><span class="sb-item-val" style="color:${p.y3.asi>=p.y1.asi?'var(--teal)':'var(--orange)'}">${dlt(p.y1,p.y3,'asi')}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">ASI Y3→Y6</span><span class="sb-item-val" style="color:${p.y6.asi>=p.y3.asi?'var(--teal)':'var(--orange)'}">${dlt(p.y3,p.y6,'asi')}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">API Y1→Y3</span><span class="sb-item-val" style="color:${p.y3.api>=p.y1.api?'var(--teal)':'var(--orange)'}">${dlt(p.y1,p.y3,'api')}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">API Y3→Y6</span><span class="sb-item-val" style="color:${p.y6.api>=p.y3.api?'var(--teal)':'var(--orange)'}">${dlt(p.y3,p.y6,'api')}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">PVS Y1→Y6</span><span class="sb-item-val" style="color:${p.y6.pvs>=p.y1.pvs?'var(--teal)':'var(--orange)'}">${dlt(p.y1,p.y6,'pvs')}</span></div>`
+  updateMatrix();updateRadar();updateComparison();renderList()
+}
+
+function deleteProposal(){
+  if(!confirm('Delete this proposal?'))return
+  PROPOSALS.splice(CURRENT,1);CURRENT=null
+  if(PROPOSALS.length>0)selectProposal(0)
+  else{document.getElementById('editor').style.display='none';document.getElementById('empty-state').style.display='block'}
+  renderList()
+}
+
+function renderList(){
+  const el=document.getElementById('prop-list')
+  if(!PROPOSALS.length){el.innerHTML='<div style="font-size:11px;color:var(--mid);text-align:center;padding:16px">No proposals yet.</div>';return}
+  el.innerHTML=PROPOSALS.map((p,i)=>{
+    const s=calcLASI(p)
+    return`<div class="prop-item ${CURRENT===i?'sel':''}" onclick="selectProposal(${i})"><div class="prop-item__name">${p.name}</div><div class="prop-item__score">LASI ${s.lasi.toFixed(1)} · ${classify(s).label}</div></div>`
+  }).join('')
+}
+
+function updateMatrix(){
+  const p=PROPOSALS[CURRENT]
+  const pts=[
+    {x:p.y1.asi,y:p.y1.api,r:Math.max(4,p.y1.pvs*2.2)},
+    {x:p.y3.asi,y:p.y3.api,r:Math.max(4,p.y3.pvs*2.2)},
+    {x:p.y6.asi,y:p.y6.api,r:Math.max(4,p.y6.pvs*2.2)}
+  ]
+  const cols=['rgba(255,85,57,0.45)','rgba(28,56,245,0.5)','rgba(0,178,144,0.7)']
+  const bords=['#FF5539','#1C38F5','#00B290']
+  const ctx=document.getElementById('matrixChart')
+  if(matrixChart)matrixChart.destroy()
+
+  const quadrantPlugin={
+    id:'ql',
+    afterDraw:function(ch){
+      var cv=ch.ctx
+      var ca=ch.chartArea
+      var xm=ch.scales.x.getPixelForValue(5)
+      var ym=ch.scales.y.getPixelForValue(5)
+      cv.save()
+      cv.strokeStyle='rgba(0,40,112,0.12)'
+      cv.lineWidth=1
+      cv.setLineDash([4,4])
+      cv.beginPath();cv.moveTo(xm,ca.top);cv.lineTo(xm,ca.bottom);cv.stroke()
+      cv.beginPath();cv.moveTo(ca.left,ym);cv.lineTo(ca.right,ym);cv.stroke()
+      cv.strokeStyle='rgba(0,40,112,0.3)'
+      cv.lineWidth=1.5
+      cv.setLineDash([3,3])
+      for(var i=0;i<2;i++){
+        var s=ch.getDatasetMeta(i).data[0]
+        var e=ch.getDatasetMeta(i+1).data[0]
+        cv.beginPath();cv.moveTo(s.x,s.y);cv.lineTo(e.x,e.y);cv.stroke()
+        var ang=Math.atan2(e.y-s.y,e.x-s.x)
+        cv.setLineDash([])
+        cv.beginPath()
+        cv.moveTo(e.x,e.y);cv.lineTo(e.x-10*Math.cos(ang-Math.PI/6),e.y-10*Math.sin(ang-Math.PI/6))
+        cv.moveTo(e.x,e.y);cv.lineTo(e.x-10*Math.cos(ang+Math.PI/6),e.y-10*Math.sin(ang+Math.PI/6))
+        cv.stroke()
+        cv.setLineDash([3,3])
+      }
+      cv.restore()
+    }
+  }
+
+  matrixChart=new Chart(ctx,{
+    type:'bubble',
+    data:{
+      datasets:pts.map(function(pt,i){
+        return{label:['Y1','Y3','Y6'][i],data:[pt],backgroundColor:cols[i],borderColor:bords[i],borderWidth:2}
+      })
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}},
+        tooltip:{callbacks:{label:function(c){return c.dataset.label+': ASI '+c.parsed.x+', API '+c.parsed.y+', PVS '+(c.raw.r/2.2).toFixed(1)}}}
+      },
+      scales:{
+        x:{min:0,max:10,title:{display:true,text:'SOVEREIGNTY (ASI)',font:{size:10,weight:'700'}},grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:9}}},
+        y:{min:0,max:10,title:{display:true,text:'SUPREMACY (API)',font:{size:10,weight:'700'}},grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:9}}}
+      }
+    },
+    plugins:[quadrantPlugin]
+  })
+}
+
+function updateRadar(){
+  const p=PROPOSALS[CURRENT]
+  const ctx=document.getElementById('radarChart')
+  if(radarChart)radarChart.destroy()
+  radarChart=new Chart(ctx,{
+    type:'radar',
+    data:{labels:['Sovereignty\n(ASI)','Supremacy\n(API)','Platform\nVitality (PVS)'],
+      datasets:[
+        {label:'Year 1',data:[p.y1.asi,p.y1.api,p.y1.pvs],borderColor:'#FF5539',backgroundColor:'rgba(255,85,57,0.08)',borderWidth:2,pointRadius:4},
+        {label:'Year 3',data:[p.y3.asi,p.y3.api,p.y3.pvs],borderColor:'#1C38F5',backgroundColor:'rgba(28,56,245,0.08)',borderWidth:2,pointRadius:4},
+        {label:'Year 6',data:[p.y6.asi,p.y6.api,p.y6.pvs],borderColor:'#00B290',backgroundColor:'rgba(0,178,144,0.1)',borderWidth:2,pointRadius:4}
+      ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}}},
+      scales:{r:{min:0,max:10,ticks:{stepSize:2,font:{size:9}},pointLabels:{font:{size:10,weight:'600'}}}}}
+  })
+}
+
+function updateComparison(){
+  const card=document.getElementById('comp-card')
+  if(PROPOSALS.length<2){card.style.display='none';return}
+  card.style.display='block'
+  const ranked=[...PROPOSALS].map(p=>({...p,scores:calcLASI(p)})).sort((a,b)=>b.scores.lasi-a.scores.lasi)
+  const max=ranked[0].scores.lasi
+  document.getElementById('comp-tbody').innerHTML=ranked.map((p,i)=>{
+    const cls=classify(p.scores)
+    return`<tr class="${i===0?'best':''}">
+      <td><strong>${p.name}</strong></td>
+      <td><strong>${p.scores.lasi.toFixed(1)}</strong><span style="display:inline-block;height:6px;border-radius:3px;background:${i===0?'var(--teal)':'var(--mid)'};width:${Math.round(p.scores.lasi/max*60)}px;margin-left:8px;vertical-align:middle"></span></td>
+      <td>${p.scores.asi.toFixed(1)}</td><td>${p.scores.api.toFixed(1)}</td><td>${p.scores.pvs.toFixed(1)}</td>
+      <td><span class="score-tag ${cls.cls}" style="font-size:10px;padding:2px 8px">${cls.label}</span></td>
+    </tr>`
+  }).join('')
+}
+
+function loadSample(){
+  PROPOSALS=[
+    {id:'s1',name:'MDoNER GeoAI Platform — Sovereign',y1:{asi:5,api:5,pvs:4},y3:{asi:7,api:7,pvs:6},y6:{asi:9,api:8,pvs:8}},
+    {id:'s2',name:'Border Surveillance — Air-Gapped',y1:{asi:6,api:4,pvs:3},y3:{asi:8,api:5,pvs:5},y6:{asi:9,api:7,pvs:7}},
+    {id:'s3',name:'Enterprise RAG — Cloud-Dependent',y1:{asi:2,api:8,pvs:7},y3:{asi:3,api:8,pvs:7},y6:{asi:4,api:9,pvs:8}},
+  ]
+  selectProposal(0);renderList()
+}
+
+function saveSession(){
+  const blob=new Blob([JSON.stringify({meta:{tool:'ATLAS AI Sovereignty Index v2.0',savedAt:new Date().toISOString()},proposals:PROPOSALS},null,2)],{type:'application/json'})
+  const url=URL.createObjectURL(blob),a=document.createElement('a')
+  a.href=url;a.download='AI-Sovereignty-Index-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url)
+}
+
+function loadSession(evt){
+  const file=evt.target.files[0];if(!file)return
+  const r=new FileReader()
+  r.onload=e=>{try{const d=JSON.parse(e.target.result);PROPOSALS=d.proposals||d;if(PROPOSALS.length)selectProposal(0);renderList()}catch{alert('Invalid session file.')}}
+  r.readAsText(file)
+}
+
+// ── EXPORT PPTX ───────────────────────────────────────────────
+async function exportPPTX(){
+  if(!PROPOSALS.length){alert('Add proposals first.');return}
+  const pptx=new PptxGenJS()
+  pptx.layout='LAYOUT_WIDE'
+  const N='002870',O='FF5539',T='00B290',B='1C38F5',W='FFFFFF',L='F5F5F7',M='B4B4BE'
+
+  // Title slide
+  let sl=pptx.addSlide()
+  sl.background={color:N}
+  sl.addShape(pptx.ShapeType.rect,{x:0,y:4.8,w:13.33,h:0.08,fill:{color:O}})
+  sl.addText('ATLAS',{x:0.5,y:1.2,w:12,h:0.8,fontSize:48,fontFace:'Roboto',bold:true,color:W,charSpacing:8})
+  sl.addText('AI Sovereignty Index',{x:0.5,y:2.1,w:12,h:0.6,fontSize:22,fontFace:'Roboto',color:W,transparency:20})
+  sl.addText('Lifecycle AI Strategic Index (LASI) · '+new Date().toLocaleDateString('en-IN'),{x:0.5,y:2.8,w:12,h:0.4,fontSize:13,fontFace:'Roboto',color:W,transparency:40})
+
+  // One slide per proposal
+  for(const p of PROPOSALS){
+    const s=calcLASI(p),cls=classify(s)
+    sl=pptx.addSlide()
+    sl.background={color:W}
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.33,h:1.1,fill:{color:N}})
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:1.1,w:13.33,h:0.06,fill:{color:O}})
+    sl.addText('AI Sovereignty Index',{x:0.4,y:0.1,w:8,h:0.4,fontSize:11,fontFace:'Roboto',color:W,transparency:30})
+    sl.addText(p.name,{x:0.4,y:0.45,w:9,h:0.55,fontSize:18,fontFace:'Roboto',bold:true,color:W})
+    // LASI score box
+    sl.addShape(pptx.ShapeType.rect,{x:10.5,y:0.1,w:2.4,h:0.9,fill:{color:O},rectRadius:0.08})
+    sl.addText(s.lasi.toFixed(1),{x:10.5,y:0.1,w:2.4,h:0.6,fontSize:28,fontFace:'Roboto',bold:true,color:W,align:'center'})
+    sl.addText('LASI Score',{x:10.5,y:0.68,w:2.4,h:0.25,fontSize:9,fontFace:'Roboto',color:W,align:'center',transparency:20})
+
+    // Score boxes
+    const metrics=[{lbl:'Sovereignty (ASI)',val:s.asi,col:B},{lbl:'Supremacy (API)',val:s.api,col:O},{lbl:'Vitality (PVS)',val:s.pvs,col:T}]
+    metrics.forEach((m,i)=>{
+      const x=0.4+i*3.1
+      sl.addShape(pptx.ShapeType.rect,{x,y:1.3,w:2.9,h:1.1,fill:{color:L},rectRadius:0.08})
+      sl.addShape(pptx.ShapeType.rect,{x,y:1.3,w:2.9,h:0.08,fill:{color:m.col}})
+      sl.addText(m.val.toFixed(1),{x,y:1.42,w:2.9,h:0.55,fontSize:28,fontFace:'Roboto',bold:true,color:N,align:'center'})
+      sl.addText(m.lbl,{x,y:1.96,w:2.9,h:0.35,fontSize:10,fontFace:'Roboto',color:M,align:'center'})
+    })
+    // Classification
+    sl.addShape(pptx.ShapeType.rect,{x:9.8,y:1.3,w:3.1,h:1.1,fill:{color:T+'22'},rectRadius:0.08})
+    sl.addText(cls.label,{x:9.8,y:1.55,w:3.1,h:0.6,fontSize:14,fontFace:'Roboto',bold:true,color:T,align:'center'})
+
+    // Year-by-year table
+    const hOpt={bold:true,color:W,fill:{color:N}}
+    const rows=[
+      [{text:'Year',options:hOpt},{text:'Sovereignty (ASI)',options:hOpt},{text:'Supremacy (API)',options:hOpt},{text:'Vitality (PVS)',options:hOpt}],
+      [{text:'Year 1',options:{}},{text:String(p.y1.asi),options:{}},{text:String(p.y1.api),options:{}},{text:String(p.y1.pvs),options:{}}],
+      [{text:'Year 3',options:{}},{text:String(p.y3.asi),options:{}},{text:String(p.y3.api),options:{}},{text:String(p.y3.pvs),options:{}}],
+      [{text:'Year 6',options:{}},{text:String(p.y6.asi),options:{}},{text:String(p.y6.api),options:{}},{text:String(p.y6.pvs),options:{}}],
+    ]
+    sl.addTable(rows,{x:0.4,y:2.6,w:8,h:2,fontSize:12,fontFace:'Roboto',border:{pt:1,color:'E0E0E8'},fill:{color:W}})
+
+    // Footnote
+    sl.addText('LASI = (ASI×0.4 + API×0.4 + PVS×0.2) · weighted Y1:10% Y3:30% Y6:60% · ATLAS AI Sovereignty Index v2.0',{x:0.4,y:5.1,w:12.5,h:0.3,fontSize:8,fontFace:'Roboto',color:M})
+  }
+
+  // Comparison slide (if multiple)
+  if(PROPOSALS.length>1){
+    sl=pptx.addSlide()
+    sl.background={color:W}
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.33,h:1.1,fill:{color:N}})
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:1.1,w:13.33,h:0.06,fill:{color:O}})
+    sl.addText('All Proposals — LASI Comparison',{x:0.4,y:0.35,w:12,h:0.55,fontSize:18,fontFace:'Roboto',bold:true,color:W})
+    const ranked=[...PROPOSALS].map(p=>({...p,s:calcLASI(p)})).sort((a,b)=>b.s.lasi-a.s.lasi)
+    const tableData=[
+      [{text:'Proposal',options:{bold:true,color:W,fill:{color:N}}},{text:'LASI',options:{bold:true,color:W,fill:{color:N}}},{text:'ASI',options:{bold:true,color:W,fill:{color:N}}},{text:'API',options:{bold:true,color:W,fill:{color:N}}},{text:'PVS',options:{bold:true,color:W,fill:{color:N}}},{text:'Classification',options:{bold:true,color:W,fill:{color:N}}}],
+      ...ranked.map(p=>[{text:p.name,options:{}},{text:p.s.lasi.toFixed(1),options:{bold:true}},{text:p.s.asi.toFixed(1),options:{}},{text:p.s.api.toFixed(1),options:{}},{text:p.s.pvs.toFixed(1),options:{}},{text:classify(p.s).label,options:{}}])
+    ]
+    sl.addTable(tableData,{x:0.4,y:1.4,w:12.5,h:ranked.length*0.6+0.6,fontSize:12,fontFace:'Roboto',border:{pt:1,color:'E0E0E8'}})
+  }
+
+  await pptx.writeFile({fileName:'AI-Sovereignty-Index-'+new Date().toISOString().slice(0,10)+'.pptx'})
+}
+
+// ── EXPORT XLSX ───────────────────────────────────────────────
+function exportXLSX(){
+  if(!PROPOSALS.length){alert('Add proposals first.');return}
+  const wb=XLSX.utils.book_new()
+
+  // Summary sheet
+  const summaryData=[
+    ['ATLAS AI Sovereignty Index — LASI Summary'],
+    ['Generated',new Date().toLocaleString('en-IN')],
+    [],
+    ['Proposal','LASI Score','Avg ASI','Avg API','Avg PVS','Classification'],
+    ...[...PROPOSALS].map(p=>{const s=calcLASI(p);return[p.name,+s.lasi.toFixed(2),+s.asi.toFixed(2),+s.api.toFixed(2),+s.pvs.toFixed(2),classify(s).label]}).sort((a,b)=>b[1]-a[1])
+  ]
+  const ws=XLSX.utils.aoa_to_sheet(summaryData)
+  ws['!cols']=[{wch:40},{wch:12},{wch:10},{wch:10},{wch:10},{wch:22}]
+  XLSX.utils.book_append_sheet(wb,ws,'Summary')
+
+  // Detail sheet per proposal
+  PROPOSALS.forEach(p=>{
+    const s=calcLASI(p)
+    const d=[
+      [p.name],
+      ['Metric','Year 1','Year 3','Year 6','Wtd Avg (Y1×10%+Y3×30%+Y6×60%)'],
+      ['Sovereignty (ASI)',p.y1.asi,p.y3.asi,p.y6.asi,+s.asi.toFixed(2)],
+      ['Supremacy (API)',p.y1.api,p.y3.api,p.y6.api,+s.api.toFixed(2)],
+      ['Platform Vitality (PVS)',p.y1.pvs,p.y3.pvs,p.y6.pvs,+s.pvs.toFixed(2)],
+      [],
+      ['LASI Composite','','','',+s.lasi.toFixed(2)],
+      ['Classification','','','',classify(s).label],
+      [],
+      ['LASI = ASI×0.4 + API×0.4 + PVS×0.2'],
+    ]
+    const ws2=XLSX.utils.aoa_to_sheet(d)
+    ws2['!cols']=[{wch:30},{wch:10},{wch:10},{wch:10},{wch:30}]
+    XLSX.utils.book_append_sheet(wb,ws2,p.name.slice(0,28).replace(/[:\\\/\?\*\[\]]/g,'_'))
+  })
+
+  XLSX.writeFile(wb,'AI-Sovereignty-Index-'+new Date().toISOString().slice(0,10)+'.xlsx')
+}
+
+window.addEventListener('DOMContentLoaded',()=>renderList())
+</script>
+
+<script>
+
+// ATLAS SHARED CONTEXT BAR
+(function(){
+  function getProject(){
+    try{
+      const u=JSON.parse(localStorage.getItem('atlas_user')||'null')
+      const projs=JSON.parse(localStorage.getItem('atlas_projects')||'[]')
+      // Find most recently updated project
+      const sorted=projs.sort((a,b)=>new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0))
+      return {user:u, project:sorted[0]||null}
+    }catch(e){return{user:null,project:null}}
+  }
+  function renderCtxBar(){
+    const bar=document.getElementById('atlasCtxBar')
+    if(!bar) return
+    const {user,project}=getProject()
+    const projName=project?project.name:'No project selected'
+    const projDomain=project?project.domain:''
+    const userLabel=user?user.name:'—'
+    bar.innerHTML=`
+      <a class="atlas-ctx__back" href="https://arvindbajaj5.github.io/atlas-platform/">← ATLAS Portal</a>
+      <div class="atlas-ctx__proj-dot" style="background:${project?'#00B290':'#B4B4BE'}"></div>
+      <span class="atlas-ctx__lbl">Project</span>
+      <span class="atlas-ctx__val">${projName}</span>
+      ${projDomain?`<span class="atlas-ctx__sep">·</span><span class="atlas-ctx__lbl">Domain</span><span class="atlas-ctx__val">${projDomain==='geospatial'?'🛰️ Geospatial':projDomain==='defence'?'🛡️ Defence':projDomain}</span>`:''}
+      <span class="atlas-ctx__sep">·</span>
+      <span class="atlas-ctx__lbl">User</span>
+      <span class="atlas-ctx__val">${userLabel}</span>
+    `
+  }
+  document.addEventListener('DOMContentLoaded', renderCtxBar)
+  window.addEventListener('storage', renderCtxBar)
+  window.atlasRefreshCtx=renderCtxBar
+})();
+
+</script>
+</body>
+</html>
