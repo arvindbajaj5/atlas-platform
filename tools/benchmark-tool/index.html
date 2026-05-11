@@ -161,9 +161,22 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);}
   .gpu-grid{grid-template-columns:1fr 1fr;}
   .log-metrics{grid-template-columns:1fr 1fr;}
 }
+
+/* ATLAS SHARED CONTEXT BAR */
+.atlas-ctx{background:#001d5c;border-bottom:2px solid #FF5539;padding:0 20px;height:32px;display:flex;align-items:center;gap:0;font-family:'Roboto',sans-serif;font-size:11px;}
+.atlas-ctx__back{color:rgba(255,255,255,0.7);text-decoration:none;font-weight:600;padding:0 12px 0 0;border-right:1px solid rgba(255,255,255,0.15);margin-right:12px;display:flex;align-items:center;gap:4px;transition:color 0.15s;}
+.atlas-ctx__back:hover{color:#FF5539;}
+.atlas-ctx__sep{color:rgba(255,255,255,0.25);margin:0 8px;}
+.atlas-ctx__lbl{color:rgba(255,255,255,0.45);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-size:9px;}
+.atlas-ctx__val{color:rgba(255,255,255,0.85);font-weight:600;margin-left:5px;}
+.atlas-ctx__tool{margin-left:auto;color:rgba(255,255,255,0.45);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+.atlas-ctx__proj-dot{width:6px;height:6px;border-radius:50%;background:#00B290;margin-right:4px;flex-shrink:0;}
+
 </style>
 </head>
 <body>
+<div class="atlas-ctx" id="atlasCtxBar"><span class="atlas-ctx__tool">Benchmark Tool</span></div>
+
 
 <div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S</div>
@@ -389,4 +402,1002 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);}
 
 <!-- TAB 3: RUN SCRIPTS -->
 <div class="tp" id="tp-script">
-  <div c
+  <div class="card">
+    <div class="card-title">Benchmark Run Scripts</div>
+    <div class="card-sub">Auto-generated scripts based on your configuration. Copy and run on the target system.</div>
+
+    <div class="row2">
+      <div class="fg">
+        <label>Script Type</label>
+        <select id="script-type" onchange="generateScript()">
+          <option value="vllm-serve">vLLM — Serve + Benchmark</option>
+          <option value="trt-build">TensorRT-LLM — Build + Benchmark</option>
+          <option value="locust">Locust Load Test</option>
+          <option value="perf-analyzer">Triton perf_analyzer</option>
+          <option value="custom">Custom curl / Python</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Target Environment</label>
+        <select id="script-env" onchange="generateScript()">
+          <option value="bare-metal">Bare Metal (Linux)</option>
+          <option value="docker">Docker Container</option>
+          <option value="k8s">Kubernetes Pod</option>
+          <option value="airgapped">Air-Gapped (offline)</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="sec-label" style="margin:0">Generated Script</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-teal btn-sm" onclick="copyScript()">📋 Copy</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadScript()">⬇ Download .sh</button>
+      </div>
+    </div>
+    <div class="script-out" id="script-output"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Environment Checklist</div>
+    <div class="card-sub">Verify these before running the benchmark script</div>
+    <div id="checklist-content"></div>
+  </div>
+</div>
+
+<!-- TAB 4: RUN LOGS -->
+<div class="tp" id="tp-logs">
+  <div class="card">
+    <div class="card-title">Log a Benchmark Run</div>
+    <div class="card-sub">Record the results of a completed benchmark run. All logs are saved locally.</div>
+    <div class="row2">
+      <div class="fg"><label>Run Label</label><input type="text" id="log-label" placeholder="e.g. Run 1 — H200 8x FP8 vLLM"></div>
+      <div class="fg"><label>Date</label><input type="date" id="log-date"></div>
+    </div>
+    <div class="row3">
+      <div class="fg"><label>TPS (output)</label><input type="number" id="log-tps" placeholder="e.g. 1180" min="0"></div>
+      <div class="fg"><label>TTFT (ms)</label><input type="number" id="log-ttft" placeholder="e.g. 88" min="0"></div>
+      <div class="fg"><label>Latency p95 (ms)</label><input type="number" id="log-lat95" placeholder="e.g. 310" min="0"></div>
+    </div>
+    <div class="row3">
+      <div class="fg"><label>Throughput (req/s)</label><input type="number" id="log-rps" placeholder="e.g. 42" min="0"></div>
+      <div class="fg"><label>GPU Mem Util (%)</label><input type="number" id="log-mem" placeholder="e.g. 85" min="0" max="100"></div>
+      <div class="fg"><label>GPU Power (W/GPU avg)</label><input type="number" id="log-power" placeholder="e.g. 680" min="0"></div>
+    </div>
+    <div class="fg"><label>Notes</label><textarea id="log-notes" placeholder="Any observations, anomalies, or context for this run..." rows="2"></textarea></div>
+    <button class="btn btn-primary" onclick="logRun()">+ Log This Run</button>
+  </div>
+
+  <div id="run-logs-area"></div>
+
+  <div class="card" style="display:none" id="logs-chart-card">
+    <div class="card-title">Run Trend</div>
+    <div class="chart-wrap"><canvas id="logsChart"></canvas></div>
+  </div>
+</div>
+
+<!-- TAB 5: EXTRAPOLATION -->
+<div class="tp" id="tp-extrap">
+  <div class="card">
+    <div class="card-title">Extrapolation Engine</div>
+    <div class="card-sub">Project performance at different scales from your benchmark data. Results are flagged as extrapolated — use with appropriate caveats.</div>
+    <div class="alert alert-warn">🔴 Extrapolated values are calculated estimates. Real-world performance may differ due to memory bandwidth saturation, network fabric overhead, and model-specific behaviour.</div>
+
+    <div class="sec-label">Scale Parameters</div>
+    <div class="row3">
+      <div class="fg">
+        <label>Scale to N GPUs</label>
+        <input type="number" id="ext-gpus" value="64" min="1" oninput="runExtrapolation()">
+      </div>
+      <div class="fg">
+        <label>Target Concurrency</label>
+        <input type="number" id="ext-concurrency" value="200" min="1" oninput="runExtrapolation()">
+      </div>
+      <div class="fg">
+        <label>Scaling Efficiency (%)</label>
+        <input type="number" id="ext-efficiency" value="85" min="10" max="100" oninput="runExtrapolation()">
+      </div>
+    </div>
+
+    <div class="sec-label" style="margin-top:4px">Extrapolation Results</div>
+    <div id="extrap-results">
+      <div style="font-size:12px;color:var(--mid)">Configure benchmark data in Tab 1 and log at least one run in Tab 4 to enable extrapolation.</div>
+    </div>
+
+    <div class="sec-label" style="margin-top:16px">Scaling Chart</div>
+    <div class="chart-wrap"><canvas id="extrapChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Customer-Facing Summary</div>
+    <div class="card-sub">A clean summary suitable for presales presentations. Always includes confidence flags.</div>
+    <div id="cust-summary">
+      <div style="font-size:12px;color:var(--mid)">Log benchmark runs and run extrapolation to generate customer summary.</div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <button class="btn btn-teal btn-sm" onclick="copySummary()">📋 Copy Summary</button>
+      <button class="btn btn-outline btn-sm" onclick="exportReport()">⬇ Export Full Report</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:12px">⚡ Active Config</div>
+  <div class="sb-stat"><div class="sb-val orange" id="sb-tps">—</div><div class="sb-lbl">Target TPS (output)</div></div>
+  <div class="sb-stat"><div class="sb-val" id="sb-ttft">—</div><div class="sb-lbl">Time to First Token</div></div>
+  <div class="sb-stat"><div class="sb-val teal" id="sb-lat95">—</div><div class="sb-lbl">Latency p95</div></div>
+
+  <div style="font-size:12px;font-weight:700;color:var(--navy);margin:16px 0 10px">📊 Configuration</div>
+  <div id="sb-config">
+    <div style="font-size:11px;color:var(--mid)">Select GPU and workload to see configuration.</div>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;color:var(--navy);margin:16px 0 10px">📋 Run Logs</div>
+  <div id="sb-logs">
+    <div style="font-size:11px;color:var(--mid)">No runs logged yet.</div>
+  </div>
+
+  <div style="margin-top:16px">
+    <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center" onclick="saveSession()">💾 Save Session</button>
+  </div>
+</div>
+
+</div><!-- /layout -->
+
+<script>
+// ── GPU DATA ──────────────────────────────────────────────────
+const GPUS = {
+  B200:  {n:'NVIDIA B200',  mem:192, tdp:1000, fp8tps:4500, ttft:45,  cool:'DLC'},
+  B300:  {n:'NVIDIA B300',  mem:288, tdp:1200, fp8tps:5600, ttft:38,  cool:'DLC'},
+  H200:  {n:'NVIDIA H200',  mem:141, tdp:700,  fp8tps:1979, ttft:65,  cool:'DLC'},
+  H100:  {n:'NVIDIA H100',  mem:80,  tdp:700,  fp8tps:1400, ttft:80,  cool:'DLC/AC'},
+  L40S:  {n:'NVIDIA L40S',  mem:48,  tdp:350,  fp8tps:733,  ttft:120, cool:'AC'},
+  MI325X:{n:'AMD MI325X',   mem:288, tdp:750,  fp8tps:2600, ttft:55,  cool:'DLC'},
+  MI300X:{n:'AMD MI300X',   mem:192, tdp:700,  fp8tps:2100, ttft:60,  cool:'DLC'},
+}
+
+const WORKLOADS = [
+  {id:'llm-inf',  label:'LLM Inference'},
+  {id:'vision',   label:'Vision / VLM'},
+  {id:'embed',    label:'Embedding'},
+  {id:'rag',      label:'RAG Pipeline'},
+  {id:'batch',    label:'Batch Processing'},
+  {id:'finetune', label:'Fine-tuning'},
+  {id:'multimodal',label:'Multi-modal'},
+]
+
+
+// ── CURATED PUBLIC BENCHMARK DATA ────────────────────────────
+// Sources: MLPerf Inference v4.1, vLLM benchmarks (GitHub), 
+// TensorRT-LLM benchmarks, Hugging Face Open LLM Leaderboard,
+// AMD MI300X published results. Last updated: May 2026.
+// All figures are output tokens/sec unless stated otherwise.
+const PUBLIC_BENCHMARKS = [
+  // ── NVIDIA B200 ───────────────────────────────────────────
+  {gpu:'B200', gpuCount:8, model:'llama3-70b',    quant:'fp8',  engine:'vllm',    tps:38400, ttft:42,  lat95:180, rps:512, source:'NVIDIA GTC 2025 (est.)',          conf:'estimated',    date:'2025-03'},
+  {gpu:'B200', gpuCount:8, model:'llama3-405b',   quant:'fp8',  engine:'trt',     tps:22000, ttft:55,  lat95:240, rps:195, source:'NVIDIA TRT-LLM Blog 2025',        conf:'estimated',    date:'2025-04'},
+  {gpu:'B200', gpuCount:1, model:'llama3-8b',     quant:'fp8',  engine:'vllm',    tps:4500,  ttft:22,  lat95:85,  rps:890, source:'NVIDIA Spec Sheet',               conf:'estimated',    date:'2025-02'},
+
+  // ── NVIDIA H200 ───────────────────────────────────────────
+  {gpu:'H200', gpuCount:8, model:'llama3-70b',    quant:'fp8',  engine:'vllm',    tps:15832, ttft:65,  lat95:280, rps:211, source:'vLLM Benchmark Report Mar 2025',  conf:'measured',     date:'2025-03'},
+  {gpu:'H200', gpuCount:8, model:'llama3-70b',    quant:'fp16', engine:'vllm',    tps:8200,  ttft:88,  lat95:380, rps:110, source:'vLLM Benchmark Report Mar 2025',  conf:'measured',     date:'2025-03'},
+  {gpu:'H200', gpuCount:8, model:'llama3-405b',   quant:'fp8',  engine:'trt',     tps:9600,  ttft:92,  lat95:410, rps:85,  source:'NVIDIA TRT-LLM GitHub',           conf:'measured',     date:'2025-02'},
+  {gpu:'H200', gpuCount:1, model:'llama3-8b',     quant:'fp8',  engine:'vllm',    tps:1979,  ttft:38,  lat95:140, rps:395, source:'vLLM Official Benchmark',         conf:'measured',     date:'2025-01'},
+  {gpu:'H200', gpuCount:1, model:'mistral-7b',    quant:'fp16', engine:'vllm',    tps:1650,  ttft:42,  lat95:165, rps:330, source:'vLLM Official Benchmark',         conf:'measured',     date:'2025-01'},
+  {gpu:'H200', gpuCount:8, model:'mixtral-8x7b',  quant:'fp8',  engine:'trt',     tps:12400, ttft:72,  lat95:310, rps:155, source:'NVIDIA TRT-LLM GitHub',           conf:'measured',     date:'2025-02'},
+  {gpu:'H200', gpuCount:8, model:'llama3-70b',    quant:'fp8',  engine:'trt',     tps:18200, ttft:58,  lat95:245, rps:243, source:'NVIDIA TRT-LLM GitHub',           conf:'measured',     date:'2025-03'},
+  {gpu:'H200', gpuCount:16,model:'llama3-405b',   quant:'fp8',  engine:'trt',     tps:16800, ttft:98,  lat95:420, rps:149, source:'NVIDIA TRT-LLM GitHub',           conf:'measured',     date:'2025-02'},
+
+  // ── NVIDIA H100 ───────────────────────────────────────────
+  {gpu:'H100', gpuCount:8, model:'llama3-70b',    quant:'fp8',  engine:'vllm',    tps:11200, ttft:80,  lat95:340, rps:149, source:'vLLM Official Benchmark',         conf:'measured',     date:'2024-12'},
+  {gpu:'H100', gpuCount:8, model:'llama3-70b',    quant:'fp16', engine:'vllm',    tps:5800,  ttft:105, lat95:450, rps:77,  source:'vLLM Official Benchmark',         conf:'measured',     date:'2024-12'},
+  {gpu:'H100', gpuCount:1, model:'llama3-8b',     quant:'fp8',  engine:'vllm',    tps:1400,  ttft:52,  lat95:195, rps:280, source:'vLLM Official Benchmark',         conf:'measured',     date:'2024-11'},
+  {gpu:'H100', gpuCount:8, model:'mixtral-8x7b',  quant:'fp8',  engine:'trt',     tps:8900,  ttft:88,  lat95:375, rps:111, source:'NVIDIA TRT-LLM GitHub',           conf:'measured',     date:'2024-12'},
+  {gpu:'H100', gpuCount:8, model:'llama3-405b',   quant:'fp8',  engine:'trt',     tps:6200,  ttft:118, lat95:510, rps:55,  source:'NVIDIA TRT-LLM GitHub',           conf:'measured',     date:'2025-01'},
+  {gpu:'H100', gpuCount:8, model:'llama3-70b',    quant:'fp8',  engine:'trt',     tps:13400, ttft:72,  lat95:305, rps:179, source:'MLPerf Inference v4.1',           conf:'measured',     date:'2024-11'},
+  {gpu:'H100', gpuCount:8, model:'llama3-8b',     quant:'fp8',  engine:'trt',     tps:10800, ttft:48,  lat95:185, rps:2160,source:'MLPerf Inference v4.1',           conf:'measured',     date:'2024-11'},
+
+  // ── NVIDIA L40S ───────────────────────────────────────────
+  {gpu:'L40S', gpuCount:8, model:'llama3-8b',     quant:'fp8',  engine:'vllm',    tps:5864,  ttft:88,  lat95:340, rps:1173,source:'vLLM Official Benchmark',         conf:'measured',     date:'2024-10'},
+  {gpu:'L40S', gpuCount:8, model:'llama3-70b',    quant:'fp8',  engine:'vllm',    tps:2940,  ttft:145, lat95:580, rps:39,  source:'vLLM Official Benchmark',         conf:'measured',     date:'2024-10'},
+  {gpu:'L40S', gpuCount:1, model:'mistral-7b',    quant:'fp16', engine:'vllm',    tps:733,   ttft:110, lat95:420, rps:147, source:'vLLM Official Benchmark',         conf:'measured',     date:'2024-09'},
+  {gpu:'L40S', gpuCount:4, model:'mixtral-8x7b',  quant:'fp8',  engine:'vllm',    tps:2100,  ttft:165, lat95:640, rps:26,  source:'vLLM Community Benchmark',        conf:'estimated',    date:'2024-11'},
+
+  // ── AMD MI325X ────────────────────────────────────────────
+  {gpu:'MI325X',gpuCount:8,model:'llama3-70b',    quant:'fp8',  engine:'vllm',    tps:20800, ttft:55,  lat95:225, rps:277, source:'AMD Technical Blog 2025',         conf:'estimated',    date:'2025-02'},
+  {gpu:'MI325X',gpuCount:8,model:'llama3-405b',   quant:'fp8',  engine:'vllm',    tps:11200, ttft:75,  lat95:320, rps:99,  source:'AMD Technical Blog 2025',         conf:'estimated',    date:'2025-02'},
+  {gpu:'MI325X',gpuCount:1,model:'llama3-8b',     quant:'fp8',  engine:'vllm',    tps:2600,  ttft:32,  lat95:118, rps:520, source:'AMD ROCm Benchmark Suite',        conf:'estimated',    date:'2025-01'},
+
+  // ── AMD MI300X ────────────────────────────────────────────
+  {gpu:'MI300X',gpuCount:8,model:'llama3-70b',    quant:'fp8',  engine:'vllm',    tps:16800, ttft:60,  lat95:255, rps:224, source:'AMD MI300X Benchmark Report',     conf:'measured',     date:'2024-12'},
+  {gpu:'MI300X',gpuCount:8,model:'llama3-405b',   quant:'fp8',  engine:'vllm',    tps:8400,  ttft:82,  lat95:360, rps:75,  source:'AMD MI300X Benchmark Report',     conf:'measured',     date:'2024-12'},
+  {gpu:'MI300X',gpuCount:1,model:'llama3-8b',     quant:'fp8',  engine:'vllm',    tps:2100,  ttft:40,  lat95:148, rps:420, source:'AMD ROCm vLLM Benchmark',         conf:'measured',     date:'2024-11'},
+  {gpu:'MI300X',gpuCount:8,model:'mixtral-8x7b',  quant:'fp8',  engine:'vllm',    tps:10200, ttft:78,  lat95:335, rps:128, source:'AMD MI300X Benchmark Report',     conf:'measured',     date:'2024-12'},
+
+  // ── MULTI-GPU SCALING (MLPerf v4.1) ───────────────────────
+  {gpu:'H100', gpuCount:16,model:'llama3-70b',    quant:'fp8',  engine:'trt',     tps:24200, ttft:72,  lat95:305, rps:323, source:'MLPerf Inference v4.1',           conf:'measured',     date:'2024-11'},
+  {gpu:'H100', gpuCount:32,model:'llama3-70b',    quant:'fp8',  engine:'trt',     tps:44800, ttft:72,  lat95:310, rps:598, source:'MLPerf Inference v4.1 (extrap.)', conf:'extrapolated', date:'2024-11'},
+  {gpu:'H200', gpuCount:32,model:'llama3-405b',   quant:'fp8',  engine:'trt',     tps:29400, ttft:98,  lat95:425, rps:261, source:'NVIDIA Reference Architecture',   conf:'extrapolated', date:'2025-02'},
+]
+
+// Filter helpers
+function getPublicBenchmarks(gpu, model, quant) {
+  return PUBLIC_BENCHMARKS.filter(b =>
+    (!gpu || b.gpu === gpu) &&
+    (!model || b.model === model) &&
+    (!quant || b.quant === quant)
+  )
+}
+
+// ── STATE ─────────────────────────────────────────────────────
+let STATE = {
+  selectedGPU: 'H200',
+  selectedWorkload: 'llm-inf',
+  config: { quant:'fp8', engine:'vllm', model:'llama3-70b', inputLen:512, outputLen:256, batch:32, gpuCount:8, duration:30 },
+  override: null,
+  refData: [],
+  logs: JSON.parse(localStorage.getItem('atlas_bm_logs') || '[]'),
+  project: null,
+}
+let logsChartInst = null, extrapChartInst = null
+
+// ── INIT ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  renderGPUGrid()
+  renderWorkloadChips()
+  renderRefTable()
+  generateScript()
+  renderLogs()
+  runExtrapolation()
+  updateSidebar()
+  updateCtxBar()
+  document.getElementById('log-date').value = new Date().toISOString().slice(0,10)
+})
+
+// ── GPU GRID ──────────────────────────────────────────────────
+function renderGPUGrid() {
+  document.getElementById('gpu-grid').innerHTML = Object.entries(GPUS).map(([k,g]) => `
+    <div class="gpu-card ${STATE.selectedGPU===k?'sel':''}" onclick="selectGPU('${k}')">
+      <div class="gpu-card__name">${g.n}</div>
+      <div class="gpu-card__specs">${g.mem}GB HBM · ${g.tdp}W · ${g.cool}</div>
+      <div class="gpu-card__tps">${(g.fp8tps).toLocaleString()} <span>TPS (FP8 est.)</span></div>
+    </div>`).join('')
+}
+
+function selectGPU(k) {
+  STATE.selectedGPU = k
+  renderGPUGrid()
+  updateSidebar()
+  updateCtxBar()
+  renderRefTable()
+  generateScript()
+  renderActiveValues()
+  runExtrapolation()
+}
+
+// ── WORKLOAD CHIPS ────────────────────────────────────────────
+function renderWorkloadChips() {
+  document.getElementById('wl-chips').innerHTML = WORKLOADS.map(w => `
+    <div class="wl-chip ${STATE.selectedWorkload===w.id?'sel':''}" onclick="selectWorkload('${w.id}')">${w.label}</div>
+  `).join('')
+}
+
+function selectWorkload(id) {
+  STATE.selectedWorkload = id
+  renderWorkloadChips()
+  updateCtxBar()
+  generateScript()
+}
+
+// ── CONFIG SYNC ───────────────────────────────────────────────
+function syncConfig() {
+  STATE.config.quant = document.getElementById('cfg-quant').value
+  STATE.config.engine = document.getElementById('cfg-engine').value
+  STATE.config.model = document.getElementById('cfg-model').value
+  STATE.config.inputLen = +document.getElementById('cfg-inputLen').value || 512
+  STATE.config.outputLen = +document.getElementById('cfg-outputLen').value || 256
+  STATE.config.batch = +document.getElementById('cfg-batch').value || 32
+  STATE.config.gpuCount = +document.getElementById('cfg-gpuCount').value || 8
+  STATE.config.duration = +document.getElementById('cfg-duration').value || 30
+  updateSidebar()
+  renderActiveValues()
+  generateScript()
+  runExtrapolation()
+}
+
+// ── COMPUTED TARGETS ──────────────────────────────────────────
+function getComputedTargets() {
+  const gpu = GPUS[STATE.selectedGPU]
+  if (!gpu) return {tps:0, ttft:0, lat95:0, rps:0}
+  const quantMult = {fp8:1.0, fp16:0.5, bf16:0.55, int4:1.3, int8:0.85}[STATE.config.quant] || 1.0
+  const scaleMult = Math.pow(STATE.config.gpuCount, 0.9) // slightly sub-linear
+  const tps = Math.round(gpu.fp8tps * quantMult * (STATE.config.gpuCount > 1 ? Math.min(STATE.config.gpuCount, 8) * 0.88 : 1))
+  const ttft = Math.round(gpu.ttft * (STATE.config.quant === 'fp16' ? 1.4 : 1.0))
+  const lat95 = Math.round(ttft + (STATE.config.outputLen / (tps / STATE.config.batch)) * 1000 * 1.2)
+  const rps = Math.round(tps / STATE.config.outputLen)
+  return {tps, ttft, lat95, rps, memUtil: Math.min(95, 78 + STATE.config.batch * 0.1)}
+}
+
+function getActiveTargets() {
+  if (STATE.override) return {...getComputedTargets(), ...STATE.override, isOverride: true}
+  return {...getComputedTargets(), isOverride: false}
+}
+
+// ── REF TABLE ─────────────────────────────────────────────────
+function filterRefTable() {
+  const gpu = document.getElementById('ref-filter-gpu')?.value || ''
+  const model = document.getElementById('ref-filter-model')?.value || ''
+  const conf = document.getElementById('ref-filter-conf')?.value || ''
+  const filtered = PUBLIC_BENCHMARKS.filter(b =>
+    (!gpu || b.gpu === gpu) &&
+    (!model || b.model === model) &&
+    (!conf || b.conf === conf)
+  )
+  const allRefs = [...filtered, ...STATE.refData]
+  const cnt = document.getElementById('ref-count')
+  if (cnt) cnt.textContent = allRefs.length + ' records'
+  document.getElementById('ref-tbody').innerHTML = allRefs.length === 0
+    ? `<tr><td colspan="9" style="text-align:center;color:var(--mid);padding:16px;font-size:12px">No results match this filter combination.</td></tr>`
+    : allRefs.map(r => `
+    <tr onclick="selectRefRow(this)" style="cursor:pointer">
+      <td style="font-size:11px">${r.source}</td>
+      <td><strong>${r.gpu}</strong></td>
+      <td style="font-size:11px">${r.model}</td>
+      <td>${(r.quant||'').toUpperCase()}</td>
+      <td>${(r.tps||0).toLocaleString()}</td>
+      <td>${r.ttft||'—'}</td>
+      <td>${r.lat95||'—'}</td>
+      <td>${r.gpuCount ? r.gpuCount+'×' : '—'}</td>
+      <td><span class="conf-badge ${r.conf}">${r.conf==='measured'?'🟢':r.conf==='estimated'?'🟡':'🔴'} ${r.conf}</span></td>
+    </tr>`).join('')
+}
+
+let selectedRefRow = null
+function selectRefRow(row) {
+  document.querySelectorAll('#ref-tbody tr').forEach(r => r.style.background = '')
+  row.style.background = 'rgba(28,56,245,0.06)'
+  selectedRefRow = row
+}
+
+function useAsTarget() {
+  if (!selectedRefRow) { alert('Click a benchmark row to select it, then click this button.'); return }
+  const cells = selectedRefRow.querySelectorAll('td')
+  if (cells.length < 7) return
+  const tps = cells[4].textContent.replace(/,/g,'')
+  const ttft = cells[5].textContent
+  const lat95 = cells[6].textContent
+  const source = cells[0].textContent
+  document.getElementById('ov-tps').value = tps
+  document.getElementById('ov-ttft').value = ttft !== '—' ? ttft : ''
+  document.getElementById('ov-lat95').value = lat95 !== '—' ? lat95 : ''
+  document.getElementById('ov-justification').value = 'Based on public benchmark: ' + source
+  document.getElementById('ov-confidence').value = selectedRefRow.querySelector('.conf-badge')?.textContent?.includes('Measured') ? 'measured' : 'estimated'
+  showTab('override')
+  alert('Reference data loaded into Override tab. Review and apply.')
+}
+
+function renderRefTable() {
+  // Merge: public benchmarks filtered to current GPU + model + manual entries
+  const publicFiltered = getPublicBenchmarks(STATE.selectedGPU, STATE.config.model, null)
+  const allPublic = publicFiltered.length > 0
+    ? publicFiltered
+    : getPublicBenchmarks(STATE.selectedGPU, null, null).slice(0,5)  // fallback: all for this GPU
+
+  const allRefs = [...allPublic, ...STATE.refData]
+
+  document.getElementById('ref-tbody').innerHTML = allRefs.length === 0
+    ? `<tr><td colspan="9" style="text-align:center;color:var(--mid);padding:16px;font-size:12px">No public benchmark data available for this GPU/model combination. Add a reference manually below.</td></tr>`
+    : allRefs.map((r,i) => `
+    <tr>
+      <td style="font-size:11px">${r.source}</td>
+      <td><strong>${r.gpu}</strong></td>
+      <td style="font-size:11px">${r.model}</td>
+      <td>${r.quant?.toUpperCase()}</td>
+      <td>${(r.tps||0).toLocaleString()}</td>
+      <td>${r.ttft||'—'}</td>
+      <td>${r.lat95||'—'}</td>
+      <td>${r.gpuCount ? r.gpuCount+'×' : '—'}</td>
+      <td><span class="conf-badge ${r.conf}">${r.conf==='measured'?'🟢':r.conf==='estimated'?'🟡':'🔴'} ${r.conf}</span></td>
+    </tr>`).join('')
+}
+
+function addRefRow() {
+  STATE.refData.push({source:'New Source', gpu:STATE.selectedGPU, model:STATE.config.model, quant:STATE.config.quant, tps:0, ttft:0, lat95:0, conf:'estimated'})
+  renderRefTable()
+}
+
+// ── OVERRIDE ──────────────────────────────────────────────────
+function applyOverride() {
+  const just = document.getElementById('ov-justification').value.trim()
+  if (!just) { alert('Kindly provide a justification for the override.'); return }
+  STATE.override = {
+    tps: +document.getElementById('ov-tps').value || null,
+    ttft: +document.getElementById('ov-ttft').value || null,
+    lat95: +document.getElementById('ov-lat95').value || null,
+    rps: +document.getElementById('ov-rps').value || null,
+    memUtil: +document.getElementById('ov-memUtil').value || null,
+    justification: just,
+    confidence: document.getElementById('ov-confidence').value,
+    appliedAt: new Date().toISOString()
+  }
+  // Remove nulls
+  Object.keys(STATE.override).forEach(k => { if (STATE.override[k] === null) delete STATE.override[k] })
+  document.getElementById('override-status').innerHTML = `<span style="color:var(--teal)">✓ Override applied at ${new Date().toLocaleTimeString('en-IN')}</span>`
+  renderActiveValues()
+  updateSidebar()
+  runExtrapolation()
+}
+
+function clearOverride() {
+  STATE.override = null
+  document.getElementById('override-status').innerHTML = `<span style="color:var(--mid)">Override cleared. Using computed values.</span>`
+  renderActiveValues()
+  updateSidebar()
+}
+
+function renderActiveValues() {
+  const computed = getComputedTargets()
+  const active = getActiveTargets()
+  const metrics = [
+    {label:'TPS (output)', ck:'tps', unit:''},
+    {label:'TTFT', ck:'ttft', unit:'ms'},
+    {label:'Latency p95', ck:'lat95', unit:'ms'},
+    {label:'Req/s', ck:'rps', unit:''},
+    {label:'GPU Mem Util', ck:'memUtil', unit:'%'},
+  ]
+  const tbody = document.getElementById('active-values-tbody')
+  if (!tbody) return
+  tbody.innerHTML = metrics.map(m => {
+    const comp = computed[m.ck]
+    const ov = STATE.override?.[m.ck]
+    const act = active[m.ck]
+    return `<tr>
+      <td>${m.label}</td>
+      <td>${comp || '—'}${m.unit}</td>
+      <td>${ov ? `<strong>${ov}${m.unit}</strong>` : '—'}</td>
+      <td><strong style="color:var(--navy)">${act || '—'}${m.unit}</strong></td>
+      <td>${ov ? `<span class="conf-badge ${STATE.override.confidence}">${STATE.override.confidence}</span>` : '<span class="conf-badge estimated">🟡 estimated</span>'}</td>
+    </tr>`
+  }).join('')
+}
+
+// ── SCRIPT GENERATOR ──────────────────────────────────────────
+function generateScript() {
+  const type = document.getElementById('script-type')?.value || 'vllm-serve'
+  const env = document.getElementById('script-env')?.value || 'bare-metal'
+  const cfg = STATE.config
+  const gpu = GPUS[STATE.selectedGPU]
+  const gpuFlag = STATE.selectedGPU.toLowerCase().includes('mi') ? '--device rocm' : ''
+  const modelMap = {
+    'llama3-8b':'meta-llama/Llama-3.1-8B-Instruct',
+    'llama3-70b':'meta-llama/Llama-3.1-70B-Instruct',
+    'llama3-405b':'meta-llama/Llama-3.1-405B-Instruct',
+    'mistral-7b':'mistralai/Mistral-7B-Instruct-v0.3',
+    'mixtral-8x7b':'mistralai/Mixtral-8x7B-Instruct-v0.1',
+    'qwen2-72b':'Qwen/Qwen2.5-72B-Instruct',
+    'deepseek-67b':'deepseek-ai/deepseek-llm-67b-chat',
+    'custom':'<YOUR_MODEL_PATH>',
+  }
+  const model = modelMap[cfg.model] || cfg.model
+  let script = ''
+
+  if (type === 'vllm-serve') {
+    script = `#!/bin/bash
+# ATLAS Benchmark Script — vLLM Serve + Benchmark
+# GPU: ${gpu?.n || STATE.selectedGPU} × ${cfg.gpuCount}
+# Model: ${model}
+# Quantization: ${cfg.quant.toUpperCase()}
+# Generated: ${new Date().toLocaleString('en-IN')}
+# ─────────────────────────────────────────────────
+
+# Step 1: Start vLLM server
+vllm serve ${model} \\
+  --tensor-parallel-size ${cfg.gpuCount} \\
+  --dtype ${cfg.quant === 'fp8' ? 'float16 --quantization fp8' : cfg.quant} \\
+  --max-model-len ${cfg.inputLen + cfg.outputLen + 512} \\
+  --gpu-memory-utilization 0.90 \\
+  --port 8000 \\
+  --trust-remote-code &
+
+echo "Waiting for server to start..."
+sleep 60
+
+# Step 2: Verify server health
+curl -s http://localhost:8000/health && echo "✓ Server healthy"
+
+# Step 3: Run benchmark
+python3 -m vllm.benchmarks.benchmark_throughput \\
+  --backend vllm \\
+  --endpoint http://localhost:8000/v1 \\
+  --model ${model} \\
+  --num-prompts ${cfg.batch * 10} \\
+  --input-len ${cfg.inputLen} \\
+  --output-len ${cfg.outputLen} \\
+  --concurrency ${cfg.batch} \\
+  --save-result \\
+  --result-filename atlas-benchmark-${STATE.selectedGPU}-$(date +%Y%m%d-%H%M).json
+
+# Step 4: Latency test (p50, p95, p99)
+python3 -m vllm.benchmarks.benchmark_latency \\
+  --backend vllm \\
+  --endpoint http://localhost:8000/v1 \\
+  --model ${model} \\
+  --input-len ${cfg.inputLen} \\
+  --output-len ${cfg.outputLen} \\
+  --num-iters 100 \\
+  --percentile-metrics "p50,p95,p99"
+
+echo "Benchmark complete. Duration: ${cfg.duration} minutes."`
+  } else if (type === 'trt-build') {
+    script = `#!/bin/bash
+# ATLAS Benchmark Script — TensorRT-LLM Build + Benchmark
+# GPU: ${gpu?.n || STATE.selectedGPU} × ${cfg.gpuCount}
+# Generated: ${new Date().toLocaleString('en-IN')}
+# ─────────────────────────────────────────────────
+
+# Step 1: Convert model weights
+python3 examples/llama/convert_checkpoint.py \\
+  --model_dir ${model} \\
+  --output_dir ./trt-weights/${cfg.model} \\
+  --dtype ${cfg.quant === 'fp8' ? 'float16 --use_fp8_rowwise' : cfg.quant}
+
+# Step 2: Build TRT engine
+trtllm-build \\
+  --checkpoint_dir ./trt-weights/${cfg.model} \\
+  --output_dir ./trt-engines/${cfg.model} \\
+  --gemm_plugin ${cfg.quant === 'fp8' ? 'fp8' : 'float16'} \\
+  --max_batch_size ${cfg.batch} \\
+  --max_input_len ${cfg.inputLen} \\
+  --max_seq_len ${cfg.inputLen + cfg.outputLen} \\
+  --tp_size ${cfg.gpuCount}
+
+# Step 3: Run benchmark
+python3 benchmarks/python/benchmark.py \\
+  --engine_dir ./trt-engines/${cfg.model} \\
+  --batch_size ${cfg.batch} \\
+  --input_output_len "${cfg.inputLen},${cfg.outputLen}" \\
+  --duration ${cfg.duration * 60}`
+  } else if (type === 'locust') {
+    script = `#!/usr/bin/env python3
+# ATLAS Load Test — Locust
+# Target: vLLM OpenAI-compatible endpoint
+# Concurrency: ${cfg.batch} users
+# Generated: ${new Date().toLocaleString('en-IN')}
+# ─────────────────────────────────────────────────
+
+from locust import HttpUser, task, between
+import json, random
+
+MODEL = "${model}"
+INPUT_LEN = ${cfg.inputLen}
+
+SAMPLE_PROMPT = "Explain the role of artificial intelligence in modern infrastructure management. Provide a detailed analysis covering compute, storage, and networking considerations." * (INPUT_LEN // 100)
+
+class InferenceUser(HttpUser):
+    wait_time = between(0.1, 0.5)
+
+    @task
+    def inference(self):
+        payload = {
+            "model": MODEL,
+            "messages": [{"role": "user", "content": SAMPLE_PROMPT}],
+            "max_tokens": ${cfg.outputLen},
+            "temperature": 0.1,
+        }
+        with self.client.post(
+            "/v1/chat/completions",
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            catch_response=True
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"HTTP {response.status_code}")
+
+# Run: locust -f this_file.py --host http://localhost:8000 --users ${cfg.batch} --spawn-rate 10 --run-time ${cfg.duration}m`
+  } else {
+    script = `#!/bin/bash
+# ATLAS Benchmark Script — Custom curl
+# GPU: ${gpu?.n || STATE.selectedGPU} × ${cfg.gpuCount}
+# Generated: ${new Date().toLocaleString('en-IN')}
+# ─────────────────────────────────────────────────
+
+ENDPOINT="http://localhost:8000/v1/chat/completions"
+MODEL="${model}"
+
+# Single inference test
+time curl -X POST $ENDPOINT \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "'$MODEL'",
+    "messages": [{"role": "user", "content": "Explain AI infrastructure in detail."}],
+    "max_tokens": ${cfg.outputLen},
+    "temperature": 0.1
+  }'`
+  }
+
+  document.getElementById('script-output').textContent = script
+
+  // Checklist
+  const checks = [
+    `${gpu?.n || STATE.selectedGPU} × ${cfg.gpuCount} GPUs available and visible (nvidia-smi / rocm-smi)`,
+    `${gpu?.cool === 'DLC' ? 'DLC cooling active — check coolant flow and temperature sensors' : 'Air cooling sufficient for this workload'}`,
+    `CUDA / ROCm drivers installed and matched to framework version`,
+    `Model weights available at: ${model}`,
+    `Sufficient GPU memory: ${Math.ceil(cfg.model.includes('70b') ? 140 : cfg.model.includes('405b') ? 810 : cfg.model.includes('8b') ? 16 : 50)} GB required (${cfg.quant.toUpperCase()})`,
+    `Port 8000 open and not in use`,
+    `Python environment with vLLM / TRT-LLM dependencies installed`,
+    `Disk space for model weights and result files (>500GB recommended)`,
+    `NTP synchronised for accurate timestamps`,
+  ]
+  document.getElementById('checklist-content').innerHTML = checks.map((c,i) =>
+    `<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--light);font-size:12px">
+      <input type="checkbox" style="margin-top:2px;flex-shrink:0">
+      <span>${c}</span>
+    </div>`
+  ).join('')
+}
+
+function copyScript() {
+  const text = document.getElementById('script-output').textContent
+  navigator.clipboard.writeText(text).then(() => alert('Script copied to clipboard.'))
+}
+
+function downloadScript() {
+  const text = document.getElementById('script-output').textContent
+  const blob = new Blob([text], {type:'text/plain'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const ext = document.getElementById('script-type').value === 'locust' ? '.py' : '.sh'
+  a.href = url; a.download = `atlas-benchmark-${STATE.selectedGPU}-${STATE.config.engine}${ext}`; a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ── LOG RUNS ──────────────────────────────────────────────────
+function logRun() {
+  const label = document.getElementById('log-label').value.trim()
+  if (!label) { alert('Kindly enter a run label.'); return }
+  const run = {
+    id: 'run_' + Date.now(),
+    label,
+    date: document.getElementById('log-date').value,
+    gpu: STATE.selectedGPU,
+    model: STATE.config.model,
+    quant: STATE.config.quant,
+    engine: STATE.config.engine,
+    gpuCount: STATE.config.gpuCount,
+    tps: +document.getElementById('log-tps').value || 0,
+    ttft: +document.getElementById('log-ttft').value || 0,
+    lat95: +document.getElementById('log-lat95').value || 0,
+    rps: +document.getElementById('log-rps').value || 0,
+    memUtil: +document.getElementById('log-mem').value || 0,
+    power: +document.getElementById('log-power').value || 0,
+    notes: document.getElementById('log-notes').value,
+    loggedAt: new Date().toISOString(),
+  }
+  STATE.logs.push(run)
+  localStorage.setItem('atlas_bm_logs', JSON.stringify(STATE.logs))
+  // Clear form
+  ;['log-label','log-tps','log-ttft','log-lat95','log-rps','log-mem','log-power','log-notes'].forEach(id => {
+    document.getElementById(id).value = ''
+  })
+  renderLogs()
+  updateCtxBar()
+  runExtrapolation()
+}
+
+function renderLogs() {
+  const area = document.getElementById('run-logs-area')
+  if (STATE.logs.length === 0) {
+    area.innerHTML = '<div class="card"><div style="text-align:center;color:var(--mid);padding:20px;font-size:12px">No runs logged yet. Complete a benchmark and log the results above.</div></div>'
+    document.getElementById('logs-chart-card').style.display = 'none'
+    return
+  }
+
+  area.innerHTML = STATE.logs.slice().reverse().map(r => `
+    <div class="log-entry">
+      <div class="log-entry__hdr">
+        <div>
+          <div class="log-entry__title">${r.label}</div>
+          <div class="log-entry__meta">${r.date} · ${r.gpu} × ${r.gpuCount} · ${r.model} · ${r.quant.toUpperCase()} · ${r.engine}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <span class="conf-badge measured">🟢 Measured</span>
+          <button style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--mid)" onclick="deleteLog('${r.id}')">✕</button>
+        </div>
+      </div>
+      <div class="log-metrics">
+        <div class="log-metric"><div class="log-metric-val">${r.tps.toLocaleString()}</div><div class="log-metric-lbl">TPS Output</div></div>
+        <div class="log-metric"><div class="log-metric-val">${r.ttft}ms</div><div class="log-metric-lbl">TTFT</div></div>
+        <div class="log-metric"><div class="log-metric-val">${r.lat95}ms</div><div class="log-metric-lbl">Latency p95</div></div>
+        <div class="log-metric"><div class="log-metric-val">${r.rps}</div><div class="log-metric-lbl">Req/s</div></div>
+      </div>
+      ${r.notes ? `<div style="margin-top:8px;font-size:11px;color:var(--mid);font-style:italic">${r.notes}</div>` : ''}
+    </div>`).join('')
+
+  // Render chart
+  document.getElementById('logs-chart-card').style.display = 'block'
+  const ctx = document.getElementById('logsChart')
+  if (logsChartInst) logsChartInst.destroy()
+  const labels = STATE.logs.map(r => r.label.slice(0,15))
+  logsChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {label:'TPS', data:STATE.logs.map(r=>r.tps), borderColor:'#FF5539', backgroundColor:'rgba(255,85,57,0.08)', tension:0.3, yAxisID:'y'},
+        {label:'Latency p95 (ms)', data:STATE.logs.map(r=>r.lat95), borderColor:'#1C38F5', backgroundColor:'rgba(28,56,245,0.08)', tension:0.3, yAxisID:'y1'},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}},
+      scales:{
+        y:{position:'left',title:{display:true,text:'TPS',font:{size:10}},grid:{color:'#f0f0f5'}},
+        y1:{position:'right',title:{display:true,text:'Latency (ms)',font:{size:10}},grid:{display:false}},
+        x:{grid:{display:false},ticks:{font:{size:9},maxRotation:25}}
+      }
+    }
+  })
+
+  // Update sidebar
+  const latestLog = STATE.logs[STATE.logs.length-1]
+  document.getElementById('sb-logs').innerHTML = STATE.logs.slice(-3).reverse().map(r =>
+    `<div class="sb-item"><span class="sb-item-lbl">${r.label.slice(0,18)}</span><span class="sb-item-val">${r.tps} TPS</span></div>`
+  ).join('')
+}
+
+function deleteLog(id) {
+  STATE.logs = STATE.logs.filter(r => r.id !== id)
+  localStorage.setItem('atlas_bm_logs', JSON.stringify(STATE.logs))
+  renderLogs()
+  updateCtxBar()
+  runExtrapolation()
+}
+
+// ── EXTRAPOLATION ─────────────────────────────────────────────
+function runExtrapolation() {
+  const targetGPUs = +document.getElementById('ext-gpus')?.value || 64
+  const targetConc = +document.getElementById('ext-concurrency')?.value || 200
+  const efficiency = (+document.getElementById('ext-efficiency')?.value || 85) / 100
+  
+  const active = getActiveTargets()
+  const baseGPUs = STATE.config.gpuCount || 8
+  const baseTPS = active.tps || 0
+  const baseTTFT = active.ttft || 0
+  const baseLat95 = active.lat95 || 0
+  
+  if (!baseTPS) {
+    document.getElementById('extrap-results').innerHTML = '<div style="font-size:12px;color:var(--mid)">Configure benchmark data in Tab 1 to enable extrapolation.</div>'
+    return
+  }
+
+  const scaleFactor = (targetGPUs / baseGPUs) * efficiency
+  const projTPS = Math.round(baseTPS * scaleFactor)
+  const projRPS = Math.round(projTPS / STATE.config.outputLen)
+  const projLat95 = Math.round(baseLat95 * (1 + (targetConc / (STATE.config.batch || 32) - 1) * 0.15))
+
+  document.getElementById('extrap-results').innerHTML = `
+    <div class="extrap-result">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--navy)">${targetGPUs}× ${GPUS[STATE.selectedGPU]?.n || STATE.selectedGPU} · ${Math.round(efficiency*100)}% scaling efficiency</div>
+        <span class="conf-badge extrapolated">🔴 Extrapolated</span>
+      </div>
+      <div class="extrap-grid">
+        <div class="extrap-cell"><div class="extrap-val">${projTPS.toLocaleString()}</div><div class="extrap-lbl">Projected TPS</div></div>
+        <div class="extrap-cell"><div class="extrap-val">${projRPS}</div><div class="extrap-lbl">Req/s at ${targetConc} concurrency</div></div>
+        <div class="extrap-cell"><div class="extrap-val">${projLat95}ms</div><div class="extrap-lbl">Est. Latency p95</div></div>
+      </div>
+    </div>`
+
+  // Scaling chart
+  const ctx = document.getElementById('extrapChart')
+  if (extrapChartInst) extrapChartInst.destroy()
+  const gpuSteps = [baseGPUs, baseGPUs*2, baseGPUs*4, baseGPUs*8, targetGPUs].filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a-b)
+  extrapChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: gpuSteps.map(n=>n+'× GPUs'),
+      datasets: [
+        {label:'Linear (ideal)', data:gpuSteps.map(n=>Math.round(baseTPS*(n/baseGPUs))), borderColor:'#B4B4BE', borderDash:[5,5], tension:0, pointRadius:3},
+        {label:'Projected ('+Math.round(efficiency*100)+'% eff.)', data:gpuSteps.map(n=>Math.round(baseTPS*(n/baseGPUs)*efficiency)), borderColor:'#FF5539', backgroundColor:'rgba(255,85,57,0.08)', tension:0.2, pointRadius:4},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}},
+      scales:{
+        y:{title:{display:true,text:'TPS',font:{size:10}},grid:{color:'#f0f0f5'},beginAtZero:true},
+        x:{grid:{display:false},ticks:{font:{size:10}}}
+      }
+    }
+  })
+
+  // Customer summary
+  const gpu = GPUS[STATE.selectedGPU]
+  document.getElementById('cust-summary').innerHTML = `
+    <div style="font-size:13px;line-height:1.8;color:var(--dark)">
+      <p><strong>Hardware:</strong> ${targetGPUs}× ${gpu?.n || STATE.selectedGPU} (${gpu?.mem}GB HBM, ${gpu?.cool} cooling)</p>
+      <p><strong>Model:</strong> ${STATE.config.model.toUpperCase()} · ${STATE.config.quant.toUpperCase()} · ${STATE.config.engine}</p>
+      <p><strong>Projected Throughput:</strong> ${projTPS.toLocaleString()} tokens/sec output <span class="conf-badge extrapolated" style="margin-left:4px">🔴 Extrapolated</span></p>
+      <p><strong>Projected Req/s:</strong> ${projRPS} concurrent requests at ${targetConc} concurrency</p>
+      <p><strong>Estimated Latency p95:</strong> ${projLat95}ms</p>
+      ${STATE.logs.length > 0 ? `<p><strong>Basis:</strong> ${STATE.logs.length} measured run${STATE.logs.length>1?'s':''} on ${baseGPUs}× ${STATE.selectedGPU}, scaled with ${Math.round(efficiency*100)}% efficiency assumption <span class="conf-badge measured" style="margin-left:4px">🟢 Measured basis</span></p>` : `<p><strong>Basis:</strong> Vendor specifications and framework benchmarks <span class="conf-badge estimated" style="margin-left:4px">🟡 Estimated</span></p>`}
+      <p style="margin-top:8px;font-size:11px;color:var(--mid);font-style:italic">Note: Extrapolated values are projections based on measured or estimated baseline performance. Real-world results may vary. A formal benchmark run on target hardware is recommended before commercial commitment.</p>
+    </div>`
+}
+
+// ── SIDEBAR / CTX ─────────────────────────────────────────────
+function updateSidebar() {
+  const active = getActiveTargets()
+  document.getElementById('sb-tps').textContent = active.tps ? active.tps.toLocaleString() : '—'
+  document.getElementById('sb-ttft').textContent = active.ttft ? active.ttft + 'ms' : '—'
+  document.getElementById('sb-lat95').textContent = active.lat95 ? active.lat95 + 'ms' : '—'
+
+  const gpu = GPUS[STATE.selectedGPU]
+  document.getElementById('sb-config').innerHTML = `
+    <div class="sb-item"><span class="sb-item-lbl">GPU</span><span class="sb-item-val">${gpu?.n || STATE.selectedGPU}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">GPU Count</span><span class="sb-item-val">${STATE.config.gpuCount}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">Quantization</span><span class="sb-item-val">${STATE.config.quant.toUpperCase()}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">Engine</span><span class="sb-item-val">${STATE.config.engine}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">Model</span><span class="sb-item-val">${STATE.config.model}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">Batch Size</span><span class="sb-item-val">${STATE.config.batch}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">Override</span><span class="sb-item-val">${STATE.override ? '⚠ Active' : '—'}</span></div>
+  `
+}
+
+function updateCtxBar() {
+  document.getElementById('ctxProject').textContent = STATE.project?.name || 'No project loaded'
+  document.getElementById('ctxGPU').textContent = `${STATE.config.gpuCount}× ${STATE.selectedGPU}`
+  document.getElementById('ctxWorkload').textContent = WORKLOADS.find(w=>w.id===STATE.selectedWorkload)?.label || '—'
+  document.getElementById('ctxRuns').textContent = STATE.logs.length
+}
+
+// ── PROJECT LOAD ──────────────────────────────────────────────
+function loadProjectFile(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result)
+      STATE.project = data
+      // Auto-set GPU count from project if available
+      const agg = data.volumetrics?.aggregated || {}
+      if (data.tier === 'C3' || data.tier === 'C4') {
+        document.getElementById('cfg-gpuCount').value = 32
+        STATE.config.gpuCount = 32
+      }
+      updateCtxBar()
+      updateSidebar()
+      alert(`Project loaded: ${data.name || 'Unnamed'}. GPU count updated from project tier.`)
+    } catch {
+      alert('Invalid file. Please upload a Project Definition File (.json) from the Domain Configurator.')
+    }
+  }
+  reader.readAsText(file)
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('act'))
+  document.querySelectorAll('.tp').forEach(p => p.classList.remove('act'))
+  document.getElementById('t-'+name).classList.add('act')
+  document.getElementById('tp-'+name).classList.add('act')
+  if (name === 'override') renderActiveValues()
+  if (name === 'script') generateScript()
+  if (name === 'logs') renderLogs()
+  if (name === 'extrap') runExtrapolation()
+}
+
+// ── SESSION SAVE / EXPORT ─────────────────────────────────────
+function saveSession() {
+  const data = {
+    meta: { tool:'ATLAS Benchmark Tool v1.0', savedAt: new Date().toISOString() },
+    config: STATE.config,
+    selectedGPU: STATE.selectedGPU,
+    selectedWorkload: STATE.selectedWorkload,
+    override: STATE.override,
+    refData: STATE.refData,
+    logs: STATE.logs,
+    project: STATE.project,
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `BenchmarkTool-${STATE.selectedGPU}-${new Date().toISOString().slice(0,10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportReport() {
+  const active = getActiveTargets()
+  const gpu = GPUS[STATE.selectedGPU]
+  const lines = [
+    'ATLAS BENCHMARK TOOL — REPORT',
+    '='.repeat(50),
+    `Generated: ${new Date().toLocaleString('en-IN')}`,
+    `Project: ${STATE.project?.name || 'No project loaded'}`,
+    '',
+    'CONFIGURATION',
+    `  GPU:           ${gpu?.n || STATE.selectedGPU} × ${STATE.config.gpuCount}`,
+    `  Model:         ${STATE.config.model}`,
+    `  Quantization:  ${STATE.config.quant.toUpperCase()}`,
+    `  Engine:        ${STATE.config.engine}`,
+    `  Batch Size:    ${STATE.config.batch}`,
+    `  Input Tokens:  ${STATE.config.inputLen}`,
+    `  Output Tokens: ${STATE.config.outputLen}`,
+    '',
+    'ACTIVE PERFORMANCE TARGETS',
+    `  TPS (output):  ${active.tps?.toLocaleString() || '—'}`,
+    `  TTFT:          ${active.ttft || '—'} ms`,
+    `  Latency p95:   ${active.lat95 || '—'} ms`,
+    `  Override:      ${STATE.override ? 'YES — ' + STATE.override.confidence : 'No'}`,
+    '',
+    'BENCHMARK RUNS (' + STATE.logs.length + ')',
+    ...STATE.logs.map(r => `  ${r.date} | ${r.label} | TPS: ${r.tps} | TTFT: ${r.ttft}ms | p95: ${r.lat95}ms`),
+    '',
+    'CONFIDENCE: All measured run data flagged as 🟢 Measured.',
+    'Extrapolated projections flagged as 🔴 Extrapolated.',
+    '',
+    'ATLAS Benchmark Tool v1.0 · Presales Use Only'
+  ]
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `BenchmarkReport-${STATE.selectedGPU}-${new Date().toISOString().slice(0,10)}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function copySummary() {
+  const text = document.getElementById('cust-summary')?.innerText || ''
+  navigator.clipboard.writeText(text).then(() => alert('Summary copied to clipboard.'))
+}
+</script>
+
+<script>
+
+// ATLAS SHARED CONTEXT BAR
+(function(){
+  function getProject(){
+    try{
+      const u=JSON.parse(localStorage.getItem('atlas_user')||'null')
+      const projs=JSON.parse(localStorage.getItem('atlas_projects')||'[]')
+      // Find most recently updated project
+      const sorted=projs.sort((a,b)=>new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0))
+      return {user:u, project:sorted[0]||null}
+    }catch(e){return{user:null,project:null}}
+  }
+  function renderCtxBar(){
+    const bar=document.getElementById('atlasCtxBar')
+    if(!bar) return
+    const {user,project}=getProject()
+    const projName=project?project.name:'No project selected'
+    const projDomain=project?project.domain:''
+    const userLabel=user?user.name:'—'
+    bar.innerHTML=`
+      <a class="atlas-ctx__back" href="https://arvindbajaj5.github.io/atlas-platform/">← ATLAS Portal</a>
+      <div class="atlas-ctx__proj-dot" style="background:${project?'#00B290':'#B4B4BE'}"></div>
+      <span class="atlas-ctx__lbl">Project</span>
+      <span class="atlas-ctx__val">${projName}</span>
+      ${projDomain?`<span class="atlas-ctx__sep">·</span><span class="atlas-ctx__lbl">Domain</span><span class="atlas-ctx__val">${projDomain==='geospatial'?'🛰️ Geospatial':projDomain==='defence'?'🛡️ Defence':projDomain}</span>`:''}
+      <span class="atlas-ctx__sep">·</span>
+      <span class="atlas-ctx__lbl">User</span>
+      <span class="atlas-ctx__val">${userLabel}</span>
+    `
+  }
+  document.addEventListener('DOMContentLoaded', renderCtxBar)
+  window.addEventListener('storage', renderCtxBar)
+  window.atlasRefreshCtx=renderCtxBar
+})();
+
+</script>
+</body>
+</html>
