@@ -370,7 +370,7 @@ function launchTool(id){
   // Pass project context if available
   let url=t.url
   if(project) url+='?project='+encodeURIComponent(project.id)
-  window.open(url,'_blank')
+  window.location.href = url
 }
 
 function showComingSoon(name){
