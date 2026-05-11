@@ -162,9 +162,22 @@ select:focus,input:focus{outline:none;border-color:var(--blue);}
   .wl-grid{grid-template-columns:1fr;}
   .power-grid{grid-template-columns:1fr 1fr;}
 }
+
+/* ATLAS SHARED CONTEXT BAR */
+.atlas-ctx{background:#001d5c;border-bottom:2px solid #FF5539;padding:0 20px;height:32px;display:flex;align-items:center;gap:0;font-family:'Roboto',sans-serif;font-size:11px;}
+.atlas-ctx__back{color:rgba(255,255,255,0.7);text-decoration:none;font-weight:600;padding:0 12px 0 0;border-right:1px solid rgba(255,255,255,0.15);margin-right:12px;display:flex;align-items:center;gap:4px;transition:color 0.15s;}
+.atlas-ctx__back:hover{color:#FF5539;}
+.atlas-ctx__sep{color:rgba(255,255,255,0.25);margin:0 8px;}
+.atlas-ctx__lbl{color:rgba(255,255,255,0.45);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-size:9px;}
+.atlas-ctx__val{color:rgba(255,255,255,0.85);font-weight:600;margin-left:5px;}
+.atlas-ctx__tool{margin-left:auto;color:rgba(255,255,255,0.45);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+.atlas-ctx__proj-dot{width:6px;height:6px;border-radius:50%;background:#00B290;margin-right:4px;flex-shrink:0;}
+
 </style>
 </head>
 <body>
+<div class="atlas-ctx" id="atlasCtxBar"><span class="atlas-ctx__tool">AI Inferencing Factory</span></div>
+
 
 <div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S</div>
@@ -1188,11 +1201,137 @@ function resetProject() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────
+
+// ATLAS DEMO DATA — MDoNER GeoAI NE India
+(function(){
+  if(localStorage.getItem('atlas_demo_loaded')) return
+  const demo={
+    meta:{id:'proj_mdoner_geoai_demo',version:'2.0',tool:'ATLAS Domain Configurator v2.0',createdAt:'2026-05-01T00:00:00.000Z'},
+    name:'MDoNER GeoAI Platform — NE India',
+    customer:'Ministry of Development of North Eastern Region (MDoNER)',
+    opportunityType:'strategic',
+    domainComplexity:'sovereign',
+    domain:'geospatial',
+    tier:'C3',
+    personas:[
+      {id:'geo-analyst',icon:'🔍',name:'Geospatial Analyst',desc:'Analyses satellite and aerial imagery for insights and change detection',profile:'analyst',workload:'batch',latency:'medium'},
+      {id:'geo-disaster',icon:'🚨',name:'Disaster Management Officer',desc:'Uses real-time AI analysis for flood, fire, and disaster response coordination',profile:'analyst',workload:'realtime',latency:'critical'},
+      {id:'geo-agri',icon:'🌾',name:'Agriculture Officer',desc:'Monitors crop health, soil conditions, and yield predictions via satellite data',profile:'business',workload:'batch',latency:'low'},
+      {id:'geo-forest',icon:'🌳',name:'Forest / Environment Officer',desc:'Tracks deforestation, forest cover change, and environmental compliance',profile:'analyst',workload:'batch',latency:'low'},
+      {id:'geo-infra',icon:'🏗️',name:'Infrastructure Manager',desc:'Monitors pipelines, roads, and civil infrastructure via satellite surveillance',profile:'analyst',workload:'mixed',latency:'medium'},
+      {id:'geo-ministry',icon:'🏛️',name:'Ministry / Policy Official',desc:'Consumes reports and dashboards for policy decisions and fund allocation',profile:'business',workload:'batch',latency:'low'},
+      {id:'geo-planner',icon:'🗺️',name:'Urban / Regional Planner',desc:'Uses AI-generated maps and analysis for land use and development planning',profile:'analyst',workload:'batch',latency:'low'},
+      {id:'geo-mleng',icon:'💻',name:'Data Scientist / ML Engineer',desc:'Trains, fine-tunes, and deploys AI models for geospatial tasks',profile:'engineer',workload:'mixed',latency:'medium'}
+    ],
+    useCases:['geo-sat','geo-flood','geo-chg','geo-damage','geo-forest','geo-crop','geo-urban','geo-road'],
+    volumetrics:{
+      byPersona:{
+        'geo-analyst':   {concurrentUsers:20,inferenceRPS:10,latencyMs:500,notes:'Batch satellite analysis workload'},
+        'geo-disaster':  {concurrentUsers:5, inferenceRPS:50,latencyMs:200,notes:'Real-time flood and disaster response'},
+        'geo-agri':      {concurrentUsers:15,inferenceRPS:5, latencyMs:2000,notes:'Daily crop monitoring batch'},
+        'geo-forest':    {concurrentUsers:10,inferenceRPS:3, latencyMs:2000,notes:'Weekly forest cover analysis'},
+        'geo-infra':     {concurrentUsers:8, inferenceRPS:4, latencyMs:1000,notes:'Infrastructure change detection'},
+        'geo-ministry':  {concurrentUsers:10,inferenceRPS:2, latencyMs:3000,notes:'Dashboard and reporting access'},
+        'geo-planner':   {concurrentUsers:12,inferenceRPS:3, latencyMs:1500,notes:'Urban planning GIS queries'},
+        'geo-mleng':     {concurrentUsers:5, inferenceRPS:8, latencyMs:1000,notes:'Model training and evaluation'}
+      },
+      aggregated:{totalConcurrentUsers:85,totalInferenceRPS:85,tightestLatencyMs:200},
+      imagesPerDay:2000,
+      dataGBPerDay:500,
+      retention:'3y',
+      batchWindow:'daily',
+      peakPeriod:'247'
+    },
+    domainSpecifics:{
+      satelliteSources:[
+        {name:'Sentinel-2 (ESA)',resolution:'mr',revisit:'daily',bands:'ms',dailyGB:120},
+        {name:'Cartosat-3 (ISRO)',resolution:'hr',revisit:'daily',bands:'rgb',dailyGB:80},
+        {name:'Resourcesat-2A (ISRO)',resolution:'mr',revisit:'weekly',bands:'ms',dailyGB:40}
+      ],
+      gisPlatform:'bhuvan',
+      outputFormat:'all',
+      groundTruth:'iot',
+      trainingData:'mixed'
+    },
+    infrastructure:{
+      topology:'hub-spoke-edge',
+      totalSites:'6-20',
+      sites:{
+        site_0:{siteType:'Hub Site',connectivity:'leased',availability:'99.9',dataClassification:'confidential',cooling:'dlc',space:'dc-new',drBackup:'hot',notes:'Primary Hub at Guwahati — GB200 NVL2 DLC racks, sovereign AI core'},
+        site_1:{siteType:'Spoke Sites',connectivity:'leased',availability:'99.5',dataClassification:'restricted',cooling:'air',space:'server-room',drBackup:'remote',notes:'7 State capitals — B200 air-cooled racks for regional processing'},
+        site_2:{siteType:'Edge Sites',connectivity:'satellite',availability:'99',dataClassification:'restricted',cooling:'air',space:'modular',drBackup:'local',notes:'5 remote district sites — L40S edge servers for field operations'}
+      }
+    }
+  }
+
+  // Save demo project
+  const projs=JSON.parse(localStorage.getItem('atlas_projects')||'[]')
+  if(!projs.find(p=>p.id===demo.meta.id)){
+    projs.push({
+      id:demo.meta.id,
+      name:demo.name,
+      customer:demo.customer,
+      domain:demo.domain,
+      tier:demo.tier,
+      status:'active',
+      useCasesCount:demo.useCases.length,
+      personasCount:demo.personas.length,
+      createdAt:demo.meta.createdAt,
+      updatedAt:demo.meta.createdAt,
+      definition:demo
+    })
+    localStorage.setItem('atlas_projects',JSON.stringify(projs))
+  }
+
+  // Set as last known project for Inferencing Factory auto-detect
+  localStorage.setItem('atlas_last_project',JSON.stringify(demo))
+
+  localStorage.setItem('atlas_demo_loaded','1')
+  console.log('ATLAS: MDoNER GeoAI demo project loaded.')
+})();
+
 window.addEventListener('DOMContentLoaded', () => {
   // Auto-detect project from localStorage
   checkLocalStorage()
 })
 </script>
+
+<script>
+
+// ATLAS SHARED CONTEXT BAR
+(function(){
+  function getProject(){
+    try{
+      const u=JSON.parse(localStorage.getItem('atlas_user')||'null')
+      const projs=JSON.parse(localStorage.getItem('atlas_projects')||'[]')
+      // Find most recently updated project
+      const sorted=projs.sort((a,b)=>new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0))
+      return {user:u, project:sorted[0]||null}
+    }catch(e){return{user:null,project:null}}
+  }
+  function renderCtxBar(){
+    const bar=document.getElementById('atlasCtxBar')
+    if(!bar) return
+    const {user,project}=getProject()
+    const projName=project?project.name:'No project selected'
+    const projDomain=project?project.domain:''
+    const userLabel=user?user.name:'—'
+    bar.innerHTML=`
+      <a class="atlas-ctx__back" href="https://arvindbajaj5.github.io/atlas-platform/">← ATLAS Portal</a>
+      <div class="atlas-ctx__proj-dot" style="background:${project?'#00B290':'#B4B4BE'}"></div>
+      <span class="atlas-ctx__lbl">Project</span>
+      <span class="atlas-ctx__val">${projName}</span>
+      ${projDomain?`<span class="atlas-ctx__sep">·</span><span class="atlas-ctx__lbl">Domain</span><span class="atlas-ctx__val">${projDomain==='geospatial'?'🛰️ Geospatial':projDomain==='defence'?'🛡️ Defence':projDomain}</span>`:''}
+      <span class="atlas-ctx__sep">·</span>
+      <span class="atlas-ctx__lbl">User</span>
+      <span class="atlas-ctx__val">${userLabel}</span>
+    `
+  }
+  document.addEventListener('DOMContentLoaded', renderCtxBar)
+  window.addEventListener('storage', renderCtxBar)
+  window.atlasRefreshCtx=renderCtxBar
+})();
+
+</script>
 </body>
 </html>
-
