@@ -1,1 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — COMPASS Token Governance</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;
+  --teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;
+  --dark:#282832;--black:#0A0A0F;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.12);
+  --r:8px;--r-sm:6px;--r-lg:12px;
+  --green:#10B981;--red:#DC2626;--warn:#F59E0B;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+
+/* ATLAS SHARED CONTEXT BAR */
+.atlas-ctx{background:#001d5c;border-bottom:2px solid #FF5539;padding:0 20px;height:32px;display:flex;align-items:center;gap:0;font-family:'Roboto',sans-serif;font-size:11px;}
+.atlas-ctx__back{color:rgba(255,255,255,0.7);text-decoration:none;font-weight:600;padding:0 12px 0 0;border-right:1px solid rgba(255,255,255,0.15);margin-right:12px;display:flex;align-items:center;gap:4px;transition:color 0.15s;}
+.atlas-ctx__back:hover{color:#FF5539;}
+.atlas-ctx__sep{color:rgba(255,255,255,0.25);margin:0 8px;}
+.atlas-ctx__lbl{color:rgba(255,255,255,0.45);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-size:9px;}
+.atlas-ctx__val{color:rgba(255,255,255,0.85);font-weight:600;margin-left:5px;}
+.atlas-ctx__tool{margin-left:auto;color:rgba(255,255,255,0.45);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+.atlas-ctx__proj-dot{width:6px;height:6px;border-radius:50%;background:#00B290;margin-right:4px;flex-shrink:0;}
+
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.hdr-badge{background:rgba(60,0,180,0.3);color:#c4b5fd;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;letter-spacing:0.5px;}
+.hdr-live{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--teal);}
+.hdr-live-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);animation:blink 1.5s ease infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.5}}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+
+/* TABS */
+.tabs{background:var(--white);border-bottom:2px solid #e0e0e8;padding:0 24px;display:flex;overflow-x:auto;}
+.tab{padding:11px 16px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all 0.15s;}
+.tab.act{color:var(--navy);border-bottom-color:var(--orange);}
+
+/* PAGE */
+.page{padding:20px 24px;max-width:1600px;margin:0 auto;}
+
+/* PILLAR CARDS */
+.pillar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;}
+.pillar-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow);border-top:4px solid var(--mid);position:relative;overflow:hidden;}
+.pillar-card.p1{border-top-color:var(--blue);}
+.pillar-card.p2{border-top-color:var(--teal);}
+.pillar-card.p3{border-top-color:var(--amber);}
+.pillar-card.p4{border-top-color:var(--indigo);}
+.pillar-card.p5{border-top-color:var(--orange);}
+.pillar-card.p6{border-top-color:var(--navy);}
+.pillar-num{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.pillar-name{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:4px;}
+.pillar-sub{font-size:10px;color:var(--mid);margin-bottom:12px;}
+.pillar-metric{text-align:center;background:var(--light);border-radius:var(--r-sm);padding:10px;}
+.pillar-metric-val{font-size:24px;font-weight:900;color:var(--navy);font-family:'Roboto Mono',monospace;}
+.pillar-metric-lbl{font-size:9px;color:var(--mid);margin-top:2px;text-transform:uppercase;}
+.pillar-metric-val.green{color:var(--green);}
+.pillar-metric-val.orange{color:var(--orange);}
+.pillar-metric-val.red{color:var(--red);}
+.pillar-metric-val.blue{color:var(--blue);}
+.pillar-metric-val.amber{color:var(--amber);}
+
+/* STATS */
+.stat-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:14px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.stat-card.blue::before{background:var(--blue);}
+.stat-card.teal::before{background:var(--teal);}
+.stat-card.green::before{background:var(--green);}
+.stat-card.orange::before{background:var(--orange);}
+.stat-card.amber::before{background:var(--amber);}
+.stat-card.navy::before{background:var(--navy);}
+.stat-val{font-size:24px;font-weight:900;color:var(--dark);font-family:'Roboto Mono',monospace;}
+.stat-val.green{color:var(--green);}
+.stat-val.teal{color:var(--teal);}
+.stat-val.blue{color:var(--blue);}
+.stat-val.orange{color:var(--orange);}
+.stat-val.amber{color:var(--amber);}
+.stat-val.red{color:var(--red);}
+.stat-lbl{font-size:10px;color:var(--mid);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;}
+
+/* TOKEN TABLE */
+.token-table{width:100%;border-collapse:collapse;font-size:12px;}
+.token-table th{text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
+.token-table td{padding:8px 10px;border-bottom:1px solid var(--light);vertical-align:middle;}
+.token-table tr:hover td{background:rgba(28,56,245,0.02);}
+.quota-bar{height:6px;background:var(--light);border-radius:3px;overflow:hidden;width:100px;display:inline-block;vertical-align:middle;margin-left:8px;}
+.quota-fill{height:100%;border-radius:3px;transition:width 0.4s;}
+
+/* OLA TABLE */
+.ola-table{width:100%;border-collapse:collapse;font-size:12px;}
+.ola-table th{text-align:center;padding:8px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
+.ola-table th:first-child{text-align:left;}
+.ola-table td{padding:7px 10px;border-bottom:1px solid var(--light);text-align:center;font-family:'Roboto Mono',monospace;font-size:11px;}
+.ola-table td:first-child{text-align:left;font-family:'Roboto',sans-serif;}
+.ola-ok{color:var(--green);font-weight:700;}
+.ola-warn{color:var(--warn);font-weight:700;}
+.ola-err{color:var(--red);font-weight:700;}
+.tier-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;color:var(--white);}
+.t0{background:#DC2626;}
+.t1{background:#F59E0B;}
+.t2{background:#1C38F5;}
+.t3{background:#00B290;}
+.t4{background:#B4B4BE;}
+
+/* CARDS */
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card:last-child{margin-bottom:0;}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:16px;}
+.sec-label{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--light);}
+
+/* CHART */
+.chart-wrap{position:relative;height:200px;}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.chart-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow);}
+.chart-card-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;}
+
+/* ALERT BADGES */
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;}
+.badge-ok{background:rgba(16,185,129,0.1);color:var(--green);}
+.badge-warn{background:rgba(245,158,11,0.12);color:var(--warn);}
+.badge-err{background:rgba(220,38,38,0.1);color:var(--red);}
+.badge-blue{background:rgba(28,56,245,0.1);color:var(--blue);}
+.badge-navy{background:rgba(0,40,112,0.1);color:var(--navy);}
+
+/* NUDGE ITEMS */
+.nudge-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #e0e0e8;border-radius:var(--r);margin-bottom:8px;font-size:12px;transition:all 0.15s;}
+.nudge-item:hover{border-color:var(--teal);background:rgba(0,178,144,0.02);}
+.nudge-icon{font-size:18px;flex-shrink:0;}
+.nudge-msg{flex:1;}
+.nudge-msg strong{display:block;font-size:12px;color:var(--dark);margin-bottom:2px;}
+.nudge-msg span{color:var(--mid);font-size:11px;}
+.nudge-action{font-size:10px;font-weight:700;color:var(--teal);white-space:nowrap;}
+
+/* PROVENANCE */
+.prov-chain{display:flex;flex-direction:column;gap:0;}
+.prov-step{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--light);}
+.prov-step:last-child{border-bottom:none;}
+.prov-step__dot{width:10px;height:10px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:3px;}
+.prov-step__line{width:1px;background:var(--light);flex-shrink:0;margin:0 4px;}
+.prov-step__content{flex:1;}
+.prov-step__label{font-size:11px;font-weight:700;color:var(--dark);}
+.prov-step__detail{font-size:10px;color:var(--mid);font-family:'Roboto Mono',monospace;margin-top:2px;}
+.prov-conf{font-size:10px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:6px;}
+
+/* SCHEDULE */
+.schedule-bar{display:flex;height:40px;border-radius:var(--r);overflow:hidden;margin-bottom:8px;}
+.sch-seg{display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--white);}
+
+/* SEASONAL TABLE */
+.seas-table{width:100%;border-collapse:collapse;font-size:12px;}
+.seas-table th{text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
+.seas-table td{padding:8px 10px;border-bottom:1px solid var(--light);vertical-align:top;}
+
+/* METRICS TABLE */
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+.kpi-card{background:var(--light);border-radius:var(--r-lg);padding:14px;}
+.kpi-val{font-size:28px;font-weight:900;color:var(--navy);font-family:'Roboto Mono',monospace;}
+.kpi-lbl{font-size:10px;color:var(--mid);margin-top:2px;font-weight:700;text-transform:uppercase;}
+.kpi-trend{font-size:11px;font-weight:700;margin-top:4px;}
+.kpi-trend.up{color:var(--green);}
+.kpi-trend.down{color:var(--red);}
+
+/* TP */
+.tp{display:none;}
+.tp.act{display:block;}
+
+@media(max-width:1200px){.stat-grid{grid-template-columns:repeat(3,1fr);}.pillar-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:768px){.stat-grid{grid-template-columns:1fr 1fr;}.pillar-grid{grid-template-columns:1fr;}.chart-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<div class="atlas-ctx" id="atlasCtxBar"><span class="atlas-ctx__tool">COMPASS</span></div>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.65)">COMPASS — Token Governance & Platform Intelligence</div>
+  <div class="hdr-right">
+    <div class="hdr-live"><div class="hdr-live-dot"></div>LIVE SIM</div>
+    <span class="hdr-badge">v2.0 · 6 Pillars</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab act" id="t-overview" onclick="showTab('overview')">🧭 Overview</div>
+  <div class="tab" id="t-tokens" onclick="showTab('tokens')">🪙 Token Economy</div>
+  <div class="tab" id="t-latency" onclick="showTab('latency')">⏱ Latency OLA</div>
+  <div class="tab" id="t-load" onclick="showTab('load')">📅 Load Intelligence</div>
+  <div class="tab" id="t-provenance" onclick="showTab('provenance')">🔍 Transparency</div>
+  <div class="tab" id="t-nudge" onclick="showTab('nudge')">💡 Behavioural Nudge</div>
+  <div class="tab" id="t-metrics" onclick="showTab('metrics')">📊 Sovereign Metrics</div>
+</div>
+
+<div class="page">
+
+<!-- OVERVIEW TAB -->
+<div class="tp act" id="tp-overview">
+  <div class="stat-grid" id="overview-stats"></div>
+  <div class="pillar-grid" id="pillar-grid"></div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-card-title">Token Consumption — 24 hrs<span style="font-size:10px;color:var(--mid)">All sites · all personas</span></div>
+      <div class="chart-wrap"><canvas id="tokenChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">OLA Compliance — Last 7 Days<span style="font-size:10px;color:var(--mid)">% within tier budget</span></div>
+      <div class="chart-wrap"><canvas id="olaChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">GPU Utilisation vs Load Tiers<span style="font-size:10px;color:var(--mid)">24-hour diurnal pattern</span></div>
+      <div class="chart-wrap"><canvas id="diurnalChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Token Efficiency Trend<span style="font-size:10px;color:var(--mid)">Useful ratio % — 30 days</span></div>
+      <div class="chart-wrap"><canvas id="effChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOKEN ECONOMY TAB -->
+<div class="tp" id="tp-tokens">
+  <div class="card">
+    <div class="card-title">MOAT — Token Governance Module</div>
+    <div class="card-sub">Monthly quota allocation and real-time consumption per persona type. Hard limits for Commercial, soft limits for Internal and Agencies.</div>
+    <table class="token-table" id="token-table">
+      <thead><tr>
+        <th>Persona</th><th>Type</th><th>Monthly Quota</th><th>Used</th><th>% Used</th><th>Useful Tokens</th><th>Efficiency</th><th>Status</th>
+      </tr></thead>
+      <tbody id="token-tbody"></tbody>
+    </table>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-card-title">Token Usage by Persona<span style="font-size:10px;color:var(--mid)">This month</span></div>
+      <div class="chart-wrap"><canvas id="personaTokenChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Useful vs Wasted Tokens<span style="font-size:10px;color:var(--mid)">Platform-wide · 30 days</span></div>
+      <div class="chart-wrap"><canvas id="wasteChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- LATENCY OLA TAB -->
+<div class="tp" id="tp-latency">
+  <div class="card">
+    <div class="card-title">Latency OLA Framework — Five Tiers</div>
+    <div class="card-sub">Every persona and urgency level has a defined end-to-end latency budget. T0 Emergency always preempts all other tiers.</div>
+    <table class="ola-table">
+      <thead><tr><th>Tier</th><th>Persona</th><th>End-to-End</th><th>Pipeline L0→L4</th><th>RAG</th><th>Inference</th><th>Distribution</th><th>Current Compliance</th><th>Breach Action</th></tr></thead>
+      <tbody id="ola-tbody"></tbody>
+    </table>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-card-title">Latency Distribution — Last Hour<span style="font-size:10px;color:var(--mid)">p50 / p95 / p99 by tier</span></div>
+      <div class="chart-wrap"><canvas id="latencyDistChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">OLA Breach History — 7 Days<span style="font-size:10px;color:var(--mid)">Breach count by tier</span></div>
+      <div class="chart-wrap"><canvas id="breachChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- LOAD INTELLIGENCE TAB -->
+<div class="tp" id="tp-load">
+  <div class="card">
+    <div class="card-title">Diurnal Load Pattern — 24-Hour Cycle</div>
+    <div class="card-sub">Batch workloads (training, backfill, annotation QC) scheduled into 02:00–06:00 low-utilisation window. Emergency preemption available 24×7.</div>
+    <div class="chart-wrap" style="height:160px"><canvas id="loadChart"></canvas></div>
+    <div style="margin-top:12px">
+      <div class="schedule-bar" id="schedule-bar"></div>
+      <div style="display:flex;gap:16px;font-size:10px;color:var(--mid);margin-top:4px">
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#DC2626;display:inline-block"></span>T0 Emergency</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#1C38F5;display:inline-block"></span>Interactive (T1-T3)</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#B4B4BE;display:inline-block"></span>Batch Window (T4)</span>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Seasonal Workload Calendar</div>
+    <div class="card-sub">COMPASS pre-positions model weights and GPU allocation 2 weeks before each season based on the calendar below.</div>
+    <table class="seas-table">
+      <thead><tr><th>Season</th><th>Peak Workloads</th><th>COMPASS Prep Action</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Jun–Sep</strong><br><span style="color:var(--blue);font-size:11px">Monsoon</span></td>
+          <td style="font-size:11px">Flood inundation (SAR dominant) · Crop stress · Relief routing · Emergency alerts</td>
+          <td style="font-size:11px">Pre-load SAR models to GPU hot tier · Expand T0 headroom · Alert PMFBY batch delay</td></tr>
+        <tr><td><strong>Oct–Nov</strong><br><span style="color:var(--amber);font-size:11px">Harvest</span></td>
+          <td style="font-size:11px">PMFBY crop insurance batch · Yield forecast reconciliation · Agricultural market advisory</td>
+          <td style="font-size:11px">Pre-schedule PMFBY batch at 02:00 · Alert Commercial API consumers of peak billing period</td></tr>
+        <tr><td><strong>Dec–Feb</strong><br><span style="color:var(--teal);font-size:11px">Dry Season</span></td>
+          <td style="font-size:11px">GLOF monitoring · Forest fire early warning (SWIR) · Infrastructure construction progress</td>
+          <td style="font-size:11px">Shift GPU allocation toward VHR and thermal models · Schedule annual model retraining</td></tr>
+        <tr><td><strong>Mar–May</strong><br><span style="color:var(--orange);font-size:11px">Pre-Monsoon</span></td>
+          <td style="font-size:11px">Soil moisture baseline · Crop sowing advisory · Reservoir pre-fill monitoring</td>
+          <td style="font-size:11px">Update RAG database · Run platform benchmark evaluations · Test failover procedures</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TRANSPARENCY TAB -->
+<div class="tp" id="tp-provenance">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-title">Provenance Chain — Sample Output</div>
+      <div class="card-sub">Every AI output carries a full evidence chain. Auditable, archivable, politically defensible.</div>
+      <div class="prov-chain" id="prov-chain"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Confidence Score Distribution</div>
+      <div class="card-sub">Confidence and uncertainty range published with every inference result.</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="confChart"></canvas></div>
+      <div style="margin-top:14px">
+        <div class="sec-label">Output Classification</div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--light)">
+            <span style="color:var(--mid)">Deterministic preprocessing</span><span style="font-weight:600">38%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--light)">
+            <span style="color:var(--mid)">Model inference (CV/EO)</span><span style="font-weight:600">41%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--light)">
+            <span style="color:var(--mid)">Language generation (LLM)</span><span style="font-weight:600">21%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NUDGE TAB -->
+<div class="tp" id="tp-nudge">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-title">Active Nudges — Today</div>
+      <div class="card-sub">Behavioural recommendations sent to users based on consumption patterns, peer percentiles, and underused capabilities.</div>
+      <div id="nudge-list"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Peer Percentile — Token Efficiency</div>
+      <div class="card-sub">Anonymised consumption rank shown to each user. Drives efficiency competition.</div>
+      <div class="chart-wrap" style="height:200px"><canvas id="peerChart"></canvas></div>
+      <div style="margin-top:14px">
+        <div class="sec-label">Commendation Flags</div>
+        <div id="commend-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SOVEREIGN METRICS TAB -->
+<div class="tp" id="tp-metrics">
+  <div class="kpi-grid" id="kpi-grid"></div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-card-title">Tokens / kWh — Monthly Trend<span style="font-size:10px;color:var(--mid)">Novel sovereign efficiency metric</span></div>
+      <div class="chart-wrap"><canvas id="tokenkwhChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Use Case Adoption — Unique UCs/User<span style="font-size:10px;color:var(--mid)">Platform integration depth</span></div>
+      <div class="chart-wrap"><canvas id="adoptionChart"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Output Record Schema</div>
+    <div class="card-sub">Every AI output generates a structured, georeferenced record. Aggregated over time it becomes the definitive domain intelligence database.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px" id="schema-grid"></div>
+  </div>
+</div>
+
+</div><!-- /page -->
+
+<script>
+const BASE_URL='https://arvindbajaj5.github.io/atlas-platform'
+
+// ── SIM HELPERS ───────────────────────────────────────────────
+function r(base,noise=0.1){return Math.max(0,base+(Math.random()-0.5)*noise*base)}
+function pct(v){return Math.round(v*100)}
+function fmt(n){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n.toString()}
+
+// ── DATA ──────────────────────────────────────────────────────
+const PERSONAS=[
+  {name:'Geospatial Analyst',     type:'Internal', quota:500000,  used:0.61, useful:0.94},
+  {name:'Disaster Mgmt Officer',  type:'Agency',   quota:300000,  used:0.34, useful:0.97},
+  {name:'Agriculture Officer',    type:'Internal', quota:200000,  used:0.78, useful:0.91},
+  {name:'Ministry Official',      type:'Internal', quota:150000,  used:0.42, useful:0.88},
+  {name:'Citizen Advisory',       type:'Citizen',  quota:1000000, used:0.23, useful:0.95},
+  {name:'Commercial API',         type:'Comm.',    quota:800000,  used:0.89, useful:0.86},
+  {name:'ML Engineer',            type:'Internal', quota:600000,  used:0.55, useful:0.92},
+  {name:'Infrastructure Mgr',     type:'Internal', quota:180000,  used:0.67, useful:0.90},
+]
+
+const OLA_TIERS=[
+  {tier:'T0',label:'Emergency',  cls:'t0', e2e:'<30s',  pipe:'<20s', rag:'<2s',  inf:'<5s',  dist:'<3s',  comp:99.8},
+  {tier:'T1',label:'Interactive',cls:'t1', e2e:'<2min', pipe:'<90s', rag:'<5s',  inf:'<20s', dist:'<5s',  comp:99.2},
+  {tier:'T2',label:'API',        cls:'t2', e2e:'<5min', pipe:'<3min',rag:'<10s', inf:'<60s', dist:'<10s', comp:98.7},
+  {tier:'T3',label:'Citizen',    cls:'t3', e2e:'<10s',  pipe:'Cache',rag:'<2s',  inf:'<5s',  dist:'<3s',  comp:99.5},
+  {tier:'T4',label:'Batch',      cls:'t4', e2e:'Best',  pipe:'Sched',rag:'N/A',  inf:'Ovnt', dist:'N/A',  comp:97.1},
+]
+
+const NUDGES=[
+  {icon:'📊',msg:'Your token efficiency is in the 78th percentile',detail:'You are above the platform average. Keep maintaining query quality.',action:'View Ranking'},
+  {icon:'🔍',msg:'8 use cases you haven\'t explored yet',detail:'Flood Mapping, Carbon Stock, Border Surveillance and 5 more are available to you.',action:'Explore Now'},
+  {icon:'⚠️',msg:'Commercial API quota at 89% — 2 days remaining',detail:'Consider batching remaining queries or requesting a quota top-up.',action:'Manage Quota'},
+  {icon:'🌾',msg:'Monsoon season starts in 12 days',detail:'PMFBY crop monitoring workload will surge. Pre-schedule batch queries now.',action:'Schedule'},
+  {icon:'🏆',msg:'Agriculture Officer: Commended for efficient querying',detail:'Ranked in top 10% for useful token ratio this month.',action:'View Badge'},
+  {icon:'💡',msg:'Similar query detected — RAG cache available',detail:'Your last 3 flood queries overlap 70%. Use cached results to save 4,200 tokens.',action:'Use Cache'},
+]
+
+const COMMENDATIONS=[
+  {name:'Agriculture Officer', badge:'🏆 Efficiency Champion', pct:'Top 10%'},
+  {name:'Disaster Mgmt Officer', badge:'⚡ Emergency Hero', pct:'Top 5%'},
+  {name:'ML Engineer', badge:'🔬 Power User', pct:'Top 15%'},
+]
+
+const PROV_STEPS=[
+  {label:'Satellite Scenes Ingested',   detail:'Sentinel-2 L2A · Path 142 Row 045 · 2026-05-10 · Bands: B2,B3,B4,B8,B11,B12', conf:null},
+  {label:'L0→L4 Pipeline (SMP Node)',  detail:'Radiometric calibration · Cloud masking (QA60) · Atmospheric correction · Spatial index', conf:null},
+  {label:'RAG Retrieval (Milvus)',      detail:'12 documents retrieved · Top-1 similarity 0.91 · PMFBY guidelines 2026 · ISRO SOP v3.2', conf:null},
+  {label:'Model Inference (GPU Node)', detail:'Crop-Health-ResNet-v2.4.1 · Weights hash: a3f8b2c1 · FP8 quantized · 1,840 tokens consumed', conf:0.87},
+  {label:'Sarvam AI Generation',       detail:'Advisory generated in Hindi + English · 340 tokens · Grounded to model output', conf:0.91},
+  {label:'Delivered to User',          detail:'WhatsApp · +91-XXXXXX4521 · Agriculture Officer · Meghalaya · 09:14:32 IST', conf:null},
+]
+
+const SCHEMA_FIELDS=[
+  {f:'Use Case ID',   d:'geo-crop-003 · Crop Health Monitoring'},
+  {f:'Timestamp',     d:'2026-05-10T03:44:12.841Z · IST 09:14:12'},
+  {f:'Geography',     d:'Ri Bhoi district · 25.8°N 91.9°E · 1.2km² bbox'},
+  {f:'Sensor Inputs', d:'Sentinel-2 L2A · 10m · 2026-05-08 · 12 bands'},
+  {f:'Model Version', d:'Crop-Health-ResNet-v2.4.1 · hash a3f8b2c1'},
+  {f:'RAG Context',   d:'12 docs · sim 0.91 · PMFBY 2026 · ISRO SOP v3'},
+  {f:'Confidence',    d:'0.87 ± 0.04 · High confidence'},
+  {f:'Token Cost',    d:'Prompt: 1,500 · Completion: 340 · Total: 1,840'},
+  {f:'Energy Proxy',  d:'1,840 × 0.0012 kWh/Ktok = 0.0022 kWh'},
+  {f:'Useful Flag',   d:'Pending · Updated post-delivery within 48h'},
+]
+
+// ── CHARTS REGISTRY ───────────────────────────────────────────
+let charts={}
+function mkChart(id,type,labels,datasets,opts){
+  const ctx=document.getElementById(id)
+  if(!ctx)return
+  if(charts[id])charts[id].destroy()
+  charts[id]=new Chart(ctx,{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,...opts}})
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────────
+function renderOverview(){
+  const totalTokens=PERSONAS.reduce((s,p)=>s+p.quota*p.used,0)
+  const totalUseful=PERSONAS.reduce((s,p)=>s+p.quota*p.used*p.useful,0)
+  const effRatio=totalUseful/totalTokens
+  document.getElementById('overview-stats').innerHTML=[
+    {val:fmt(Math.round(totalTokens)),lbl:'Tokens Consumed Today',cls:'blue blue'},
+    {val:(effRatio*100).toFixed(1)+'%',lbl:'Token Efficiency Ratio',cls:'green green'},
+    {val:'99.5%',lbl:'T0 OLA Compliance',cls:'teal teal'},
+    {val:'0',lbl:'Active Breaches',cls:'navy navy'},
+    {val:'63%',lbl:'Avg GPU Utilisation',cls:'amber amber'},
+    {val:'6',lbl:'Active Nudges',cls:'orange orange'},
+  ].map(s=>`<div class="stat-card ${s.cls.split(' ')[0]}"><div class="stat-val ${s.cls.split(' ')[1]}">${s.val}</div><div class="stat-lbl">${s.lbl}</div></div>`).join('')
+
+  document.getElementById('pillar-grid').innerHTML=[
+    {n:1,cls:'p1',name:'Latency Governance',sub:'OLA-by-persona · T0–T4 tiers',val:'99.5%',vlbl:'T0 OLA Compliance',vcls:'green'},
+    {n:2,cls:'p2',name:'Token Economy (MOAT)',sub:'Allocation · Monitoring · Nudge',val:'91.4%',vlbl:'Platform Efficiency',vcls:'teal'},
+    {n:3,cls:'p3',name:'Load Intelligence',sub:'Diurnal · Seasonal · Preemption',val:'63%',vlbl:'Avg GPU Utilisation',vcls:'amber'},
+    {n:4,cls:'p4',name:'Transparency',sub:'Provenance · Confidence · Explain',val:'100%',vlbl:'Outputs with Provenance',vcls:'blue'},
+    {n:5,cls:'p5',name:'Behavioural Nudge',sub:'Percentile · Reward · Alert',val:'6',vlbl:'Active Nudges Today',vcls:'orange'},
+    {n:6,cls:'p6',name:'Sovereign Metrics',sub:'Tokens/kWh · KPIs · Commons',val:'847',vlbl:'Tokens per kWh',vcls:''},
+  ].map(p=>`<div class="pillar-card ${p.cls}">
+    <div class="pillar-num">Pillar 0${p.n}</div>
+    <div class="pillar-name">${p.name}</div>
+    <div class="pillar-sub">${p.sub}</div>
+    <div class="pillar-metric"><div class="pillar-metric-val ${p.vcls}">${p.val}</div><div class="pillar-metric-lbl">${p.vlbl}</div></div>
+  </div>`).join('')
+
+  // Charts
+  const hrs=Array.from({length:24},(_,i)=>i+':00')
+  const tokenData=hrs.map((_,i)=>Math.round(r(i>=2&&i<=6?5000:i>=9&&i<=17?45000:20000,0.3)))
+  mkChart('tokenChart','line',hrs,[
+    {label:'Tokens/hr',data:tokenData,borderColor:'#1C38F5',backgroundColor:'rgba(28,56,245,0.08)',fill:true,tension:0.4,pointRadius:0,borderWidth:2}
+  ],{plugins:{legend:{display:false}},scales:{y:{grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:8}}}})
+
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+  mkChart('olaChart','bar',days,[
+    {label:'T0',data:days.map(()=>r(99.8,0.002)),backgroundColor:'rgba(220,38,38,0.7)',borderRadius:3},
+    {label:'T1',data:days.map(()=>r(99.2,0.01)),backgroundColor:'rgba(245,158,11,0.7)',borderRadius:3},
+    {label:'T2',data:days.map(()=>r(98.7,0.02)),backgroundColor:'rgba(28,56,245,0.7)',borderRadius:3},
+  ],{plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{y:{min:95,max:100,grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9}}}}})
+
+  const gpuLoad=hrs.map((_,i)=>Math.round(r(i>=2&&i<=6?25:i>=9&&i<=17?75:55,0.15)))
+  mkChart('diurnalChart','line',hrs,[
+    {label:'GPU Util %',data:gpuLoad,borderColor:'#00B290',backgroundColor:'rgba(0,178,144,0.08)',fill:true,tension:0.4,pointRadius:0,borderWidth:2},
+    {label:'Batch window',data:hrs.map((_,i)=>i>=2&&i<=6?30:null),borderColor:'#B4B4BE',backgroundColor:'rgba(180,180,190,0.15)',fill:true,tension:0,pointRadius:0,borderWidth:1,borderDash:[4,4]},
+  ],{plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{y:{min:0,max:100,grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:8}}}})
+
+  const effTrend=Array.from({length:30},(_,i)=>+(88+i*0.12+r(0,0.5)).toFixed(1))
+  const days30=Array.from({length:30},(_,i)=>`May ${i+1}`)
+  mkChart('effChart','line',days30,[
+    {label:'Useful token %',data:effTrend,borderColor:'#FF5539',backgroundColor:'rgba(255,85,57,0.08)',fill:true,tension:0.3,pointRadius:0,borderWidth:2}
+  ],{plugins:{legend:{display:false}},scales:{y:{min:85,max:100,grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:6}}}})
+}
+
+// ── TOKENS ────────────────────────────────────────────────────
+function renderTokens(){
+  document.getElementById('token-tbody').innerHTML=PERSONAS.map(p=>{
+    const used=Math.round(p.quota*p.used)
+    const useful=Math.round(used*p.useful)
+    const pctUsed=Math.round(p.used*100)
+    const effPct=Math.round(p.useful*100)
+    const statusCls=p.type==='Comm.'&&p.used>0.85?'badge-err':p.used>0.7?'badge-warn':'badge-ok'
+    const statusLbl=p.type==='Comm.'&&p.used>0.85?'⚠ Near Limit':p.used>0.7?'Monitor':'OK'
+    const barColor=pctUsed>85?'var(--red)':pctUsed>70?'var(--amber)':'var(--teal)'
+    return `<tr>
+      <td><strong>${p.name}</strong></td>
+      <td><span class="badge badge-navy">${p.type}</span></td>
+      <td style="font-family:'Roboto Mono',monospace">${fmt(p.quota)}</td>
+      <td style="font-family:'Roboto Mono',monospace">${fmt(used)}
+        <div class="quota-bar"><div class="quota-fill" style="width:${pctUsed}%;background:${barColor}"></div></div>
+      </td>
+      <td style="font-weight:700;color:${barColor}">${pctUsed}%</td>
+      <td style="font-family:'Roboto Mono',monospace">${fmt(useful)}</td>
+      <td style="font-weight:700;color:${effPct>=90?'var(--green)':effPct>=85?'var(--amber)':'var(--orange)'}">${effPct}%</td>
+      <td><span class="badge ${statusCls}">${statusLbl}</span></td>
+    </tr>`
+  }).join('')
+
+  mkChart('personaTokenChart','bar',PERSONAS.map(p=>p.name.split(' ')[0]),[
+    {label:'Used',data:PERSONAS.map(p=>Math.round(p.quota*p.used)),backgroundColor:'rgba(28,56,245,0.7)',borderRadius:4},
+    {label:'Quota',data:PERSONAS.map(p=>p.quota),backgroundColor:'rgba(180,180,190,0.3)',borderRadius:4},
+  ],{plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{y:{grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9},maxRotation:30}}}})
+
+  const days30=Array.from({length:30},(_,i)=>`May ${i+1}`)
+  const useful=days30.map(()=>Math.round(r(420000,0.1)))
+  const wasted=days30.map(()=>Math.round(r(38000,0.2)))
+  mkChart('wasteChart','bar',days30,[
+    {label:'Useful',data:useful,backgroundColor:'rgba(0,178,144,0.75)',borderRadius:3},
+    {label:'Wasted',data:wasted,backgroundColor:'rgba(220,38,38,0.6)',borderRadius:3},
+  ],{plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9},maxTicksLimit:6}},y:{stacked:true,grid:{color:'#f0f0f5'},ticks:{font:{size:9}}}}})
+}
+
+// ── LATENCY ───────────────────────────────────────────────────
+function renderLatency(){
+  document.getElementById('ola-tbody').innerHTML=OLA_TIERS.map(t=>{
+    const compCls=t.comp>=99.5?'ola-ok':t.comp>=98?'ola-warn':'ola-err'
+    return `<tr>
+      <td><span class="tier-badge ${t.tier.toLowerCase()}">${t.tier}</span></td>
+      <td>${t.label}</td>
+      <td>${t.e2e}</td><td>${t.pipe}</td><td>${t.rag}</td><td>${t.inf}</td><td>${t.dist}</td>
+      <td class="${compCls}">${t.comp}%</td>
+      <td style="font-size:10px;color:var(--mid)">${t.tier==='T0'?'Preempt all · Page NOC':t.tier==='T1'?'Alert NOC · Deprioritise batch':t.tier==='T2'?'HTTP 503 + retry-after':t.tier==='T3'?'Serve cached · Log':t.tier==='T4'?'Preempted by T0–T2':''}</td>
+    </tr>`
+  }).join('')
+
+  mkChart('latencyDistChart','bar',['T0','T1','T2','T3','T4'],[
+    {label:'p50 (ms)',data:[4200,38000,95000,3200,null],backgroundColor:'rgba(0,178,144,0.7)',borderRadius:3},
+    {label:'p95 (ms)',data:[18000,95000,220000,6800,null],backgroundColor:'rgba(255,182,0,0.7)',borderRadius:3},
+    {label:'p99 (ms)',data:[26000,115000,290000,9200,null],backgroundColor:'rgba(220,38,38,0.6)',borderRadius:3},
+  ],{plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{y:{grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9}}}}})
+
+  const days7=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+  mkChart('breachChart','bar',days7,[
+    {label:'T0 Breaches',data:[0,0,1,0,0,0,0],backgroundColor:'rgba(220,38,38,0.7)',borderRadius:3},
+    {label:'T1 Breaches',data:[2,1,3,1,2,0,1],backgroundColor:'rgba(245,158,11,0.7)',borderRadius:3},
+    {label:'T2 Breaches',data:[5,3,8,4,6,2,3],backgroundColor:'rgba(28,56,245,0.6)',borderRadius:3},
+  ],{plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{y:{beginAtZero:true,grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9}}}}})
+}
+
+// ── LOAD ──────────────────────────────────────────────────────
+function renderLoad(){
+  const hrs=Array.from({length:24},(_,i)=>i+':00')
+  const interactive=hrs.map((_,i)=>i>=2&&i<=6?5:i>=8&&i<=19?Math.round(r(65,0.2)):30)
+  const batch=hrs.map((_,i)=>i>=2&&i<=6?Math.round(r(55,0.1)):0)
+  mkChart('loadChart','bar',hrs,[
+    {label:'Interactive (T1–T3)',data:interactive,backgroundColor:'rgba(28,56,245,0.7)',borderRadius:2},
+    {label:'Batch (T4)',data:batch,backgroundColor:'rgba(180,180,190,0.6)',borderRadius:2},
+  ],{plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9},maxTicksLimit:8}},y:{stacked:true,max:100,grid:{color:'#f0f0f5'},ticks:{font:{size:9}},title:{display:true,text:'GPU %',font:{size:9}}}}})
+
+  // 24-hour schedule bar
+  const segs=[
+    {hrs:2,color:'#B4B4BE',label:'Low'},
+    {hrs:4,color:'#6B7280',label:'Batch'},
+    {hrs:3,color:'#1C38F5',label:'Rise'},
+    {hrs:9,color:'#1C38F5',label:'Peak'},
+    {hrs:4,color:'#3B82F6',label:'Decline'},
+    {hrs:2,color:'#B4B4BE',label:'Low'},
+  ]
+  document.getElementById('schedule-bar').innerHTML=segs.map(s=>
+    `<div class="sch-seg" style="width:${(s.hrs/24*100).toFixed(1)}%;background:${s.color}">${s.hrs>2?s.label:''}</div>`
+  ).join('')
+}
+
+// ── PROVENANCE ────────────────────────────────────────────────
+function renderProvenance(){
+  document.getElementById('prov-chain').innerHTML=PROV_STEPS.map((s,i)=>`
+    <div class="prov-step">
+      <div>
+        <div class="prov-step__dot" style="background:${i===PROV_STEPS.length-1?'var(--teal)':'var(--blue)'}"></div>
+        ${i<PROV_STEPS.length-1?'<div style="width:1px;height:100%;background:var(--light);margin:3px auto 0;min-height:20px"></div>':''}
+      </div>
+      <div class="prov-step__content">
+        <div class="prov-step__label">${s.label}${s.conf?`<span class="prov-conf" style="background:rgba(0,178,144,0.1);color:var(--teal)">Conf: ${s.conf}</span>`:''}</div>
+        <div class="prov-step__detail">${s.detail}</div>
+      </div>
+    </div>`).join('')
+
+  const confBands=['<0.5','0.5–0.6','0.6–0.7','0.7–0.8','0.8–0.9','>0.9']
+  mkChart('confChart','bar',confBands,[
+    {label:'Output count',data:[320,850,2100,4800,8200,12400],backgroundColor:['rgba(220,38,38,0.7)','rgba(245,158,11,0.7)','rgba(255,182,0,0.7)','rgba(28,56,245,0.6)','rgba(0,178,144,0.7)','rgba(16,185,129,0.8)'],borderRadius:4}
+  ],{plugins:{legend:{display:false}},scales:{y:{grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9}}}}})
+}
+
+// ── NUDGE ─────────────────────────────────────────────────────
+function renderNudge(){
+  document.getElementById('nudge-list').innerHTML=NUDGES.map(n=>`
+    <div class="nudge-item">
+      <div class="nudge-icon">${n.icon}</div>
+      <div class="nudge-msg"><strong>${n.msg}</strong><span>${n.detail}</span></div>
+      <div class="nudge-action">${n.action} →</div>
+    </div>`).join('')
+
+  const personas=PERSONAS.map(p=>p.name.split(' ')[0])
+  const pctiles=PERSONAS.map(()=>Math.round(r(60,0.4)))
+  mkChart('peerChart','bar',personas,[
+    {label:'Efficiency Percentile',data:pctiles,backgroundColor:pctiles.map(v=>v>=80?'rgba(0,178,144,0.7)':v>=60?'rgba(28,56,245,0.6)':'rgba(255,182,0,0.6)'),borderRadius:4}
+  ],{plugins:{legend:{display:false}},scales:{y:{min:0,max:100,grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9},maxRotation:30}}}})
+
+  document.getElementById('commend-list').innerHTML=COMMENDATIONS.map(c=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--light);font-size:11px">
+      <span style="font-weight:600">${c.name}</span>
+      <span style="color:var(--amber)">${c.badge}</span>
+      <span class="badge badge-ok">${c.pct}</span>
+    </div>`).join('')
+}
+
+// ── METRICS ───────────────────────────────────────────────────
+function renderMetrics(){
+  document.getElementById('kpi-grid').innerHTML=[
+    {val:'847',lbl:'Tokens / kWh',trend:'+12% vs last month',up:true},
+    {val:'1,840',lbl:'Avg Tokens / Query',trend:'-3% vs last month',up:true},
+    {val:'91.4%',lbl:'Useful Token Ratio',trend:'+2.1pp vs last month',up:true},
+    {val:'99.5%',lbl:'T0 OLA Compliance',trend:'Target >99.5% ✓',up:true},
+    {val:'284',lbl:'Peak Queries / Minute',trend:'Measured under simulation',up:false},
+    {val:'3.2',lbl:'Unique UCs / User',trend:'+0.4 vs last month',up:true},
+  ].map(k=>`<div class="kpi-card">
+    <div class="kpi-val">${k.val}</div>
+    <div class="kpi-lbl">${k.lbl}</div>
+    <div class="kpi-trend ${k.up?'up':'down'}">${k.trend}</div>
+  </div>`).join('')
+
+  const months=['Dec','Jan','Feb','Mar','Apr','May']
+  mkChart('tokenkwhChart','line',months,[
+    {label:'Tokens/kWh',data:[720,748,778,801,824,847],borderColor:'#00B290',backgroundColor:'rgba(0,178,144,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:4}
+  ],{plugins:{legend:{display:false}},scales:{y:{grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9}}}}})
+
+  mkChart('adoptionChart','bar',PERSONAS.map(p=>p.name.split(' ')[0]),[
+    {label:'Unique UCs Used',data:PERSONAS.map(()=>Math.round(r(3.2,0.5))),backgroundColor:'rgba(60,0,180,0.7)',borderRadius:4}
+  ],{plugins:{legend:{display:false}},scales:{y:{max:10,grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},x:{grid:{display:false},ticks:{font:{size:9},maxRotation:30}}}})
+
+  document.getElementById('schema-grid').innerHTML=SCHEMA_FIELDS.map(f=>`
+    <div style="background:var(--light);border-radius:var(--r-sm);padding:8px 10px;">
+      <div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:3px">${f.f}</div>
+      <div style="font-size:11px;font-family:'Roboto Mono',monospace;color:var(--dark)">${f.d}</div>
+    </div>`).join('')
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'))
+  document.querySelectorAll('.tp').forEach(p=>p.classList.remove('act'))
+  document.getElementById('t-'+name).classList.add('act')
+  document.getElementById('tp-'+name).classList.add('act')
+  const renders={overview:renderOverview,tokens:renderTokens,latency:renderLatency,load:renderLoad,provenance:renderProvenance,nudge:renderNudge,metrics:renderMetrics}
+  if(renders[name]) setTimeout(()=>renders[name](),50)
+}
+
+// ── CONTEXT BAR ───────────────────────────────────────────────
+(function(){
+  function renderCtxBar(){
+    const bar=document.getElementById('atlasCtxBar')
+    if(!bar)return
+    try{
+      const u=JSON.parse(localStorage.getItem('atlas_user')||'null')
+      const projs=JSON.parse(localStorage.getItem('atlas_projects')||'[]')
+      const sorted=projs.sort((a,b)=>new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0))
+      const project=sorted[0]||null
+      bar.innerHTML=`
+        <a class="atlas-ctx__back" href="${BASE_URL}/">← ATLAS Portal</a>
+        <div class="atlas-ctx__proj-dot" style="background:${project?'#00B290':'#B4B4BE'}"></div>
+        <span class="atlas-ctx__lbl">Project</span>
+        <span class="atlas-ctx__val">${project?project.name:'No project selected'}</span>
+        ${project&&project.domain?`<span class="atlas-ctx__sep">·</span><span class="atlas-ctx__lbl">Domain</span><span class="atlas-ctx__val">${project.domain==='geospatial'?'🛰️ Geospatial':'🛡️ Defence'}</span>`:''}
+        <span class="atlas-ctx__sep">·</span>
+        <span class="atlas-ctx__lbl">User</span>
+        <span class="atlas-ctx__val">${u?u.name:'—'}</span>
+        <span class="atlas-ctx__tool">COMPASS v2.0</span>`
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',renderCtxBar)
+  window.addEventListener('storage',renderCtxBar)
+})();
+
+// ── INIT ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{
+  renderOverview()
+  // Live tick every 5s
+  setInterval(()=>{
+    const s=document.getElementById('overview-stats')
+    if(s) renderOverview()
+  },5000)
+})
+</script>
+</body>
+</html>
 
