@@ -134,22 +134,9 @@ input[type=number]:focus{outline:none;border-color:var(--blue);}
   .sidebar{border-right:none;border-bottom:1px solid #e0e0e8;}
   .result-grid,.banner{grid-template-columns:1fr 1fr;}
 }
-
-/* ATLAS SHARED CONTEXT BAR */
-.atlas-ctx{background:#001d5c;border-bottom:2px solid #FF5539;padding:0 20px;height:32px;display:flex;align-items:center;gap:0;font-family:'Roboto',sans-serif;font-size:11px;}
-.atlas-ctx__back{color:rgba(255,255,255,0.7);text-decoration:none;font-weight:600;padding:0 12px 0 0;border-right:1px solid rgba(255,255,255,0.15);margin-right:12px;display:flex;align-items:center;gap:4px;transition:color 0.15s;}
-.atlas-ctx__back:hover{color:#FF5539;}
-.atlas-ctx__sep{color:rgba(255,255,255,0.25);margin:0 8px;}
-.atlas-ctx__lbl{color:rgba(255,255,255,0.45);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-size:9px;}
-.atlas-ctx__val{color:rgba(255,255,255,0.85);font-weight:600;margin-left:5px;}
-.atlas-ctx__tool{margin-left:auto;color:rgba(255,255,255,0.45);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
-.atlas-ctx__proj-dot{width:6px;height:6px;border-radius:50%;background:#00B290;margin-right:4px;flex-shrink:0;}
-
 </style>
 </head>
 <body>
-<div class="atlas-ctx" id="atlasCtxBar"><span class="atlas-ctx__tool">COMPASS — BOM Validator</span></div>
-
 <div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S</div>
   <div style="font-size:13px;color:rgba(255,255,255,0.65)">COMPASS — Sovereign AI BOM Validator</div>
@@ -723,44 +710,6 @@ window.addEventListener('DOMContentLoaded',()=>{
   populateUCTable()
   calculate()
 })
-</script>
-
-<script>
-
-// ATLAS SHARED CONTEXT BAR
-(function(){
-  function getProject(){
-    try{
-      const u=JSON.parse(localStorage.getItem('atlas_user')||'null')
-      const projs=JSON.parse(localStorage.getItem('atlas_projects')||'[]')
-      // Find most recently updated project
-      const sorted=projs.sort((a,b)=>new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0))
-      return {user:u, project:sorted[0]||null}
-    }catch(e){return{user:null,project:null}}
-  }
-  function renderCtxBar(){
-    const bar=document.getElementById('atlasCtxBar')
-    if(!bar) return
-    const {user,project}=getProject()
-    const projName=project?project.name:'No project selected'
-    const projDomain=project?project.domain:''
-    const userLabel=user?user.name:'—'
-    bar.innerHTML=`
-      <a class="atlas-ctx__back" href="https://arvindbajaj5.github.io/atlas-platform/">← ATLAS Portal</a>
-      <div class="atlas-ctx__proj-dot" style="background:${project?'#00B290':'#B4B4BE'}"></div>
-      <span class="atlas-ctx__lbl">Project</span>
-      <span class="atlas-ctx__val">${projName}</span>
-      ${projDomain?`<span class="atlas-ctx__sep">·</span><span class="atlas-ctx__lbl">Domain</span><span class="atlas-ctx__val">${projDomain==='geospatial'?'🛰️ Geospatial':projDomain==='defence'?'🛡️ Defence':projDomain}</span>`:''}
-      <span class="atlas-ctx__sep">·</span>
-      <span class="atlas-ctx__lbl">User</span>
-      <span class="atlas-ctx__val">${userLabel}</span>
-    `
-  }
-  document.addEventListener('DOMContentLoaded', renderCtxBar)
-  window.addEventListener('storage', renderCtxBar)
-  window.atlasRefreshCtx=renderCtxBar
-})();
-
 </script>
 </body>
 </html>
