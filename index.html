@@ -203,13 +203,14 @@ const TOOLS = {
 
   // Operations
   'hpc-monitor':         { label:'HPC Monitoring',            icon:'📡', ver:'v1.0', status:'ready',  cat:'ops',      url:BASE+'/tools/hpc-monitoring/', desc:'Live cluster dashboard — GPU utilisation, job queue, alerts, power & cooling' },
-  'compass':             { label:'COMPASS',                   icon:'🧭', ver:'v2.0', status:'ready',  cat:'ops',      url:BASE+'/tools/compass/', desc:'BOM Validator — 40 use cases, GPU sizing, power model, cost & margin, validation' },
+  'bom-validator':       { label:'GeoAI BOM Validator',       icon:'📐', ver:'v1.0', status:'ready',  cat:'presales', url:BASE+'/tools/compass/', desc:'40 use cases, GPU sizing, power model, cost & margin, BOM vs reference validation' },
+  'compass':             { label:'COMPASS',                   icon:'🧭', ver:null,   status:'soon',   cat:'ops',      url:null, desc:'Token governance, workload scheduling, latency OLA, sovereign metrics — coming soon' },
 }
 
 const CATEGORIES = [
   { id:'sales',    label:'01 · Sales Enablement',       icon:'📈', tools:['portfolio-portal','ai-sovereignty'] },
   { id:'opp',      label:'02 · Opportunity Management', icon:'🎯', tools:['rac-tool','deal-analysis'] },
-  { id:'presales', label:'03 · Presales',               icon:'🔭', tools:['domain-config','inferencing','vision-doc','benchmark'] },
+  { id:'presales', label:'03 · Presales',               icon:'🔭', tools:['domain-config','inferencing','vision-doc','benchmark','bom-validator'] },
   { id:'ops',      label:'04 · Business Operations',    icon:'⚙️', tools:['hpc-monitor','compass'] },
 ]
 
