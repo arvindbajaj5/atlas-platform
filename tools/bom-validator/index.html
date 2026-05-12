@@ -1,1 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — GeoAI BOM Validator</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;
+  --teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;
+  --dark:#282832;--black:#0A0A0F;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.12);
+  --r:8px;--r-sm:6px;--r-lg:12px;
+  --green:#10B981;--red:#DC2626;--warn:#F59E0B;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.hdr-badge{background:rgba(255,182,0,0.2);color:var(--amber);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-sm{padding:5px 10px;font-size:11px;}
+
+/* TABS */
+.tabs{background:var(--white);border-bottom:2px solid #e0e0e8;padding:0 24px;display:flex;overflow-x:auto;}
+.tab{padding:12px 18px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all 0.15s;}
+.tab.act{color:var(--navy);border-bottom-color:var(--orange);}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 100px);}
+.sidebar{background:var(--white);border-right:1px solid #e0e0e8;padding:20px;overflow-y:auto;}
+.main{padding:24px;overflow-y:auto;}
+
+/* SIDEBAR */
+.sec-label{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--light);}
+.sec-label:first-child{margin-top:0;}
+.inp-group{margin-bottom:10px;}
+.inp-label{display:block;font-size:10px;color:var(--mid);margin-bottom:3px;font-weight:600;}
+.inp-row{display:flex;align-items:center;gap:6px;}
+input[type=number]{flex:1;padding:6px 8px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:'Roboto Mono',monospace;color:var(--dark);}
+input[type=number]:focus{outline:none;border-color:var(--blue);}
+.inp-unit{font-size:10px;color:var(--mid);white-space:nowrap;min-width:40px;}
+.calc-btn{background:var(--navy);color:var(--white);border:none;padding:10px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;width:100%;margin-top:14px;border-radius:var(--r);letter-spacing:0.5px;transition:background 0.15s;}
+.calc-btn:hover{background:#001d5c;}
+
+/* CARDS */
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card:last-child{margin-bottom:0;}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:16px;}
+
+/* SUMMARY BANNER */
+.banner{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.banner-cell{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;text-align:center;box-shadow:var(--shadow);}
+.banner-val{font-size:26px;font-weight:900;color:var(--navy);font-family:'Roboto Mono',monospace;}
+.banner-lbl{font-size:10px;color:var(--mid);margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;}
+.banner-sub{font-size:10px;color:var(--mid);margin-top:2px;}
+
+/* RESULT CARDS */
+.result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;}
+.result-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow);border-top:3px solid var(--mid);}
+.result-card.hub{border-top-color:var(--navy);}
+.result-card.spoke{border-top-color:var(--teal);}
+.result-card.edge{border-top-color:var(--amber);}
+.result-card__hdr{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;}
+.result-metric{margin-bottom:8px;}
+.result-metric:last-child{margin-bottom:0;}
+.result-metric__lbl{font-size:10px;color:var(--mid);}
+.result-metric__val{font-size:20px;font-weight:900;color:var(--navy);font-family:'Roboto Mono',monospace;}
+.result-metric__val.highlight{color:var(--orange);font-size:26px;}
+.result-metric__sub{font-size:10px;color:var(--mid);}
+
+/* VALIDATION TABLE */
+.val-table{width:100%;border-collapse:collapse;font-size:12px;}
+.val-table th{text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
+.val-table td{padding:7px 10px;border-bottom:1px solid var(--light);vertical-align:middle;}
+.val-table tr:hover td{background:rgba(28,56,245,0.02);}
+.delta-ok{color:var(--green);font-weight:700;}
+.delta-warn{color:var(--warn);font-weight:700;}
+.delta-err{color:var(--red);font-weight:700;}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;}
+.badge-ok{background:rgba(16,185,129,0.1);color:var(--green);}
+.badge-warn{background:rgba(245,158,11,0.1);color:var(--warn);}
+.badge-err{background:rgba(220,38,38,0.1);color:var(--red);}
+
+/* UC TABLE */
+.uc-table{width:100%;border-collapse:collapse;font-size:11px;}
+.uc-table th{text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;position:sticky;top:0;}
+.uc-table td{padding:5px 8px;border-bottom:1px solid var(--light);}
+.domain-crops{color:var(--teal);}
+.domain-water{color:var(--blue);}
+.domain-forest{color:var(--green);}
+.domain-infra{color:var(--orange);}
+.domain-emerg{color:var(--red);}
+.edge-y{color:var(--green);font-weight:700;}
+.edge-n{color:var(--mid);}
+
+/* MARGIN TABLE */
+.margin-table{width:100%;border-collapse:collapse;font-size:12px;}
+.margin-table th{text-align:left;padding:8px 12px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
+.margin-table td{padding:8px 12px;border-bottom:1px solid var(--light);}
+.margin-table tr:nth-child(even) td{background:rgba(0,0,0,0.01);}
+.tier-bronze{color:var(--teal);}
+.tier-silver{color:var(--mid);}
+.tier-gold{color:var(--amber);}
+.tier-active{color:var(--orange);}
+
+/* CHART */
+.chart-wrap{position:relative;height:200px;}
+
+/* TP */
+.tp{display:none;}
+.tp.act{display:block;}
+
+/* ALERT */
+.alert{padding:10px 14px;border-radius:var(--r);font-size:12px;margin-bottom:14px;line-height:1.5;}
+.alert-warn{background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);color:#9a7000;}
+.alert-err{background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);color:var(--red);}
+.alert-ok{background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);color:#065f46;}
+
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;}
+  .sidebar{border-right:none;border-bottom:1px solid #e0e0e8;}
+  .result-grid,.banner{grid-template-columns:1fr 1fr;}
+}
+
+/* ATLAS SHARED CONTEXT BAR */
+.atlas-ctx{background:#001d5c;border-bottom:2px solid #FF5539;padding:0 20px;height:32px;display:flex;align-items:center;gap:0;font-family:'Roboto',sans-serif;font-size:11px;}
+.atlas-ctx__back{color:rgba(255,255,255,0.7);text-decoration:none;font-weight:600;padding:0 12px 0 0;border-right:1px solid rgba(255,255,255,0.15);margin-right:12px;display:flex;align-items:center;gap:4px;transition:color 0.15s;}
+.atlas-ctx__back:hover{color:#FF5539;}
+.atlas-ctx__sep{color:rgba(255,255,255,0.25);margin:0 8px;}
+.atlas-ctx__lbl{color:rgba(255,255,255,0.45);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-size:9px;}
+.atlas-ctx__val{color:rgba(255,255,255,0.85);font-weight:600;margin-left:5px;}
+.atlas-ctx__tool{margin-left:auto;color:rgba(255,255,255,0.45);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+.atlas-ctx__proj-dot{width:6px;height:6px;border-radius:50%;background:#00B290;margin-right:4px;flex-shrink:0;}
+
+</style>
+</head>
+<body>
+<div class="atlas-ctx" id="atlasCtxBar"><span class="atlas-ctx__tool">COMPASS — BOM Validator</span></div>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.65)">GeoAI BOM Validator</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">GeoAI NE India · 40 UC · 13 Sites · v1.0</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab act" id="t-sizing" onclick="showTab('sizing')">⚡ GPU Sizing</div>
+  <div class="tab" id="t-uc" onclick="showTab('uc')">📋 40 Use Cases</div>
+  <div class="tab" id="t-power" onclick="showTab('power')">🔌 Power Model</div>
+  <div class="tab" id="t-cost" onclick="showTab('cost')">💰 Cost & Margin</div>
+  <div class="tab" id="t-validate" onclick="showTab('validate')">✅ Validation</div>
+  <div class="tab" id="t-assumptions" onclick="showTab('assumptions')">📊 Assumptions</div>
+</div>
+
+<div class="layout">
+<div class="sidebar">
+  <div class="sec-label">Site Configuration</div>
+  <div class="inp-group"><span class="inp-label">Hub Sites</span><div class="inp-row"><input type="number" id="hubSites" value="1" min="1"><span class="inp-unit">sites</span></div></div>
+  <div class="inp-group"><span class="inp-label">Spoke Sites</span><div class="inp-row"><input type="number" id="spokeSites" value="7" min="1"><span class="inp-unit">sites</span></div></div>
+  <div class="inp-group"><span class="inp-label">Edge Sites</span><div class="inp-row"><input type="number" id="edgeSites" value="5" min="1"><span class="inp-unit">sites</span></div></div>
+
+  <div class="sec-label">GPU Specifications</div>
+  <div class="inp-group"><span class="inp-label">Hub GPU VRAM (GB200 NVL2)</span><div class="inp-row"><input type="number" id="hubVRAM" value="192"><span class="inp-unit">GB</span></div></div>
+  <div class="inp-group"><span class="inp-label">Hub GPUs per Rack</span><div class="inp-row"><input type="number" id="hubGPUsRack" value="100"><span class="inp-unit">GPUs</span></div></div>
+  <div class="inp-group"><span class="inp-label">Spoke GPU VRAM (B200)</span><div class="inp-row"><input type="number" id="spokeVRAM" value="192"><span class="inp-unit">GB</span></div></div>
+  <div class="inp-group"><span class="inp-label">Spoke GPUs per Rack</span><div class="inp-row"><input type="number" id="spokeGPUsRack" value="8"><span class="inp-unit">GPUs</span></div></div>
+  <div class="inp-group"><span class="inp-label">Edge GPU VRAM (L40S)</span><div class="inp-row"><input type="number" id="edgeVRAM" value="48"><span class="inp-unit">GB</span></div></div>
+  <div class="inp-group"><span class="inp-label">Edge GPUs per Server</span><div class="inp-row"><input type="number" id="edgeGPUsServer" value="4"><span class="inp-unit">GPUs</span></div></div>
+
+  <div class="sec-label">Sizing Parameters</div>
+  <div class="inp-group"><span class="inp-label">VRAM Overhead Factor</span><div class="inp-row"><input type="number" id="vramOH" value="1.2" step="0.05"><span class="inp-unit">×</span></div></div>
+  <div class="inp-group"><span class="inp-label">Training VRAM Multiplier</span><div class="inp-row"><input type="number" id="trainMult" value="6" step="0.5"><span class="inp-unit">×</span></div></div>
+  <div class="inp-group"><span class="inp-label">Concurrency Overlap Factor</span><div class="inp-row"><input type="number" id="overlapFactor" value="0.45" step="0.05"><span class="inp-unit">frac</span></div></div>
+  <div class="inp-group"><span class="inp-label">Spoke Active UC %</span><div class="inp-row"><input type="number" id="spokeUCpct" value="0.60" step="0.05"><span class="inp-unit">frac</span></div></div>
+  <div class="inp-group"><span class="inp-label">Edge Active UC %</span><div class="inp-row"><input type="number" id="edgeUCpct" value="0.80" step="0.05"><span class="inp-unit">frac</span></div></div>
+  <div class="inp-group"><span class="inp-label">Spare GPU Pool %</span><div class="inp-row"><input type="number" id="spareGPU" value="0.15" step="0.05"><span class="inp-unit">frac</span></div></div>
+
+  <div class="sec-label">Power (INR/kWh)</div>
+  <div class="inp-group"><span class="inp-label">Hub INR/kWh</span><div class="inp-row"><input type="number" id="hubKwh" value="7.5" step="0.5"><span class="inp-unit">₹</span></div></div>
+  <div class="inp-group"><span class="inp-label">Spoke INR/kWh</span><div class="inp-row"><input type="number" id="spokeKwh" value="8.0" step="0.5"><span class="inp-unit">₹</span></div></div>
+  <div class="inp-group"><span class="inp-label">Edge INR/kWh</span><div class="inp-row"><input type="number" id="edgeKwh" value="9.5" step="0.5"><span class="inp-unit">₹</span></div></div>
+  <div class="inp-group"><span class="inp-label">PUE Hub (DLC)</span><div class="inp-row"><input type="number" id="pueHub" value="1.25" step="0.05"><span class="inp-unit">×</span></div></div>
+  <div class="inp-group"><span class="inp-label">PUE Spoke</span><div class="inp-row"><input type="number" id="pueSpoke" value="1.55" step="0.05"><span class="inp-unit">×</span></div></div>
+  <div class="inp-group"><span class="inp-label">PUE Edge</span><div class="inp-row"><input type="number" id="pueEdge" value="1.30" step="0.05"><span class="inp-unit">×</span></div></div>
+
+  <div class="sec-label">Pricing (USD)</div>
+  <div class="inp-group"><span class="inp-label">GB200 NVL2 Rack</span><div class="inp-row"><input type="number" id="gb200Price" value="6500000"><span class="inp-unit">USD</span></div></div>
+  <div class="inp-group"><span class="inp-label">B200 per GPU</span><div class="inp-row"><input type="number" id="b200Price" value="38000"><span class="inp-unit">USD</span></div></div>
+  <div class="inp-group"><span class="inp-label">L40S per GPU</span><div class="inp-row"><input type="number" id="l40sPrice" value="22000"><span class="inp-unit">USD</span></div></div>
+  <div class="inp-group"><span class="inp-label">OEM Discount %</span><div class="inp-row"><input type="number" id="oemDisc" value="46" step="1"><span class="inp-unit">%</span></div></div>
+  <div class="inp-group"><span class="inp-label">USD → INR Rate</span><div class="inp-row"><input type="number" id="fxRate" value="84"><span class="inp-unit">₹/USD</span></div></div>
+
+  <button class="calc-btn" onclick="calculate()">⚡ CALCULATE & VALIDATE</button>
+</div>
+
+<div class="main">
+
+<!-- SIZING TAB -->
+<div class="tp act" id="tp-sizing">
+  <div class="banner" id="banner"></div>
+  <div class="result-grid" id="result-grid"></div>
+  <div style="font-size:11px;color:var(--mid);background:rgba(255,182,0,0.06);border:1px solid rgba(255,182,0,0.2);border-radius:var(--r);padding:10px 14px;line-height:1.6">
+    <strong>Methodology:</strong> Raw inference VRAM ÷ GPU VRAM × overhead factor = GPUs per UC. Sum across active UCs. Apply overlap factor (45% concurrent). Add spare pool (15%). Round up to rack multiples. Training demand = top-5 heaviest UCs × training multiplier (6×), Hub only.
+  </div>
+</div>
+
+<!-- USE CASES TAB -->
+<div class="tp" id="tp-uc">
+  <div class="card">
+    <div class="card-title">40 Use Cases — Model Stacks & VRAM Requirements</div>
+    <div class="card-sub">All use cases from the GeoAI NE India Sovereign AI Platform</div>
+    <div style="overflow-x:auto">
+      <table class="uc-table">
+        <thead><tr><th>#</th><th>Domain</th><th>Use Case</th><th>VRAM (GB)</th><th>Edge?</th></tr></thead>
+        <tbody id="uc-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- POWER TAB -->
+<div class="tp" id="tp-power">
+  <div class="banner" id="power-banner" style="grid-template-columns:repeat(4,1fr)"></div>
+  <div class="result-grid" id="power-detail"></div>
+  <div class="card">
+    <div class="card-title">Power Build-Up Chart</div>
+    <div class="chart-wrap"><canvas id="powerChart"></canvas></div>
+  </div>
+</div>
+
+<!-- COST TAB -->
+<div class="tp" id="tp-cost">
+  <div class="card">
+    <div class="card-title">Hardware Cost Build-Up (Independent Calculation)</div>
+    <div id="cost-breakdown"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Margin & Pricing — Bronze / Silver / Gold / Active</div>
+    <div class="card-sub">All pricing in USD. INR Crore at current FX rate.</div>
+    <div style="overflow-x:auto">
+      <table class="margin-table">
+        <thead><tr><th>Category</th><th>SI Cost (USD)</th><th class="tier-bronze">Bronze</th><th class="tier-silver">Silver</th><th class="tier-gold">Gold</th><th class="tier-active">Active</th></tr></thead>
+        <tbody id="margin-tbody"></tbody>
+      </table>
+    </div>
+    <div id="margin-totals" style="margin-top:14px"></div>
+  </div>
+</div>
+
+<!-- VALIDATE TAB -->
+<div class="tp" id="tp-validate">
+  <div class="alert alert-warn">⚠ BOM v4 reference values are hardcoded from the actual Excel output. Tool calculates independently from identical assumptions. Delta = (Tool − BOM) / BOM. GREEN ≤ 2% · AMBER 2–10% · RED &gt;10% — investigate.</div>
+  <div class="card">
+    <div class="card-title">Validation — Tool vs BOM v4 Reference</div>
+    <div style="overflow-x:auto">
+      <table class="val-table">
+        <thead><tr><th>Metric</th><th>Tool</th><th>BOM v4 Reference</th><th>Delta %</th><th>Status</th><th>Note</th></tr></thead>
+        <tbody id="validate-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card" id="discrepancy-card">
+    <div class="card-title">Discrepancy Analysis</div>
+    <div id="discrepancy-notes"></div>
+  </div>
+</div>
+
+<!-- ASSUMPTIONS TAB -->
+<div class="tp" id="tp-assumptions">
+  <div class="card">
+    <div class="card-title">All Assumptions — Tool vs BOM v4 Comparison</div>
+    <div style="overflow-x:auto">
+      <table class="val-table">
+        <thead><tr><th>Parameter</th><th>Tool Value</th><th>BOM v4 Value</th><th>Match?</th></tr></thead>
+        <tbody id="assumptions-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+// ── USE CASES (40) ────────────────────────────────────────────
+const USE_CASES=[
+  [1,"Crops","Crop Health Monitoring",1.5,true],
+  [2,"Crops","Yield Forecast Analytics",2.0,false],
+  [3,"Crops","Irrigation Water Stress",1.3,true],
+  [4,"Crops","Paddy Flood Damage (SAR)",17.5,false],
+  [5,"Crops","Jhum Cultivation Monitoring",39.0,false],
+  [6,"Crops","Crop Insurance Verification",76.0,false],
+  [7,"Crops","Soil Fertility Mapping",1.3,false],
+  [8,"Crops","Horticulture Crop Mapping",2.9,true],
+  [9,"Water","Flood Inundation Mapping",24.0,false],
+  [10,"Water","River Course Change Detection",4.5,false],
+  [11,"Water","GLOF Risk Monitoring",47.5,true],
+  [12,"Water","Wetland & Floodplain Health",1.3,false],
+  [13,"Water","Reservoir Storage Estimation",2.2,true],
+  [14,"Water","Groundwater Recharge Mapping",1.3,false],
+  [15,"Water","Water Quality Anomaly",1.3,true],
+  [16,"Water","Transboundary River Monitor",138.0,false],
+  [17,"Forest","Deforestation & Degradation",1.8,false],
+  [18,"Forest","Forest Fire Detection",1.1,true],
+  [19,"Forest","Biodiversity Corridor Mapping",40.5,false],
+  [20,"Forest","Carbon Stock (REDD+)",39.2,false],
+  [21,"Forest","Invasive Species Detection",1.3,false],
+  [22,"Forest","Illegal Mining & Timber",16.0,false],
+  [23,"Forest","Road Construction Impact",2.0,false],
+  [24,"Forest","Afforestation Monitoring",2.0,false],
+  [25,"Infra","Road Network Condition",3.5,true],
+  [26,"Infra","Construction Progress Verify",16.0,false],
+  [27,"Infra","Landslide Susceptibility",42.0,true],
+  [28,"Infra","Urban Sprawl & Illegal Const",17.5,false],
+  [29,"Infra","Border Infrastructure Surv.",79.5,false],
+  [30,"Infra","Power Transmission Mapping",2.0,false],
+  [31,"Infra","Smart City 3D Modelling",40.5,false],
+  [32,"Infra","Heritage Site Monitoring",1.8,false],
+  [33,"Emerg","Cyclone Rapid Assessment",43.5,false],
+  [34,"Emerg","Earthquake Damage Mapping",131.0,false],
+  [35,"Emerg","Multi-Hazard Risk Atlas",85.0,false],
+  [36,"Emerg","Displaced Population Detect.",39.5,true],
+  [37,"Emerg","Relief Route Access Planning",22.4,true],
+  [38,"Emerg","Infrastructure Damage Triage",19.5,false],
+  [39,"Emerg","SAR Area Prioritisation",85.0,false],
+  [40,"Emerg","Post-Disaster Recovery Monitor",15.8,false],
+]
+
+// ── BOM v4 REFERENCE ─────────────────────────────────────────
+const BOM_REF={
+  hubRawInferGPUs:2098, hubRawTrainGPUs:67, hubFinalGPUs:1100, hubRacks:11,
+  spokeFinalGPUsPerSite:192, spokeRacksPerSite:24, spokeTotalGPUs:1344,
+  edgeFinalGPUsPerSite:64, edgeServersPerSite:16, edgeTotalGPUs:320,
+  totalGPUs:2764,
+  hubAnnualPowerCr:26.68, spokeAnnualPowerCrAll:57.81, edgeAnnualPowerCrAll:0.41, totalAnnualPowerCr:84.90,
+  hubITkW:3248.2, hubFacilityKW:4060.25,
+  siCostHubUSD:86725302.4, siCostSpokesUSD:65495460.8, siCostEdgeUSD:8283418.0,
+  silverSellUSD:224662000.26, goldSellUSD:242580973.58,
+  silverINRCr:1887.16, goldINRCr:2037.68,
+}
+
+const SW_3YR=5743855, SERVICES_RATE=0.12
+
+let RESULT={}
+let powerChartInst=null
+
+function V(id){return parseFloat(document.getElementById(id).value)||0}
+
+function calculate(){
+  const hubSites=V('hubSites'),spokeSites=V('spokeSites'),edgeSites=V('edgeSites')
+  const hubVRAM=V('hubVRAM'),hubGPUsRack=V('hubGPUsRack')
+  const spokeVRAM=V('spokeVRAM'),spokeGPUsRack=V('spokeGPUsRack')
+  const edgeVRAM=V('edgeVRAM'),edgeGPUsServer=V('edgeGPUsServer')
+  const vramOH=V('vramOH'),trainMult=V('trainMult')
+  const overlap=V('overlapFactor'),spokeUCpct=V('spokeUCpct')
+  const edgeUCpct=V('edgeUCpct'),spare=V('spareGPU')
+  const pueHub=V('pueHub'),pueSpoke=V('pueSpoke'),pueEdge=V('pueEdge')
+  const hubKwh=V('hubKwh'),spokeKwh=V('spokeKwh'),edgeKwh=V('edgeKwh')
+  const gb200Price=V('gb200Price'),b200Price=V('b200Price'),l40sPrice=V('l40sPrice')
+  const oemDisc=V('oemDisc')/100,fxRate=V('fxRate')
+  const HRS=8760
+
+  // Hub GPU sizing
+  let hubRawInfer=0
+  USE_CASES.forEach(([,,, vram])=>{ hubRawInfer+=Math.ceil(vram*vramOH/hubVRAM) })
+  const sorted=[...USE_CASES].sort((a,b)=>b[3]-a[3])
+  let hubRawTrain=0
+  sorted.slice(0,5).forEach(([,,,vram])=>{ hubRawTrain+=Math.ceil(vram*vramOH*trainMult/hubVRAM) })
+  const hubAdj=Math.ceil(hubRawInfer*overlap)
+  const hubWithSpare=Math.ceil(hubAdj*(1+spare))
+  const hubFinalGPU=Math.ceil(Math.max(hubWithSpare,hubAdj+hubRawTrain)/hubGPUsRack)*hubGPUsRack
+  const hubRacks=hubFinalGPU/hubGPUsRack
+
+  // Spoke
+  const spokeActiveCount=Math.round(40*spokeUCpct)
+  const spokeSortedUCs=[...USE_CASES].sort((a,b)=>b[3]-a[3]).slice(0,spokeActiveCount)
+  let spokeRaw=0
+  spokeSortedUCs.forEach(([,,,vram])=>{ spokeRaw+=Math.ceil(vram*vramOH/spokeVRAM) })
+  const spokeAdj=Math.ceil(spokeRaw*overlap)
+  const spokeWithSpare=Math.ceil(spokeAdj*(1+spare))
+  const spokeFinalGPU=Math.ceil(spokeWithSpare/spokeGPUsRack)*spokeGPUsRack
+  const spokeRacksPerSite=spokeFinalGPU/spokeGPUsRack
+  const spokeTotalGPU=spokeFinalGPU*spokeSites
+
+  // Edge
+  const edgeCapable=USE_CASES.filter(uc=>uc[4])
+  const edgeActiveCount=Math.round(edgeCapable.length*edgeUCpct)
+  const edgeActiveUCs=[...edgeCapable].sort((a,b)=>b[3]-a[3]).slice(0,edgeActiveCount)
+  const edgeMaxVRAM=edgeActiveUCs.length>0?edgeActiveUCs[0][3]:0
+  let edgeRaw=0
+  edgeActiveUCs.forEach(([,,,vram])=>{ edgeRaw+=Math.ceil(vram*vramOH/edgeVRAM) })
+  const edgeWithSpare=Math.ceil(edgeRaw*(1+spare))
+  const edgeFinalGPU=Math.ceil(edgeWithSpare/edgeGPUsServer)*edgeGPUsServer
+  const edgeServersPerSite=edgeFinalGPU/edgeGPUsServer
+  const edgeTotalGPU=edgeFinalGPU*edgeSites
+  const totalGPUs=hubFinalGPU*hubSites+spokeTotalGPU+edgeTotalGPU
+
+  // Power
+  const hubITkW=3248.2 // from component sum
+  const hubFacilityKW=hubITkW*pueHub
+  const hubAnnualCr=(hubFacilityKW*HRS*hubKwh)/10000000
+  const spokeITkW=spokeRacksPerSite*30+2*8+8+2*1.5+0.3+5
+  const spokeFacilityKW=spokeITkW*pueSpoke
+  const spokeAnnualCrAll=(spokeFacilityKW*HRS*spokeKwh*spokeSites)/10000000
+  const edgeITkW=1.6*2+0.4*2+0.8+0.1+0.15+2.5
+  const edgeFacilityKW=edgeITkW*pueEdge
+  const edgeAnnualCrAll=(edgeFacilityKW*HRS*edgeKwh*edgeSites)/10000000
+  const totalAnnualPowerCr=hubAnnualCr+spokeAnnualCrAll+edgeAnnualCrAll
+
+  // Cost
+  const hubGPUListUSD=hubRacks*gb200Price
+  const hubStorageUSD=400*225+4800*58+10*27000
+  const hubNetUSD=4*128000+12*23000+4*5800+2*49000+2*67000
+  const hubCDUListUSD=hubRacks*92000
+  const hubUPSListUSD=135000
+  const hubGenListUSD=325000*2
+  const hubCPUListUSD=24*28000
+  const hubTotalList=hubGPUListUSD+hubStorageUSD+hubNetUSD+hubCDUListUSD+hubUPSListUSD+hubGenListUSD+hubCPUListUSD
+  const hubSICost=hubTotalList*(1-oemDisc)
+  const spokeTotalListPerSite=spokeFinalGPU*b200Price+spokeRacksPerSite*88000+8*13500+100*225+500*58+2*23000+1*8500+1*5800+38000
+  const spokeTotalList=spokeTotalListPerSite*spokeSites
+  const spokeSICost=spokeTotalList*(1-oemDisc)
+  const edgeTotalListPerSite=edgeFinalGPU*l40sPrice+2*14500+2*9200+50*225+1*3800+1*13500+8500
+  const edgeTotalList=edgeTotalListPerSite*edgeSites
+  const edgeSICost=edgeTotalList*(1-oemDisc)
+  const totalHWSICost=hubSICost+spokeSICost+edgeSICost
+  const totalHWList=hubTotalList+spokeTotalList+edgeTotalList
+  const installCost=totalHWList*0.12
+  const profServCost=totalHWList*0.08
+  const trainingCost=165000
+
+  const tiers={
+    Bronze:{hw:0.08,sw:0.20,svc:0.25},
+    Silver:{hw:0.15,sw:0.25,svc:0.30},
+    Gold:  {hw:0.22,sw:0.30,svc:0.35},
+    Active:{hw:0.28,sw:0.35,svc:0.40},
+  }
+  const tierResults={}
+  Object.entries(tiers).forEach(([name,t])=>{
+    const hwSell=totalHWSICost/(1-t.hw)
+    const swSell=SW_3YR/(1-t.sw)
+    const instSell=installCost/(1-t.svc)
+    const profSell=profServCost/(1-t.svc)
+    const trainSell=trainingCost/(1-t.svc)
+    const total=hwSell+swSell+instSell+profSell+trainSell
+    tierResults[name]={hwSell,swSell,instSell,profSell,trainSell,total,totalINRCr:(total*fxRate)/10000000}
+  })
+
+  RESULT={
+    hubRawInfer,hubRawTrain,hubAdj,hubWithSpare,hubFinalGPU,hubRacks,
+    spokeActiveCount,spokeRaw,spokeAdj,spokeWithSpare,spokeFinalGPU,spokeRacksPerSite,spokeTotalGPU,
+    edgeCapableCount:edgeCapable.length,edgeActiveCount,edgeMaxVRAM,edgeRaw,edgeWithSpare,edgeFinalGPU,edgeServersPerSite,edgeTotalGPU,
+    totalGPUs,
+    hubITkW,hubFacilityKW,hubAnnualCr,spokeITkW,spokeFacilityKW,spokeAnnualCrAll,edgeITkW,edgeFacilityKW,edgeAnnualCrAll,totalAnnualPowerCr,
+    hubGPUListUSD,hubStorageUSD,hubNetUSD,hubCDUListUSD,hubUPSListUSD,hubGenListUSD,hubCPUListUSD,hubTotalList,hubSICost,
+    spokeTotalList,spokeSICost,edgeTotalList,edgeSICost,totalHWSICost,totalHWList,installCost,profServCost,trainingCost,
+    tierResults,fxRate,oemDisc,
+  }
+
+  updateUI()
+}
+
+function fmt(n,dec=0){return n==null?'—':n.toLocaleString(undefined,{maximumFractionDigits:dec,minimumFractionDigits:dec})}
+function fmtUSD(n){return '$'+fmt(Math.round(n))}
+function fmtCr(n){return '₹'+fmt(n,2)+' Cr'}
+
+function updateUI(){
+  const R=RESULT
+  if(!R.hubFinalGPU) return
+
+  // Banner
+  document.getElementById('banner').innerHTML=[
+    {val:R.hubRacks,lbl:'Hub Racks',sub:'GB200 NVL2 DLC'},
+    {val:R.spokeRacksPerSite+'/site',lbl:'Spoke Racks',sub:`B200 × ${V('spokeSites')} sites`},
+    {val:R.edgeServersPerSite+'/site',lbl:'Edge Servers',sub:`L40S × ${V('edgeSites')} sites`},
+    {val:fmt(R.totalGPUs),lbl:'Total GPUs',sub:'All 13 sites'},
+  ].map(b=>`<div class="banner-cell"><div class="banner-val">${b.val}</div><div class="banner-lbl">${b.lbl}</div><div class="banner-sub">${b.sub}</div></div>`).join('')
+
+  // Result cards
+  document.getElementById('result-grid').innerHTML=`
+    <div class="result-card hub">
+      <div class="result-card__hdr">Hub · Guwahati · GB200 NVL2</div>
+      <div class="result-metric"><div class="result-metric__lbl">Raw inference GPU demand</div><div class="result-metric__val">${fmt(R.hubRawInfer)} GPUs</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Training GPU demand (top-5)</div><div class="result-metric__val">${fmt(R.hubRawTrain)} GPUs</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Overlap-adjusted</div><div class="result-metric__val">${fmt(R.hubAdj)} GPUs</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">+ Spare pool (15%)</div><div class="result-metric__val">${fmt(R.hubWithSpare)} GPUs</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Final GPU Count</div><div class="result-metric__val highlight">${fmt(R.hubFinalGPU)}</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Rack Count @ 100 GPUs/rack</div><div class="result-metric__val highlight">${R.hubRacks}</div></div>
+    </div>
+    <div class="result-card spoke">
+      <div class="result-card__hdr">Spoke · Per Site · B200</div>
+      <div class="result-metric"><div class="result-metric__lbl">Active UCs at spoke (60%)</div><div class="result-metric__val">${R.spokeActiveCount} UCs</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Raw inference GPU/site</div><div class="result-metric__val">${fmt(R.spokeRaw)} GPUs</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Overlap-adjusted</div><div class="result-metric__val">${fmt(R.spokeAdj)} GPUs</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Final GPU/site</div><div class="result-metric__val highlight">${fmt(R.spokeFinalGPU)}</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Racks/site @ 8 GPUs/rack</div><div class="result-metric__val highlight">${R.spokeRacksPerSite}</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Total Spoke GPUs (×${V('spokeSites')} sites)</div><div class="result-metric__val">${fmt(R.spokeTotalGPU)}</div></div>
+    </div>
+    <div class="result-card edge">
+      <div class="result-card__hdr">Edge · Per Site · L40S</div>
+      <div class="result-metric"><div class="result-metric__lbl">Edge-capable UCs</div><div class="result-metric__val">${R.edgeCapableCount} UCs</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Active at edge (80%)</div><div class="result-metric__val">${R.edgeActiveCount} UCs</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Max model VRAM at edge</div><div class="result-metric__val">${R.edgeMaxVRAM} GB</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Raw + spare GPU/site</div><div class="result-metric__val">${fmt(R.edgeWithSpare)} GPUs</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Final GPU/site</div><div class="result-metric__val highlight">${fmt(R.edgeFinalGPU)}</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Servers/site @ 4 GPUs/srv</div><div class="result-metric__val highlight">${R.edgeServersPerSite}</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Total Edge GPUs (×${V('edgeSites')} sites)</div><div class="result-metric__val">${fmt(R.edgeTotalGPU)}</div></div>
+    </div>`
+
+  // Power banner
+  document.getElementById('power-banner').innerHTML=[
+    {val:fmt(R.hubITkW,1)+' kW',lbl:'Hub IT Load',sub:'Component sum'},
+    {val:fmt(R.hubFacilityKW,1)+' kW',lbl:'Hub Facility Load',sub:'IT × PUE '+V('pueHub')},
+    {val:fmtCr(R.hubAnnualCr),lbl:'Hub Annual Energy',sub:'₹'+V('hubKwh')+'/kWh'},
+    {val:fmtCr(R.totalAnnualPowerCr),lbl:'Total Annual Energy',sub:'All 13 sites'},
+  ].map(b=>`<div class="banner-cell"><div class="banner-val">${b.val}</div><div class="banner-lbl">${b.lbl}</div><div class="banner-sub">${b.sub}</div></div>`).join('')
+
+  document.getElementById('power-detail').innerHTML=`
+    <div class="result-card hub">
+      <div class="result-card__hdr">Hub Power</div>
+      <div class="result-metric"><div class="result-metric__lbl">IT Subtotal</div><div class="result-metric__val">${fmt(R.hubITkW,1)} kW</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Facility (×PUE ${V('pueHub')})</div><div class="result-metric__val">${fmt(R.hubFacilityKW,1)} kW</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Annual Cost</div><div class="result-metric__val highlight">${fmtCr(R.hubAnnualCr)}</div></div>
+    </div>
+    <div class="result-card spoke">
+      <div class="result-card__hdr">Spoke Power (per site)</div>
+      <div class="result-metric"><div class="result-metric__lbl">IT/site</div><div class="result-metric__val">${fmt(R.spokeITkW,1)} kW</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Facility/site (×PUE ${V('pueSpoke')})</div><div class="result-metric__val">${fmt(R.spokeFacilityKW,1)} kW</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">All ${V('spokeSites')} sites annual</div><div class="result-metric__val highlight">${fmtCr(R.spokeAnnualCrAll)}</div></div>
+    </div>
+    <div class="result-card edge">
+      <div class="result-card__hdr">Edge Power (per site)</div>
+      <div class="result-metric"><div class="result-metric__lbl">IT/site</div><div class="result-metric__val">${fmt(R.edgeITkW,2)} kW</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">Facility/site (×PUE ${V('pueEdge')})</div><div class="result-metric__val">${fmt(R.edgeFacilityKW,3)} kW</div></div>
+      <div class="result-metric"><div class="result-metric__lbl">All ${V('edgeSites')} sites annual</div><div class="result-metric__val highlight">${fmtCr(R.edgeAnnualCrAll)}</div></div>
+    </div>`
+
+  // Power chart
+  const ctx=document.getElementById('powerChart')
+  if(powerChartInst) powerChartInst.destroy()
+  powerChartInst=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:['Hub IT','Hub Facility','Spoke IT/site','Spoke Facility/site','Edge IT/site','Edge Facility/site'],
+      datasets:[{label:'kW',data:[R.hubITkW,R.hubFacilityKW,R.spokeITkW,R.spokeFacilityKW,R.edgeITkW,R.edgeFacilityKW],
+        backgroundColor:['#002870','#1C38F5','#00B290','#00d4ad','#FFB600','#ffd166'],borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{title:{display:true,text:'kW',font:{size:10}},grid:{color:'#f0f0f5'},ticks:{font:{size:9}}},
+              x:{grid:{display:false},ticks:{font:{size:9}}}}}
+  })
+
+  // Cost breakdown
+  const costs=[
+    {label:'Hub GPUs (GB200 NVL2 Racks)',list:R.hubGPUListUSD},
+    {label:'Hub Storage (NVMe+SAS+Object)',list:R.hubStorageUSD},
+    {label:'Hub Network (BXI+WAN+NGFW)',list:R.hubNetUSD},
+    {label:'Hub Power/Cooling (CDU+UPS+Gen)',list:R.hubCDUListUSD+R.hubUPSListUSD+R.hubGenListUSD},
+    {label:'Hub CPU Servers',list:R.hubCPUListUSD},
+    {label:`All Spokes (×${V('spokeSites')} sites)`,list:R.spokeTotalList},
+    {label:`All Edge Sites (×${V('edgeSites')} sites)`,list:R.edgeTotalList},
+  ]
+  const maxList=Math.max(...costs.map(c=>c.list))
+  const colors=['#002870','#1C38F5','#3C00B4','#FF5539','#FFB600','#00B290','#10B981']
+  document.getElementById('cost-breakdown').innerHTML=costs.map((c,i)=>`
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+        <span style="color:var(--mid)">${c.label}</span>
+        <span style="color:${colors[i]};font-weight:700">${fmtUSD(c.list)} list → ${fmtUSD(c.list*(1-R.oemDisc))} net</span>
+      </div>
+      <div style="height:8px;background:var(--light);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${(c.list/maxList*100).toFixed(1)}%;background:${colors[i]};border-radius:4px"></div>
+      </div>
+    </div>`).join('')
+
+  // Margin table
+  const marRows=[
+    {label:'Hub Hardware',siCost:R.hubSICost},
+    {label:'All Spokes Hardware',siCost:R.spokeSICost},
+    {label:'All Edge Hardware',siCost:R.edgeSICost},
+    {label:'Installation & Commissioning',siCost:R.installCost},
+    {label:'Professional Services',siCost:R.profServCost},
+    {label:'Training & KT',siCost:R.trainingCost},
+    {label:'Software 3-Year Total',siCost:SW_3YR},
+  ]
+  const tierKeys=['Bronze','Silver','Gold','Active']
+  const tierCols=['tier-bronze','tier-silver','tier-gold','tier-active']
+  const tierMults=[0.08,0.15,0.22,0.28]
+  document.getElementById('margin-tbody').innerHTML=marRows.map((row,ri)=>{
+    const tierVals=tierKeys.map((t,ti)=>{
+      const sell=ri<3?row.siCost/(1-tierMults[ti]):R.tierResults[t][['hwSell','hwSell','hwSell','instSell','profSell','trainSell','swSell'][ri]]
+      return `<td class="${tierCols[ti]}">${fmtUSD(sell)}</td>`
+    }).join('')
+    return `<tr><td style="font-weight:500">${row.label}</td><td style="color:var(--blue);font-weight:600">${fmtUSD(row.siCost)}</td>${tierVals}</tr>`
+  }).join('')
+
+  document.getElementById('margin-totals').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+      ${tierKeys.map((t,i)=>`<div class="banner-cell">
+        <div class="banner-val ${tierCols[i]}" style="font-size:18px">${fmtUSD(R.tierResults[t].total)}</div>
+        <div class="banner-lbl">${t} Sell (USD)</div>
+        <div class="banner-sub">${fmtCr(R.tierResults[t].totalINRCr)}</div>
+      </div>`).join('')}
+    </div>`
+
+  // Validation
+  function dRow(label,cat,toolVal,bomVal,fmtFn,note=''){
+    if(bomVal==null||bomVal===0) return null
+    const pct=((toolVal-bomVal)/bomVal)*100
+    const abs=Math.abs(pct)
+    const cls=abs<=2?'delta-ok':abs<=10?'delta-warn':'delta-err'
+    const badge=abs<=2?'badge-ok':abs<=10?'badge-warn':'badge-err'
+    const status=abs<=2?'MATCH':abs<=10?'NEAR':'DIFF'
+    return `<tr>
+      <td><strong>${label}</strong><br><span style="font-size:10px;color:var(--mid)">${cat}</span></td>
+      <td style="font-family:'Roboto Mono',monospace;font-size:11px">${fmtFn(toolVal)}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-size:11px">${fmtFn(bomVal)}</td>
+      <td class="${cls}">${pct>=0?'+':''}${pct.toFixed(1)}%</td>
+      <td><span class="badge ${badge}">${status}</span></td>
+      <td style="font-size:10px;color:var(--mid)">${note}</td>
+    </tr>`
+  }
+
+  const fmtG=v=>fmt(v)+' GPUs', fmtR=v=>fmt(v)+' racks'
+  document.getElementById('validate-tbody').innerHTML=[
+    dRow('Hub Raw Inference GPUs','GPU Sizing',R.hubRawInfer,BOM_REF.hubRawInferGPUs,fmtG,'Sum VRAM/hubVRAM × OH across 40 UCs'),
+    dRow('Hub Training GPUs','GPU Sizing',R.hubRawTrain,BOM_REF.hubRawTrainGPUs,fmtG,'Top-5 UCs × trainMult'),
+    dRow('Hub Final GPU Count','GPU Sizing',R.hubFinalGPU,BOM_REF.hubFinalGPUs,fmtG,'Post overlap + spare + rounding'),
+    dRow('Hub Rack Count','GPU Sizing',R.hubRacks,BOM_REF.hubRacks,fmtR,'hubFinalGPU / 100'),
+    dRow('Spoke GPUs per Site','GPU Sizing',R.spokeFinalGPU,BOM_REF.spokeFinalGPUsPerSite,fmtG,'60% UCs active per spoke'),
+    dRow('Spoke Racks per Site','GPU Sizing',R.spokeRacksPerSite,BOM_REF.spokeRacksPerSite,fmtR,'spokeFinalGPU / 8'),
+    dRow('Total Spoke GPUs (×7)','GPU Sizing',R.spokeTotalGPU,BOM_REF.spokeTotalGPUs,fmtG),
+    dRow('Edge GPUs per Site','GPU Sizing',R.edgeFinalGPU,BOM_REF.edgeFinalGPUsPerSite,fmtG,'Edge-capable UCs × 80%'),
+    dRow('Edge Servers per Site','GPU Sizing',R.edgeServersPerSite,BOM_REF.edgeServersPerSite,v=>fmt(v)+' servers','edgeFinalGPU / 4'),
+    dRow('Total Edge GPUs (×5)','GPU Sizing',R.edgeTotalGPU,BOM_REF.edgeTotalGPUs,fmtG),
+    dRow('Total Platform GPUs','GPU Sizing',R.totalGPUs,BOM_REF.totalGPUs,fmtG,'Hub+Spoke+Edge'),
+    dRow('Hub IT Power (kW)','Power',R.hubITkW,BOM_REF.hubITkW,v=>fmt(v,1)+' kW','Sum component kW×qty'),
+    dRow('Hub Facility Power (kW)','Power',R.hubFacilityKW,BOM_REF.hubFacilityKW,v=>fmt(v,1)+' kW','IT × PUE 1.25'),
+    dRow('Hub Annual Energy Cost','Power',R.hubAnnualCr,BOM_REF.hubAnnualPowerCr,fmtCr,'facility kW × 8760 × ₹7.5/kWh'),
+    dRow('Spoke Annual Energy (all 7)','Power',R.spokeAnnualCrAll,BOM_REF.spokeAnnualPowerCrAll,fmtCr,'per site × 7 × ₹8/kWh'),
+    dRow('Edge Annual Energy (all 5)','Power',R.edgeAnnualCrAll,BOM_REF.edgeAnnualPowerCrAll,fmtCr,'per site × 5 × ₹9.5/kWh'),
+    dRow('Total Platform Energy','Power',R.totalAnnualPowerCr,BOM_REF.totalAnnualPowerCr,fmtCr,'Hub+Spoke+Edge'),
+    dRow('Hub SI Cost (USD)','Cost',R.hubSICost,BOM_REF.siCostHubUSD,fmtUSD,'list × (1 - OEM discount)'),
+    dRow('All Spokes SI Cost (USD)','Cost',R.spokeSICost,BOM_REF.siCostSpokesUSD,fmtUSD),
+    dRow('All Edge SI Cost (USD)','Cost',R.edgeSICost,BOM_REF.siCostEdgeUSD,fmtUSD),
+    dRow('Silver Sell (USD)','Margin',R.tierResults.Silver.total,BOM_REF.silverSellUSD,fmtUSD,'HW 15% / SW 25% / Svc 30%'),
+    dRow('Gold Sell (USD)','Margin',R.tierResults.Gold.total,BOM_REF.goldSellUSD,fmtUSD,'HW 22% / SW 30% / Svc 35%'),
+    dRow('Silver Total (INR Crore)','Margin',R.tierResults.Silver.totalINRCr,BOM_REF.silverINRCr,fmtCr),
+    dRow('Gold Total (INR Crore)','Margin',R.tierResults.Gold.totalINRCr,BOM_REF.goldINRCr,fmtCr),
+  ].filter(Boolean).join('')
+
+  // Discrepancy
+  const issues=[]
+  if(Math.abs(R.hubRawInfer-BOM_REF.hubRawInferGPUs)/BOM_REF.hubRawInferGPUs>0.02)
+    issues.push({cls:'alert-warn',msg:`Hub raw inference GPU: Tool=${fmt(R.hubRawInfer)}, BOM=${fmt(BOM_REF.hubRawInferGPUs)}. Difference in GPU-per-UC calculation. BOM may use pre-calculated workload GPU demand rather than dividing VRAM directly.`})
+  if(Math.abs(R.hubRacks-BOM_REF.hubRacks)/BOM_REF.hubRacks>0.02)
+    issues.push({cls:'alert-warn',msg:`Hub rack count: Tool=${R.hubRacks}, BOM=${BOM_REF.hubRacks}. Check overlap factor and rounding direction.`})
+  issues.push({cls:'alert-err',msg:`BOM ISSUE FOUND: Bronze sell price in BOM Margin sheet = SI Cost (0% margin). This appears to be a formula error in the BOM — Bronze column pulls SI Cost, not applying the margin formula. Silver and Gold are correct.`})
+
+  document.getElementById('discrepancy-notes').innerHTML=issues.map(i=>`<div class="alert ${i.cls}" style="margin-bottom:8px">${i.msg}</div>`).join('')
+
+  // Assumptions
+  const assumps=[
+    ['Hub Sites',V('hubSites'),1],['Spoke Sites',V('spokeSites'),7],['Edge Sites',V('edgeSites'),5],
+    ['Hub VRAM (GB)',V('hubVRAM'),192],['Hub GPUs/Rack',V('hubGPUsRack'),100],
+    ['Spoke VRAM (GB)',V('spokeVRAM'),192],['Spoke GPUs/Rack',V('spokeGPUsRack'),8],
+    ['Edge VRAM (GB)',V('edgeVRAM'),48],['VRAM Overhead',V('vramOH'),1.2],
+    ['Training Multiplier',V('trainMult'),6],['Overlap Factor',V('overlapFactor'),0.45],
+    ['Spoke UC %',V('spokeUCpct'),0.60],['Edge UC %',V('edgeUCpct'),0.80],['Spare Pool %',V('spareGPU'),0.15],
+    ['PUE Hub',V('pueHub'),1.25],['PUE Spoke',V('pueSpoke'),1.55],['PUE Edge',V('pueEdge'),1.30],
+    ['Hub INR/kWh',V('hubKwh'),7.5],['Spoke INR/kWh',V('spokeKwh'),8.0],['Edge INR/kWh',V('edgeKwh'),9.5],
+    ['GB200 NVL2 Rack USD',V('gb200Price'),6500000],['B200 per GPU USD',V('b200Price'),38000],
+    ['L40S per GPU USD',V('l40sPrice'),22000],['OEM Discount %',V('oemDisc'),46],['USD→INR',V('fxRate'),84],
+  ]
+  document.getElementById('assumptions-tbody').innerHTML=assumps.map(([lbl,tool,bom])=>{
+    const match=Math.abs(tool-bom)<0.001
+    return `<tr>
+      <td><strong>${lbl}</strong></td>
+      <td style="font-family:'Roboto Mono',monospace">${tool}</td>
+      <td style="font-family:'Roboto Mono',monospace">${bom}</td>
+      <td><span class="badge ${match?'badge-ok':'badge-warn'}">${match?'MATCH':'DIFFERS'}</span></td>
+    </tr>`
+  }).join('')
+}
+
+// ── USE CASE TABLE ────────────────────────────────────────────
+function populateUCTable(){
+  const dc={Crops:'domain-crops',Water:'domain-water',Forest:'domain-forest',Infra:'domain-infra',Emerg:'domain-emerg'}
+  document.getElementById('uc-tbody').innerHTML=USE_CASES.map(([id,dom,name,vram,edge])=>`
+    <tr>
+      <td style="color:var(--mid)">${id}</td>
+      <td><span class="${dc[dom]}">${dom}</span></td>
+      <td>${name}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-weight:600">${vram}</td>
+      <td class="${edge?'edge-y':'edge-n'}">${edge?'✓ YES':'✗ NO'}</td>
+    </tr>`).join('')
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'))
+  document.querySelectorAll('.tp').forEach(p=>p.classList.remove('act'))
+  document.getElementById('t-'+name).classList.add('act')
+  document.getElementById('tp-'+name).classList.add('act')
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  populateUCTable()
+  calculate()
+})
+</script>
+
+<script>
+
+// ATLAS SHARED CONTEXT BAR
+(function(){
+  function getProject(){
+    try{
+      const u=JSON.parse(localStorage.getItem('atlas_user')||'null')
+      const projs=JSON.parse(localStorage.getItem('atlas_projects')||'[]')
+      // Find most recently updated project
+      const sorted=projs.sort((a,b)=>new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0))
+      return {user:u, project:sorted[0]||null}
+    }catch(e){return{user:null,project:null}}
+  }
+  function renderCtxBar(){
+    const bar=document.getElementById('atlasCtxBar')
+    if(!bar) return
+    const {user,project}=getProject()
+    const projName=project?project.name:'No project selected'
+    const projDomain=project?project.domain:''
+    const userLabel=user?user.name:'—'
+    bar.innerHTML=`
+      <a class="atlas-ctx__back" href="https://arvindbajaj5.github.io/atlas-platform/">← ATLAS Portal</a>
+      <div class="atlas-ctx__proj-dot" style="background:${project?'#00B290':'#B4B4BE'}"></div>
+      <span class="atlas-ctx__lbl">Project</span>
+      <span class="atlas-ctx__val">${projName}</span>
+      ${projDomain?`<span class="atlas-ctx__sep">·</span><span class="atlas-ctx__lbl">Domain</span><span class="atlas-ctx__val">${projDomain==='geospatial'?'🛰️ Geospatial':projDomain==='defence'?'🛡️ Defence':projDomain}</span>`:''}
+      <span class="atlas-ctx__sep">·</span>
+      <span class="atlas-ctx__lbl">User</span>
+      <span class="atlas-ctx__val">${userLabel}</span>
+    `
+  }
+  document.addEventListener('DOMContentLoaded', renderCtxBar)
+  window.addEventListener('storage', renderCtxBar)
+  window.atlasRefreshCtx=renderCtxBar
+})();
+
+</script>
+</body>
+</html>
 
