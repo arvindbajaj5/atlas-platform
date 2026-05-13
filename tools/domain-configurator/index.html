@@ -238,6 +238,45 @@ textarea{resize:vertical;min-height:70px;}
 .atlas-ctx__tool{margin-left:auto;color:rgba(255,255,255,0.45);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
 .atlas-ctx__proj-dot{width:6px;height:6px;border-radius:50%;background:#00B290;margin-right:4px;flex-shrink:0;}
 
+
+/* DOC GENERATION PANEL */
+.doc-panel{position:fixed;top:0;right:-580px;width:560px;height:100vh;background:var(--white);box-shadow:-4px 0 24px rgba(0,0,0,0.15);z-index:500;transition:right 0.3s ease;display:flex;flex-direction:column;}
+.doc-panel.open{right:0;}
+.doc-panel__hdr{background:var(--navy);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.doc-panel__title{font-size:14px;font-weight:700;color:var(--white);}
+.doc-panel__close{background:none;border:none;color:rgba(255,255,255,0.7);font-size:20px;cursor:pointer;padding:4px;}
+.doc-panel__close:hover{color:var(--white);}
+.doc-panel__body{flex:1;overflow-y:auto;padding:20px;}
+.doc-panel__footer{padding:16px 20px;border-top:1px solid var(--light);flex-shrink:0;display:flex;gap:10px;}
+.doc-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:499;display:none;}
+.doc-overlay.open{display:block;}
+
+/* DOCUMENT PREVIEW */
+.doc-preview{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);overflow:hidden;margin-top:16px;}
+.doc-hdr-band{background:var(--navy);padding:20px 28px;display:flex;align-items:flex-start;justify-content:space-between;}
+.doc-hdr-band__left{flex:1;}
+.doc-hdr-band__logo{max-height:36px;max-width:120px;object-fit:contain;border-radius:3px;}
+.doc-watermark{background:rgba(255,85,57,0.15);border:1px solid rgba(255,85,57,0.4);color:var(--orange);font-size:9px;font-weight:700;padding:2px 8px;border-radius:6px;display:inline-block;letter-spacing:1px;margin-bottom:8px;}
+.doc-main-title{font-size:18px;font-weight:900;color:var(--white);margin-bottom:3px;}
+.doc-main-sub{font-size:11px;color:rgba(255,255,255,0.6);}
+.doc-orange-line{height:4px;background:var(--orange);}
+.doc-body-area{padding:24px 28px;}
+.doc-section-title{font-size:10px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid var(--orange);}
+.doc-section-body{font-size:13px;line-height:1.8;color:var(--dark);margin-bottom:20px;}
+.doc-section-body p{margin-bottom:10px;}
+.doc-footer-band{background:var(--light);border-top:1px solid #e0e0e8;padding:10px 28px;display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--mid);}
+
+/* PROGRESS */
+.gen-progress-bar{height:4px;background:var(--light);border-radius:2px;overflow:hidden;margin:12px 0;}
+.gen-progress-fill{height:100%;background:linear-gradient(90deg,var(--navy),var(--blue));border-radius:2px;transition:width 0.4s;animation:shimmer 1.5s ease infinite;}
+@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}
+
+@media print {
+  .atlas-ctx,.hdr,.step-bar,.doc-panel,.doc-overlay,.doc-panel__footer { display:none!important; }
+  .doc-preview { box-shadow:none!important; border:none!important; }
+  #docPanel { position:static!important; width:100%!important; height:auto!important; box-shadow:none!important; }
+}
+
 </style>
 </head>
 <body>
@@ -546,6 +585,8 @@ textarea{resize:vertical;min-height:70px;}
     <div class="out-grid">
       <div class="out-card" onclick="exportJSON()"><div class="out-card__icon">📄</div><div class="out-card__lbl">Project Definition File</div><div class="out-card__desc">JSON for Inferencing Factory & Document Factory</div></div>
       <div class="out-card" onclick="exportTxt()"><div class="out-card__icon">📋</div><div class="out-card__lbl">Requirements Summary</div><div class="out-card__desc">Plain text for sharing and sign-off</div></div>
+      <div class="out-card" onclick="openDocPanel('requirements')"><div class="out-card__icon">📋</div><div class="out-card__lbl">Requirements Document</div><div class="out-card__desc">Claude API — full structured requirements doc</div></div>
+      <div class="out-card" onclick="openDocPanel('brief')"><div class="out-card__icon">📄</div><div class="out-card__lbl">Project Brief</div><div class="out-card__desc">Claude API — executive summary for sign-off</div></div>
     </div>
   </div>
   <div class="sec"><div class="sec-label">JSON Preview</div><div class="json-out" id="json-prev"></div></div>
@@ -1400,6 +1441,279 @@ function savePortal(){
   window.atlasRefreshCtx=renderCtxBar
 })();
 
+
+
+// ── DOCUMENT GENERATION ──────────────────────────────────────
+var currentDocType = null
+var generatedDocContent = null
+
+function openDocPanel(type) {
+  currentDocType = type
+  generatedDocContent = null
+  var titles = {
+    'requirements': '📋 Requirements Document',
+    'brief': '📄 Project Brief'
+  }
+  document.getElementById('docPanelTitle').textContent = titles[type] || '📄 Generate Document'
+  document.getElementById('docGenerateBtn').textContent = '✨ Generate'
+  document.getElementById('docGenerateBtn').disabled = false
+
+  var apiKey = localStorage.getItem('atlas_api_key') || ''
+  var apiStatus = apiKey && apiKey.startsWith('sk-ant-')
+    ? '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--teal)"><div style="width:7px;height:7px;border-radius:50%;background:var(--teal)"></div>API key set ✓</div>'
+    : '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--orange)"><div style="width:7px;height:7px;border-radius:50%;background:var(--orange)"></div>No API key — add in Portal Settings</div>'
+
+  var typeSpecific = type === 'requirements'
+    ? '<div class="fg"><label>Prepared For (Customer Contact)</label><input type="text" id="doc-recipient" placeholder="e.g. Secretary, Ministry of DONER" style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:inherit"></div><div class="fg"><label>Prepared By (Your Name / Team)</label><input type="text" id="doc-author" placeholder="e.g. Presales Team, XYZ Technologies" style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:inherit"></div><div class="fg"><label>Document Version</label><input type="text" id="doc-version" value="v1.0 DRAFT" style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:inherit"></div>'
+    : '<div class="fg"><label>Prepared For</label><input type="text" id="doc-recipient" placeholder="e.g. Ministry of DONER Leadership Team" style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:inherit"></div><div class="fg"><label>Prepared By</label><input type="text" id="doc-author" placeholder="e.g. AI Solutions Team" style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:inherit"></div>'
+
+  document.getElementById('docPanelBody').innerHTML = `
+    <div style="font-size:12px;color:var(--mid);line-height:1.6;margin-bottom:16px">
+      ${type === 'requirements'
+        ? 'Generates a structured Requirements Document capturing all use cases, personas, volumetrics, infrastructure constraints and domain-specific requirements from this project definition.'
+        : 'Generates a concise Project Brief summarising the project scope, objectives, key stakeholders, and proposed approach — suitable for executive review and sign-off.'}
+    </div>
+    <div style="background:var(--light);border-radius:var(--r);padding:12px;margin-bottom:16px;font-size:11px">
+      <strong style="color:var(--navy)">Project:</strong> ${P.name || '—'} &nbsp;·&nbsp;
+      <strong style="color:var(--navy)">Domain:</strong> ${P.domain || '—'} &nbsp;·&nbsp;
+      <strong style="color:var(--navy)">Tier:</strong> ${P.tier || '—'} &nbsp;·&nbsp;
+      <strong style="color:var(--navy)">UCs:</strong> ${(P.useCases||[]).length} &nbsp;·&nbsp;
+      <strong style="color:var(--navy)">Personas:</strong> ${(P.personas||[]).length}
+    </div>
+    <div style="margin-bottom:14px">${typeSpecific}</div>
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:10px;font-weight:700;color:var(--dark);margin-bottom:5px;text-transform:uppercase">Anthropic API Key</label>
+      <input type="password" id="doc-apikey" value="${apiKey}" placeholder="sk-ant-..." style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:inherit">
+      <div style="margin-top:4px">${apiStatus}</div>
+    </div>
+    <div id="doc-progress" style="display:none">
+      <div style="font-size:12px;font-weight:600;color:var(--navy)" id="doc-progress-msg">Connecting to Claude...</div>
+      <div class="gen-progress-bar"><div class="gen-progress-fill" id="doc-progress-fill" style="width:15%"></div></div>
+    </div>
+    <div id="doc-output"></div>
+  `
+
+  document.getElementById('docPanel').classList.add('open')
+  document.getElementById('docOverlay').classList.add('open')
+}
+
+function closeDocPanel() {
+  document.getElementById('docPanel').classList.remove('open')
+  document.getElementById('docOverlay').classList.remove('open')
+}
+
+async function generateDocument() {
+  var apiKey = document.getElementById('doc-apikey')?.value?.trim()
+  if (!apiKey || !apiKey.startsWith('sk-ant-')) {
+    alert('Kindly enter a valid Anthropic API key.')
+    return
+  }
+  localStorage.setItem('atlas_api_key', apiKey)
+
+  var recipient = document.getElementById('doc-recipient')?.value?.trim() || 'Project Stakeholders'
+  var author = document.getElementById('doc-author')?.value?.trim() || 'Presales Team'
+  var version = document.getElementById('doc-version')?.value?.trim() || 'v1.0 DRAFT'
+
+  var btn = document.getElementById('docGenerateBtn')
+  btn.disabled = true
+  btn.textContent = '⏳ Generating...'
+  document.getElementById('doc-progress').style.display = 'block'
+  document.getElementById('doc-output').innerHTML = ''
+
+  function setProgress(pct, msg) {
+    document.getElementById('doc-progress-fill').style.width = pct + '%'
+    document.getElementById('doc-progress-msg').textContent = msg
+  }
+
+  try {
+    setProgress(20, 'Building project context...')
+    var prompt = buildDocPrompt(currentDocType, recipient, author, version)
+
+    setProgress(40, 'Calling Claude API...')
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 3000,
+        system: 'You are a senior technical writer specialising in AI infrastructure and sovereign technology programmes. You write in formal Indian English — precise, structured, and professional. You write documents that are concise, clear, and free of jargon. Never use marketing superlatives. Always write in complete sentences and paragraphs. Output must follow the EXACT section structure requested.',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+
+    setProgress(75, 'Processing response...')
+    if (!response.ok) {
+      var err = await response.json()
+      throw new Error(err.error?.message || 'API request failed')
+    }
+
+    var data = await response.json()
+    var raw = data.content?.[0]?.text || ''
+
+    setProgress(90, 'Rendering document...')
+    generatedDocContent = { raw, recipient, author, version, type: currentDocType }
+    renderDocPreview(raw, recipient, author, version, currentDocType)
+
+    setProgress(100, 'Complete.')
+    btn.textContent = '↺ Regenerate'
+    btn.disabled = false
+
+  } catch(err) {
+    document.getElementById('doc-progress').style.display = 'none'
+    document.getElementById('doc-output').innerHTML = '<div style="color:var(--red);font-size:12px;padding:10px;background:rgba(220,38,38,0.06);border-radius:var(--r)">❌ ' + err.message + '</div>'
+    btn.disabled = false
+    btn.textContent = '✨ Retry'
+  }
+}
+
+function buildDocPrompt(type, recipient, author, version) {
+  var project = P
+  var ucNames = (project.useCases || []).map(function(id) {
+    var names = {
+      'geo-sat':'Satellite Image Analysis','geo-flood':'Flood Inundation Mapping',
+      'geo-chg':'Change Detection','geo-damage':'Disaster Damage Assessment',
+      'geo-forest':'Forest Cover Analysis','geo-crop':'Crop Health Monitoring',
+      'geo-urban':'Urban Sprawl Detection','geo-road':'Road Network Extraction',
+      'def-isr-auto':'ISR Automation','def-target':'Target Detection',
+      'def-border':'Border Surveillance','def-uav-analysis':'UAV Image Analysis',
+      'def-terrain':'Terrain Analysis','def-threat':'Threat Classification',
+      'def-log':'Logistics Optimisation','def-maint':'Predictive Maintenance',
+      'def-c4isr':'C4ISR Integration','def-anomaly':'Anomaly Detection',
+    }
+    return names[id] || id
+  }).join(', ')
+
+  var agg = project.volumetrics?.aggregated || {}
+  var infra = project.infrastructure || {}
+
+  var ctx = [
+    'Project Name: ' + (project.name || '—'),
+    'Customer: ' + (project.customer || '—'),
+    'Domain: ' + (project.domain || '—'),
+    'Architecture Tier: ' + (project.tier || '—'),
+    'Opportunity Type: ' + (project.opportunityType || '—') + ' / ' + (project.domainComplexity || '—'),
+    'Selected Use Cases (' + (project.useCases||[]).length + '): ' + ucNames,
+    'Personas (' + (project.personas||[]).length + '): ' + (project.personas||[]).map(function(p){return p.name}).join(', '),
+    'Total Concurrent Users: ' + (agg.totalConcurrentUsers || '—'),
+    'Total Inference RPS: ' + (agg.totalInferenceRPS || '—'),
+    'Tightest Latency Requirement: ' + (agg.tightestLatencyMs ? agg.tightestLatencyMs + 'ms' : '—'),
+    'Infrastructure Topology: ' + (infra.topology || '—'),
+    'Data per Day: ' + (project.volumetrics?.dataGBPerDay || '—') + ' GB',
+    'Retention: ' + (project.volumetrics?.retention || '—'),
+    'Satellite Sources: ' + (project.domainSpecifics?.satelliteSources||[]).map(function(s){return s.name}).join(', '),
+    'GIS Platform: ' + (project.domainSpecifics?.gisPlatform || '—'),
+  ].join('\n')
+
+  if (type === 'requirements') {
+    return 'Write a formal Requirements Document for the following AI platform engagement. This document will be shared with the customer for review and sign-off.\n\nDOCUMENT METADATA:\nPrepared For: ' + recipient + '\nPrepared By: ' + author + '\nVersion: ' + version + '\nDate: ' + new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'}) + '\n\nPROJECT CONTEXT:\n' + ctx + '\n\nWrite the document with EXACTLY these sections in order:\n\n[SECTION: EXECUTIVE SUMMARY]\nA 2-paragraph summary of the project scope and objectives.\n\n[SECTION: PROJECT SCOPE]\n3-4 paragraphs covering what is in scope, what is explicitly out of scope, and the geographic/organisational boundaries.\n\n[SECTION: USE CASES AND FUNCTIONAL REQUIREMENTS]\nFor each use case listed, write one paragraph covering the functional requirement, expected input/output, and performance requirement. Group by domain category.\n\n[SECTION: NON-FUNCTIONAL REQUIREMENTS]\nCover: Performance (throughput, latency), Availability and SLA, Security and Data Classification, Compliance and Regulatory, Scalability, Disaster Recovery.\n\n[SECTION: INFRASTRUCTURE REQUIREMENTS]\nCover the site topology, hardware requirements at each tier (Hub/Spoke/Edge where applicable), cooling, power, and connectivity.\n\n[SECTION: DATA REQUIREMENTS]\nCover data sources, volumes, retention, classification, movement and sovereignty constraints.\n\n[SECTION: ASSUMPTIONS AND CONSTRAINTS]\n5-8 bullet points of key assumptions and constraints.\n\n[SECTION: ACCEPTANCE CRITERIA]\nHow the customer will confirm the requirements have been met. 4-6 measurable criteria.'
+  } else {
+    return 'Write a concise Project Brief for the following AI platform engagement. This is a 1-2 page executive summary document for senior leadership review.\n\nDOCUMENT METADATA:\nPrepared For: ' + recipient + '\nPrepared By: ' + author + '\nDate: ' + new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'}) + '\n\nPROJECT CONTEXT:\n' + ctx + '\n\nWrite the document with EXACTLY these sections in order:\n\n[SECTION: PROJECT OVERVIEW]\nTwo paragraphs: what the project is and why it matters now.\n\n[SECTION: OBJECTIVES]\n4-6 clear, measurable objectives.\n\n[SECTION: SCOPE SUMMARY]\nOne paragraph covering the key use cases, sites, and stakeholders.\n\n[SECTION: KEY REQUIREMENTS]\nTop 5-6 requirements in plain language — no jargon.\n\n[SECTION: PROPOSED APPROACH]\nOne paragraph on the recommended solution approach and timeline.\n\n[SECTION: SUCCESS CRITERIA]\n3-4 measurable success criteria for the project.'
+  }
+}
+
+function renderDocPreview(raw, recipient, author, version, type) {
+  var sections = {}
+  var sectionKeys = type === 'requirements'
+    ? ['EXECUTIVE SUMMARY','PROJECT SCOPE','USE CASES AND FUNCTIONAL REQUIREMENTS','NON-FUNCTIONAL REQUIREMENTS','INFRASTRUCTURE REQUIREMENTS','DATA REQUIREMENTS','ASSUMPTIONS AND CONSTRAINTS','ACCEPTANCE CRITERIA']
+    : ['PROJECT OVERVIEW','OBJECTIVES','SCOPE SUMMARY','KEY REQUIREMENTS','PROPOSED APPROACH','SUCCESS CRITERIA']
+
+  sectionKeys.forEach(function(key, i) {
+    var startTag = '[SECTION: ' + key + ']'
+    var start = raw.indexOf(startTag)
+    if (start === -1) { sections[key] = ''; return }
+    start += startTag.length
+    var end = raw.length
+    var nextKey = sectionKeys[i+1]
+    if (nextKey) {
+      var nextStart = raw.indexOf('[SECTION: ' + nextKey + ']')
+      if (nextStart !== -1) end = nextStart
+    }
+    sections[key] = raw.slice(start, end).trim()
+  })
+
+  // Logo from localStorage
+  var logo = localStorage.getItem('atlas_logo') || ''
+  var logoHTML = logo
+    ? '<img src="' + logo + '" class="doc-hdr-band__logo" alt="Company Logo">'
+    : '<div style="width:80px;height:32px;background:rgba(255,255,255,0.1);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,0.4)">YOUR LOGO</div>'
+
+  var docTitle = type === 'requirements' ? 'Requirements Document' : 'Project Brief'
+  var date = new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'})
+
+  var sectionsHTML = sectionKeys.map(function(key) {
+    var content = sections[key]
+    if (!content) return ''
+    var paras = content.split('\n').filter(function(p){return p.trim()}).map(function(p){return '<p>' + p.trim() + '</p>'}).join('')
+    return '<div style="margin-bottom:22px"><div class="doc-section-title">' + key + '</div><div class="doc-section-body">' + paras + '</div></div>'
+  }).join('')
+
+  document.getElementById('doc-progress').style.display = 'none'
+  document.getElementById('doc-output').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn btn-teal btn-sm" onclick="exportDocTxt()">⬇ Export TXT</button>
+      <button class="btn btn-outline btn-sm" onclick="copyDocText()">📋 Copy</button>
+      <button class="btn btn-outline btn-sm" onclick="printDoc()">🖨 Print / PDF</button>
+      <span style="margin-left:auto;font-size:10px;color:var(--mid);align-self:center">DRAFT — review before sharing</span>
+    </div>
+    <div class="doc-preview" id="docPreviewEl">
+      <div class="doc-hdr-band">
+        <div class="doc-hdr-band__left">
+          <div class="doc-watermark">DRAFT — NOT FOR DISTRIBUTION</div>
+          <div class="doc-main-title">${P.name || 'Project'}</div>
+          <div class="doc-main-sub">${docTitle} · ${version} · ${date}</div>
+          <div class="doc-main-sub" style="margin-top:3px">Prepared for: ${recipient} · By: ${author}</div>
+        </div>
+        ${logoHTML}
+      </div>
+      <div class="doc-orange-line"></div>
+      <div class="doc-body-area">${sectionsHTML}</div>
+      <div class="doc-footer-band">
+        <span>${author} · ${docTitle}</span>
+        <span style="font-size:10px;font-weight:700;color:var(--orange)">DRAFT</span>
+        <span>${date}</span>
+      </div>
+    </div>
+  `
+}
+
+function exportDocTxt() {
+  if (!generatedDocContent) return
+  var el = document.getElementById('docPreviewEl')
+  var text = el ? el.innerText : generatedDocContent.raw
+  var blob = new Blob([text], {type:'text/plain'})
+  var url = URL.createObjectURL(blob)
+  var a = document.createElement('a')
+  a.href = url
+  a.download = (P.name||'Project').replace(/\s+/g,'-') + '-' + (currentDocType === 'requirements' ? 'Requirements' : 'Brief') + '-' + new Date().toISOString().slice(0,10) + '.txt'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function copyDocText() {
+  var el = document.getElementById('docPreviewEl')
+  if (el) navigator.clipboard.writeText(el.innerText).then(function(){ alert('Document copied to clipboard.') })
+}
+
+function printDoc() {
+  window.print()
+}
+
 </script>
+
+<div class="doc-overlay" id="docOverlay" onclick="closeDocPanel()"></div>
+<div class="doc-panel" id="docPanel">
+  <div class="doc-panel__hdr">
+    <div class="doc-panel__title" id="docPanelTitle">📄 Generate Document</div>
+    <button class="doc-panel__close" onclick="closeDocPanel()">✕</button>
+  </div>
+  <div class="doc-panel__body" id="docPanelBody">
+    <!-- populated by JS -->
+  </div>
+  <div class="doc-panel__footer">
+    <button class="btn btn-outline" onclick="closeDocPanel()">Cancel</button>
+    <button class="btn btn-primary" id="docGenerateBtn" onclick="generateDocument()">✨ Generate</button>
+  </div>
+</div>
+
 </body>
 </html>
