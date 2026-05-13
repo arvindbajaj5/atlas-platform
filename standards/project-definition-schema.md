@@ -1,0 +1,233 @@
+# project-definition-schema.md
+# ATLAS Project Definition File Schema
+# Version: 1.0 | Last Updated: 2026-05-13
+
+---
+
+## Overview
+
+The Project Definition File (PDF) is the central data object in ATLAS. It is created by the Domain Configurator and consumed by downstream tools — Inferencing Factory, Deal Analysis, COMPASS, and Document Factory. It is the single source of truth for a customer engagement.
+
+Format: `.json` (machine-readable) + `.md` summary (human-readable, for Claude session activation)
+
+---
+
+## Schema — Full JSON Structure
+
+```json
+{
+  "meta": {
+    "schema_version": "1.0",
+    "created_at": "ISO8601 datetime",
+    "updated_at": "ISO8601 datetime",
+    "created_by": "user name or role",
+    "tool": "ATLAS Domain Configurator v2"
+  },
+
+  "project": {
+    "id": "unique string e.g. PROJ-2026-0001",
+    "name": "string — project/engagement name",
+    "customer": "string — customer / organisation name",
+    "customer_short": "string — abbreviation for use in filenames and slides",
+    "country": "string — ISO 3166-1 alpha-2 country code e.g. IN",
+    "sector": "enum: government | defence | psu | enterprise | academic",
+    "classification": "enum: unclassified | restricted | confidential | secret",
+    "stage": "enum: prospect | qualify | instantiate | size | propose | win | deliver | renew"
+  },
+
+  "domain": {
+    "primary": "enum: geospatial | defence | enterprise_ai | hpc | sovereign_platform | other",
+    "secondary": ["array of strings — secondary domain tags"],
+    "use_cases": [
+      {
+        "id": "string e.g. UC-001",
+        "name": "string",
+        "category": "string e.g. crop monitoring, surveillance, RAG",
+        "priority": "enum: high | medium | low",
+        "model_type": "enum: llm | vision | multimodal | classification | regression | satellite | custom",
+        "notes": "string"
+      }
+    ],
+    "total_use_cases": "integer"
+  },
+
+  "personas": [
+    {
+      "id": "string e.g. P-001",
+      "role": "string — job title",
+      "department": "string",
+      "primary_need": "string — one sentence",
+      "key_tools": ["array of strings"],
+      "data_access": "enum: full | restricted | read_only"
+    }
+  ],
+
+  "architecture": {
+    "tier": "enum: 1 | 2 | 3 | 4",
+    "topology": "enum: standalone | cluster | hub_spoke_edge | hybrid",
+    "deployment_type": "enum: on_prem | modular_dc | private_cloud | air_gapped",
+    "sites": [
+      {
+        "id": "string e.g. SITE-HUB",
+        "name": "string",
+        "role": "enum: hub | spoke | edge",
+        "location": "string — city or region",
+        "air_gapped": "boolean"
+      }
+    ],
+    "high_availability": "boolean",
+    "sovereign_requirements": "boolean",
+    "compass_required": "boolean",
+    "notes": "string"
+  },
+
+  "volumetrics": {
+    "concurrent_users": "integer",
+    "peak_requests_per_second": "number",
+    "average_tokens_per_request": "integer",
+    "data_volume_tb": "number — total data to be processed/stored",
+    "model_sizes": ["array of strings e.g. 7B, 13B, 70B"],
+    "inference_batch_size": "integer",
+    "training_required": "boolean",
+    "fine_tuning_required": "boolean",
+    "retraining_frequency": "enum: daily | weekly | monthly | quarterly | none",
+    "latency_sla_ms": "integer — target P95 latency in milliseconds",
+    "availability_sla_pct": "number — e.g. 99.9"
+  },
+
+  "commercial": {
+    "deal_id": "string e.g. DEAL-2026-0001",
+    "currency": "enum: USD | INR | EUR | GBP | AED | SGD",
+    "size": "enum: S | M | L | XL",
+    "estimated_value": "number — in currency units (not millions)",
+    "delivery_months": "integer",
+    "implementation_months": "integer",
+    "amc_years": "integer",
+    "channel": "enum: direct | si_partner | distributor",
+    "partner_name": "string or null",
+    "procurement_route": "enum: direct | gem | tender | dpsu | nomination | other",
+    "notes": "string"
+  },
+
+  "portfolio_items": [
+    {
+      "id": "string — portfolio item ID",
+      "name": "string — portfolio item name",
+      "lifecycle_phase": "enum: explore | pilot | train | run | govern_scale",
+      "quantity": "integer or null",
+      "notes": "string"
+    }
+  ],
+
+  "flags": {
+    "vision_doc_required": "boolean",
+    "compass_required": "boolean",
+    "air_gap_required": "boolean",
+    "classified_environment": "boolean",
+    "modular_dc_required": "boolean",
+    "geospatial_workloads": "boolean",
+    "defence_workloads": "boolean",
+    "ifrs15_poc_recognition": "boolean"
+  },
+
+  "documents": {
+    "requirements_doc": "string — Drive file ID or null",
+    "vision_doc": "string — Drive file ID or null",
+    "proposal": "string — Drive file ID or null",
+    "sow": "string — Drive file ID or null",
+    "tad": "string — Drive file ID or null",
+    "bom": "string — Drive file ID or null"
+  },
+
+  "notes": "string — free-form engagement notes for Claude context"
+}
+```
+
+---
+
+## Field Rules
+
+| Field | Required | Notes |
+|---|---|---|
+| `project.id` | Yes | Auto-generated by Domain Configurator; format PROJ-YYYY-NNNN |
+| `project.name` | Yes | Full engagement name |
+| `project.stage` | Yes | Must match RAC pipeline stage |
+| `domain.primary` | Yes | Single primary domain |
+| `domain.use_cases` | Yes | At least one use case required |
+| `architecture.tier` | Yes | Must be 1–4; derived from volumetrics + use cases |
+| `volumetrics` | Yes | All fields required; use 0 or null if unknown at time of creation |
+| `commercial.currency` | Yes | Defaults to USD |
+| `commercial.size` | Yes | Derived from estimated_value + currency thresholds in hardware-preferences.md |
+| `flags` | Yes | All boolean flags must be explicitly set |
+| `notes` | Recommended | Used by Claude for session context |
+
+---
+
+## Downstream Tool Consumption
+
+| Tool | Fields Consumed |
+|---|---|
+| AI Inferencing Factory | `domain.use_cases`, `volumetrics`, `architecture`, `commercial.currency` |
+| Deal Analysis Tool | `commercial`, `project`, `architecture.tier`, `flags` |
+| COMPASS | `volumetrics`, `architecture`, `flags.compass_required` |
+| AI Sovereignty Index | `project`, `domain.primary`, `flags.sovereign_requirements` |
+| Vision Document Factory | `project`, `domain`, `personas`, `architecture`, `flags` |
+| RAC Pipeline | `project.stage`, `commercial.size`, `portfolio_items`, `flags` |
+
+---
+
+## Markdown Summary Format
+
+When exporting for Claude session activation, the Domain Configurator generates a `.md` summary with this structure:
+
+```markdown
+# Project Definition: [project.name]
+**ID:** [project.id] | **Stage:** [project.stage] | **Date:** [updated_at]
+
+## Customer
+[project.customer] · [project.sector] · [project.country]
+
+## Domain & Use Cases
+Primary: [domain.primary]
+[N] use cases — [comma-separated UC names]
+
+## Architecture
+Tier [architecture.tier] · [architecture.topology] · [architecture.deployment_type]
+Sites: [list of site names and roles]
+Flags: [list of true flags]
+
+## Volumetrics
+[concurrent_users] users · [peak_rps] RPS · [model_sizes] models
+Latency SLA: [latency_sla_ms]ms · Availability: [availability_sla_pct]%
+
+## Commercial
+[commercial.size] deal · [currency] · Est. [estimated_value]
+[delivery_months]m delivery + [implementation_months]m impl + [amc_years]yr AMC
+Channel: [channel] · Procurement: [procurement_route]
+
+## Notes
+[notes]
+```
+
+---
+
+## File Naming Convention
+
+```
+ProjectDefinition-[CustomerShort]-[PROJ-ID]-[YYYY-MM-DD].json
+ProjectDefinition-[CustomerShort]-[PROJ-ID]-[YYYY-MM-DD].md
+```
+
+Example:
+```
+ProjectDefinition-MDoNER-PROJ-2026-0001-2026-05-13.json
+ProjectDefinition-MDoNER-PROJ-2026-0001-2026-05-13.md
+```
+
+---
+
+## Storage Location
+
+- **Google Drive:** `02 - Opportunity Management / [Customer Name] / Project Definition Files /`
+- **ATLAS Portal:** Accessible via Project Library (Supabase-backed)
+- **Local export:** Available from Domain Configurator as JSON download
