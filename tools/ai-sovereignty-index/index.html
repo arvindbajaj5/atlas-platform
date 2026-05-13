@@ -3,331 +3,777 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ATLAS — AI Sovereignty Index v3.0</title>
+<title>ATLAS — AI Sovereignty Index</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-:root{
-  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;
-  --teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
-  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;
-  --dark:#282832;--black:#0A0A0F;
-  --shadow:0 2px 8px rgba(0,0,0,0.08);
-  --shadow-md:0 4px 16px rgba(0,0,0,0.12);
-  --r:8px;--r-sm:6px;--r-lg:12px;
-  --a1:#002870;--a2:#1C38F5;--a3:#00B290;
-  --a4:#10B981;--a5:#FFB600;--a6:#3C00B4;
-}
+:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--black:#0A0A0F;--shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);--r:8px;--r-sm:6px;--r-lg:12px;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
-
-/* ATLAS CTX BAR */
-.atlas-ctx{background:#001d5c;border-bottom:2px solid #FF5539;padding:0 20px;height:32px;display:flex;align-items:center;gap:0;font-size:11px;}
-.atlas-ctx__back{color:rgba(255,255,255,0.7);text-decoration:none;font-weight:600;padding:0 12px 0 0;border-right:1px solid rgba(255,255,255,0.15);margin-right:12px;transition:color 0.15s;}
-.atlas-ctx__back:hover{color:#FF5539;}
-.atlas-ctx__lbl{color:rgba(255,255,255,0.45);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-size:9px;}
-.atlas-ctx__val{color:rgba(255,255,255,0.85);font-weight:600;margin-left:5px;}
-.atlas-ctx__sep{color:rgba(255,255,255,0.25);margin:0 8px;}
-.atlas-ctx__tool{margin-left:auto;color:rgba(255,255,255,0.45);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
-
-/* HEADER */
-.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);}
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:100;}
 .hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
 .hdr-brand span{color:var(--orange);}
-.hdr-right{display:flex;align-items:center;gap:10px;}
+.hdr-right{display:flex;align-items:center;gap:8px;}
 .hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
 .btn-primary{background:var(--orange);color:var(--white);}
 .btn-primary:hover{background:#e6421f;}
 .btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
 .btn-ghost:hover{background:rgba(255,255,255,0.25);}
-.btn-teal{background:var(--teal);color:var(--white);}
 .btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
 .btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-indigo{background:var(--indigo);color:var(--white);}
+.btn-indigo:hover{background:#2d0090;}
 .btn-sm{padding:5px 10px;font-size:11px;}
-
-/* LAYOUT */
-.page-layout{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 84px);}
-.left-panel{background:var(--white);border-right:1px solid #e0e0e8;padding:20px;overflow-y:auto;}
-.main-area{overflow-y:auto;}
-
-/* TABS */
-.tabs{background:var(--white);border-bottom:2px solid #e0e0e8;padding:0 24px;display:flex;overflow-x:auto;}
-.tab{padding:10px 16px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all 0.15s;}
-.tab.act{color:var(--navy);border-bottom-color:var(--orange);}
-.tab-content{padding:24px;display:none;}
-.tab-content.act{display:block;}
-
-/* PROPOSALS */
-.prop-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
-.prop-title{font-size:13px;font-weight:700;color:var(--navy);}
-.prop-item{padding:10px 12px;border-radius:var(--r);margin-bottom:6px;cursor:pointer;border:1px solid #e0e0e8;font-size:12px;transition:all 0.15s;position:relative;}
+.page{display:grid;grid-template-columns:240px 1fr 260px;min-height:calc(100vh - 52px);}
+.left{background:var(--white);border-right:1px solid #e0e0e8;padding:20px;overflow-y:auto;}
+.main{padding:24px;overflow-y:auto;}
+.right{background:var(--white);border-left:1px solid #e0e0e8;padding:20px;overflow-y:auto;}
+.prop-list-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.prop-list-title{font-size:13px;font-weight:700;color:var(--navy);}
+.prop-item{padding:10px 12px;border-radius:var(--r);margin-bottom:6px;cursor:pointer;transition:all 0.15s;border:1px solid #e0e0e8;font-size:12px;}
 .prop-item:hover{border-color:var(--navy);}
-.prop-item.sel{border-color:var(--orange);background:rgba(255,85,57,0.04);}
-.prop-item__name{font-weight:600;margin-bottom:2px;color:var(--dark);}
-.prop-item__score{font-size:10px;color:var(--mid);}
-.prop-color-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;flex-shrink:0;}
-.prop-delete{position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--mid);}
-.prop-delete:hover{color:var(--orange);}
-
-/* CARDS */
+.prop-item.sel{background:var(--navy);color:var(--white);border-color:var(--navy);}
+.prop-item__name{font-weight:600;margin-bottom:2px;}
+.prop-item__score{font-size:10px;opacity:0.7;}
 .card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
 .card:last-child{margin-bottom:0;}
 .card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
 .card-sub{font-size:11px;color:var(--mid);margin-bottom:16px;}
-
-/* AXIS SECTIONS */
-.axis-section{margin-bottom:20px;border:1px solid #e0e0e8;border-radius:var(--r-lg);overflow:hidden;}
-.axis-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;transition:background 0.15s;}
-.axis-header:hover{background:var(--light);}
-.axis-header-left{display:flex;align-items:center;gap:10px;}
-.axis-dot{width:12px;height:12px;border-radius:50%;}
-.axis-name{font-size:13px;font-weight:700;color:var(--dark);}
-.axis-sub{font-size:10px;color:var(--mid);margin-top:1px;}
-.axis-score{font-size:20px;font-weight:900;font-family:'Roboto Mono',monospace;color:var(--navy);}
-.axis-score-max{font-size:11px;color:var(--mid);}
-.axis-body{padding:0 16px 16px;display:none;}
-.axis-body.open{display:block;}
-.axis-bar{height:4px;border-radius:2px;margin-bottom:12px;overflow:hidden;background:var(--light);}
-.axis-bar-fill{height:100%;border-radius:2px;transition:width 0.4s;}
-
-/* SUB-FACTOR ROWS */
-.sf-row{display:grid;grid-template-columns:1fr auto;align-items:start;gap:12px;padding:10px 0;border-bottom:1px solid var(--light);}
-.sf-row:last-child{border-bottom:none;}
-.sf-label{font-size:12px;font-weight:600;color:var(--dark);}
-.sf-desc{font-size:10px;color:var(--mid);margin-top:2px;line-height:1.4;}
-.sf-rating{display:flex;gap:4px;align-items:center;}
-.sf-star{width:28px;height:28px;border-radius:50%;border:2px solid #d0d0d8;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--mid);transition:all 0.15s;flex-shrink:0;}
-.sf-star:hover{border-color:var(--orange);color:var(--orange);}
-.sf-star.active{color:var(--white);border-color:transparent;}
-.sf-weight{font-size:10px;color:var(--mid);margin-left:4px;white-space:nowrap;}
-
-/* CHARTS */
-.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
-.chart-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow);}
-.chart-card-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;}
+.sec-label{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--light);}
+.prop-name-input{font-size:18px;font-weight:700;color:var(--navy);border:none;border-bottom:2px solid #e0e0e8;padding:4px 0;width:100%;font-family:inherit;outline:none;margin-bottom:4px;background:transparent;}
+.prop-name-input:focus{border-bottom-color:var(--orange);}
+.year-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;}
+.year-card{border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;}
+.year-card.y1{border-top:4px solid var(--mid);}
+.year-card.y3{border-top:4px solid var(--blue);}
+.year-card.y6{border-top:4px solid var(--teal);}
+.year-card__title{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:2px;}
+.year-card__sub{font-size:10px;color:var(--mid);margin-bottom:12px;}
+.metric-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.metric-label{font-size:11px;color:var(--dark);}
+.metric-acronym{font-size:10px;font-weight:700;color:var(--mid);margin-left:2px;}
+.metric-input{width:58px;padding:4px 6px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:'Roboto Mono',monospace;text-align:center;}
+.metric-input:focus{outline:none;border-color:var(--blue);}
+.metric-bar{height:4px;border-radius:2px;background:var(--light);overflow:hidden;margin-top:3px;margin-bottom:8px;}
+.metric-fill{height:100%;border-radius:2px;transition:width 0.3s;}
+.matrix-wrap{position:relative;height:340px;}
+.quadrant-labels{position:absolute;inset:0;pointer-events:none;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}
+.ql-tl{position:absolute;top:10px;left:10px;color:var(--blue);opacity:0.5;}
+.ql-tr{position:absolute;top:10px;right:10px;color:var(--teal);opacity:0.5;}
+.ql-bl{position:absolute;bottom:10px;left:10px;color:var(--orange);opacity:0.5;}
+.ql-br{position:absolute;bottom:10px;right:10px;color:var(--amber);opacity:0.5;}
+.score-display{text-align:center;padding:16px 10px;}
+.score-val{font-size:52px;font-weight:900;color:var(--navy);line-height:1;}
+.score-label{font-size:10px;color:var(--mid);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+.score-tag{display:inline-block;font-size:11px;font-weight:700;padding:4px 12px;border-radius:12px;margin-top:8px;}
+.score-tag.champion{background:rgba(0,178,144,0.12);color:var(--teal);}
+.score-tag.niche{background:rgba(28,56,245,0.1);color:var(--blue);}
+.score-tag.dependency{background:rgba(255,85,57,0.12);color:var(--orange);}
+.score-tag.standard{background:rgba(255,182,0,0.12);color:#9a7000;}
+.sb-stat{background:var(--light);border-radius:var(--r);padding:10px;text-align:center;margin-bottom:8px;}
+.sb-val{font-size:22px;font-weight:900;color:var(--navy);}
+.sb-val.orange{color:var(--orange);}
+.sb-val.teal{color:var(--teal);}
+.sb-val.blue{color:var(--blue);}
+.sb-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+.sb-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--light);font-size:11px;}
+.sb-item:last-child{border-bottom:none;}
+.sb-item-lbl{color:var(--mid);}
+.sb-item-val{font-weight:600;color:var(--dark);}
 .chart-wrap{position:relative;height:260px;}
-.chart-wrap.tall{height:340px;}
-
-/* HEATMAP */
-.heatmap-table{width:100%;border-collapse:collapse;font-size:11px;}
-.heatmap-table th{text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
-.heatmap-table td{padding:5px 8px;border-bottom:1px solid var(--light);text-align:center;}
-.heatmap-table td:first-child{text-align:left;font-weight:600;color:var(--dark);}
-.hm-cell{display:inline-flex;align-items:center;justify-content:center;width:32px;height:22px;border-radius:4px;font-size:11px;font-weight:700;color:var(--white);}
-
-/* COMPARISON TABLE */
+.export-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);box-shadow:var(--shadow);}
 .comp-table{width:100%;border-collapse:collapse;font-size:12px;}
-.comp-table th{text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
-.comp-table td{padding:8px 10px;border-bottom:1px solid var(--light);}
-.comp-table tr.winner td{background:rgba(0,178,144,0.04);}
-.bar-inline{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:6px;}
-
-/* NATIONAL */
-.natl-stat{background:var(--light);border-radius:var(--r);padding:12px;text-align:center;margin-bottom:10px;}
-.natl-val{font-size:22px;font-weight:900;color:var(--navy);}
-.natl-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
-.threshold-line{border:none;border-top:2px dashed var(--orange);margin:8px 0;position:relative;}
-
-/* SIDEBAR SUMMARY */
-.sb-section{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--light);}
-.sb-section:last-child{border-bottom:none;}
-.sb-section-title{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
-.lasi-big{font-size:48px;font-weight:900;color:var(--navy);line-height:1;text-align:center;font-family:'Roboto Mono',monospace;}
-.lasi-label{font-size:10px;color:var(--mid);text-transform:uppercase;letter-spacing:1px;text-align:center;margin-top:4px;}
-.lasi-tag{text-align:center;margin-top:8px;}
-.lasi-tag span{font-size:11px;font-weight:700;padding:4px 12px;border-radius:12px;}
-.axis-mini{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;}
-.axis-mini-bar{flex:1;height:4px;background:var(--light);border-radius:2px;overflow:hidden;margin:0 8px;}
-.axis-mini-fill{height:100%;border-radius:2px;}
-.axis-mini-val{font-family:'Roboto Mono',monospace;font-size:11px;font-weight:700;color:var(--navy);width:28px;text-align:right;}
-
-/* EMPTY */
+.comp-table th{text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
+.comp-table td{padding:7px 10px;border-bottom:1px solid var(--light);}
+.comp-table tr.best td{background:rgba(0,178,144,0.04);}
+.alert-info{padding:10px 14px;border-radius:var(--r);font-size:11px;margin-bottom:14px;line-height:1.6;background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
 .empty{text-align:center;padding:60px 20px;color:var(--mid);}
-.empty__icon{font-size:48px;margin-bottom:12px;opacity:0.4;}
+.empty__icon{font-size:48px;margin-bottom:12px;opacity:0.5;}
+.empty__title{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:8px;}
 
-/* EXPORT BAR */
-.export-bar{display:flex;gap:8px;flex-wrap:wrap;padding:12px 24px;background:var(--white);border-bottom:1px solid #e0e0e8;}
+/* EVALUATION REPORT MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:400;display:none;align-items:center;justify-content:center;padding:24px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--white);border-radius:var(--r-lg);width:100%;max-width:760px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.2);}
+.modal-hdr{padding:20px 24px;border-bottom:1px solid var(--light);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.modal-hdr-left{display:flex;align-items:center;gap:12px;}
+.modal-title{font-size:16px;font-weight:700;color:var(--navy);}
+.modal-sub{font-size:11px;color:var(--mid);margin-top:2px;}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--mid);padding:4px;}
+.modal-close:hover{color:var(--dark);}
+.modal-body{padding:24px;overflow-y:auto;flex:1;}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--light);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;}
 
-@media(max-width:1000px){
-  .page-layout{grid-template-columns:1fr;}
-  .left-panel{border-right:none;border-bottom:1px solid #e0e0e8;}
-  .chart-grid{grid-template-columns:1fr;}
-}
+/* LOADING STATE */
+.eval-loading{text-align:center;padding:48px 20px;}
+.eval-loading-icon{font-size:40px;margin-bottom:16px;animation:spin 2s linear infinite;}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);};}
+.eval-loading-text{font-size:13px;color:var(--mid);line-height:1.6;}
+
+/* REPORT CONTENT */
+.report-content{font-size:13px;line-height:1.7;color:var(--dark);}
+.report-content h1{font-size:18px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.report-content h2{font-size:14px;font-weight:700;color:var(--navy);margin:20px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--light);}
+.report-content h3{font-size:12px;font-weight:700;color:var(--dark);margin:14px 0 6px;text-transform:uppercase;letter-spacing:0.4px;}
+.report-content p{margin-bottom:10px;}
+.report-content ul{margin:8px 0 10px 20px;}
+.report-content li{margin-bottom:4px;}
+.report-content strong{color:var(--navy);}
+.report-meta{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;padding:12px 16px;background:var(--light);border-radius:var(--r);}
+.report-meta-item{font-size:11px;}
+.report-meta-item span{font-weight:700;color:var(--navy);}
+.report-score-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0;}
+.report-score-box{text-align:center;padding:12px 8px;border-radius:var(--r);border:1px solid #e0e0e8;}
+.report-score-box .val{font-size:28px;font-weight:900;}
+.report-score-box .lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+.report-score-box.lasi .val{color:var(--navy);}
+.report-score-box.asi .val{color:var(--blue);}
+.report-score-box.api .val{color:var(--orange);}
+.report-score-box.pvs .val{color:var(--teal);}
+.draft-watermark{background:rgba(255,85,57,0.06);border:1px dashed rgba(255,85,57,0.3);border-radius:var(--r);padding:6px 14px;font-size:10px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:1px;display:inline-block;margin-bottom:16px;}
+.traj-table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px;}
+.traj-table th{text-align:left;padding:6px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:1px solid #e0e0e8;}
+.traj-table td{padding:6px 10px;border-bottom:1px solid var(--light);}
+.delta-pos{color:var(--teal);font-weight:700;}
+.delta-neg{color:var(--orange);font-weight:700;}
+
+@media(max-width:1100px){.page{grid-template-columns:220px 1fr;}.right{display:none;}}
+@media(max-width:768px){.page{grid-template-columns:1fr;}.left{border-right:none;border-bottom:1px solid #e0e0e8;}.year-grid{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
-
-<div class="atlas-ctx" id="atlasCtxBar">
-  <a class="atlas-ctx__back" href="https://arvindbajaj5.github.io/atlas-platform/">← ATLAS Portal</a>
-  <span class="atlas-ctx__tool">AI Sovereignty Index v3.0</span>
-</div>
-
 <div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S</div>
   <div style="font-size:13px;color:rgba(255,255,255,0.65)">AI Sovereignty Index</div>
   <div class="hdr-right">
-    <span class="hdr-badge">v3.0 · 6 Axes · Objective</span>
+    <span class="hdr-badge">LASI v2.1</span>
     <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
   </div>
 </div>
 
-<div class="export-bar">
-  <button class="btn btn-primary btn-sm" onclick="exportPPTX()">📊 Export PPTX</button>
-  <button class="btn btn-teal btn-sm" onclick="exportXLSX()">📗 Export Excel</button>
-  <button class="btn btn-outline btn-sm" onclick="saveSession()">💾 Save Session</button>
-  <label class="btn btn-outline btn-sm" style="cursor:pointer">⬆ Load Session<input type="file" accept=".json" style="display:none" onchange="loadSession(event)"></label>
-  <button class="btn btn-outline btn-sm" onclick="loadSamples()">📋 Load Sample Data</button>
-</div>
-
-<div class="page-layout">
-
-<!-- LEFT: PROPOSALS + SUMMARY -->
-<div class="left-panel">
-  <div class="prop-hdr">
-    <div class="prop-title">Proposals (max 5)</div>
-    <button class="btn btn-primary btn-sm" id="addBtn" onclick="addProposal()">+ Add</button>
+<div class="page">
+<div class="left">
+  <div class="prop-list-hdr">
+    <div class="prop-list-title">Proposals</div>
+    <button class="btn btn-primary btn-sm" onclick="addProposal()">+ New</button>
   </div>
   <div id="prop-list"></div>
-
-  <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--light)" id="sidebar-summary">
-    <div style="font-size:11px;color:var(--mid);text-align:center;padding:20px">Add a proposal to see scores</div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--light)">
+    <div class="sec-label">Session</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <label class="btn btn-outline btn-sm" style="cursor:pointer;justify-content:center">⬆ Load Session<input type="file" accept=".json" style="display:none" onchange="loadSession(event)"></label>
+      <button class="btn btn-outline btn-sm" onclick="saveSession()">💾 Save Session</button>
+    </div>
   </div>
 </div>
 
-<!-- MAIN: TABS + CONTENT -->
-<div class="main-area">
-  <div class="tabs">
-    <div class="tab act" id="t-score" onclick="showTab('score')">📊 Score Proposal</div>
-    <div class="tab" id="t-compare" onclick="showTab('compare')">⚖ Compare All</div>
-    <div class="tab" id="t-charts" onclick="showTab('charts')">📈 Charts</div>
-    <div class="tab" id="t-heatmap" onclick="showTab('heatmap')">🟥 Heatmap</div>
-    <div class="tab" id="t-national" onclick="showTab('national')">🏛️ National View</div>
-  </div>
-
-  <!-- SCORE TAB -->
-  <div class="tab-content act" id="tc-score">
-    <div id="score-empty" class="empty">
-      <div class="empty__icon">📋</div>
-      <div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:8px">No Proposal Selected</div>
-      <div style="font-size:12px;color:var(--mid)">Add a proposal from the left panel, or load sample data to begin.</div>
-    </div>
-    <div id="score-editor" style="display:none">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-        <input type="text" id="prop-name-input" style="font-size:18px;font-weight:700;color:var(--navy);border:none;border-bottom:2px solid #e0e0e8;padding:4px 0;flex:1;font-family:inherit;outline:none;background:transparent" placeholder="Proposal / Vendor Name..." oninput="updatePropName()">
-        <div style="font-size:11px;color:var(--mid)">Score each sub-factor 1–5</div>
-      </div>
-      <div id="axes-container"></div>
+<div class="main">
+  <div id="empty-state" class="empty">
+    <div class="empty__icon">🛡️</div>
+    <div class="empty__title">AI Sovereignty Index</div>
+    <div style="font-size:12px;color:var(--mid);line-height:1.7;max-width:340px;margin:0 auto 20px">Evaluate and compare AI proposals across three strategic dimensions — Sovereignty (ASI), Supremacy (API), and Platform Vitality (PVS) — over a 6-year lifecycle. The LASI composite score guides strategic investment decisions.</div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="addProposal()">+ New Proposal</button>
+      <button class="btn btn-outline" onclick="loadSample()">📋 Load Sample</button>
     </div>
   </div>
 
-  <!-- COMPARE TAB -->
-  <div class="tab-content" id="tc-compare">
-    <div id="compare-content">
-      <div class="empty"><div class="empty__icon">⚖</div><div style="font-size:13px;color:var(--mid)">Add at least 2 proposals to compare</div></div>
-    </div>
-  </div>
-
-  <!-- CHARTS TAB -->
-  <div class="tab-content" id="tc-charts">
-    <div class="chart-grid">
-      <div class="chart-card">
-        <div class="chart-card-title">2×2 Strategic Matrix<span style="font-size:10px;color:var(--mid)">Sovereignty vs Performance · bubble=Technical Fit</span></div>
-        <div class="chart-wrap tall"><canvas id="matrixChart"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-card-title">Radar — All Proposals<span style="font-size:10px;color:var(--mid)">6 Axes · Lifecycle weighted</span></div>
-        <div class="chart-wrap tall"><canvas id="radarChart"></canvas></div>
+  <div id="editor" style="display:none">
+    <div class="export-bar">
+      <button class="btn btn-primary" onclick="exportPPTX()">📊 Export PPTX</button>
+      <button class="btn btn-teal" onclick="exportXLSX()">📗 Export Excel</button>
+      <button class="btn btn-outline" onclick="saveSession()">💾 Save JSON</button>
+      <button class="btn btn-indigo" onclick="generateEvalReport()" id="eval-report-btn">📝 Evaluation Report</button>
+      <div style="margin-left:auto">
+        <button class="btn btn-sm" style="color:#DC2626;border:1px solid #DC2626;background:transparent" onclick="deleteProposal()">🗑 Delete</button>
       </div>
     </div>
-    <div class="chart-card">
-      <div class="chart-card-title">Lifecycle Cost Waterfall<span style="font-size:10px;color:var(--mid)">Commercial axis build-up per proposal</span></div>
-      <div class="chart-wrap"><canvas id="waterfallChart"></canvas></div>
-    </div>
-  </div>
 
-  <!-- HEATMAP TAB -->
-  <div class="tab-content" id="tc-heatmap">
     <div class="card">
-      <div class="card-title">Sub-Factor Heatmap — All Proposals</div>
-      <div class="card-sub">Every sub-factor scored 1–5 across all proposals. Green = strong, Red = gap. Identify weaknesses at a glance.</div>
-      <div style="overflow-x:auto"><table class="heatmap-table" id="heatmap-table"></table></div>
+      <input class="prop-name-input" id="prop-name" placeholder="Proposal / Customer Name…" oninput="updateData()">
+      <div style="font-size:11px;color:var(--mid);margin-top:2px">Enter the engagement or customer name for this proposal</div>
     </div>
-  </div>
 
-  <!-- NATIONAL TAB -->
-  <div class="tab-content" id="tc-national">
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px" id="natl-stats"></div>
     <div class="card">
-      <div class="card-title">National Project Rankings</div>
-      <div class="card-sub">All proposals ranked by LASI composite. Red threshold line = national minimum standard (configurable).</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:12px">
-        <label style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase">Min. Standard:</label>
-        <input type="number" id="threshold" value="3.0" min="1" max="5" step="0.1" style="width:60px;padding:4px 6px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:12px;font-family:'Roboto Mono',monospace" oninput="renderNational()">
-        <span style="color:var(--mid)">/ 5.0 — proposals below this line need review</span>
+      <div class="card-title">Strategic Lifecycle Scoring</div>
+      <div class="card-sub">Score each dimension 0–10 at Year 1, 3, and 6. Weighted composite LASI score is computed automatically.</div>
+      <div class="alert-info">
+        <strong>ASI</strong> — AI Sovereignty Index: degree of on-premises, nationally controlled, sovereign AI capability ·
+        <strong>API</strong> — AI Performance Index: performance leadership and competitive superiority ·
+        <strong>PVS</strong> — Platform Vitality Score: ecosystem health, partner depth, and long-term platform viability
       </div>
-      <div class="chart-wrap" style="height:280px"><canvas id="nationalChart"></canvas></div>
+
+      <div class="year-grid">
+        <div class="year-card y1">
+          <div class="year-card__title">Year 1 — Baseline</div>
+          <div class="year-card__sub">Current / immediate state</div>
+          <div class="metric-row"><div><span class="metric-label">Sovereignty</span><span class="metric-acronym">ASI</span></div><input class="metric-input" type="number" id="y1-asi" min="0" max="10" step="0.1" value="4" oninput="updateData()"></div>
+          <div class="metric-bar"><div class="metric-fill" id="bar-y1-asi" style="background:var(--blue);width:40%"></div></div>
+          <div class="metric-row"><div><span class="metric-label">Supremacy</span><span class="metric-acronym">API</span></div><input class="metric-input" type="number" id="y1-api" min="0" max="10" step="0.1" value="5" oninput="updateData()"></div>
+          <div class="metric-bar"><div class="metric-fill" id="bar-y1-api" style="background:var(--orange);width:50%"></div></div>
+          <div class="metric-row"><div><span class="metric-label">Vitality</span><span class="metric-acronym">PVS</span></div><input class="metric-input" type="number" id="y1-pvs" min="0" max="10" step="0.1" value="4" oninput="updateData()"></div>
+          <div class="metric-bar"><div class="metric-fill" id="bar-y1-pvs" style="background:var(--teal);width:40%"></div></div>
+        </div>
+        <div class="year-card y3">
+          <div class="year-card__title">Year 3 — Growth</div>
+          <div class="year-card__sub">Target trajectory</div>
+          <div class="metric-row"><div><span class="metric-label">Sovereignty</span><span class="metric-acronym">ASI</span></div><input class="metric-input" type="number" id="y3-asi" min="0" max="10" step="0.1" value="6" oninput="updateData()"></div>
+          <div class="metric-bar"><div class="metric-fill" id="bar-y3-asi" style="background:var(--blue);width:60%"></div></div>
+          <div class="metric-row"><div><span class="metric-label">Supremacy</span><span class="metric-acronym">API</span></div><input class="metric-input" type="number" id="y3-api" min="0" max="10" step="0.1" value="6" oninput="updateData()"></div>
+          <div class="metric-bar"><div class="metric-fill" id="bar-y3-api" style="background:var(--orange);width:60%"></div></div>
+          <div class="metric-row"><div><span class="metric-label">Vitality</span><span class="metric-acronym">PVS</span></div><input class="metric-input" type="number" id="y3-pvs" min="0" max="10" step="0.1" value="6" oninput="updateData()"></div>
+          <div class="metric-bar"><div class="metric-fill" id="bar-y3-pvs" style="background:var(--teal);width:60%"></div></div>
+        </div>
+        <div class="year-card y6">
+          <div class="year-card__title">Year 6 — Maturity</div>
+          <div class="year-card__sub">Strategic goal</div>
+          <div class="metric-row"><div><span class="metric-label">Sovereignty</span><span class="metric-acronym">ASI</span></div><input class="metric-input" type="number" id="y6-asi" min="0" max="10" step="0.1" value="8" oninput="updateData()"></div>
+          <div class="metric-bar"><div class="metric-fill" id="bar-y6-asi" style="background:var(--blue);width:80%"></div></div>
+          <div class="metric-row"><div><span class="metric-label">Supremacy</span><span class="metric-acronym">API</span></div><input class="metric-input" type="number" id="y6-api" min="0" max="10" step="0.1" value="8" oninput="updateData()"></div>
+          <div class="metric-bar"><div class="metric-fill" id="bar-y6-api" style="background:var(--orange);width:80%"></div></div>
+          <div class="metric-row"><div><span class="metric-label">Vitality</span><span class="metric-acronym">PVS</span></div><input class="metric-input" type="number" id="y6-pvs" min="0" max="10" step="0.1" value="8" oninput="updateData()"></div>
+          <div class="metric-bar"><div class="metric-fill" id="bar-y6-pvs" style="background:var(--teal);width:80%"></div></div>
+        </div>
+      </div>
     </div>
-    <div class="card">
-      <div class="card-title">Axis Benchmark — National Average vs Best in Class</div>
-      <div class="chart-wrap"><canvas id="benchmarkChart"></canvas></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card">
+        <div class="card-title">Strategic Growth Vector</div>
+        <div class="card-sub">ASI vs API · bubble size = PVS · arrows show trajectory</div>
+        <div class="matrix-wrap">
+          <canvas id="matrixChart"></canvas>
+          <div class="quadrant-labels">
+            <div class="ql-tl">Secure Niche</div>
+            <div class="ql-tr">Strategic Champion</div>
+            <div class="ql-bl">Tactical Dependency</div>
+            <div class="ql-br">Standard Market</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Dimension Radar</div>
+        <div class="card-sub">Year 1, 3, 6 across ASI · API · PVS</div>
+        <div class="chart-wrap"><canvas id="radarChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card" id="comp-card" style="display:none">
+      <div class="card-title">All Proposals — Comparison</div>
+      <div class="card-sub">Ranked by LASI composite score</div>
+      <table class="comp-table">
+        <thead><tr><th>Proposal</th><th>LASI</th><th>Avg ASI</th><th>Avg API</th><th>Avg PVS</th><th>Classification</th></tr></thead>
+        <tbody id="comp-tbody"></tbody>
+      </table>
     </div>
   </div>
+</div>
 
-</div><!-- /main-area -->
-</div><!-- /page-layout -->
+<div class="right">
+  <div class="score-display">
+    <div class="score-val" id="sb-lasi">—</div>
+    <div class="score-label">LASI Score / 10</div>
+    <div class="score-tag" id="sb-tag">—</div>
+  </div>
+  <div style="font-size:11px;font-weight:700;color:var(--navy);margin:4px 0 8px">Lifecycle Averages</div>
+  <div class="sb-stat"><div class="sb-val blue" id="sb-asi">—</div><div class="sb-lbl">Avg Sovereignty (ASI)</div></div>
+  <div class="sb-stat"><div class="sb-val orange" id="sb-api">—</div><div class="sb-lbl">Avg Supremacy (API)</div></div>
+  <div class="sb-stat"><div class="sb-val teal" id="sb-pvs">—</div><div class="sb-lbl">Avg Vitality (PVS)</div></div>
+  <div style="font-size:11px;font-weight:700;color:var(--navy);margin:14px 0 8px">Year-on-Year Delta</div>
+  <div id="sb-deltas"></div>
+  <div style="font-size:11px;font-weight:700;color:var(--navy);margin:14px 0 8px">Weighting Method</div>
+  <div class="sb-item"><span class="sb-item-lbl">Y1 weight</span><span class="sb-item-val">10%</span></div>
+  <div class="sb-item"><span class="sb-item-lbl">Y3 weight</span><span class="sb-item-val">30%</span></div>
+  <div class="sb-item"><span class="sb-item-lbl">Y6 weight</span><span class="sb-item-val">60%</span></div>
+  <div class="sb-item"><span class="sb-item-lbl">ASI weight</span><span class="sb-item-val">40%</span></div>
+  <div class="sb-item"><span class="sb-item-lbl">API weight</span><span class="sb-item-val">40%</span></div>
+  <div class="sb-item"><span class="sb-item-lbl">PVS weight</span><span class="sb-item-val">20%</span></div>
+  <div style="font-size:11px;font-weight:700;color:var(--navy);margin:14px 0 8px">Classifications</div>
+  <div style="font-size:10px;line-height:1.8;display:flex;flex-direction:column;gap:4px">
+    <div style="padding:5px 8px;border-radius:6px;background:rgba(0,178,144,0.1);color:var(--teal)"><strong>Strategic Champion</strong><br>High ASI + API · LASI ≥ 8.5</div>
+    <div style="padding:5px 8px;border-radius:6px;background:rgba(28,56,245,0.08);color:var(--blue)"><strong>Secure Niche</strong><br>High ASI, lower API · sovereign strength</div>
+    <div style="padding:5px 8px;border-radius:6px;background:rgba(255,85,57,0.08);color:var(--orange)"><strong>Tactical Dependency</strong><br>Low ASI, high API · performance without sovereignty</div>
+    <div style="padding:5px 8px;border-radius:6px;background:rgba(255,182,0,0.1);color:#9a7000"><strong>Standard Market</strong><br>Balanced · no strong differentiation</div>
+  </div>
+</div>
+</div>
+
+<!-- EVALUATION REPORT MODAL -->
+<div class="modal-overlay" id="evalModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-hdr-left">
+        <div>
+          <div class="modal-title">AI Sovereignty Evaluation Report</div>
+          <div class="modal-sub" id="modal-sub-title">—</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeEvalModal()">✕</button>
+    </div>
+    <div class="modal-body" id="eval-modal-body">
+      <div class="eval-loading">
+        <div class="eval-loading-icon">⚙️</div>
+        <div class="eval-loading-text">Generating evaluation report…<br>Analysing scores, trajectories, and strategic positioning.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeEvalModal()">Close</button>
+      <button class="btn btn-teal" onclick="copyReport()" id="copy-report-btn" style="display:none">📋 Copy Text</button>
+      <button class="btn btn-primary" onclick="downloadReport()" id="dl-report-btn" style="display:none">⬇ Download .txt</button>
+    </div>
+  </div>
+</div>
 
 <script>
-// ── AXIS / SUB-FACTOR FRAMEWORK ───────────────────────────────
-const AXES = [
-  {
-    id:'A1', name:'Sovereignty', icon:'🏛️', color:'var(--a1)', hex:'#002870', weight:0.25,
-    sub:'Data · Model · Infrastructure · Governance · Supply Chain',
-    factors:[
-      {id:'A1F1',name:'Data Sovereignty',desc:'Data residency within jurisdiction, no external egress, classification compliance',weight:1},
-      {id:'A1F2',name:'Model Sovereignty',desc:'Model weights owned/controlled by client, in-country fine-tuning capability',weight:1},
-      {id:'A1F3',name:'Infrastructure Sovereignty',desc:'Hardware domestically hosted, zero cloud dependency, air-gap capable',weight:1},
-      {id:'A1F4',name:'Governance & Legal',desc:'National policy compliance, legal jurisdiction, audit trail, accountability',weight:1},
-      {id:'A1F5',name:'Supply Chain Sovereignty',desc:'Indigenous hardware components, Make in India / Atmanirbhar compliance',weight:0.8},
+let PROPOSALS=[], CURRENT=null, matrixChart=null, radarChart=null
+let evalReportText = ''
+
+// ── SCORING ──────────────────────────────────────────────────────────
+function calcLASI(p){
+  const w=k=>p.y1[k]*0.1+p.y3[k]*0.3+p.y6[k]*0.6
+  const asi=w('asi'),api=w('api'),pvs=w('pvs')
+  return{asi,api,pvs,lasi:asi*0.4+api*0.4+pvs*0.2}
+}
+
+function classify(s){
+  if(s.lasi>=8.5)return{label:'Strategic Champion',cls:'champion'}
+  if(s.asi>=7&&s.api<5)return{label:'Secure Niche',cls:'niche'}
+  if(s.asi<4&&s.api>=7)return{label:'Tactical Dependency',cls:'dependency'}
+  return{label:'Standard Market',cls:'standard'}
+}
+
+// ── PROPOSALS ────────────────────────────────────────────────────────
+function addProposal(preset){
+  const p=preset||{id:'p_'+Date.now(),name:'New Proposal '+(PROPOSALS.length+1),y1:{asi:4,api:5,pvs:4},y3:{asi:6,api:6,pvs:6},y6:{asi:8,api:8,pvs:8}}
+  PROPOSALS.push(p);selectProposal(PROPOSALS.length-1);renderList()
+}
+
+function selectProposal(idx){
+  CURRENT=idx;const p=PROPOSALS[idx]
+  document.getElementById('empty-state').style.display='none'
+  document.getElementById('editor').style.display='block'
+  document.getElementById('prop-name').value=p.name
+  ;['y1','y3','y6'].forEach(yr=>['asi','api','pvs'].forEach(d=>{document.getElementById(`${yr}-${d}`).value=p[yr][d]}))
+  updateData();renderList()
+}
+
+function updateData(){
+  if(CURRENT===null)return
+  const p=PROPOSALS[CURRENT]
+  p.name=document.getElementById('prop-name').value||'Unnamed'
+  ;['y1','y3','y6'].forEach(yr=>['asi','api','pvs'].forEach(d=>{
+    const v=Math.min(10,Math.max(0,parseFloat(document.getElementById(`${yr}-${d}`).value)||0))
+    p[yr][d]=v
+    document.getElementById(`bar-${yr}-${d}`).style.width=(v/10*100)+'%'
+  }))
+  const s=calcLASI(p),cls=classify(s)
+  document.getElementById('sb-lasi').textContent=s.lasi.toFixed(1)
+  document.getElementById('sb-asi').textContent=s.asi.toFixed(1)
+  document.getElementById('sb-api').textContent=s.api.toFixed(1)
+  document.getElementById('sb-pvs').textContent=s.pvs.toFixed(1)
+  const tag=document.getElementById('sb-tag');tag.textContent=cls.label;tag.className='score-tag '+cls.cls
+  const dlt=(a,b,k)=>{const d=b[k]-a[k];return(d>=0?'+':'')+d.toFixed(1)}
+  document.getElementById('sb-deltas').innerHTML=`
+    <div class="sb-item"><span class="sb-item-lbl">ASI Y1→Y3</span><span class="sb-item-val" style="color:${p.y3.asi>=p.y1.asi?'var(--teal)':'var(--orange)'}">${dlt(p.y1,p.y3,'asi')}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">ASI Y3→Y6</span><span class="sb-item-val" style="color:${p.y6.asi>=p.y3.asi?'var(--teal)':'var(--orange)'}">${dlt(p.y3,p.y6,'asi')}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">API Y1→Y3</span><span class="sb-item-val" style="color:${p.y3.api>=p.y1.api?'var(--teal)':'var(--orange)'}">${dlt(p.y1,p.y3,'api')}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">API Y3→Y6</span><span class="sb-item-val" style="color:${p.y6.api>=p.y3.api?'var(--teal)':'var(--orange)'}">${dlt(p.y3,p.y6,'api')}</span></div>
+    <div class="sb-item"><span class="sb-item-lbl">PVS Y1→Y6</span><span class="sb-item-val" style="color:${p.y6.pvs>=p.y1.pvs?'var(--teal)':'var(--orange)'}">${dlt(p.y1,p.y6,'pvs')}</span></div>`
+  updateMatrix();updateRadar();updateComparison();renderList()
+}
+
+function deleteProposal(){
+  if(!confirm('Delete this proposal?'))return
+  PROPOSALS.splice(CURRENT,1);CURRENT=null
+  if(PROPOSALS.length>0)selectProposal(0)
+  else{document.getElementById('editor').style.display='none';document.getElementById('empty-state').style.display='block'}
+  renderList()
+}
+
+function renderList(){
+  const el=document.getElementById('prop-list')
+  if(!PROPOSALS.length){el.innerHTML='<div style="font-size:11px;color:var(--mid);text-align:center;padding:16px">No proposals yet.</div>';return}
+  el.innerHTML=PROPOSALS.map((p,i)=>{
+    const s=calcLASI(p)
+    return`<div class="prop-item ${CURRENT===i?'sel':''}" onclick="selectProposal(${i})"><div class="prop-item__name">${p.name}</div><div class="prop-item__score">LASI ${s.lasi.toFixed(1)} · ${classify(s).label}</div></div>`
+  }).join('')
+}
+
+// ── CHARTS ───────────────────────────────────────────────────────────
+function updateMatrix(){
+  const p=PROPOSALS[CURRENT]
+  const pts=[
+    {x:p.y1.asi,y:p.y1.api,r:Math.max(4,p.y1.pvs*2.2)},
+    {x:p.y3.asi,y:p.y3.api,r:Math.max(4,p.y3.pvs*2.2)},
+    {x:p.y6.asi,y:p.y6.api,r:Math.max(4,p.y6.pvs*2.2)}
+  ]
+  const cols=['rgba(255,85,57,0.45)','rgba(28,56,245,0.5)','rgba(0,178,144,0.7)']
+  const bords=['#FF5539','#1C38F5','#00B290']
+  const ctx=document.getElementById('matrixChart')
+  if(matrixChart)matrixChart.destroy()
+  const quadPlugin={
+    id:'ql',
+    afterDraw:function(ch){
+      var cv=ch.ctx,ca=ch.chartArea
+      var xm=ch.scales.x.getPixelForValue(5),ym=ch.scales.y.getPixelForValue(5)
+      cv.save()
+      cv.strokeStyle='rgba(0,40,112,0.12)';cv.lineWidth=1;cv.setLineDash([4,4])
+      cv.beginPath();cv.moveTo(xm,ca.top);cv.lineTo(xm,ca.bottom);cv.stroke()
+      cv.beginPath();cv.moveTo(ca.left,ym);cv.lineTo(ca.right,ym);cv.stroke()
+      cv.strokeStyle='rgba(0,40,112,0.3)';cv.lineWidth=1.5;cv.setLineDash([3,3])
+      for(var i=0;i<2;i++){
+        var s=ch.getDatasetMeta(i).data[0],e=ch.getDatasetMeta(i+1).data[0]
+        cv.beginPath();cv.moveTo(s.x,s.y);cv.lineTo(e.x,e.y);cv.stroke()
+        var ang=Math.atan2(e.y-s.y,e.x-s.x)
+        cv.setLineDash([])
+        cv.beginPath()
+        cv.moveTo(e.x,e.y);cv.lineTo(e.x-10*Math.cos(ang-Math.PI/6),e.y-10*Math.sin(ang-Math.PI/6))
+        cv.moveTo(e.x,e.y);cv.lineTo(e.x-10*Math.cos(ang+Math.PI/6),e.y-10*Math.sin(ang+Math.PI/6))
+        cv.stroke();cv.setLineDash([3,3])
+      }
+      cv.restore()
+    }
+  }
+  matrixChart=new Chart(ctx,{
+    type:'bubble',
+    data:{datasets:pts.map(function(pt,i){return{label:['Y1','Y3','Y6'][i],data:[pt],backgroundColor:cols[i],borderColor:bords[i],borderWidth:2}})},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:function(c){return c.dataset.label+': ASI '+c.parsed.x+', API '+c.parsed.y+', PVS '+(c.raw.r/2.2).toFixed(1)}}}},
+      scales:{x:{min:0,max:10,title:{display:true,text:'SOVEREIGNTY (ASI)',font:{size:10,weight:'700'}},grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:9}}},y:{min:0,max:10,title:{display:true,text:'SUPREMACY (API)',font:{size:10,weight:'700'}},grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:9}}}}
+    },
+    plugins:[quadPlugin]
+  })
+}
+
+function updateRadar(){
+  const p=PROPOSALS[CURRENT]
+  const ctx=document.getElementById('radarChart')
+  if(radarChart)radarChart.destroy()
+  radarChart=new Chart(ctx,{
+    type:'radar',
+    data:{labels:['Sovereignty\n(ASI)','Supremacy\n(API)','Platform\nVitality (PVS)'],
+      datasets:[
+        {label:'Year 1',data:[p.y1.asi,p.y1.api,p.y1.pvs],borderColor:'#FF5539',backgroundColor:'rgba(255,85,57,0.08)',borderWidth:2,pointRadius:4},
+        {label:'Year 3',data:[p.y3.asi,p.y3.api,p.y3.pvs],borderColor:'#1C38F5',backgroundColor:'rgba(28,56,245,0.08)',borderWidth:2,pointRadius:4},
+        {label:'Year 6',data:[p.y6.asi,p.y6.api,p.y6.pvs],borderColor:'#00B290',backgroundColor:'rgba(0,178,144,0.1)',borderWidth:2,pointRadius:4}
+      ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}}},
+      scales:{r:{min:0,max:10,ticks:{stepSize:2,font:{size:9}},pointLabels:{font:{size:10,weight:'600'}}}}}
+  })
+}
+
+function updateComparison(){
+  const card=document.getElementById('comp-card')
+  if(PROPOSALS.length<2){card.style.display='none';return}
+  card.style.display='block'
+  const ranked=[...PROPOSALS].map(p=>({...p,scores:calcLASI(p)})).sort((a,b)=>b.scores.lasi-a.scores.lasi)
+  const max=ranked[0].scores.lasi
+  document.getElementById('comp-tbody').innerHTML=ranked.map((p,i)=>{
+    const cls=classify(p.scores)
+    return`<tr class="${i===0?'best':''}">
+      <td><strong>${p.name}</strong></td>
+      <td><strong>${p.scores.lasi.toFixed(1)}</strong><span style="display:inline-block;height:6px;border-radius:3px;background:${i===0?'var(--teal)':'var(--mid)'};width:${Math.round(p.scores.lasi/max*60)}px;margin-left:8px;vertical-align:middle"></span></td>
+      <td>${p.scores.asi.toFixed(1)}</td><td>${p.scores.api.toFixed(1)}</td><td>${p.scores.pvs.toFixed(1)}</td>
+      <td><span class="score-tag ${cls.cls}" style="font-size:10px;padding:2px 8px">${cls.label}</span></td>
+    </tr>`
+  }).join('')
+}
+
+// ── SESSION ───────────────────────────────────────────────────────────
+function loadSample(){
+  PROPOSALS=[
+    {id:'s1',name:'MDoNER GeoAI Platform — Sovereign',y1:{asi:5,api:5,pvs:4},y3:{asi:7,api:7,pvs:6},y6:{asi:9,api:8,pvs:8}},
+    {id:'s2',name:'Border Surveillance — Air-Gapped',y1:{asi:6,api:4,pvs:3},y3:{asi:8,api:5,pvs:5},y6:{asi:9,api:7,pvs:7}},
+    {id:'s3',name:'Enterprise RAG — Cloud-Dependent',y1:{asi:2,api:8,pvs:7},y3:{asi:3,api:8,pvs:7},y6:{asi:4,api:9,pvs:8}},
+  ]
+  selectProposal(0);renderList()
+}
+
+function saveSession(){
+  const blob=new Blob([JSON.stringify({meta:{tool:'ATLAS AI Sovereignty Index v2.1',savedAt:new Date().toISOString()},proposals:PROPOSALS},null,2)],{type:'application/json'})
+  const url=URL.createObjectURL(blob),a=document.createElement('a')
+  a.href=url;a.download='AI-Sovereignty-Index-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url)
+}
+
+function loadSession(evt){
+  const file=evt.target.files[0];if(!file)return
+  const r=new FileReader()
+  r.onload=e=>{try{const d=JSON.parse(e.target.result);PROPOSALS=d.proposals||d;if(PROPOSALS.length)selectProposal(0);renderList()}catch{alert('Invalid session file.')}}
+  r.readAsText(file)
+}
+
+// ── EVALUATION REPORT ─────────────────────────────────────────────────
+async function generateEvalReport(){
+  if(CURRENT===null){alert('Select a proposal first.');return}
+  const p=PROPOSALS[CURRENT]
+  const s=calcLASI(p)
+  const cls=classify(s)
+
+  // Open modal in loading state
+  document.getElementById('evalModal').classList.add('open')
+  document.getElementById('modal-sub-title').textContent=p.name
+  document.getElementById('copy-report-btn').style.display='none'
+  document.getElementById('dl-report-btn').style.display='none'
+  document.getElementById('eval-modal-body').innerHTML=`
+    <div class="eval-loading">
+      <div class="eval-loading-icon">⚙️</div>
+      <div class="eval-loading-text">Generating evaluation report…<br>Analysing scores, trajectories, and strategic positioning.</div>
+    </div>`
+
+  // Build prompt with all scoring data
+  const dlt=(a,b,k)=>{const d=b[k]-a[k];return(d>=0?'+':'')+d.toFixed(1)}
+  const prompt=`You are a strategic AI advisor producing a formal evaluation report for an AI infrastructure proposal. Write a professional, structured evaluation report using the scoring data below. The audience is senior leadership / investment decision-makers.
+
+PROPOSAL: ${p.name}
+DATE: ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}
+
+LASI COMPOSITE SCORES (weighted: Y1=10%, Y3=30%, Y6=60%):
+- LASI (composite): ${s.lasi.toFixed(2)} / 10
+- ASI (Sovereignty, weight 40%): ${s.asi.toFixed(2)} / 10
+- API (Supremacy, weight 40%): ${s.api.toFixed(2)} / 10
+- PVS (Platform Vitality, weight 20%): ${s.pvs.toFixed(2)} / 10
+- Strategic Classification: ${cls.label}
+
+YEAR-BY-YEAR SCORES:
+Year 1 (Baseline): ASI=${p.y1.asi}, API=${p.y1.api}, PVS=${p.y1.pvs}
+Year 3 (Growth):   ASI=${p.y3.asi}, API=${p.y3.api}, PVS=${p.y3.pvs}
+Year 6 (Maturity): ASI=${p.y6.asi}, API=${p.y6.api}, PVS=${p.y6.pvs}
+
+TRAJECTORY DELTAS:
+ASI: Y1→Y3: ${dlt(p.y1,p.y3,'asi')}, Y3→Y6: ${dlt(p.y3,p.y6,'asi')}
+API: Y1→Y3: ${dlt(p.y1,p.y3,'api')}, Y3→Y6: ${dlt(p.y3,p.y6,'api')}
+PVS: Y1→Y6: ${dlt(p.y1,p.y6,'pvs')}
+
+SCORING FRAMEWORK:
+- ASI (AI Sovereignty Index): measures degree of on-premises, nationally controlled, sovereign AI capability
+- API (AI Performance Index): performance leadership and competitive superiority
+- PVS (Platform Vitality Score): ecosystem health, partner depth, long-term platform viability
+- Classifications: Strategic Champion (LASI≥8.5), Secure Niche (high ASI, lower API), Tactical Dependency (low ASI, high API), Standard Market (balanced)
+
+Write the report with these sections:
+1. Executive Summary (3-4 sentences covering LASI score, classification, and headline recommendation)
+2. Strategic Positioning Analysis (interpret the ASI/API/PVS balance — what it means strategically)
+3. Lifecycle Trajectory Assessment (analyse year-on-year deltas — is the trajectory credible and positive?)
+4. Dimension Deep-Dive (one paragraph each for Sovereignty, Supremacy, Vitality)
+5. Risk Factors (3-5 specific risks based on the scores — e.g. low ASI = sovereignty risk, low PVS = ecosystem risk)
+6. Strategic Recommendations (4-6 concrete recommendations for the customer or investment committee)
+7. Investment Verdict (clear go/conditional go/no-go with brief rationale)
+
+Keep the tone authoritative, specific to the scores, and free of generic filler. Total length: approximately 600-800 words.`
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        messages: [{role: 'user', content: prompt}]
+      })
+    })
+
+    const data = await response.json()
+    if(data.error){throw new Error(data.error.message)}
+    const text = data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n')
+    evalReportText = text
+    renderReport(p, s, cls, text)
+  } catch(err) {
+    document.getElementById('eval-modal-body').innerHTML=`
+      <div class="alert-info" style="background:rgba(220,38,38,0.06);border-color:rgba(220,38,38,0.2);color:#DC2626">
+        <strong>Error generating report:</strong> ${err.message}<br><br>
+        Please check your connection and try again.
+      </div>`
+  }
+}
+
+function renderReport(p, s, cls, text){
+  const dlt=(a,b,k)=>{const d=b[k]-a[k];return{val:(d>=0?'+':'')+d.toFixed(1),pos:d>=0}}
+
+  // Parse the markdown-style text into HTML
+  let html = text
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/\n\n/g,'</p><p>')
+
+  const d13a=dlt(p.y1,p.y3,'asi'), d36a=dlt(p.y3,p.y6,'asi')
+  const d13p=dlt(p.y1,p.y3,'api'), d36p=dlt(p.y3,p.y6,'api')
+  const d16v=dlt(p.y1,p.y6,'pvs')
+
+  document.getElementById('eval-modal-body').innerHTML=`
+    <div class="draft-watermark">DRAFT — Internal Use Only</div>
+
+    <div class="report-meta">
+      <div class="report-meta-item">Proposal: <span>${p.name}</span></div>
+      <div class="report-meta-item">Date: <span>${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}</span></div>
+      <div class="report-meta-item">Tool: <span>ATLAS AI Sovereignty Index v2.1</span></div>
+      <div class="report-meta-item">Classification: <span>${cls.label}</span></div>
+    </div>
+
+    <div class="report-score-grid">
+      <div class="report-score-box lasi"><div class="val">${s.lasi.toFixed(1)}</div><div class="lbl">LASI Composite</div></div>
+      <div class="report-score-box asi"><div class="val">${s.asi.toFixed(1)}</div><div class="lbl">Avg Sovereignty</div></div>
+      <div class="report-score-box api"><div class="val">${s.api.toFixed(1)}</div><div class="lbl">Avg Supremacy</div></div>
+      <div class="report-score-box pvs"><div class="val">${s.pvs.toFixed(1)}</div><div class="lbl">Avg Vitality</div></div>
+    </div>
+
+    <table class="traj-table" style="margin-bottom:20px">
+      <thead><tr><th>Dimension</th><th>Y1</th><th>Y3</th><th>Y6</th><th>Y1→Y3</th><th>Y3→Y6</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Sovereignty (ASI)</strong></td><td>${p.y1.asi}</td><td>${p.y3.asi}</td><td>${p.y6.asi}</td>
+          <td class="${d13a.pos?'delta-pos':'delta-neg'}">${d13a.val}</td>
+          <td class="${d36a.pos?'delta-pos':'delta-neg'}">${d36a.val}</td></tr>
+        <tr><td><strong>Supremacy (API)</strong></td><td>${p.y1.api}</td><td>${p.y3.api}</td><td>${p.y6.api}</td>
+          <td class="${d13p.pos?'delta-pos':'delta-neg'}">${d13p.val}</td>
+          <td class="${d36p.pos?'delta-pos':'delta-neg'}">${d36p.val}</td></tr>
+        <tr><td><strong>Vitality (PVS)</strong></td><td>${p.y1.pvs}</td><td>${p.y3.pvs}</td><td>${p.y6.pvs}</td>
+          <td class="${d16v.pos?'delta-pos':'delta-neg'}" colspan="2">${d16v.val} (Y1→Y6)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="report-content"><p>${html}</p></div>`
+
+  document.getElementById('copy-report-btn').style.display='inline-flex'
+  document.getElementById('dl-report-btn').style.display='inline-flex'
+}
+
+function closeEvalModal(){
+  document.getElementById('evalModal').classList.remove('open')
+}
+
+function copyReport(){
+  if(!evalReportText)return
+  navigator.clipboard.writeText(evalReportText).then(()=>{
+    const btn=document.getElementById('copy-report-btn')
+    btn.textContent='✓ Copied!'
+    setTimeout(()=>{btn.innerHTML='📋 Copy Text'},2000)
+  })
+}
+
+function downloadReport(){
+  if(!PROPOSALS[CURRENT]||!evalReportText)return
+  const p=PROPOSALS[CURRENT]
+  const s=calcLASI(p),cls=classify(s)
+  const header=`AI SOVEREIGNTY EVALUATION REPORT\n${'='.repeat(50)}\nProposal: ${p.name}\nDate: ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}\nLASI Score: ${s.lasi.toFixed(2)} / 10  |  Classification: ${cls.label}\nASI: ${s.asi.toFixed(2)}  |  API: ${s.api.toFixed(2)}  |  PVS: ${s.pvs.toFixed(2)}\n${'='.repeat(50)}\n\n[DRAFT — Internal Use Only]\n\n`
+  const blob=new Blob([header+evalReportText],{type:'text/plain'})
+  const url=URL.createObjectURL(blob),a=document.createElement('a')
+  a.href=url;a.download='AI-Sovereignty-Evaluation-'+p.name.replace(/[^a-z0-9]/gi,'_').slice(0,30)+'-'+new Date().toISOString().slice(0,10)+'.txt'
+  a.click();URL.revokeObjectURL(url)
+}
+
+// Close modal on overlay click
+document.getElementById('evalModal').addEventListener('click', function(e){
+  if(e.target===this) closeEvalModal()
+})
+
+// ── PPTX EXPORT ───────────────────────────────────────────────────────
+async function exportPPTX(){
+  if(!PROPOSALS.length){alert('Add proposals first.');return}
+  const pptx=new PptxGenJS()
+  pptx.layout='LAYOUT_WIDE'
+  const N='002870',O='FF5539',T='00B290',B='1C38F5',W='FFFFFF',L='F5F5F7',M='B4B4BE'
+
+  let sl=pptx.addSlide()
+  sl.background={color:N}
+  sl.addShape(pptx.ShapeType.rect,{x:0,y:4.8,w:13.33,h:0.08,fill:{color:O}})
+  sl.addText('ATLAS',{x:0.5,y:1.2,w:12,h:0.8,fontSize:48,fontFace:'Roboto',bold:true,color:W,charSpacing:8})
+  sl.addText('AI Sovereignty Index',{x:0.5,y:2.1,w:12,h:0.6,fontSize:22,fontFace:'Roboto',color:W,transparency:20})
+  sl.addText('Lifecycle AI Strategic Index (LASI) · '+new Date().toLocaleDateString('en-IN'),{x:0.5,y:2.8,w:12,h:0.4,fontSize:13,fontFace:'Roboto',color:W,transparency:40})
+
+  for(const p of PROPOSALS){
+    const s=calcLASI(p),cls=classify(s)
+    sl=pptx.addSlide()
+    sl.background={color:W}
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.33,h:1.1,fill:{color:N}})
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:1.1,w:13.33,h:0.06,fill:{color:O}})
+    sl.addText('AI Sovereignty Index',{x:0.4,y:0.1,w:8,h:0.4,fontSize:11,fontFace:'Roboto',color:W,transparency:30})
+    sl.addText(p.name,{x:0.4,y:0.45,w:9,h:0.55,fontSize:18,fontFace:'Roboto',bold:true,color:W})
+    sl.addShape(pptx.ShapeType.rect,{x:10.5,y:0.1,w:2.4,h:0.9,fill:{color:O},rectRadius:0.08})
+    sl.addText(s.lasi.toFixed(1),{x:10.5,y:0.1,w:2.4,h:0.6,fontSize:28,fontFace:'Roboto',bold:true,color:W,align:'center'})
+    sl.addText('LASI Score',{x:10.5,y:0.68,w:2.4,h:0.25,fontSize:9,fontFace:'Roboto',color:W,align:'center',transparency:20})
+    const metrics=[{lbl:'Sovereignty (ASI)',val:s.asi,col:B},{lbl:'Supremacy (API)',val:s.api,col:O},{lbl:'Vitality (PVS)',val:s.pvs,col:T}]
+    metrics.forEach((m,i)=>{
+      const x=0.4+i*3.1
+      sl.addShape(pptx.ShapeType.rect,{x,y:1.3,w:2.9,h:1.1,fill:{color:L},rectRadius:0.08})
+      sl.addShape(pptx.ShapeType.rect,{x,y:1.3,w:2.9,h:0.08,fill:{color:m.col}})
+      sl.addText(m.val.toFixed(1),{x,y:1.42,w:2.9,h:0.55,fontSize:28,fontFace:'Roboto',bold:true,color:N,align:'center'})
+      sl.addText(m.lbl,{x,y:1.96,w:2.9,h:0.35,fontSize:10,fontFace:'Roboto',color:M,align:'center'})
+    })
+    sl.addShape(pptx.ShapeType.rect,{x:9.8,y:1.3,w:3.1,h:1.1,fill:{color:T+'22'},rectRadius:0.08})
+    sl.addText(cls.label,{x:9.8,y:1.55,w:3.1,h:0.6,fontSize:14,fontFace:'Roboto',bold:true,color:T,align:'center'})
+    const hOpt={bold:true,color:W,fill:{color:N}}
+    const rows=[
+      [{text:'Year',options:hOpt},{text:'Sovereignty (ASI)',options:hOpt},{text:'Supremacy (API)',options:hOpt},{text:'Vitality (PVS)',options:hOpt}],
+      [{text:'Year 1',options:{}},{text:String(p.y1.asi),options:{}},{text:String(p.y1.api),options:{}},{text:String(p.y1.pvs),options:{}}],
+      [{text:'Year 3',options:{}},{text:String(p.y3.asi),options:{}},{text:String(p.y3.api),options:{}},{text:String(p.y3.pvs),options:{}}],
+      [{text:'Year 6',options:{}},{text:String(p.y6.asi),options:{}},{text:String(p.y6.api),options:{}},{text:String(p.y6.pvs),options:{}}],
     ]
-  },
-  {
-    id:'A2', name:'AI Performance', icon:'⚡', color:'var(--a2)', hex:'#1C38F5', weight:0.20,
-    sub:'Throughput · Quality · Scale · Reliability · Interoperability',
-    factors:[
-      {id:'A2F1',name:'Inference Performance',desc:'Throughput (tokens/sec), latency benchmarks vs published specifications',weight:1},
-      {id:'A2F2',name:'Model Quality',desc:'Accuracy, hallucination rate, domain fitness, benchmark scores',weight:1},
-      {id:'A2F3',name:'Scalability',desc:'Horizontal scaling, multi-site support, multi-domain capability',weight:1},
-      {id:'A2F4',name:'Reliability & Resilience',desc:'Uptime SLA, fault tolerance, disaster recovery, MTTR',weight:1},
-      {id:'A2F5',name:'Interoperability',desc:'Open API standards, integration ease, vendor-neutral interfaces',weight:0.8},
+    sl.addTable(rows,{x:0.4,y:2.6,w:8,h:2,fontSize:12,fontFace:'Roboto',border:{pt:1,color:'E0E0E8'},fill:{color:W}})
+    sl.addText('LASI = (ASI×0.4 + API×0.4 + PVS×0.2) · weighted Y1:10% Y3:30% Y6:60% · ATLAS AI Sovereignty Index v2.1',{x:0.4,y:5.1,w:12.5,h:0.3,fontSize:8,fontFace:'Roboto',color:M})
+  }
+
+  if(PROPOSALS.length>1){
+    sl=pptx.addSlide()
+    sl.background={color:W}
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.33,h:1.1,fill:{color:N}})
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:1.1,w:13.33,h:0.06,fill:{color:O}})
+    sl.addText('All Proposals — LASI Comparison',{x:0.4,y:0.35,w:12,h:0.55,fontSize:18,fontFace:'Roboto',bold:true,color:W})
+    const ranked=[...PROPOSALS].map(p=>({...p,s:calcLASI(p)})).sort((a,b)=>b.s.lasi-a.s.lasi)
+    const tableData=[
+      [{text:'Proposal',options:{bold:true,color:W,fill:{color:N}}},{text:'LASI',options:{bold:true,color:W,fill:{color:N}}},{text:'ASI',options:{bold:true,color:W,fill:{color:N}}},{text:'API',options:{bold:true,color:W,fill:{color:N}}},{text:'PVS',options:{bold:true,color:W,fill:{color:N}}},{text:'Classification',options:{bold:true,color:W,fill:{color:N}}}],
+      ...ranked.map(p=>[{text:p.name,options:{}},{text:p.s.lasi.toFixed(1),options:{bold:true}},{text:p.s.asi.toFixed(1),options:{}},{text:p.s.api.toFixed(1),options:{}},{text:p.s.pvs.toFixed(1),options:{}},{text:classify(p.s).label,options:{}}])
     ]
-  },
-  {
-    id:'A3', name:'Technical Fitment', icon:'🔧', color:'var(--a3)', hex:'#00B290', weight:0.20,
-    sub:'Architecture · Software · Security · Operations · Future',
-    factors:[
-      {id:'A3F1',name:'Architecture Fitness',desc:'Right hardware and topology for the workload, proven reference design',weight:1},
-      {id:'A3F2',name:'Software Stack Maturity',desc:'Production-grade, open source community, no single-vendor lock-in',weight:1},
-      {id:'A3F3',name:'Security Posture',desc:'Air-gap capability, zero-trust architecture, encryption at rest and in transit',weight:1},
-      {id:'A3F4',name:'Operational Readiness',desc:'Monitoring, observability, NOC/SOC integration, runbook quality',weight:1},
-      {id:'A3F5',name:'Future Proofing',desc:'Hardware upgrade path, software roadmap, ecosystem health, support longevity',weight:0.8},
+    sl.addTable(tableData,{x:0.4,y:1.4,w:12.5,h:ranked.length*0.6+0.6,fontSize:12,fontFace:'Roboto',border:{pt:1,color:'E0E0E8'}})
+  }
+
+  await pptx.writeFile({fileName:'AI-Sovereignty-Index-'+new Date().toISOString().slice(0,10)+'.pptx'})
+}
+
+// ── XLSX EXPORT ───────────────────────────────────────────────────────
+function exportXLSX(){
+  if(!PROPOSALS.length){alert('Add proposals first.');return}
+  const wb=XLSX.utils.book_new()
+  const summaryData=[
+    ['ATLAS AI Sovereignty Index — LASI Summary'],
+    ['Generated',new Date().toLocaleString('en-IN')],
+    [],
+    ['Proposal','LASI Score','Avg ASI','Avg API','Avg PVS','Classification'],
+    ...[...PROPOSALS].map(p=>{const s=calcLASI(p);return[p.name,+s.lasi.toFixed(2),+s.asi.toFixed(2),+s.api.toFixed(2),+s.pvs.toFixed(2),classify(s).label]}).sort((a,b)=>b[1]-a[1])
+  ]
+  const ws=XLSX.utils.aoa_to_sheet(summaryData)
+  ws['!cols']=[{wch:40},{wch:12},{wch:10},{wch:10},{wch:10},{wch:22}]
+  XLSX.utils.book_append_sheet(wb,ws,'Summary')
+  PROPOSALS.forEach(p=>{
+    const s=calcLASI(p)
+    const d=[
+      [p.name],
+      ['Metric','Year 1','Year 3','Year 6','Wtd Avg (Y1×10%+Y3×30%+Y6×60%)'],
+      ['Sovereignty (ASI)',p.y1.asi,p.y3.asi,p.y6.asi,+s.asi.toFixed(2)],
+      ['Supremacy (API)',p.y1.api,p.y3.api,p.y6.api,+s.api.toFixed(2)],
+      ['Platform Vitality (PVS)',p.y1.pvs,p.y3.pvs,p.y6.pvs,+s.pvs.toFixed(2)],
+      [],
+      ['LASI Composite','','','',+s.lasi.toFixed(2)],
+      ['Classification','','','',classify(s).label],
+      [],
+      ['LASI = ASI×0.4 + API×0.4 + PVS×0.2'],
     ]
-  },
-  {
-    id:'A4', name:'Green & Sustainability', icon:'🌱', color:'var(--a4)', hex:'#10B981', weight:0.10,
-    sub:'Energy · Cooling · Renewables · Longevity',
-    factors:[
-      {id:'A4F1',name:'Power Efficiency',desc:'PUE target, tokens/kWh metric, IT power optimisation',weight:1},
-      {id:'A4F2',name:'Cooling Approach',desc:'DLC adoption, water usage effectiveness (WUE), heat reuse potential',weight:1},
-      {id:'A4F3',name:'Renewable Energy',desc:'% green power, carbon offset programme, sustainability reporting',weight:1},
-      {id:'A4F4',name:'Hardware Longevity',desc:'Expected useful life (>5yr), repairability, component recyclability',weight:0.8},
-    ]
-  },
-  {
-    id:'A5', name:'Skills & Ecosystem', icon:'🎓', color:'var(--a5)', hex:'#FFB600', weight:0.10,
-    sub:'Training · Academia · Partners · Jobs',
-    factors:[
-      {id:'A5F1',name:'Local Skills Transfer',desc:'Structured training programme, certifications, knowledge handover plan',weight:1},
-      {id:'A5F2',name:'Academic Linkages',desc:'University partnerships, research collaboration, 
+    const ws2=XLSX.utils.aoa_to_sheet(d)
+    ws2['!cols']=[{wch:30},{wch:10},{wch:10},{wch:10},{wch:30}]
+    XLSX.utils.book_append_sheet(wb,ws2,p.name.slice(0,28).replace(/[:\\/\?\*\[\]]/g,'_'))
+  })
+  XLSX.writeFile(wb,'AI-Sovereignty-Index-'+new Date().toISOString().slice(0,10)+'.xlsx')
+}
+
+window.addEventListener('DOMContentLoaded',()=>renderList())
+</script>
+</body>
+</html>
