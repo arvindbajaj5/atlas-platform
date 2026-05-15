@@ -164,6 +164,8 @@ input[type="range"]{width:100%;accent-color:var(--p1);height:5px}
   <button class="tab" data-t="bom">BOM & Sizing</button>
   <button class="tab" data-t="edge">Edge Deployment</button>
   <button class="tab" data-t="scenarios">Scenarios & Config</button>
+  <button class="tab" data-t="services">🔧 Services & Manpower</button>
+  <button class="tab" data-t="tad">🏗️ TAD</button>
   <button class="tab" data-t="report">📄 Report Generator</button>
   <button class="tab" data-t="params">⚙️ Parameters</button>
 </div>
@@ -234,6 +236,57 @@ input[type="range"]{width:100%;accent-color:var(--p1);height:5px}
 <div class="pnl" id="p-edge"><div id="edgeC"></div></div>
 <!-- Scenarios -->
 <div class="pnl" id="p-scenarios"><div id="scenC"></div></div>
+<!-- Services & Manpower -->
+<div class="pnl" id="p-services">
+  <div class="card" style="margin-bottom:16px">
+    <h3>🔧 Professional Services — Suggested BOM</h3>
+    <p style="font-size:11px;color:var(--txM);margin-bottom:14px">Based on your sizing, the tool suggests a services BOM below. Edit quantities, rates, and toggle line items as needed. All figures feed into the total project cost.</p>
+    <div id="servicesC"></div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button class="bp btn-sm" onclick="addServiceLine()">+ Add Line</button>
+      <button class="bp btn-sm" style="background:var(--s2)" onclick="resetServices()">↺ Reset to Suggested</button>
+      <span id="svcTotalLbl" style="margin-left:auto;font-size:14px;font-weight:700;color:var(--p2)"></span>
+    </div>
+  </div>
+  <div class="card">
+    <h3>👥 Manpower — Post-Deployment Staffing Model</h3>
+    <p style="font-size:11px;color:var(--txM);margin-bottom:14px">Suggested FTE headcount and annual cost for operating this platform post-deployment. Based on deployment tier, GPU count, and workload complexity. Edit as needed.</p>
+    <div id="manpowerC"></div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button class="bp btn-sm" onclick="addManpowerLine()">+ Add Role</button>
+      <button class="bp btn-sm" style="background:var(--s2)" onclick="resetManpower()">↺ Reset to Suggested</button>
+      <span id="mpTotalLbl" style="margin-left:auto;font-size:14px;font-weight:700;color:var(--p2)"></span>
+    </div>
+  </div>
+</div>
+
+<!-- TAD -->
+<div class="pnl" id="p-tad">
+  <div class="card">
+    <h3>🏗️ Technical Architecture Document (TAD)</h3>
+    <p style="font-size:11px;color:var(--txM);margin-bottom:14px">Claude AI generates a structured TAD from your current sizing — covering architecture rationale, component decisions, deployment topology, performance envelope, and operational requirements. Review and download.</p>
+    <div class="g3" style="gap:12px;margin-bottom:16px">
+      <div><span class="lb">Customer Name</span><input type="text" id="tadCustomer" style="font-size:12px" placeholder="Customer / Programme Name"></div>
+      <div><span class="lb">Prepared By</span><input type="text" id="tadAuthor" style="font-size:12px" placeholder="Solutions Architect"></div>
+      <div><span class="lb">Classification</span>
+        <select id="tadClassification" style="font-size:12px">
+          <option value="DRAFT — Internal Use Only">DRAFT — Internal Use Only</option>
+          <option value="UNCLASSIFIED">UNCLASSIFIED</option>
+          <option value="RESTRICTED">RESTRICTED</option>
+          <option value="CONFIDENTIAL">CONFIDENTIAL</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
+      <button class="bp" style="font-size:14px;padding:10px 28px" onclick="generateTAD()">🏗️ Generate TAD</button>
+      <button class="bp btn-sm" style="background:var(--s2);display:none" id="tadDownloadBtn" onclick="downloadTAD()">⬇ Download .txt</button>
+      <button class="bp btn-sm" style="background:var(--p2);display:none" id="tadCopyBtn" onclick="copyTAD()">📋 Copy</button>
+      <span id="tadStatus" style="font-size:11px;color:var(--txM)"></span>
+    </div>
+    <div id="tadOutput" style="display:none;background:var(--bg);border:1px solid #e0e0e8;border-radius:8px;padding:20px;font-size:13px;line-height:1.7;max-height:70vh;overflow-y:auto"></div>
+  </div>
+</div>
+
 <!-- Parameters -->
 <div class="pnl" id="p-params"><div id="paramsC"></div></div>
 <!-- Report -->
@@ -1155,6 +1208,8 @@ function render(){
   
   try{renderTok(sz);}catch(e){console.error('renderTok:',e);}
   try{renderBOM(sz);}catch(e){console.error('renderBOM:',e);}
+  try{renderServices(sz);}catch(e){console.error('renderServices:',e);}
+  try{renderManpower(sz);}catch(e){console.error('renderManpower:',e);}
   try{renderArch(sz);}catch(e){console.error('renderArch:',e);}
   try{renderPerf(sz);}catch(e){console.error('renderPerf:',e);}
   try{renderEdge(sz);}catch(e){console.error('renderEdge:',e);}
@@ -3122,7 +3177,269 @@ function loadSampleBenchmarks(){
 // INIT
 // ═══════════════════════════════════════════════════════════════
 document.getElementById('bdgS').addEventListener('input',function(){budget=+this.value;document.getElementById('bdgD').textContent=fmt$(budget);render();});
+// ═══════════════════════════════════════════════════════════════
+// SERVICES & MANPOWER — state vars must be declared before render()
+// ═══════════════════════════════════════════════════════════════
+
+var servicesLines = []
+var manpowerLines = []
+var _lastSz = null
+
 render();setTimeout(rebuildCharts,120);
+
+function suggestServices(sz) {
+  var gpus = sz.tGPU || 0
+  var srvs = sz.srvTotal || 0
+  var tier = gpus >= 128 ? 'Tier 3-4' : gpus >= 32 ? 'Tier 2-3' : 'Tier 1-2'
+  var impl_weeks = gpus >= 128 ? 20 : gpus >= 32 ? 12 : 6
+  var integ_weeks = gpus >= 128 ? 8 : gpus >= 32 ? 5 : 3
+  var train_days = gpus >= 128 ? 10 : gpus >= 32 ? 6 : 3
+  var rate_arch = 1800, rate_eng = 1200, rate_train = 1500
+
+  return [
+    {id:'svc-1', name:'Infrastructure Implementation & Commissioning', category:'Implementation', qty:impl_weeks, unit:'weeks', rate:rate_eng*5, enabled:true},
+    {id:'svc-2', name:'AI Platform Integration & Configuration', category:'Integration', qty:integ_weeks, unit:'weeks', rate:rate_arch*5, enabled:true},
+    {id:'svc-3', name:'RAG Pipeline Design & Deployment', category:'Integration', qty:Math.round(integ_weeks*0.6), unit:'weeks', rate:rate_eng*5, enabled:true},
+    {id:'svc-4', name:'Network & Fabric Configuration', category:'Implementation', qty:Math.round(impl_weeks*0.3), unit:'weeks', rate:rate_eng*5, enabled:true},
+    {id:'svc-5', name:'Security Hardening & Compliance Review', category:'Security', qty:2, unit:'weeks', rate:rate_arch*5, enabled:gpus>=32},
+    {id:'svc-6', name:'Administrator & Operator Training', category:'Training', qty:train_days, unit:'days', rate:rate_train, enabled:true},
+    {id:'svc-7', name:'User & Data Scientist Enablement', category:'Training', qty:Math.round(train_days*0.7), unit:'days', rate:rate_train, enabled:true},
+    {id:'svc-8', name:'Factory Acceptance Testing (FAT)', category:'Testing', qty:1, unit:'weeks', rate:rate_eng*5, enabled:true},
+    {id:'svc-9', name:'Site Acceptance Testing (SAT)', category:'Testing', qty:1, unit:'weeks', rate:rate_eng*5, enabled:true},
+    {id:'svc-10', name:'Project Management (SI)', category:'Management', qty:Math.round(impl_weeks*1.2), unit:'weeks', rate:1000*5, enabled:true},
+    {id:'svc-11', name:'Documentation & Handover Pack', category:'Documentation', qty:2, unit:'weeks', rate:rate_eng*5, enabled:true},
+    {id:'svc-12', name:'Post-Go-Live Hypercare Support (90 days)', category:'Support', qty:1, unit:'flat', rate:gpus*800, enabled:true},
+  ]
+}
+
+function suggestManpower(sz) {
+  var gpus = sz.tGPU || 0
+  var srvs = sz.srvTotal || 0
+
+  // Scale headcount by deployment size
+  var scale = gpus >= 256 ? 3 : gpus >= 64 ? 2 : 1
+
+  return [
+    {id:'mp-1', role:'Platform Administrator', dept:'IT Operations', hc:Math.max(1,scale), annual_cost_lakhs:18, enabled:true},
+    {id:'mp-2', role:'MLOps Engineer', dept:'AI Operations', hc:Math.max(1,scale), annual_cost_lakhs:28, enabled:true},
+    {id:'mp-3', role:'Data Engineer (Pipelines & RAG)', dept:'AI Operations', hc:Math.max(1,Math.round(scale*1.5)), annual_cost_lakhs:25, enabled:true},
+    {id:'mp-4', role:'AI/ML Engineer (Model Ops)', dept:'AI Engineering', hc:Math.max(1,scale), annual_cost_lakhs:35, enabled:true},
+    {id:'mp-5', role:'Infrastructure Engineer (Network/Storage)', dept:'IT Operations', hc:Math.max(1,scale), annual_cost_lakhs:20, enabled:gpus>=32},
+    {id:'mp-6', role:'Data Centre / Hardware Technician', dept:'IT Operations', hc:scale>=2?2:1, annual_cost_lakhs:12, enabled:true},
+    {id:'mp-7', role:'Security & Compliance Analyst', dept:'GRC', hc:1, annual_cost_lakhs:22, enabled:gpus>=32},
+    {id:'mp-8', role:'Platform Product Owner / Programme Manager', dept:'Management', hc:1, annual_cost_lakhs:45, enabled:true},
+    {id:'mp-9', role:'Domain SME / AI Analyst', dept:'Business', hc:Math.max(1,scale), annual_cost_lakhs:30, enabled:true},
+    {id:'mp-10', role:'24×7 NOC Operator (shift)', dept:'IT Operations', hc:gpus>=64?4:0, annual_cost_lakhs:10, enabled:gpus>=64},
+  ]
+}
+
+function renderServices(sz) {
+  _lastSz = sz
+  if (!servicesLines.length) servicesLines = suggestServices(sz)
+  renderServicesTable()
+}
+
+function renderServicesTable() {
+  var showP = document.getElementById('togPrice')?.checked !== false
+  var total = 0
+  var rows = servicesLines.map(function(s, i) {
+    var cost = s.unit === 'flat' ? s.rate : s.qty * s.rate
+    if (s.enabled) total += cost
+    return '<tr style="opacity:' + (s.enabled?1:0.4) + '">' +
+      '<td><input type="checkbox" ' + (s.enabled?'checked':'') + ' onchange="toggleService(' + i + ',this.checked)" style="margin-right:6px">' +
+        '<input type="text" value="' + s.name + '" onchange="servicesLines[' + i + '].name=this.value" style="font-size:11px;border:none;background:transparent;width:220px;color:var(--tx)"></td>' +
+      '<td><span style="font-size:10px;background:rgba(28,56,245,0.08);color:var(--p2);padding:2px 7px;border-radius:6px">' + s.category + '</span></td>' +
+      '<td><input type="number" value="' + s.qty + '" onchange="servicesLines[' + i + '].qty=+this.value;renderServicesTable()" style="width:55px;font-size:12px;text-align:center;border:1px solid #e0e0e8;border-radius:4px;padding:2px 4px"></td>' +
+      '<td style="font-size:11px;color:var(--txM)">' + s.unit + '</td>' +
+      '<td><input type="number" value="' + s.rate + '" onchange="servicesLines[' + i + '].rate=+this.value;renderServicesTable()" style="width:80px;font-size:12px;text-align:right;border:1px solid #e0e0e8;border-radius:4px;padding:2px 4px"></td>' +
+      '<td style="font-weight:700;color:var(--p2);font-size:12px">' + fmt$(cost) + '</td>' +
+      '<td><button onclick="removeService(' + i + ')" style="background:none;border:none;cursor:pointer;color:var(--txM);font-size:14px">×</button></td>' +
+    '</tr>'
+  }).join('')
+
+  document.getElementById('servicesC').innerHTML =
+    '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+    '<thead><tr style="background:var(--bg)">' +
+    '<th style="text-align:left;padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">Service Line Item</th>' +
+    '<th style="text-align:left;padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">Category</th>' +
+    '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">Qty</th>' +
+    '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">Unit</th>' +
+    '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">Rate (₹/$)</th>' +
+    '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">Total</th>' +
+    '<th></th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>'
+
+  document.getElementById('svcTotalLbl').textContent = 'Services Total: ' + fmt$(total)
+}
+
+function toggleService(i, checked) { servicesLines[i].enabled = checked; renderServicesTable() }
+function removeService(i) { servicesLines.splice(i,1); renderServicesTable() }
+function addServiceLine() {
+  servicesLines.push({id:'svc-'+Date.now(),name:'New Service Line',category:'Custom',qty:1,unit:'weeks',rate:5000,enabled:true})
+  renderServicesTable()
+}
+function resetServices() { if(_lastSz){servicesLines=suggestServices(_lastSz);renderServicesTable()} }
+
+function renderManpower(sz) {
+  _lastSz = sz
+  if (!manpowerLines.length) manpowerLines = suggestManpower(sz)
+  renderManpowerTable()
+}
+
+function renderManpowerTable() {
+  var total_hc = 0, total_cost = 0
+  var rows = manpowerLines.map(function(m, i) {
+    var annual = m.hc * m.annual_cost_lakhs
+    if (m.enabled) { total_hc += m.hc; total_cost += annual }
+    return '<tr style="opacity:' + (m.enabled?1:0.4) + '">' +
+      '<td><input type="checkbox" ' + (m.enabled?'checked':'') + ' onchange="toggleManpower(' + i + ',this.checked)" style="margin-right:6px">' +
+        '<input type="text" value="' + m.role + '" onchange="manpowerLines[' + i + '].role=this.value" style="font-size:11px;border:none;background:transparent;width:220px;color:var(--tx)"></td>' +
+      '<td><span style="font-size:10px;background:rgba(0,178,144,0.08);color:var(--s2);padding:2px 7px;border-radius:6px">' + m.dept + '</span></td>' +
+      '<td><input type="number" value="' + m.hc + '" min="0" onchange="manpowerLines[' + i + '].hc=+this.value;renderManpowerTable()" style="width:50px;font-size:12px;text-align:center;border:1px solid #e0e0e8;border-radius:4px;padding:2px 4px"></td>' +
+      '<td><input type="number" value="' + m.annual_cost_lakhs + '" onchange="manpowerLines[' + i + '].annual_cost_lakhs=+this.value;renderManpowerTable()" style="width:65px;font-size:12px;text-align:right;border:1px solid #e0e0e8;border-radius:4px;padding:2px 4px"></td>' +
+      '<td style="font-size:10px;color:var(--txM)">Lakhs/yr</td>' +
+      '<td style="font-weight:700;color:var(--s2);font-size:12px">₹' + annual + 'L/yr</td>' +
+      '<td><button onclick="removeManpower(' + i + ')" style="background:none;border:none;cursor:pointer;color:var(--txM);font-size:14px">×</button></td>' +
+    '</tr>'
+  }).join('')
+
+  document.getElementById('manpowerC').innerHTML =
+    '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+    '<thead><tr style="background:var(--bg)">' +
+    '<th style="text-align:left;padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">Role</th>' +
+    '<th style="text-align:left;padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">Department</th>' +
+    '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">HC</th>' +
+    '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">Cost/Head (Lakhs)</th>' +
+    '<th></th>' +
+    '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:var(--txM);text-transform:uppercase">Annual Total</th>' +
+    '<th></th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div style="margin-top:10px;padding:10px 14px;background:rgba(0,178,144,0.06);border-radius:8px;display:flex;gap:24px">' +
+    '<div><div style="font-size:22px;font-weight:900;color:var(--s2)">' + total_hc + '</div><div style="font-size:10px;color:var(--txM)">Total FTEs</div></div>' +
+    '<div><div style="font-size:22px;font-weight:900;color:var(--s2)">₹' + total_cost + 'L</div><div style="font-size:10px;color:var(--txM)">Annual Manpower Cost</div></div>' +
+    '<div><div style="font-size:22px;font-weight:900;color:var(--p2)">₹' + (total_cost*5) + 'L</div><div style="font-size:10px;color:var(--txM)">5-Year Manpower Cost</div></div>' +
+    '</div>'
+
+  document.getElementById('mpTotalLbl').textContent = total_hc + ' FTEs · ₹' + total_cost + 'L/yr'
+}
+
+function toggleManpower(i, checked) { manpowerLines[i].enabled = checked; renderManpowerTable() }
+function removeManpower(i) { manpowerLines.splice(i,1); renderManpowerTable() }
+function addManpowerLine() {
+  manpowerLines.push({id:'mp-'+Date.now(),role:'New Role',dept:'Operations',hc:1,annual_cost_lakhs:20,enabled:true})
+  renderManpowerTable()
+}
+function resetManpower() { if(_lastSz){manpowerLines=suggestManpower(_lastSz);renderManpowerTable()} }
+
+// ═══════════════════════════════════════════════════════════════
+// TAD — New panel wiring (uses existing generateTAD logic but
+// reads from new panel element IDs and writes to new output div)
+// ═══════════════════════════════════════════════════════════════
+function generateTAD_new() {
+  var customer = document.getElementById('tadCustomer')?.value?.trim() || 'Customer'
+  var author = document.getElementById('tadAuthor')?.value?.trim() || 'Solutions Architect'
+  var classification = document.getElementById('tadClassification')?.value || 'DRAFT — Internal Use Only'
+  var statusEl = document.getElementById('tadStatus')
+  var outputEl = document.getElementById('tadOutput')
+  var dlBtn = document.getElementById('tadDownloadBtn')
+  var cpBtn = document.getElementById('tadCopyBtn')
+
+  statusEl.textContent = '⏳ Generating TAD...'
+  outputEl.style.display = 'none'
+  dlBtn.style.display = 'none'
+  cpBtn.style.display = 'none'
+
+  try {
+    var ctx = buildTADContext()
+    var sz = sizing()
+    var svcTotal = servicesLines.filter(function(s){return s.enabled}).reduce(function(t,s){return t+(s.unit==='flat'?s.rate:s.qty*s.rate)},0)
+    var mpTotal = manpowerLines.filter(function(m){return m.enabled}).reduce(function(t,m){return t+m.hc*m.annual_cost_lakhs},0)
+    var mpHC = manpowerLines.filter(function(m){return m.enabled}).reduce(function(t,m){return t+m.hc},0)
+    var svcLines = servicesLines.filter(function(s){return s.enabled}).map(function(s){return '- '+s.name+': '+s.qty+' '+s.unit+' @ '+fmt$(s.unit==='flat'?s.rate:s.rate)+'/'+s.unit+' = '+fmt$(s.unit==='flat'?s.rate:s.qty*s.rate)}).join('\n')
+    var mpLines = manpowerLines.filter(function(m){return m.enabled}).map(function(m){return '- '+m.role+' ('+m.dept+'): '+m.hc+' FTE × ₹'+m.annual_cost_lakhs+'L = ₹'+m.hc*m.annual_cost_lakhs+'L/yr'}).join('\n')
+    var date = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
+
+    var prompt = 'You are a senior solutions architect. Write a formal Technical Architecture Document (TAD) for an AI inferencing platform deployment. This document is for the customer technical team for detailed review and procurement approval.\n\n' +
+      'DOCUMENT DETAILS:\nCustomer: ' + customer + '\nPrepared By: ' + author + '\nDate: ' + date + '\nClassification: ' + classification + '\n\n' +
+      'PLATFORM SIZING SUMMARY:\n' + (ctx.stats || 'GPU-accelerated inference platform') + '\n' +
+      'GPUs: ' + sz.tGPU + ' | Servers: ' + sz.srvTotal + ' | Storage: ' + sz.stoTB + 'TB | Power: ' + sz.tPow.toFixed(0) + 'kW\n' +
+      'DLC Racks: ' + sz.dlcRacks + ' | AC Racks: ' + sz.acRacks + '\n\n' +
+      'KEY USE CASES:\n' + (ctx.ucNames || 'AI inferencing workloads') + '\n\n' +
+      'HARDWARE BOM SUMMARY:\n' + (ctx.bomText || 'GPU servers, storage, networking') + '\n\n' +
+      'PROFESSIONAL SERVICES:\n' + (svcLines || 'Standard implementation services') + '\nServices Total: ' + fmt$(svcTotal) + '\n\n' +
+      'POST-DEPLOYMENT STAFFING:\n' + (mpLines || 'Platform operations team') + '\nTotal: ' + mpHC + ' FTEs · ₹' + mpTotal + 'L/yr\n\n' +
+      'Write the TAD with these exact sections using ## for section headings:\n\n' +
+      '## 1. Executive Summary\n## 2. Architecture Overview\n## 3. Component Architecture\n## 4. Network & Fabric Design\n## 5. Storage Architecture\n## 6. Cooling & Power Infrastructure\n## 7. AI Software Stack\n## 8. RAG & Data Pipeline Architecture\n## 9. Security & Compliance Architecture\n## 10. Performance Envelope & SLA\n## 11. Deployment Topology\n## 12. Professional Services Plan\n## 13. Post-Deployment Operations Model\n## 14. Risks & Mitigations\n## 15. Acceptance Criteria\n\n' +
+      'Be specific to the sizing numbers above. Total length: 1000-1400 words. Professional, technical, no fluff.'
+
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{role:'user', content: prompt}]
+      })
+    }).then(function(r){return r.json()}).then(function(data){
+      if (data.error) throw new Error(data.error.message)
+      var text = data.content.filter(function(b){return b.type==='text'}).map(function(b){return b.text}).join('\n')
+      window._tadText = text
+
+      // Render as HTML
+      var html = '<div style="margin-bottom:12px;font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:1px;padding:4px 12px;background:rgba(255,85,57,0.06);border:1px dashed rgba(255,85,57,0.3);border-radius:6px;display:inline-block">' + classification + '</div>' +
+        '<div style="margin-bottom:16px"><div style="font-size:20px;font-weight:700;color:var(--p2)">Technical Architecture Document</div>' +
+        '<div style="font-size:12px;color:var(--txM);margin-top:4px">Customer: ' + customer + ' · Prepared by: ' + author + ' · ' + date + '</div></div>'
+      
+      html += text
+        .replace(/^## (\d+\. .+)$/gm, '<h2 style="font-size:14px;font-weight:700;color:var(--p2);margin:20px 0 8px;padding-bottom:6px;border-bottom:2px solid #e0e0e8">$1</h2>')
+        .replace(/^### (.+)$/gm, '<h3 style="font-size:12px;font-weight:700;color:var(--tx);margin:12px 0 6px">$1</h3>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^- (.+)$/gm, '<li style="margin-bottom:3px">$1</li>')
+        .replace(/(<li[^>]*>.*<\/li>)/gs, '<ul style="margin:6px 0 8px 20px">$1</ul>')
+        .replace(/\n\n/g, '</p><p style="margin-bottom:8px">')
+
+      outputEl.innerHTML = '<p style="margin-bottom:8px">' + html + '</p>'
+      outputEl.style.display = 'block'
+      dlBtn.style.display = 'inline-flex'
+      cpBtn.style.display = 'inline-flex'
+      statusEl.textContent = '✅ TAD generated'
+    }).catch(function(err){
+      statusEl.textContent = '❌ Error: ' + err.message
+    })
+  } catch(e) {
+    statusEl.textContent = '❌ Error: ' + e.message
+  }
+}
+
+function downloadTAD() {
+  if (!window._tadText) return
+  var customer = document.getElementById('tadCustomer')?.value?.trim() || 'Customer'
+  var blob = new Blob(['TECHNICAL ARCHITECTURE DOCUMENT\n' + '='.repeat(50) + '\nCustomer: ' + customer + '\nGenerated: ' + new Date().toLocaleString('en-IN') + '\n' + '='.repeat(50) + '\n\n' + window._tadText], {type:'text/plain'})
+  var url = URL.createObjectURL(blob)
+  var a = document.createElement('a')
+  a.href = url; a.download = 'TAD-' + customer.replace(/[^a-z0-9]/gi,'_').slice(0,30) + '-' + new Date().toISOString().slice(0,10) + '.txt'
+  a.click(); URL.revokeObjectURL(url)
+}
+
+function copyTAD_new() {
+  if (!window._tadText) return
+  navigator.clipboard.writeText(window._tadText).then(function(){
+    var btn = document.getElementById('tadCopyBtn')
+    btn.textContent = '✓ Copied'
+    setTimeout(function(){btn.textContent='📋 Copy'},2000)
+  })
+}
+
+// Wire new TAD panel buttons
+document.addEventListener('DOMContentLoaded', function(){
+  // Override TAD button in new panel
+  var tadBtn = document.querySelector('#p-tad .bp')
+  if (tadBtn) tadBtn.onclick = generateTAD_new
+  var tadCpBtn = document.getElementById('tadCopyBtn')
+  if (tadCpBtn) tadCpBtn.onclick = copyTAD_new
+  var tadDlBtn = document.getElementById('tadDownloadBtn')
+  if (tadDlBtn) tadDlBtn.onclick = downloadTAD
+})
 </script>
 
 <script>
