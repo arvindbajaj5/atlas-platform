@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — Domain Configurator v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--black:#0A0A0F;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);--shadow-lg:0 8px 32px rgba(0,0,0,0.18);
+  --r:8px;--r-sm:6px;--r-lg:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+
+/* HEADER */
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:200;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-center{font-size:13px;color:rgba(255,255,255,0.65);}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;letter-spacing:0.5px;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-secondary{background:var(--navy);color:var(--white);}
+.btn-secondary:hover{background:#001d5c;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-lg{padding:12px 28px;font-size:14px;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* PROGRESS BAR */
+.progress-bar{background:var(--white);border-bottom:1px solid #e0e0e8;padding:0 24px;display:flex;align-items:center;gap:0;overflow-x:auto;}
+.step-item{display:flex;align-items:center;flex-shrink:0;}
+.step-btn{display:flex;align-items:center;gap:8px;padding:14px 16px;font-size:11px;font-weight:600;color:var(--mid);cursor:pointer;border:none;background:transparent;border-bottom:3px solid transparent;transition:all 0.15s;white-space:nowrap;font-family:inherit;}
+.step-btn.done{color:var(--teal);border-bottom-color:var(--teal);}
+.step-btn.active{color:var(--navy);border-bottom-color:var(--orange);}
+.step-btn.done .step-num{background:var(--teal);color:var(--white);}
+.step-btn.active .step-num{background:var(--orange);color:var(--white);}
+.step-num{width:20px;height:20px;border-radius:50%;background:var(--light);color:var(--mid);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;}
+.step-arrow{color:#d0d0d8;font-size:12px;padding:0 4px;}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 108px);}
+.sidebar{background:var(--white);border-right:1px solid #e0e0e8;padding:20px;overflow-y:auto;}
+.main{padding:28px;overflow-y:auto;max-width:900px;}
+
+/* SIDEBAR */
+.sb-title{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;}
+.sb-step{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--r);margin-bottom:4px;cursor:pointer;transition:all 0.15s;border:1px solid transparent;}
+.sb-step:hover{background:var(--light);}
+.sb-step.active{background:rgba(0,40,112,0.06);border-color:rgba(0,40,112,0.15);}
+.sb-step.done{opacity:0.7;}
+.sb-step-num{width:22px;height:22px;border-radius:50%;background:var(--light);color:var(--mid);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.sb-step.active .sb-step-num{background:var(--orange);color:var(--white);}
+.sb-step.done .sb-step-num{background:var(--teal);color:var(--white);}
+.sb-step-label{font-size:12px;font-weight:600;color:var(--dark);line-height:1.3;}
+.sb-step-sub{font-size:10px;color:var(--mid);margin-top:2px;}
+.sb-divider{height:1px;background:#e0e0e8;margin:14px 0;}
+.sb-info{padding:12px;background:rgba(28,56,245,0.05);border:1px solid rgba(28,56,245,0.15);border-radius:var(--r);font-size:11px;color:var(--blue);line-height:1.6;}
+.sb-proj-id{font-family:'Roboto Mono',monospace;font-size:10px;color:var(--mid);padding:6px 10px;background:var(--light);border-radius:var(--r-sm);margin-top:10px;word-break:break-all;}
+
+/* STEP CONTENT */
+.step-page{display:none;}
+.step-page.active{display:block;}
+.step-title{font-size:22px;font-weight:700;color:var(--navy);margin-bottom:6px;}
+.step-sub{font-size:13px;color:var(--mid);margin-bottom:24px;line-height:1.6;}
+
+/* MODE TOGGLE */
+.mode-bar{display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.25);border-radius:var(--r);margin-bottom:20px;}
+.mode-label{font-size:11px;font-weight:700;color:var(--dark);}
+.mode-btns{display:flex;gap:0;border:1px solid #d0d0d8;border-radius:var(--r-sm);overflow:hidden;margin-left:auto;}
+.mode-btn{padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;border:none;background:var(--white);color:var(--mid);transition:all 0.15s;font-family:inherit;}
+.mode-btn.active{background:var(--navy);color:var(--white);}
+
+/* FORM ELEMENTS */
+.form-row{margin-bottom:18px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px;}
+label.lbl{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;}
+input[type=text],input[type=number],select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
+input[type=text]:focus,input[type=number]:focus,select:focus,textarea:focus{border-color:var(--blue);}
+textarea{resize:vertical;min-height:80px;}
+.field-hint{font-size:10px;color:var(--mid);margin-top:4px;line-height:1.5;}
+.required::after{content:' *';color:var(--orange);}
+.section-hdr{font-size:13px;font-weight:700;color:var(--navy);margin:20px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--light);display:flex;align-items:center;gap:8px;}
+
+/* DOMAIN GRID */
+.domain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+.domain-card{border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;cursor:pointer;transition:all 0.18s;background:var(--white);}
+.domain-card:hover{border-color:var(--navy);box-shadow:var(--shadow);}
+.domain-card.selected{border-color:var(--orange);background:rgba(255,85,57,0.04);box-shadow:0 0 0 3px rgba(255,85,57,0.12);}
+.domain-card__icon{font-size:28px;margin-bottom:8px;}
+.domain-card__name{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:3px;}
+.domain-card__desc{font-size:10px;color:var(--mid);line-height:1.5;}
+.domain-card__count{font-size:10px;font-weight:700;color:var(--teal);margin-top:6px;}
+
+/* USE CASE LIST */
+.uc-toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.uc-list{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto;padding-right:4px;}
+.uc-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #e0e0e8;border-radius:var(--r);background:var(--white);transition:all 0.15s;}
+.uc-item.active{border-color:var(--teal);background:rgba(0,178,144,0.03);}
+.uc-item input[type=checkbox]{margin-top:2px;flex-shrink:0;accent-color:var(--teal);}
+.uc-item__body{flex:1;}
+.uc-item__name{font-size:12px;font-weight:600;color:var(--dark);}
+.uc-item__meta{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;}
+.tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;}
+.tag-model{background:rgba(28,56,245,0.08);color:var(--blue);}
+.tag-cat{background:rgba(0,40,112,0.06);color:var(--navy);}
+.tag-pri-high{background:rgba(255,85,57,0.1);color:var(--orange);}
+.tag-pri-med{background:rgba(255,182,0,0.1);color:#9a7000;}
+.tag-pri-low{background:var(--light);color:var(--mid);}
+.uc-count{font-size:11px;font-weight:700;color:var(--teal);}
+
+/* PERSONAS */
+.persona-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.persona-card{border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:14px;background:var(--white);position:relative;}
+.persona-card__role{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:3px;}
+.persona-card__dept{font-size:11px;color:var(--mid);margin-bottom:8px;}
+.persona-card__need{font-size:11px;color:var(--dark);line-height:1.5;}
+.persona-remove{position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;color:var(--mid);font-size:16px;}
+.persona-remove:hover{color:#DC2626;}
+
+/* ARCHITECTURE */
+.tier-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.tier-card{border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:14px;cursor:pointer;transition:all 0.15s;text-align:center;background:var(--white);}
+.tier-card:hover{border-color:var(--navy);}
+.tier-card.selected{border-color:var(--orange);background:rgba(255,85,57,0.04);}
+.tier-card__num{font-size:24px;font-weight:900;color:var(--navy);margin-bottom:4px;}
+.tier-card__name{font-size:11px;font-weight:700;color:var(--dark);margin-bottom:4px;}
+.tier-card__desc{font-size:10px;color:var(--mid);line-height:1.4;}
+.tier-card__gpu{font-size:10px;font-weight:700;color:var(--teal);margin-top:6px;}
+.flags-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;}
+.flag-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e0e0e8;border-radius:var(--r);background:var(--white);cursor:pointer;transition:all 0.15s;}
+.flag-item.on{border-color:var(--teal);background:rgba(0,178,144,0.05);}
+.flag-item input[type=checkbox]{accent-color:var(--teal);}
+.flag-item__label{font-size:11px;font-weight:600;color:var(--dark);}
+
+/* SITES */
+.site-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+.site-item{display:grid;grid-template-columns:auto 1fr 1fr auto auto;gap:8px;align-items:center;padding:10px 12px;border:1px solid #e0e0e8;border-radius:var(--r);background:var(--white);}
+.site-role-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;}
+.site-role-hub{background:rgba(0,40,112,0.1);color:var(--navy);}
+.site-role-spoke{background:rgba(28,56,245,0.08);color:var(--blue);}
+.site-role-edge{background:rgba(0,178,144,0.08);color:var(--teal);}
+
+/* REVIEW */
+.review-section{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;}
+.review-section-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.review-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--light);font-size:12px;}
+.review-row:last-child{border-bottom:none;}
+.review-key{color:var(--mid);}
+.review-val{font-weight:600;color:var(--dark);text-align:right;max-width:60%;}
+.review-uc-list{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+.review-uc-tag{font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(0,178,144,0.08);color:var(--teal);font-weight:600;}
+
+/* EXPORT BAR */
+.export-bar{display:flex;gap:10px;flex-wrap:wrap;padding:16px 20px;background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);box-shadow:var(--shadow);}
+
+/* NAV FOOTER */
+.nav-footer{position:sticky;bottom:0;background:var(--white);border-top:1px solid #e0e0e8;padding:12px 28px;display:flex;justify-content:space-between;align-items:center;}
+.nav-footer-info{font-size:11px;color:var(--mid);}
+
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:var(--r);font-size:11px;margin-bottom:14px;line-height:1.6;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-success{background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.2);color:var(--teal);}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.25);color:#9a7000;}
+
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;}
+  .sidebar{display:none;}
+  .domain-grid{grid-template-columns:repeat(2,1fr);}
+  .tier-grid{grid-template-columns:repeat(2,1fr);}
+  .form-grid{grid-template-columns:1fr;}
+  .form-grid-3{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div class="hdr-center">Domain Configurator</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">v3.0</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+  </div>
+</div>
+
+<!-- PROGRESS BAR -->
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sb-title">Steps</div>
+    <div id="sidebarSteps"></div>
+    <div class="sb-divider"></div>
+    <div class="sb-info" id="sidebarInfo">Select a domain to load a pre-configured pack of use cases, personas, and architecture defaults.</div>
+    <div class="sb-proj-id" id="sidebarProjId">ID: —</div>
+  </div>
+
+  <div class="main">
+    <!-- STEP 1: ENGAGEMENT -->
+    <div class="step-page" id="step-1">
+      <div class="step-title">Engagement Details</div>
+      <div class="step-sub">Define the engagement basics. This information anchors the Project Definition File and all downstream documents.</div>
+
+      <div class="form-row">
+        <label class="lbl required">Project / Engagement Name</label>
+        <input type="text" id="f-projName" placeholder="e.g. MDoNER GeoAI Platform · Phase 1" oninput="autoSave()">
+        <div class="field-hint">Full name of the project or programme.</div>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label class="lbl required">Customer / Organisation</label>
+          <input type="text" id="f-customer" placeholder="e.g. Ministry of DoNER" oninput="autoSave()">
+        </div>
+        <div>
+          <label class="lbl">Customer Short Name</label>
+          <input type="text" id="f-custShort" placeholder="e.g. MDoNER" oninput="autoSave()">
+          <div class="field-hint">Used in filenames and slide labels.</div>
+        </div>
+      </div>
+      <div class="form-grid-3">
+        <div>
+          <label class="lbl required">Country</label>
+          <select id="f-country" onchange="autoSave()">
+            <option value="">Select…</option>
+            <option value="IN" selected>India</option>
+            <option value="AE">UAE</option>
+            <option value="SA">Saudi Arabia</option>
+            <option value="SG">Singapore</option>
+            <option value="GB">United Kingdom</option>
+            <option value="US">United States</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl required">Sector</label>
+          <select id="f-sector" onchange="autoSave()">
+            <option value="">Select…</option>
+            <option value="government">Government / Ministry</option>
+            <option value="defence">Defence / Military</option>
+            <option value="psu">PSU / Public Enterprise</option>
+            <option value="enterprise">Private Enterprise</option>
+            <option value="academic">Academic / Research</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Pipeline Stage</label>
+          <select id="f-stage" onchange="autoSave()">
+            <option value="prospect">Prospect</option>
+            <option value="qualify">Qualify</option>
+            <option value="instantiate">Instantiate</option>
+            <option value="size">Size</option>
+            <option value="propose">Propose</option>
+            <option value="win">Win</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="lbl">Engagement Notes</label>
+        <textarea id="f-notes" placeholder="Key context for Claude — background, constraints, strategic importance, key stakeholders…" oninput="autoSave()"></textarea>
+      </div>
+    </div>
+
+    <!-- STEP 2: DOMAIN -->
+    <div class="step-page" id="step-2">
+      <div class="step-title">Domain Selection</div>
+      <div class="step-sub">Select the primary domain for this engagement. A domain pack will pre-populate use cases, personas, and architecture defaults in the following steps.</div>
+
+      <div class="mode-bar">
+        <span class="mode-label">⚡ Input Mode</span>
+        <div class="field-hint" style="flex:1;margin:0 0 0 8px">Domain Pack loads pre-configured content. Manual starts with a blank slate.</div>
+        <div class="mode-btns">
+          <button class="mode-btn active" id="modePackBtn" onclick="setMode('pack')">📦 Domain Pack</button>
+          <button class="mode-btn" id="modeManualBtn" onclick="setMode('manual')">✏️ Manual</button>
+        </div>
+      </div>
+
+      <div class="domain-grid" id="domainGrid"></div>
+
+      <div id="domainPreview" style="display:none">
+        <div class="alert alert-success" id="domainPreviewText"></div>
+      </div>
+    </div>
+
+    <!-- STEP 3: USE CASES -->
+    <div class="step-page" id="step-3">
+      <div class="step-title">Use Cases</div>
+      <div class="step-sub">Select and configure the use cases for this engagement. Toggle on/off, edit priorities, and add custom use cases as needed.</div>
+
+      <div class="uc-toolbar">
+        <span class="uc-count" id="ucSelectedCount">0 selected</span>
+        <button class="btn btn-outline btn-sm" onclick="selectAllUCs()">Select All</button>
+        <button class="btn btn-outline btn-sm" onclick="clearAllUCs()">Clear All</button>
+        <button class="btn btn-teal btn-sm" onclick="addCustomUC()">+ Custom UC</button>
+        <div style="margin-left:auto">
+          <select onchange="filterUCs(this.value)" style="font-size:11px;padding:5px 8px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-family:inherit">
+            <option value="">All categories</option>
+            <option value="Surveillance">Surveillance</option>
+            <option value="Analytics">Analytics</option>
+            <option value="Planning">Planning</option>
+            <option value="Monitoring">Monitoring</option>
+            <option value="Intelligence">Intelligence</option>
+            <option value="Operations">Operations</option>
+          </select>
+        </div>
+      </div>
+      <div class="uc-list" id="ucList"></div>
+    </div>
+
+    <!-- STEP 4: PERSONAS -->
+    <div class="step-page" id="step-4">
+      <div class="step-title">User Personas</div>
+      <div class="step-sub">Define the key user groups who will interact with or benefit from this platform. Personas guide architecture decisions and solution design.</div>
+
+      <div class="persona-grid" id="personaGrid"></div>
+      <button class="btn btn-outline btn-sm" onclick="addPersona()">+ Add Persona</button>
+    </div>
+
+    <!-- STEP 5: ARCHITECTURE -->
+    <div class="step-page" id="step-5">
+      <div class="step-title">Architecture & Deployment</div>
+      <div class="step-sub">Define the deployment architecture. Select a tier, topology, and configure sites. Flags drive downstream tool behaviour.</div>
+
+      <div class="section-hdr">🏗️ Deployment Tier</div>
+      <div class="tier-grid">
+        <div class="tier-card" onclick="selectTier(1)" id="tier-1">
+          <div class="tier-card__num">T1</div>
+          <div class="tier-card__name">Edge Node</div>
+          <div class="tier-card__desc">Standalone appliance, air-gapped or remote</div>
+          <div class="tier-card__gpu">1–4 GPUs</div>
+        </div>
+        <div class="tier-card" onclick="selectTier(2)" id="tier-2">
+          <div class="tier-card__num">T2</div>
+          <div class="tier-card__name">Departmental Cluster</div>
+          <div class="tier-card__desc">Single-site, moderate workload, shared storage</div>
+          <div class="tier-card__gpu">8–64 GPUs</div>
+        </div>
+        <div class="tier-card" onclick="selectTier(3)" id="tier-3">
+          <div class="tier-card__num">T3</div>
+          <div class="tier-card__name">Enterprise AI Factory</div>
+          <div class="tier-card__desc">Multi-dept, production-grade, DLC, HA</div>
+          <div class="tier-card__gpu">64–512 GPUs</div>
+        </div>
+        <div class="tier-card" onclick="selectTier(4)" id="tier-4">
+          <div class="tier-card__num">T4</div>
+          <div class="tier-card__name">Sovereign AI Hub</div>
+          <div class="tier-card__desc">National programme, hub-spoke-edge</div>
+          <div class="tier-card__gpu">512+ GPUs</div>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div>
+          <label class="lbl">Topology</label>
+          <select id="f-topology" onchange="autoSave();toggleSites()">
+            <option value="standalone">Standalone</option>
+            <option value="cluster">Cluster</option>
+            <option value="hub_spoke_edge">Hub-Spoke-Edge</option>
+            <option value="hybrid">Hybrid</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Deployment Type</label>
+          <select id="f-deployType" onchange="autoSave()">
+            <option value="on_prem">On-Premises</option>
+            <option value="modular_dc">Modular Datacenter</option>
+            <option value="private_cloud">Private Cloud</option>
+            <option value="air_gapped">Air-Gapped</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="sitesSection">
+        <div class="section-hdr">📍 Sites</div>
+        <div class="site-list" id="siteList"></div>
+        <button class="btn btn-outline btn-sm" onclick="addSite()">+ Add Site</button>
+      </div>
+
+      <div class="section-hdr" style="margin-top:20px">🚩 Flags</div>
+      <div class="flags-grid" id="flagsGrid"></div>
+    </div>
+
+    <!-- STEP 6: VOLUMETRICS -->
+    <div class="step-page" id="step-6">
+      <div class="step-title">Volumetrics & Performance</div>
+      <div class="step-sub">Define workload scale, performance requirements, and data characteristics. These values drive hardware sizing in the Inferencing Factory.</div>
+
+      <div class="form-grid">
+        <div>
+          <label class="lbl">Concurrent Users</label>
+          <input type="number" id="f-users" placeholder="e.g. 500" oninput="autoSave()">
+        </div>
+        <div>
+          <label class="lbl">Peak Requests / Second</label>
+          <input type="number" id="f-rps" placeholder="e.g. 50" oninput="autoSave()">
+        </div>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label class="lbl">Avg Tokens / Request</label>
+          <input type="number" id="f-tokens" placeholder="e.g. 1000" oninput="autoSave()">
+        </div>
+        <div>
+          <label class="lbl">Latency SLA (P95, ms)</label>
+          <input type="number" id="f-latency" placeholder="e.g. 2000" oninput="autoSave()">
+        </div>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label class="lbl">Data Volume (TB)</label>
+          <input type="number" id="f-dataTB" placeholder="e.g. 500" oninput="autoSave()">
+        </div>
+        <div>
+          <label class="lbl">Availability SLA (%)</label>
+          <input type="number" id="f-availability" placeholder="e.g. 99.9" step="0.1" oninput="autoSave()">
+        </div>
+      </div>
+
+      <div class="section-hdr">🤖 Model & Training</div>
+      <div class="form-row">
+        <label class="lbl">Model Sizes in Scope</label>
+        <input type="text" id="f-modelSizes" placeholder="e.g. 7B, 13B, 70B" oninput="autoSave()">
+        <div class="field-hint">Comma-separated list of model parameter sizes.</div>
+      </div>
+      <div class="form-grid-3">
+        <div>
+          <label class="lbl">Training Required?</label>
+          <select id="f-training" onchange="autoSave()">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Fine-Tuning Required?</label>
+          <select id="f-finetuning" onchange="autoSave()">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Retraining Frequency</label>
+          <select id="f-retrain" onchange="autoSave()">
+            <option value="none">None</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="weekly">Weekly</option>
+            <option value="daily">Daily</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 7: COMMERCIAL -->
+    <div class="step-page" id="step-7">
+      <div class="step-title">Commercial Parameters</div>
+      <div class="step-sub">Define deal structure, procurement route, and timeline. These values feed directly into the Deal Analysis Tool.</div>
+
+      <div class="form-grid">
+        <div>
+          <label class="lbl">Deal Currency</label>
+          <select id="f-currency" onchange="autoSave();updateSizeHint()">
+            <option value="USD">USD — US Dollar</option>
+            <option value="INR">INR — Indian Rupee (Crores)</option>
+            <option value="EUR">EUR — Euro</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="AED">AED — UAE Dirham</option>
+            <option value="SGD">SGD — Singapore Dollar</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Estimated Deal Value</label>
+          <input type="number" id="f-dealValue" placeholder="e.g. 5000000" oninput="autoSave();updateSizeHint()">
+          <div class="field-hint" id="sizeHint"></div>
+        </div>
+      </div>
+      <div class="form-grid-3">
+        <div>
+          <label class="lbl">Deal Size</label>
+          <select id="f-size" onchange="autoSave()">
+            <option value="S">S — Small</option>
+            <option value="M">M — Medium</option>
+            <option value="L">L — Large</option>
+            <option value="XL">XL — Strategic</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Channel</label>
+          <select id="f-channel" onchange="autoSave()">
+            <option value="direct">Direct</option>
+            <option value="si_partner">SI Partner</option>
+            <option value="distributor">Distributor</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Procurement Route</label>
+          <select id="f-procurement" onchange="autoSave()">
+            <option value="direct">Direct / RFP</option>
+            <option value="gem">GeM Portal</option>
+            <option value="tender">Open Tender</option>
+            <option value="dpsu">DPSU / DPP</option>
+            <option value="nomination">Nomination Basis</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid-3">
+        <div>
+          <label class="lbl">Delivery Duration (months)</label>
+          <input type="number" id="f-delivery" placeholder="e.g. 12" oninput="autoSave()">
+        </div>
+        <div>
+          <label class="lbl">Implementation (months)</label>
+          <input type="number" id="f-impl" placeholder="e.g. 6" oninput="autoSave()">
+        </div>
+        <div>
+          <label class="lbl">AMC Duration (years)</label>
+          <input type="number" id="f-amc" placeholder="e.g. 5" oninput="autoSave()">
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="lbl">Partner Name (if applicable)</label>
+        <input type="text" id="f-partner" placeholder="e.g. TATA Advanced Systems" oninput="autoSave()">
+      </div>
+    </div>
+
+    <!-- STEP 8: REVIEW & EXPORT -->
+    <div class="step-page" id="step-8">
+      <div class="step-title">Review & Export</div>
+      <div class="step-sub">Review the complete Project Definition File before exporting. Download as JSON for tool handoff and Markdown for Claude session activation.</div>
+
+      <div class="export-bar" style="margin-bottom:20px">
+        <button class="btn btn-primary btn-lg" onclick="exportJSON()">⬇ Download JSON</button>
+        <button class="btn btn-teal" onclick="exportMarkdown()">⬇ Download Markdown</button>
+        <button class="btn btn-outline" onclick="exportBoth()">⬇ Download Both</button>
+        <button class="btn btn-secondary btn-sm" onclick="copyJSON()" style="margin-left:auto">📋 Copy JSON</button>
+      </div>
+
+      <div id="reviewContent"></div>
+    </div>
+
+    <!-- NAV FOOTER -->
+    <div class="nav-footer">
+      <button class="btn btn-outline" id="btnBack" onclick="prevStep()">← Back</button>
+      <span class="nav-footer-info" id="navInfo">Step 1 of 8</span>
+      <button class="btn btn-primary" id="btnNext" onclick="nextStep()">Next →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DOMAIN PACKS
+// ═══════════════════════════════════════════════════════════════
+const DOMAIN_PACKS = {
+  geospatial: {
+    id:'geospatial', icon:'🛰️', name:'Geospatial & Earth Observation',
+    desc:'Satellite imagery analysis, remote sensing, GIS, environmental monitoring, precision agriculture',
+    defaultTier:3, defaultTopology:'hub_spoke_edge', defaultDeploy:'on_prem',
+    sovereignDefault:true, compassRequired:true,
+    useCases:[
+      {id:'geo-1',name:'Crop Health & Yield Prediction',cat:'Analytics',model:'vision',priority:'high'},
+      {id:'geo-2',name:'Flood Mapping & Disaster Response',cat:'Monitoring',model:'vision',priority:'high'},
+      {id:'geo-3',name:'Forest Cover & Deforestation Detection',cat:'Monitoring',model:'vision',priority:'high'},
+      {id:'geo-4',name:'Urban Sprawl & Land Use Change Detection',cat:'Analytics',model:'vision',priority:'medium'},
+      {id:'geo-5',name:'Road & Infrastructure Extraction',cat:'Analytics',model:'vision',priority:'medium'},
+      {id:'geo-6',name:'Glacier & Snowpack Monitoring',cat:'Monitoring',model:'vision',priority:'high'},
+      {id:'geo-7',name:'River & Waterbody Change Detection',cat:'Monitoring',model:'vision',priority:'medium'},
+      {id:'geo-8',name:'3D Building Reconstruction from SAR',cat:'Analytics',model:'vision',priority:'low'},
+      {id:'geo-9',name:'Illegal Mining Detection',cat:'Surveillance',model:'vision',priority:'high'},
+      {id:'geo-10',name:'Coastal Erosion Monitoring',cat:'Monitoring',model:'vision',priority:'medium'},
+      {id:'geo-11',name:'Air Quality Index Estimation from EO',cat:'Analytics',model:'multimodal',priority:'medium'},
+      {id:'geo-12',name:'Plantation & Orchard Health Mapping',cat:'Analytics',model:'vision',priority:'medium'},
+      {id:'geo-13',name:'Night Light & Economic Activity Index',cat:'Analytics',model:'vision',priority:'low'},
+      {id:'geo-14',name:'Solar Panel & Rooftop Detection',cat:'Analytics',model:'vision',priority:'low'},
+      {id:'geo-15',name:'Railway Track Condition Monitoring',cat:'Monitoring',model:'vision',priority:'medium'},
+      {id:'geo-16',name:'Pipeline & Power Line Inspection',cat:'Monitoring',model:'vision',priority:'medium'},
+      {id:'geo-17',name:'Landslide Risk Mapping',cat:'Analytics',model:'vision',priority:'high'},
+      {id:'geo-18',name:'Wetland & Biodiversity Mapping',cat:'Analytics',model:'vision',priority:'low'},
+      {id:'geo-19',name:'Drought & Soil Moisture Estimation',cat:'Monitoring',model:'vision',priority:'high'},
+      {id:'geo-20',name:'Construction Progress Monitoring',cat:'Monitoring',model:'vision',priority:'medium'},
+      {id:'geo-21',name:'Harbour & Port Activity Monitoring',cat:'Surveillance',model:'vision',priority:'medium'},
+      {id:'geo-22',name:'Wildfire Detection & Spread Modelling',cat:'Monitoring',model:'vision',priority:'high'},
+      {id:'geo-23',name:'Road Traffic Density Mapping',cat:'Analytics',model:'vision',priority:'medium'},
+      {id:'geo-24',name:'Paddy Field Mapping & Water Management',cat:'Analytics',model:'vision',priority:'high'},
+      {id:'geo-25',name:'Geospatial RAG Chatbot (Natural Language Query)',cat:'Intelligence',model:'llm',priority:'high'},
+      {id:'geo-26',name:'Change Detection Across Multi-Temporal Imagery',cat:'Analytics',model:'vision',priority:'high'},
+      {id:'geo-27',name:'Slope Stability & Erosion Risk Assessment',cat:'Analytics',model:'vision',priority:'medium'},
+      {id:'geo-28',name:'Horticulture Crop Damage Assessment',cat:'Analytics',model:'vision',priority:'high'},
+      {id:'geo-29',name:'Settlement Mapping in Remote Areas',cat:'Analytics',model:'vision',priority:'medium'},
+      {id:'geo-30',name:'Bridge & Dam Structural Monitoring',cat:'Monitoring',model:'vision',priority:'medium'},
+    ],
+    personas:[
+      {role:'GIS Analyst',dept:'Geospatial Division',need:'Access satellite imagery, run change detection models, export maps'},
+      {role:'Policy Officer',dept:'Ministry / Planning',need:'High-level dashboards, trend reports, natural language queries'},
+      {role:'Field Operations Officer',dept:'District Administration',need:'Mobile-friendly maps, alert notifications, offline access'},
+      {role:'Data Scientist',dept:'AI/ML Team',need:'Model training pipeline, data labelling, performance benchmarking'},
+    ],
+    flags:{sovereign:true,compass:true,airgap:false,modularDC:false,geo:true,def:false}
+  },
+
+  defence: {
+    id:'defence', icon:'🛡️', name:'Defence & Security',
+    desc:'ISR, C4ISR, border surveillance, threat detection, battlefield AI, secure communications',
+    defaultTier:3, defaultTopology:'hub_spoke_edge', defaultDeploy:'air_gapped',
+    sovereignDefault:true, compassRequired:true,
+    useCases:[
+      {id:'def-1',name:'Border Intrusion Detection (EO + Radar Fusion)',cat:'Surveillance',model:'vision',priority:'high'},
+      {id:'def-2',name:'Target Recognition & Classification',cat:'Intelligence',model:'vision',priority:'high'},
+      {id:'def-3',name:'Threat Assessment & Prioritisation',cat:'Intelligence',model:'multimodal',priority:'high'},
+      {id:'def-4',name:'Battlefield Situational Awareness',cat:'Operations',model:'multimodal',priority:'high'},
+      {id:'def-5',name:'UAV / Drone Detection & Tracking',cat:'Surveillance',model:'vision',priority:'high'},
+      {id:'def-6',name:'Logistics & Supply Chain Optimisation',cat:'Operations',model:'llm',priority:'medium'},
+      {id:'def-7',name:'Intelligence Report Summarisation (RAG)',cat:'Intelligence',model:'llm',priority:'high'},
+      {id:'def-8',name:'Signals & Pattern Analysis',cat:'Intelligence',model:'multimodal',priority:'high'},
+      {id:'def-9',name:'Predictive Maintenance (Vehicles & Equipment)',cat:'Monitoring',model:'classification',priority:'medium'},
+      {id:'def-10',name:'Personnel & Asset Tracking',cat:'Operations',model:'vision',priority:'medium'},
+      {id:'def-11',name:'Cyber Threat Detection & Response',cat:'Intelligence',model:'classification',priority:'high'},
+      {id:'def-12',name:'Training Simulation & Scenario Generation',cat:'Operations',model:'llm',priority:'medium'},
+    ],
+    personas:[
+      {role:'Intelligence Analyst',dept:'J2 / Intelligence',need:'Rapid threat assessment, report synthesis, pattern recognition'},
+      {role:'Operations Commander',dept:'J3 / Operations',need:'Real-time situational picture, decision support, alerts'},
+      {role:'Signals Operator',dept:'J6 / Communications',need:'Signal classification, anomaly detection, automated flagging'},
+      {role:'Logistics Officer',dept:'J4 / Logistics',need:'Supply chain visibility, predictive maintenance alerts'},
+    ],
+    flags:{sovereign:true,compass:true,airgap:true,modularDC:true,geo:true,def:true}
+  },
+
+  aviation: {
+    id:'aviation', icon:'✈️', name:'Aviation / DGCA',
+    desc:'Aviation safety AI, ATC optimisation, predictive maintenance, crew safety, flight data analysis',
+    defaultTier:3, defaultTopology:'hub_spoke_edge', defaultDeploy:'on_prem',
+    sovereignDefault:true, compassRequired:true,
+    useCases:[
+      {id:'av-1',name:'Flight Data Recorder (FDR) Anomaly Detection',cat:'Monitoring',model:'classification',priority:'high'},
+      {id:'av-2',name:'Predictive Maintenance — Airframe & Engines',cat:'Monitoring',model:'classification',priority:'high'},
+      {id:'av-3',name:'ATC Communication Transcription & Analysis',cat:'Intelligence',model:'multimodal',priority:'high'},
+      {id:'av-4',name:'Runway Incursion & Ground Safety Detection',cat:'Surveillance',model:'vision',priority:'high'},
+      {id:'av-5',name:'Weather & NOTAM Intelligence RAG',cat:'Intelligence',model:'llm',priority:'high'},
+      {id:'av-6',name:'Pilot Fatigue & Crew Fitness Monitoring',cat:'Monitoring',model:'classification',priority:'high'},
+      {id:'av-7',name:'Safety Incident Report Analysis (ASRS-style)',cat:'Analytics',model:'llm',priority:'high'},
+      {id:'av-8',name:'Flight Route Optimisation & Fuel Efficiency',cat:'Analytics',model:'classification',priority:'medium'},
+      {id:'av-9',name:'Bird Strike Risk Prediction',cat:'Monitoring',model:'classification',priority:'medium'},
+      {id:'av-10',name:'FOQA / Flight Operations Quality Assurance',cat:'Analytics',model:'classification',priority:'high'},
+      {id:'av-11',name:'Regulatory Compliance Document RAG',cat:'Intelligence',model:'llm',priority:'medium'},
+      {id:'av-12',name:'Cargo & Baggage Anomaly Detection',cat:'Surveillance',model:'vision',priority:'medium'},
+      {id:'av-13',name:'Airport Perimeter Security (EO + Video)',cat:'Surveillance',model:'vision',priority:'high'},
+      {id:'av-14',name:'Crew Scheduling & Rostering Optimisation',cat:'Operations',model:'llm',priority:'medium'},
+      {id:'av-15',name:'Air Traffic Flow Management (ATFM) AI',cat:'Operations',model:'classification',priority:'medium'},
+    ],
+    personas:[
+      {role:'DGCA Safety Inspector',dept:'DGCA / Safety Division',need:'Safety trend analysis, incident pattern detection, regulatory reports'},
+      {role:'Airline MRO Engineer',dept:'Maintenance, Repair & Overhaul',need:'Predictive maintenance alerts, component health scoring'},
+      {role:'Air Traffic Controller',dept:'AAI / ATC',need:'Real-time decision support, traffic flow alerts, communication logs'},
+      {role:'Flight Safety Officer',dept:'Airline Safety Dept',need:'FOQA dashboards, crew fatigue alerts, incident correlation'},
+    ],
+    flags:{sovereign:true,compass:true,airgap:false,modularDC:false,geo:false,def:false}
+  },
+
+  intelligence: {
+    id:'intelligence', icon:'📡', name:'Intelligence & Signals',
+    desc:'SIGINT, ELINT, OSINT, threat intelligence, call data analysis, pattern of life',
+    defaultTier:3, defaultTopology:'hub_spoke_edge', defaultDeploy:'air_gapped',
+    sovereignDefault:true, compassRequired:true,
+    useCases:[
+      {id:'int-1',name:'Signal Classification & Emitter Identification',cat:'Intelligence',model:'classification',priority:'high'},
+      {id:'int-2',name:'Pattern of Life Analysis',cat:'Analytics',model:'multimodal',priority:'high'},
+      {id:'int-3',name:'OSINT Aggregation & Threat Scoring',cat:'Intelligence',model:'llm',priority:'high'},
+      {id:'int-4',name:'Call Data Record (CDR) Analysis',cat:'Analytics',model:'classification',priority:'high'},
+      {id:'int-5',name:'Network Entity Resolution & Link Analysis',cat:'Intelligence',model:'multimodal',priority:'high'},
+      {id:'int-6',name:'Multi-Source Intelligence Fusion',cat:'Intelligence',model:'multimodal',priority:'high'},
+      {id:'int-7',name:'Automated Intelligence Report Generation',cat:'Intelligence',model:'llm',priority:'high'},
+      {id:'int-8',name:'Dark Web & Social Media Monitoring',cat:'Surveillance',model:'llm',priority:'medium'},
+    ],
+    personas:[
+      {role:'Intelligence Analyst',dept:'National Intelligence Agency',need:'Multi-source fusion, rapid report generation, pattern alerts'},
+      {role:'Signals Analyst',dept:'SIGINT Division',need:'Signal classification, emitter database, anomaly alerts'},
+      {role:'OSINT Analyst',dept:'Open Source Intelligence',need:'Web scraping pipelines, entity resolution, scoring dashboards'},
+    ],
+    flags:{sovereign:true,compass:true,airgap:true,modularDC:false,geo:false,def:true}
+  },
+
+  telecom: {
+    id:'telecom', icon:'📶', name:'Telecom & Networks',
+    desc:'Network AI, traffic analysis, fraud detection, QoS optimisation, 5G/6G intelligence',
+    defaultTier:2, defaultTopology:'cluster', defaultDeploy:'on_prem',
+    sovereignDefault:false, compassRequired:false,
+    useCases:[
+      {id:'tel-1',name:'Network Anomaly & Fault Detection',cat:'Monitoring',model:'classification',priority:'high'},
+      {id:'tel-2',name:'Fraud Detection & Revenue Assurance',cat:'Analytics',model:'classification',priority:'high'},
+      {id:'tel-3',name:'QoS Degradation Prediction',cat:'Monitoring',model:'classification',priority:'high'},
+      {id:'tel-4',name:'Customer Churn Prediction',cat:'Analytics',model:'classification',priority:'medium'},
+      {id:'tel-5',name:'Network Traffic Demand Forecasting',cat:'Analytics',model:'classification',priority:'medium'},
+      {id:'tel-6',name:'Automated Network Configuration (AIOps)',cat:'Operations',model:'llm',priority:'medium'},
+      {id:'tel-7',name:'Subscriber Experience Intelligence',cat:'Analytics',model:'multimodal',priority:'medium'},
+      {id:'tel-8',name:'5G Spectrum Optimisation',cat:'Analytics',model:'classification',priority:'high'},
+    ],
+    personas:[
+      {role:'Network Operations Engineer',dept:'NOC',need:'Real-time fault detection, automated remediation, capacity alerts'},
+      {role:'Revenue Assurance Analyst',dept:'Finance / RA',need:'Fraud dashboards, anomaly reports, leakage detection'},
+      {role:'Product Manager',dept:'Commercial',need:'Churn predictions, subscriber intelligence, NPS correlation'},
+    ],
+    flags:{sovereign:false,compass:false,airgap:false,modularDC:false,geo:false,def:false}
+  },
+
+  governance: {
+    id:'governance', icon:'🏛️', name:'Governance & Smart City',
+    desc:'Urban planning, public services AI, citizen services, smart infrastructure, e-governance',
+    defaultTier:3, defaultTopology:'hub_spoke_edge', defaultDeploy:'on_prem',
+    sovereignDefault:true, compassRequired:false,
+    useCases:[
+      {id:'gov-1',name:'Citizen Query Chatbot (Multi-lingual RAG)',cat:'Operations',model:'llm',priority:'high'},
+      {id:'gov-2',name:'Traffic Flow Optimisation',cat:'Analytics',model:'classification',priority:'high'},
+      {id:'gov-3',name:'Public Safety & CCTV Analytics',cat:'Surveillance',model:'vision',priority:'high'},
+      {id:'gov-4',name:'Waste Management Route Optimisation',cat:'Operations',model:'classification',priority:'medium'},
+      {id:'gov-5',name:'Urban Heat Island Mapping',cat:'Analytics',model:'vision',priority:'medium'},
+      {id:'gov-6',name:'Document Processing & OCR (Government Forms)',cat:'Operations',model:'multimodal',priority:'high'},
+      {id:'gov-7',name:'Fraud Detection in Public Schemes',cat:'Analytics',model:'classification',priority:'high'},
+      {id:'gov-8',name:'Infrastructure Inspection (Potholes, Drains)',cat:'Monitoring',model:'vision',priority:'medium'},
+    ],
+    personas:[
+      {role:'Smart City Programme Manager',dept:'Urban Development Authority',need:'Cross-domain dashboards, KPI tracking, citizen impact metrics'},
+      {role:'Citizen Services Officer',dept:'e-Governance',need:'Chatbot monitoring, query analytics, escalation routing'},
+      {role:'Traffic Management Officer',dept:'Traffic Police / RTO',need:'Real-time traffic AI alerts, signal control integration'},
+    ],
+    flags:{sovereign:true,compass:false,airgap:false,modularDC:false,geo:true,def:false}
+  },
+
+  lifesciences: {
+    id:'lifesciences', icon:'🧬', name:'Life Sciences',
+    desc:'Drug discovery, genomics, clinical trials, protein structure, biomarker identification',
+    defaultTier:3, defaultTopology:'cluster', defaultDeploy:'on_prem',
+    sovereignDefault:false, compassRequired:false,
+    useCases:[
+      {id:'ls-1',name:'Drug Candidate Screening & Molecular Property Prediction',cat:'Analytics',model:'classification',priority:'high'},
+      {id:'ls-2',name:'Genomic Variant Analysis',cat:'Analytics',model:'classification',priority:'high'},
+      {id:'ls-3',name:'Clinical Trial Data Analysis & Adverse Event Detection',cat:'Analytics',model:'multimodal',priority:'high'},
+      {id:'ls-4',name:'Protein Structure Prediction',cat:'Analytics',model:'classification',priority:'high'},
+      {id:'ls-5',name:'Biomarker Discovery',cat:'Analytics',model:'classification',priority:'medium'},
+      {id:'ls-6',name:'Literature Mining RAG (PubMed, ClinicalTrials)',cat:'Intelligence',model:'llm',priority:'high'},
+      {id:'ls-7',name:'Regulatory Submission Document Generation',cat:'Operations',model:'llm',priority:'medium'},
+    ],
+    personas:[
+      {role:'Computational Biologist',dept:'R&D',need:'High-throughput model runs, molecular data pipelines, result visualisation'},
+      {role:'Clinical Data Manager',dept:'Clinical Operations',need:'Trial data QC, adverse event flagging, regulatory reporting'},
+      {role:'Research Scientist',dept:'Discovery Research',need:'Literature RAG, hypothesis generation, model benchmarking'},
+    ],
+    flags:{sovereign:false,compass:false,airgap:false,modularDC:false,geo:false,def:false}
+  },
+
+  healthcare: {
+    id:'healthcare', icon:'🏥', name:'Healthcare & Medical',
+    desc:'Diagnostic imaging AI, clinical decision support, hospital operations, patient safety, DISHA compliance',
+    defaultTier:2, defaultTopology:'cluster', defaultDeploy:'on_prem',
+    sovereignDefault:true, compassRequired:false,
+    useCases:[
+      {id:'hc-1',name:'Radiology AI — Chest X-Ray & CT Analysis',cat:'Analytics',model:'vision',priority:'high'},
+      {id:'hc-2',name:'Pathology Slide Analysis (Digital Pathology)',cat:'Analytics',model:'vision',priority:'high'},
+      {id:'hc-3',name:'Clinical Decision Support (Diagnosis Assist)',cat:'Intelligence',model:'multimodal',priority:'high'},
+      {id:'hc-4',name:'Sepsis & Deterioration Early Warning',cat:'Monitoring',model:'classification',priority:'high'},
+      {id:'hc-5',name:'Clinical Notes NLP & ICD Coding',cat:'Operations',model:'llm',priority:'high'},
+      {id:'hc-6',name:'Patient Flow & Bed Management Optimisation',cat:'Operations',model:'classification',priority:'medium'},
+      {id:'hc-7',name:'Drug Interaction & Prescription Safety',cat:'Intelligence',model:'llm',priority:'high'},
+      {id:'hc-8',name:'Medical Imaging Report Generation',cat:'Operations',model:'multimodal',priority:'medium'},
+    ],
+    personas:[
+      {role:'Radiologist',dept:'Radiology',need:'AI-assisted reads, report drafting, worklist prioritisation'},
+      {role:'Clinician / Physician',dept:'Clinical Medicine',need:'Decision support, drug interaction checks, patient history RAG'},
+      {role:'Hospital Operations Manager',dept:'Administration',need:'Bed management, patient flow, staffing analytics'},
+      {role:'Health IT Officer',dept:'IT / HIMS',need:'System integration, DISHA compliance, audit logs'},
+    ],
+    flags:{sovereign:true,compass:false,airgap:false,modularDC:false,geo:false,def:false}
+  },
+
+  coe: {
+    id:'coe', icon:'🎓', name:'AI Centre / CoE',
+    desc:'AI Centre of Excellence setup — use case delivery hub, startup incubator, skills academy, research partnerships, sovereign AI infrastructure',
+    defaultTier:4, defaultTopology:'hub_spoke_edge', defaultDeploy:'on_prem',
+    sovereignDefault:true, compassRequired:true,
+    useCases:[
+      {id:'coe-1',name:'Domain-Specific AI Use Case Delivery (Hub)',cat:'Operations',model:'multimodal',priority:'high'},
+      {id:'coe-2',name:'Startup Sandbox — Model Training & Experimentation',cat:'Operations',model:'multimodal',priority:'high'},
+      {id:'coe-3',name:'Skills Academy — AI Curriculum & Simulation',cat:'Operations',model:'llm',priority:'high'},
+      {id:'coe-4',name:'Government Service AI (Citizen-Facing)',cat:'Operations',model:'llm',priority:'high'},
+      {id:'coe-5',name:'Research Collaboration Platform (RAG + Compute)',cat:'Intelligence',model:'multimodal',priority:'medium'},
+      {id:'coe-6',name:'AI Policy & Governance Dashboard',cat:'Analytics',model:'llm',priority:'medium'},
+      {id:'coe-7',name:'Economic Impact Measurement Platform',cat:'Analytics',model:'multimodal',priority:'medium'},
+      {id:'coe-8',name:'Sovereign Data Lake & Federated Learning',cat:'Operations',model:'multimodal',priority:'high'},
+    ],
+    personas:[
+      {role:'CoE Programme Director',dept:'Government / Ministry',need:'Programme dashboard, milestone tracking, impact metrics'},
+      {role:'Startup Founder / Incubatee',dept:'Startup Cohort',need:'Compute access, model APIs, mentorship scheduling'},
+      {role:'AI Curriculum Trainer',dept:'Skills Academy',need:'LMS integration, simulation environments, certification tracking'},
+      {role:'Research Partner (Academia)',dept:'University / IIT/IISc',need:'Data access, compute allocation, publication pipeline'},
+    ],
+    flags:{sovereign:true,compass:true,airgap:false,modularDC:true,geo:false,def:false}
+  },
+
+  general: {
+    id:'general', icon:'⚙️', name:'General / Custom',
+    desc:'Blank slate — define your own use cases, personas, and architecture from scratch',
+    defaultTier:2, defaultTopology:'cluster', defaultDeploy:'on_prem',
+    sovereignDefault:false, compassRequired:false,
+    useCases:[
+      {id:'gen-1',name:'Custom Use Case 1',cat:'Operations',model:'llm',priority:'medium'},
+    ],
+    personas:[
+      {role:'Platform User',dept:'Operations',need:'Access AI platform capabilities for defined use cases'},
+    ],
+    flags:{sovereign:false,compass:false,airgap:false,modularDC:false,geo:false,def:false}
+  }
+}
+
+const STEPS = [
+  {num:1,label:'Engagement',sub:'Project & customer details'},
+  {num:2,label:'Domain',sub:'Select & load domain pack'},
+  {num:3,label:'Use Cases',sub:'Select & configure UCs'},
+  {num:4,label:'Personas',sub:'Define user groups'},
+  {num:5,label:'Architecture',sub:'Tier, topology, sites'},
+  {num:6,label:'Volumetrics',sub:'Scale & performance'},
+  {num:7,label:'Commercial',sub:'Deal & procurement'},
+  {num:8,label:'Review & Export',sub:'Download project file'},
+]
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let STATE = {
+  step: 1,
+  mode: 'pack',
+  projId: generateProjId(),
+  domain: null,
+  engagement: {},
+  useCases: [],
+  personas: [],
+  architecture: {tier:2,topology:'cluster',deployType:'on_prem',sites:[],flags:{sovereign:false,compass:false,airgap:false,modularDC:false,geo:false,def:false,ha:false}},
+  volumetrics: {},
+  commercial: {currency:'USD'},
+}
+
+function generateProjId(){
+  const y=new Date().getFullYear()
+  const n=String(Math.floor(Math.random()*9000)+1000)
+  return `PROJ-${y}-${n}`
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+function init(){
+  renderProgressBar()
+  renderSidebar()
+  renderDomainGrid()
+  renderFlags()
+  showStep(1)
+  updateSizeHint()
+}
+
+function renderProgressBar(){
+  document.getElementById('progressBar').innerHTML = STEPS.map((s,i)=>
+    `<div class="step-item">
+      <button class="step-btn ${STATE.step===s.num?'active':STATE.step>s.num?'done':''}" onclick="goToStep(${s.num})">
+        <span class="step-num">${STATE.step>s.num?'✓':s.num}</span>${s.label}
+      </button>
+      ${i<STEPS.length-1?'<span class="step-arrow">›</span>':''}
+    </div>`
+  ).join('')
+}
+
+function renderSidebar(){
+  document.getElementById('sidebarSteps').innerHTML = STEPS.map(s=>
+    `<div class="sb-step ${STATE.step===s.num?'active':STATE.step>s.num?'done':''}" onclick="goToStep(${s.num})">
+      <div class="sb-step-num">${STATE.step>s.num?'✓':s.num}</div>
+      <div><div class="sb-step-label">${s.label}</div><div class="sb-step-sub">${s.sub}</div></div>
+    </div>`
+  ).join('')
+  document.getElementById('sidebarProjId').textContent = `ID: ${STATE.projId}`
+  if(STATE.domain){
+    const pack = DOMAIN_PACKS[STATE.domain]
+    document.getElementById('sidebarInfo').innerHTML = `<strong>${pack.icon} ${pack.name}</strong><br>${STATE.useCases.filter(u=>u.selected).length} UCs selected · Tier ${STATE.architecture.tier}`
+  }
+}
+
+function showStep(n){
+  document.querySelectorAll('.step-page').forEach(p=>p.classList.remove('active'))
+  document.getElementById(`step-${n}`).classList.add('active')
+  STATE.step = n
+  renderProgressBar()
+  renderSidebar()
+  document.getElementById('navInfo').textContent = `Step ${n} of 8`
+  document.getElementById('btnBack').disabled = n===1
+  document.getElementById('btnNext').textContent = n===8 ? '✓ Done' : 'Next →'
+  if(n===8) renderReview()
+  window.scrollTo(0,0)
+}
+
+function goToStep(n){
+  if(n < STATE.step || n <= STATE.step+1) showStep(n)
+}
+
+function nextStep(){
+  if(STATE.step===8) return
+  collectCurrentStep()
+  showStep(STATE.step+1)
+}
+
+function prevStep(){
+  if(STATE.step===1) return
+  showStep(STATE.step-1)
+}
+
+function collectCurrentStep(){
+  if(STATE.step===1) collectEngagement()
+  if(STATE.step===5) collectArchitecture()
+  if(STATE.step===6) collectVolumetrics()
+  if(STATE.step===7) collectCommercial()
+}
+
+function autoSave(){
+  collectEngagement()
+  collectVolumetrics()
+  collectCommercial()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 1 — ENGAGEMENT
+// ═══════════════════════════════════════════════════════════════
+function collectEngagement(){
+  STATE.engagement = {
+    projName: v('f-projName'),
+    customer: v('f-customer'),
+    custShort: v('f-custShort') || v('f-customer').slice(0,8),
+    country: v('f-country'),
+    sector: v('f-sector'),
+    stage: v('f-stage'),
+    notes: v('f-notes'),
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 2 — DOMAIN
+// ═══════════════════════════════════════════════════════════════
+function renderDomainGrid(){
+  document.getElementById('domainGrid').innerHTML = Object.values(DOMAIN_PACKS).map(p=>
+    `<div class="domain-card ${STATE.domain===p.id?'selected':''}" onclick="selectDomain('${p.id}')">
+      <div class="domain-card__icon">${p.icon}</div>
+      <div class="domain-card__name">${p.name}</div>
+      <div class="domain-card__desc">${p.desc}</div>
+      <div class="domain-card__count">${p.useCases.length} use cases in pack</div>
+    </div>`
+  ).join('')
+}
+
+function selectDomain(id){
+  STATE.domain = id
+  renderDomainGrid()
+  const pack = DOMAIN_PACKS[id]
+  if(STATE.mode==='pack'){
+    loadDomainPack(pack)
+  }
+  document.getElementById('domainPreview').style.display='block'
+  document.getElementById('domainPreviewText').innerHTML =
+    `<strong>${pack.icon} ${pack.name} selected.</strong> ${STATE.mode==='pack'?`Domain pack loaded — ${pack.useCases.length} use cases, ${pack.personas.length} personas, and architecture defaults pre-configured.`:'Manual mode — pack data not loaded.'}`
+  renderSidebar()
+}
+
+function loadDomainPack(pack){
+  STATE.useCases = pack.useCases.map(u=>({...u,selected:true,custom:false}))
+  STATE.personas = pack.personas.map((p,i)=>({...p,id:'p-'+i}))
+  STATE.architecture.tier = pack.defaultTier
+  STATE.architecture.topology = pack.defaultTopology
+  STATE.architecture.deployType = pack.defaultDeploy
+  STATE.architecture.flags = {...pack.flags,ha:pack.defaultTier>=3}
+  // Set default site if hub-spoke
+  if(pack.defaultTopology==='hub_spoke_edge'){
+    STATE.architecture.sites=[
+      {id:'s1',name:'Central Hub',role:'hub',location:'',airgap:false},
+      {id:'s2',name:'Regional Spoke 1',role:'spoke',location:'',airgap:false},
+      {id:'s3',name:'Edge Node 1',role:'edge',location:'',airgap:false},
+    ]
+  } else {
+    STATE.architecture.sites=[{id:'s1',name:'Primary Site',role:'hub',location:'',airgap:false}]
+  }
+  renderUCList()
+  renderPersonas()
+  renderTiers()
+  sv('f-topology', pack.defaultTopology)
+  sv('f-deployType', pack.defaultDeploy)
+  renderFlags()
+  renderSites()
+}
+
+function setMode(m){
+  STATE.mode = m
+  document.getElementById('modePackBtn').classList.toggle('active', m==='pack')
+  document.getElementById('modeManualBtn').classList.toggle('active', m==='manual')
+  if(STATE.domain) selectDomain(STATE.domain)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 3 — USE CASES
+// ═══════════════════════════════════════════════════════════════
+function renderUCList(filter){
+  const list = filter ? STATE.useCases.filter(u=>u.cat===filter) : STATE.useCases
+  document.getElementById('ucList').innerHTML = list.map((u,i)=>
+    `<div class="uc-item ${u.selected?'active':''}">
+      <input type="checkbox" ${u.selected?'checked':''} onchange="toggleUC('${u.id}',this.checked)">
+      <div class="uc-item__body">
+        <div class="uc-item__name">${u.name}</div>
+        <div class="uc-item__meta">
+          <span class="tag tag-cat">${u.cat}</span>
+          <span class="tag tag-model">${u.model}</span>
+          <span class="tag tag-pri-${u.priority}">${u.priority}</span>
+        </div>
+      </div>
+      <select onchange="updateUCPri('${u.id}',this.value)" style="font-size:10px;padding:3px 5px;border:1px solid #d0d0d8;border-radius:4px;font-family:inherit">
+        <option ${u.priority==='high'?'selected':''} value="high">High</option>
+        <option ${u.priority==='medium'?'selected':''} value="medium">Med</option>
+        <option ${u.priority==='low'?'selected':''} value="low">Low</option>
+      </select>
+    </div>`
+  ).join('')
+  updateUCCount()
+}
+
+function toggleUC(id,checked){
+  const uc = STATE.useCases.find(u=>u.id===id)
+  if(uc) uc.selected = checked
+  renderUCList()
+}
+function updateUCPri(id,pri){
+  const uc = STATE.useCases.find(u=>u.id===id)
+  if(uc) uc.priority = pri
+}
+function selectAllUCs(){ STATE.useCases.forEach(u=>u.selected=true); renderUCList() }
+function clearAllUCs(){ STATE.useCases.forEach(u=>u.selected=false); renderUCList() }
+function filterUCs(cat){ renderUCList(cat||null) }
+function updateUCCount(){
+  const n = STATE.useCases.filter(u=>u.selected).length
+  document.getElementById('ucSelectedCount').textContent = `${n} of ${STATE.useCases.length} selected`
+}
+function addCustomUC(){
+  const name = prompt('Use case name:')
+  if(!name) return
+  STATE.useCases.push({id:'custom-'+Date.now(),name,cat:'Operations',model:'llm',priority:'medium',selected:true,custom:true})
+  renderUCList()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 4 — PERSONAS
+// ═══════════════════════════════════════════════════════════════
+function renderPersonas(){
+  document.getElementById('personaGrid').innerHTML = STATE.personas.map((p,i)=>
+    `<div class="persona-card">
+      <button class="persona-remove" onclick="removePersona(${i})">×</button>
+      <div><label class="lbl">Role</label><input type="text" value="${p.role}" onchange="STATE.personas[${i}].role=this.value" style="margin-bottom:8px"></div>
+      <div><label class="lbl">Department</label><input type="text" value="${p.dept}" onchange="STATE.personas[${i}].dept=this.value" style="margin-bottom:8px"></div>
+      <div><label class="lbl">Primary Need</label><input type="text" value="${p.need}" onchange="STATE.personas[${i}].need=this.value"></div>
+    </div>`
+  ).join('')
+}
+function addPersona(){
+  STATE.personas.push({id:'p-'+Date.now(),role:'New Role',dept:'Department',need:'Primary need…'})
+  renderPersonas()
+}
+function removePersona(i){ STATE.personas.splice(i,1); renderPersonas() }
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 5 — ARCHITECTURE
+// ═══════════════════════════════════════════════════════════════
+function renderTiers(){
+  [1,2,3,4].forEach(t=>{
+    document.getElementById(`tier-${t}`).classList.toggle('selected', STATE.architecture.tier===t)
+  })
+}
+function selectTier(t){
+  STATE.architecture.tier = t
+  renderTiers()
+  if(t>=3) STATE.architecture.flags.ha = true
+  renderFlags()
+}
+function collectArchitecture(){
+  STATE.architecture.topology = v('f-topology')
+  STATE.architecture.deployType = v('f-deployType')
+}
+function renderFlags(){
+  const flags = [
+    {key:'sovereign',label:'Sovereign Requirements',icon:'🛡️'},
+    {key:'compass',label:'COMPASS Required',icon:'🧭'},
+    {key:'airgap',label:'Air-Gap Required',icon:'🔒'},
+    {key:'modularDC',label:'Modular Datacenter',icon:'📦'},
+    {key:'geo',label:'Geospatial Workloads',icon:'🛰️'},
+    {key:'def',label:'Defence Workloads',icon:'⚔️'},
+    {key:'ha',label:'High Availability',icon:'⚡'},
+  ]
+  document.getElementById('flagsGrid').innerHTML = flags.map(f=>
+    `<div class="flag-item ${STATE.architecture.flags[f.key]?'on':''}" onclick="toggleFlag('${f.key}')">
+      <input type="checkbox" ${STATE.architecture.flags[f.key]?'checked':''} onchange="toggleFlag('${f.key}')" onclick="event.stopPropagation()">
+      <div class="flag-item__label">${f.icon} ${f.label}</div>
+    </div>`
+  ).join('')
+}
+function toggleFlag(key){
+  STATE.architecture.flags[key] = !STATE.architecture.flags[key]
+  renderFlags()
+}
+function toggleSites(){
+  const topo = v('f-topology')
+  STATE.architecture.topology = topo
+  if(topo==='hub_spoke_edge' && STATE.architecture.sites.length<2){
+    STATE.architecture.sites=[
+      {id:'s1',name:'Central Hub',role:'hub',location:'',airgap:false},
+      {id:'s2',name:'Regional Spoke',role:'spoke',location:'',airgap:false},
+      {id:'s3',name:'Edge Node',role:'edge',location:'',airgap:false},
+    ]
+  }
+  renderSites()
+}
+function renderSites(){
+  document.getElementById('siteList').innerHTML = STATE.architecture.sites.map((s,i)=>
+    `<div class="site-item">
+      <span class="site-role-badge site-role-${s.role}">${s.role}</span>
+      <input type="text" value="${s.name}" placeholder="Site name" onchange="STATE.architecture.sites[${i}].name=this.value" style="font-size:12px">
+      <input type="text" value="${s.location}" placeholder="City / region" onchange="STATE.architecture.sites[${i}].location=this.value" style="font-size:12px">
+      <select onchange="STATE.architecture.sites[${i}].role=this.value" style="font-size:11px;padding:4px 6px;border:1px solid #d0d0d8;border-radius:4px;font-family:inherit">
+        <option ${s.role==='hub'?'selected':''} value="hub">Hub</option>
+        <option ${s.role==='spoke'?'selected':''} value="spoke">Spoke</option>
+        <option ${s.role==='edge'?'selected':''} value="edge">Edge</option>
+      </select>
+      <button onclick="removeSite(${i})" style="background:none;border:none;cursor:pointer;color:var(--mid);font-size:16px">×</button>
+    </div>`
+  ).join('')
+}
+function addSite(){
+  STATE.architecture.sites.push({id:'s-'+Date.now(),name:'New Site',role:'spoke',location:'',airgap:false})
+  renderSites()
+}
+function removeSite(i){ STATE.architecture.sites.splice(i,1); renderSites() }
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 6 — VOLUMETRICS
+// ═══════════════════════════════════════════════════════════════
+function collectVolumetrics(){
+  STATE.volumetrics = {
+    concurrentUsers: nv('f-users'),
+    peakRPS: nv('f-rps'),
+    avgTokens: nv('f-tokens'),
+    latencySLA: nv('f-latency'),
+    dataTB: nv('f-dataTB'),
+    availabilitySLA: nv('f-availability'),
+    modelSizes: v('f-modelSizes'),
+    trainingRequired: v('f-training')==='true',
+    finetuningRequired: v('f-finetuning')==='true',
+    retrainingFreq: v('f-retrain'),
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 7 — COMMERCIAL
+// ═══════════════════════════════════════════════════════════════
+function collectCommercial(){
+  STATE.commercial = {
+    currency: v('f-currency'),
+    dealValue: nv('f-dealValue'),
+    size: v('f-size'),
+    channel: v('f-channel'),
+    procurement: v('f-procurement'),
+    deliveryMonths: nv('f-delivery'),
+    implMonths: nv('f-impl'),
+    amcYears: nv('f-amc'),
+    partner: v('f-partner'),
+  }
+}
+
+function updateSizeHint(){
+  const cur = v('f-currency')
+  const val = nv('f-dealValue')
+  const hints = {
+    USD: [{max:500000,lbl:'S'},{max:3000000,lbl:'M'},{max:12000000,lbl:'L'},{max:Infinity,lbl:'XL'}],
+    INR: [{max:50000000,lbl:'S'},{max:250000000,lbl:'M'},{max:1000000000,lbl:'L'},{max:Infinity,lbl:'XL'}],
+  }
+  const tiers = hints[cur] || hints.USD
+  const tier = tiers.find(t=>val<=t.max)
+  if(tier && val>0){
+    document.getElementById('sizeHint').textContent = `→ Size: ${tier.lbl}`
+    sv('f-size', tier.lbl)
+  } else {
+    document.getElementById('sizeHint').textContent = 'USD: S<$500K · M<$3M · L<$12M · XL>$12M · INR: S<₹5Cr · M<₹25Cr · L<₹100Cr · XL>₹100Cr'
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 8 — REVIEW & EXPORT
+// ═══════════════════════════════════════════════════════════════
+function renderReview(){
+  collectCurrentStep()
+  collectEngagement()
+  collectVolumetrics()
+  collectCommercial()
+
+  const e = STATE.engagement
+  const a = STATE.architecture
+  const vol = STATE.volumetrics
+  const com = STATE.commercial
+  const selectedUCs = STATE.useCases.filter(u=>u.selected)
+  const pack = STATE.domain ? DOMAIN_PACKS[STATE.domain] : null
+
+  document.getElementById('reviewContent').innerHTML = `
+    <div class="review-section">
+      <div class="review-section-title">📋 Engagement</div>
+      ${row('Project Name', e.projName||'—')}
+      ${row('Customer', e.customer||'—')}
+      ${row('Country / Sector', `${e.country||'—'} · ${e.sector||'—'}`)}
+      ${row('Pipeline Stage', e.stage||'—')}
+      ${row('Project ID', STATE.projId)}
+    </div>
+    <div class="review-section">
+      <div class="review-section-title">${pack?pack.icon:'⚙️'} Domain</div>
+      ${row('Domain', pack?pack.name:'Not selected')}
+      ${row('Input Mode', STATE.mode==='pack'?'Domain Pack':'Manual')}
+      ${row('Use Cases Selected', selectedUCs.length + ' of ' + STATE.useCases.length)}
+      <div style="margin-top:8px"><div style="font-size:11px;color:var(--mid);margin-bottom:6px">Selected use cases:</div>
+      <div class="review-uc-list">${selectedUCs.slice(0,12).map(u=>`<span class="review-uc-tag">${u.name}</span>`).join('')}${selectedUCs.length>12?`<span class="review-uc-tag">+${selectedUCs.length-12} more</span>`:''}</div></div>
+    </div>
+    <div class="review-section">
+      <div class="review-section-title">🏗️ Architecture</div>
+      ${row('Tier', `Tier ${a.tier}`)}
+      ${row('Topology', a.topology)}
+      ${row('Deployment', a.deployType)}
+      ${row('Sites', a.sites.map(s=>`${s.name} (${s.role})`).join(', ')||'—')}
+      ${row('Active Flags', Object.entries(a.flags).filter(([k,v])=>v).map(([k])=>k).join(', ')||'None')}
+    </div>
+    <div class="review-section">
+      <div class="review-section-title">📊 Volumetrics</div>
+      ${row('Concurrent Users', vol.concurrentUsers||'—')}
+      ${row('Peak RPS', vol.peakRPS||'—')}
+      ${row('Latency SLA', vol.latencySLA ? vol.latencySLA+'ms' : '—')}
+      ${row('Data Volume', vol.dataTB ? vol.dataTB+'TB' : '—')}
+      ${row('Model Sizes', vol.modelSizes||'—')}
+      ${row('Training / Fine-tuning', `${vol.trainingRequired?'Yes':'No'} / ${vol.finetuningRequired?'Yes':'No'}`)}
+    </div>
+    <div class="review-section">
+      <div class="review-section-title">💼 Commercial</div>
+      ${row('Currency', com.currency||'—')}
+      ${row('Deal Value', com.dealValue ? com.currency+' '+com.dealValue.toLocaleString() : '—')}
+      ${row('Deal Size', com.size||'—')}
+      ${row('Channel', com.channel||'—')}
+      ${row('Procurement', com.procurement||'—')}
+      ${row('Delivery / Impl / AMC', `${com.deliveryMonths||'—'}m / ${com.implMonths||'—'}m / ${com.amcYears||'—'}yr`)}
+    </div>`
+}
+
+function row(k,v){
+  return `<div class="review-row"><span class="review-key">${k}</span><span class="review-val">${v}</span></div>`
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════════
+function buildJSON(){
+  collectEngagement(); collectArchitecture(); collectVolumetrics(); collectCommercial()
+  const e=STATE.engagement, a=STATE.architecture, vol=STATE.volumetrics, com=STATE.commercial
+  const pack = STATE.domain ? DOMAIN_PACKS[STATE.domain] : null
+  return {
+    meta:{schema_version:'1.0',created_at:new Date().toISOString(),updated_at:new Date().toISOString(),tool:'ATLAS Domain Configurator v3'},
+    project:{id:STATE.projId,name:e.projName,customer:e.customer,customer_short:e.custShort,country:e.country,sector:e.sector,stage:e.stage,notes:e.notes},
+    domain:{primary:STATE.domain||'general',display_name:pack?pack.name:'General',use_cases:STATE.useCases.filter(u=>u.selected).map(u=>({id:u.id,name:u.name,category:u.cat,priority:u.priority,model_type:u.model,custom:u.custom||false})),total_use_cases:STATE.useCases.filter(u=>u.selected).length},
+    personas:STATE.personas.map(p=>({role:p.role,department:p.dept,primary_need:p.need})),
+    architecture:{tier:a.tier,topology:a.topology,deployment_type:a.deployType,sites:a.sites,flags:a.flags},
+    volumetrics:vol,
+    commercial:{...com,deal_id:'DEAL-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*9000)+1000)},
+  }
+}
+
+function buildMarkdown(){
+  const j=buildJSON()
+  const p=j.project, d=j.domain, a=j.architecture, vol=j.volumetrics, com=j.commercial
+  const pack = STATE.domain ? DOMAIN_PACKS[STATE.domain] : null
+  return `# Project Definition: ${p.name||'Unnamed'}
+**ID:** ${p.id} | **Stage:** ${p.stage} | **Date:** ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}
+
+## Customer
+${p.customer||'—'} · ${p.sector||'—'} · ${p.country||'—'}
+
+## Domain & Use Cases
+Primary: ${d.display_name}
+${d.total_use_cases} use cases — ${d.use_cases.slice(0,8).map(u=>u.name).join(', ')}${d.total_use_cases>8?` … and ${d.total_use_cases-8} more`:''}
+
+## Architecture
+Tier ${a.tier} · ${a.topology} · ${a.deployment_type}
+Sites: ${a.sites.map(s=>`${s.name} (${s.role})`).join(', ')||'—'}
+Flags: ${Object.entries(a.flags).filter(([k,v])=>v).map(([k])=>k).join(', ')||'None'}
+
+## Volumetrics
+${vol.concurrentUsers||'—'} users · ${vol.peakRPS||'—'} RPS · ${vol.modelSizes||'—'} models
+Latency SLA: ${vol.latencySLA||'—'}ms · Availability: ${vol.availabilitySLA||'—'}%
+Training: ${vol.trainingRequired?'Yes':'No'} · Fine-tuning: ${vol.finetuningRequired?'Yes':'No'}
+
+## Commercial
+${com.size||'—'} deal · ${com.currency||'—'} · Est. ${com.dealValue?com.dealValue.toLocaleString():'—'}
+${com.deliveryMonths||'—'}m delivery + ${com.implMonths||'—'}m impl + ${com.amcYears||'—'}yr AMC
+Channel: ${com.channel||'—'} · Procurement: ${com.procurement||'—'}
+
+## Notes
+${p.notes||'—'}
+`
+}
+
+function exportJSON(){
+  const j=buildJSON()
+  const e=STATE.engagement
+  const fname=`ProjectDefinition-${(e.custShort||'Customer').replace(/[^a-z0-9]/gi,'_')}-${STATE.projId}-${new Date().toISOString().slice(0,10)}.json`
+  dl(JSON.stringify(j,null,2),'application/json',fname)
+}
+
+function exportMarkdown(){
+  const e=STATE.engagement
+  const fname=`ProjectDefinition-${(e.custShort||'Customer').replace(/[^a-z0-9]/gi,'_')}-${STATE.projId}-${new Date().toISOString().slice(0,10)}.md`
+  dl(buildMarkdown(),'text/markdown',fname)
+}
+
+function exportBoth(){ exportJSON(); exportMarkdown() }
+
+function copyJSON(){
+  navigator.clipboard.writeText(JSON.stringify(buildJSON(),null,2)).then(()=>{
+    const btn=event.target; btn.textContent='✓ Copied'; setTimeout(()=>btn.textContent='📋 Copy JSON',2000)
+  })
+}
+
+function dl(content,type,fname){
+  const blob=new Blob([content],{type})
+  const url=URL.createObjectURL(blob),a=document.createElement('a')
+  a.href=url;a.download=fname;a.click();URL.revokeObjectURL(url)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function v(id){ const el=document.getElementById(id); return el?el.value.trim():'' }
+function nv(id){ const val=parseFloat(v(id)); return isNaN(val)?null:val }
+function sv(id,val){ const el=document.getElementById(id); if(el) el.value=val }
+
+window.addEventListener('DOMContentLoaded', init)
+</script>
+</body>
+</html>
