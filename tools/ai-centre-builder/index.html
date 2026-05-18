@@ -1,1 +1,1443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — AI Centre Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);
+  --r:8px;--r-sm:6px;--r-lg:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:200;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-center{font-size:13px;color:rgba(255,255,255,0.65);}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-indigo{background:var(--indigo);color:var(--white);}
+.btn-indigo:hover{background:#2d0090;}
+.btn-amber{background:var(--amber);color:var(--dark);}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-lg{padding:12px 28px;font-size:14px;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;}
 
+/* PROGRESS */
+.progress-bar{background:var(--white);border-bottom:1px solid #e0e0e8;padding:0 24px;display:flex;overflow-x:auto;}
+.step-btn{display:flex;align-items:center;gap:8px;padding:14px 16px;font-size:11px;font-weight:600;color:var(--mid);cursor:pointer;border:none;background:transparent;border-bottom:3px solid transparent;white-space:nowrap;font-family:inherit;transition:all 0.15s;}
+.step-btn.active{color:var(--navy);border-bottom-color:var(--orange);}
+.step-btn.done{color:var(--teal);border-bottom-color:var(--teal);}
+.step-num{width:20px;height:20px;border-radius:50%;background:var(--light);color:var(--mid);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.step-btn.active .step-num{background:var(--orange);color:var(--white);}
+.step-btn.done .step-num{background:var(--teal);color:var(--white);}
+.step-arrow{color:#d0d0d8;font-size:12px;padding:0 2px;}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 108px);}
+.sidebar{background:var(--white);border-right:1px solid #e0e0e8;padding:20px;overflow-y:auto;}
+.main{padding:28px;overflow-y:auto;}
+.sb-title{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;}
+.sb-step{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--r);margin-bottom:4px;cursor:pointer;transition:all 0.15s;border:1px solid transparent;}
+.sb-step:hover{background:var(--light);}
+.sb-step.active{background:rgba(0,40,112,0.06);border-color:rgba(0,40,112,0.15);}
+.sb-num{width:22px;height:22px;border-radius:50%;background:var(--light);color:var(--mid);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.sb-step.active .sb-num{background:var(--orange);color:var(--white);}
+.sb-step.done .sb-num{background:var(--teal);color:var(--white);}
+.sb-label{font-size:12px;font-weight:600;color:var(--dark);}
+.sb-sub{font-size:10px;color:var(--mid);margin-top:2px;}
+.sb-divider{height:1px;background:#e0e0e8;margin:14px 0;}
+.sb-kpi{background:var(--light);border-radius:var(--r);padding:10px;margin-bottom:8px;}
+.sb-kpi-val{font-size:18px;font-weight:900;color:var(--navy);}
+.sb-kpi-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+
+/* FORMS */
+.step-page{display:none;}
+.step-page.active{display:block;}
+.step-title{font-size:22px;font-weight:700;color:var(--navy);margin-bottom:6px;}
+.step-sub{font-size:13px;color:var(--mid);margin-bottom:24px;line-height:1.6;}
+label.lbl{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;}
+input[type=text],input[type=number],select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+textarea{resize:vertical;min-height:80px;}
+.form-row{margin-bottom:18px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px;}
+.field-hint{font-size:10px;color:var(--mid);margin-top:4px;line-height:1.5;}
+.section-hdr{font-size:13px;font-weight:700;color:var(--navy);margin:24px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--light);display:flex;align-items:center;gap:8px;}
+
+/* CARDS */
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:14px;}
+
+/* TRACK CARDS */
+.track-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.track-card{border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;}
+.track-card.t1{border-top:4px solid var(--teal);}
+.track-card.t2{border-top:4px solid var(--orange);}
+.track-title{font-size:14px;font-weight:700;margin-bottom:4px;}
+.track-title.t1{color:var(--teal);}
+.track-title.t2{color:var(--orange);}
+.track-sub{font-size:11px;color:var(--mid);margin-bottom:14px;line-height:1.5;}
+
+/* INTELLIGENCE PANEL */
+.intel-panel{background:rgba(28,56,245,0.04);border:1px solid rgba(28,56,245,0.15);border-radius:var(--r-lg);padding:16px;margin-bottom:20px;}
+.intel-panel-title{font-size:12px;font-weight:700;color:var(--blue);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.intel-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.intel-item{background:var(--white);border-radius:var(--r);padding:10px;}
+.intel-item-val{font-size:16px;font-weight:700;color:var(--navy);}
+.intel-item-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+.intel-item-src{font-size:9px;color:var(--mid);margin-top:4px;font-style:italic;}
+
+/* LOADING */
+.loading-panel{text-align:center;padding:32px;background:rgba(28,56,245,0.04);border-radius:var(--r-lg);border:1px solid rgba(28,56,245,0.15);}
+.loading-icon{font-size:32px;animation:spin 1.5s linear infinite;display:inline-block;}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);};}
+.loading-text{font-size:12px;color:var(--mid);margin-top:8px;}
+
+/* STATE CARDS */
+.state-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.state-card{border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:12px;cursor:pointer;transition:all 0.15s;text-align:center;background:var(--white);}
+.state-card:hover{border-color:var(--navy);}
+.state-card.selected{border-color:var(--orange);background:rgba(255,85,57,0.04);}
+.state-card__name{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.state-card__tag{font-size:10px;color:var(--mid);}
+.state-card__score{font-size:18px;font-weight:900;margin-top:6px;}
+
+/* STACK BARS */
+.stack-item{margin-bottom:14px;}
+.stack-item-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.stack-item-lbl{font-size:12px;font-weight:600;color:var(--dark);}
+.stack-item-val{font-size:12px;font-weight:700;color:var(--navy);font-family:'Roboto Mono',monospace;}
+.stack-bar{height:8px;background:var(--light);border-radius:4px;overflow:hidden;}
+.stack-fill{height:100%;border-radius:4px;transition:width 0.4s;}
+
+/* TOKENOMICS */
+.token-table{width:100%;border-collapse:collapse;font-size:12px;}
+.token-table th{text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;background:var(--light);border-bottom:2px solid #e0e0e8;}
+.token-table td{padding:8px 10px;border-bottom:1px solid var(--light);}
+.token-table tr:last-child td{border-bottom:none;}
+.saving-pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(0,178,144,0.1);color:var(--teal);}
+
+/* USE CASES */
+.uc-list{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;}
+.uc-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e8;border-radius:var(--r);background:var(--white);}
+.uc-item.on{border-color:var(--teal);background:rgba(0,178,144,0.03);}
+.uc-item input{accent-color:var(--teal);}
+.uc-item-name{font-size:12px;font-weight:600;flex:1;}
+.uc-item-dept{font-size:10px;color:var(--mid);}
+
+/* POLICY TIMELINE */
+.policy-list{display:flex;flex-direction:column;gap:8px;}
+.policy-item{display:grid;grid-template-columns:80px 1fr 120px 100px;gap:10px;align-items:center;padding:10px 12px;border:1px solid #e0e0e8;border-radius:var(--r);background:var(--white);font-size:12px;}
+.policy-track-t1{border-left:3px solid var(--teal);}
+.policy-track-t2{border-left:3px solid var(--orange);}
+.policy-month{font-family:'Roboto Mono',monospace;font-size:11px;font-weight:700;color:var(--navy);}
+.policy-action{font-weight:600;}
+.policy-inst{font-size:10px;color:var(--mid);}
+.policy-type-pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;}
+.type-admin{background:rgba(0,178,144,0.1);color:var(--teal);}
+.type-board{background:rgba(28,56,245,0.08);color:var(--blue);}
+.type-leg{background:rgba(255,85,57,0.1);color:var(--orange);}
+
+/* REVIEW */
+.review-section{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:14px;}
+.review-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;}
+.review-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--light);font-size:12px;}
+.review-row:last-child{border-bottom:none;}
+.review-key{color:var(--mid);}
+.review-val{font-weight:600;color:var(--dark);text-align:right;}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+.kpi-box{text-align:center;padding:14px 10px;border-radius:var(--r-lg);border:1px solid #e0e0e8;background:var(--white);}
+.kpi-val{font-size:22px;font-weight:900;color:var(--navy);}
+.kpi-lbl{font-size:10px;color:var(--mid);margin-top:3px;}
+
+/* VISION BRIEF MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:400;display:none;align-items:center;justify-content:center;padding:24px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--white);border-radius:var(--r-lg);width:100%;max-width:780px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.2);}
+.modal-hdr{padding:20px 24px;border-bottom:1px solid var(--light);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.modal-title{font-size:16px;font-weight:700;color:var(--navy);}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--mid);}
+.modal-body{padding:24px;overflow-y:auto;flex:1;font-size:13px;line-height:1.7;}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--light);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;}
+
+/* EXPORT BAR */
+.export-bar{display:flex;gap:10px;flex-wrap:wrap;padding:14px 18px;background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);box-shadow:var(--shadow);margin-bottom:20px;}
+
+/* NAV FOOTER */
+.nav-footer{position:sticky;bottom:0;background:var(--white);border-top:1px solid #e0e0e8;padding:12px 28px;display:flex;justify-content:space-between;align-items:center;}
+.nav-info{font-size:11px;color:var(--mid);}
+
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:var(--r);font-size:11px;margin-bottom:14px;line-height:1.6;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-success{background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.2);color:var(--teal);}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.25);color:#9a7000;}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr;}.sidebar{display:none;}.track-grid{grid-template-columns:1fr;}.state-grid{grid-template-columns:repeat(2,1fr);}.form-grid{grid-template-columns:1fr;}.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div class="hdr-center">AI Centre Builder</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">v1.0</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+  </div>
+</div>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sb-title">Steps</div>
+    <div id="sidebarSteps"></div>
+    <div class="sb-divider"></div>
+    <div id="sidebarKPIs"></div>
+  </div>
+
+  <div class="main">
+
+    <!-- STEP 1: GEOGRAPHY -->
+    <div class="step-page active" id="step-1">
+      <div class="step-title">🌍 Geography</div>
+      <div class="step-sub">Define the territory for this AI Centre proposal. Select a pre-profiled state or enter a custom geography. The tool will load local intelligence on power, cooling, land, and policy.</div>
+
+      <div class="section-hdr">📍 Quick-Select — India State Profiles</div>
+      <div class="state-grid" id="stateGrid"></div>
+
+      <div class="card">
+        <div class="card-title">Geography Details</div>
+        <div class="card-sub">Review and edit the auto-loaded profile, or enter a custom geography.</div>
+        <div class="form-grid">
+          <div>
+            <label class="lbl">Country</label>
+            <select id="f-country" onchange="autoSave()">
+              <option value="India">India</option>
+              <option value="UAE">UAE</option>
+              <option value="Saudi Arabia">Saudi Arabia</option>
+              <option value="Singapore">Singapore</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">State / Province / Region</label>
+            <input type="text" id="f-state" placeholder="e.g. Himachal Pradesh" oninput="autoSave()">
+          </div>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label class="lbl">Primary Site City / District</label>
+            <input type="text" id="f-city" placeholder="e.g. Kangra" oninput="autoSave()">
+          </div>
+          <div>
+            <label class="lbl">Centre Name / Acronym</label>
+            <input type="text" id="f-centreName" placeholder="e.g. HAICE" oninput="autoSave()">
+            <div class="field-hint">Used across all documents and exports.</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <label class="lbl">Centre Full Name</label>
+          <input type="text" id="f-centreFullName" placeholder="e.g. Himalayan AI Centre of Excellence" oninput="autoSave()">
+        </div>
+        <div class="form-row">
+          <label class="lbl">Target Government / Authority</label>
+          <input type="text" id="f-govtName" placeholder="e.g. Government of Himachal Pradesh" oninput="autoSave()">
+        </div>
+      </div>
+
+      <div id="geoIntelPanel" style="display:none"></div>
+    </div>
+
+    <!-- STEP 2: NATURAL STACK -->
+    <div class="step-page" id="step-2">
+      <div class="step-title">⚡ Natural Stack Assessment</div>
+      <div class="step-sub">The natural stack is the structural competitive advantage of this geography. Review and calibrate the auto-loaded profile. These values drive the tokenomics calculator in Track 2.</div>
+
+      <div class="intel-panel">
+        <div class="intel-panel-title">📊 Geo-Intelligence Summary — <span id="geoLabel">—</span></div>
+        <div class="intel-grid" id="intelGrid"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⚡ Power</div>
+        <div class="form-grid-3">
+          <div>
+            <label class="lbl">Primary Power Source</label>
+            <select id="f-powerSource" onchange="autoSave();updateTokenomics()">
+              <option value="hydel">Hydro / Hydel</option>
+              <option value="solar">Solar</option>
+              <option value="wind">Wind</option>
+              <option value="mixed">Mixed Renewable</option>
+              <option value="grid">State Grid</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Power Cost (₹/kWh)</label>
+            <input type="number" id="f-powerCost" step="0.1" placeholder="3.5" oninput="autoSave();updateTokenomics()">
+            <div class="field-hint">Metro benchmark: ₹7–9/kWh</div>
+          </div>
+          <div>
+            <label class="lbl">Renewable %</label>
+            <input type="number" id="f-renewablePct" placeholder="90" oninput="autoSave()">
+          </div>
+        </div>
+        <div id="powerBar" class="stack-item" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💧 Cooling</div>
+        <div class="form-grid-3">
+          <div>
+            <label class="lbl">Cooling Source</label>
+            <select id="f-coolingSource" onchange="autoSave();updateTokenomics()">
+              <option value="glacial">Glacial / River Water</option>
+              <option value="ambient">Ambient Air (high altitude)</option>
+              <option value="seawater">Seawater</option>
+              <option value="groundwater">Groundwater</option>
+              <option value="chiller">Mechanical Chiller</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Free Cooling Months/Year</label>
+            <input type="number" id="f-coolingMonths" placeholder="8" min="0" max="12" oninput="autoSave();updateTokenomics()">
+          </div>
+          <div>
+            <label class="lbl">Target PUE</label>
+            <input type="number" id="f-pue" step="0.05" placeholder="1.15" oninput="autoSave();updateTokenomics()">
+            <div class="field-hint">Metro air-cooled: 1.5–1.8</div>
+          </div>
+        </div>
+        <div id="coolingBar" class="stack-item" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🏔️ Land & Connectivity</div>
+        <div class="form-grid">
+          <div>
+            <label class="lbl">Land Cost vs Metro (%)</label>
+            <input type="number" id="f-landCost" placeholder="15" oninput="autoSave()">
+            <div class="field-hint">e.g. 15 = 15% of metro cost. HP ≈ 10–20%.</div>
+          </div>
+          <div>
+            <label class="lbl">Nearest Metro (for latency)</label>
+            <input type="text" id="f-nearestMetro" placeholder="e.g. Chandigarh / Delhi NCR" oninput="autoSave()">
+          </div>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label class="lbl">Fibre Backbone</label>
+            <select id="f-fibre" onchange="autoSave()">
+              <option value="BharatNet Phase 2">BharatNet Phase 2</option>
+              <option value="NKN">NKN</option>
+              <option value="State OFC">State OFC</option>
+              <option value="Private fibre">Private fibre</option>
+              <option value="To be laid">To be laid</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Latency to Nearest Metro (ms)</label>
+            <input type="number" id="f-latency" placeholder="15" oninput="autoSave()">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🏛️ State Incentives</div>
+        <div class="form-grid">
+          <div>
+            <label class="lbl">Capital Subsidy (%)</label>
+            <input type="number" id="f-capSubsidy" placeholder="15" oninput="autoSave()">
+          </div>
+          <div>
+            <label class="lbl">Power Tariff Concession (years)</label>
+            <input type="number" id="f-tariffYears" placeholder="10" oninput="autoSave()">
+          </div>
+        </div>
+        <div class="form-row">
+          <label class="lbl">Additional Incentives</label>
+          <textarea id="f-incentives" placeholder="e.g. Electricity duty exemption 10 years, stamp duty waiver, single-window clearance, HPIDB concessional land rate…" oninput="autoSave()"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: DUAL TRACK -->
+    <div class="step-page" id="step-3">
+      <div class="step-title">🛤️ Dual Track Configuration</div>
+      <div class="step-sub">Configure both tracks. Track 1 is a government CoE — in-territory consumption with full data sovereignty. Track 2 is a commercial inferencing factory selling tokens nationally.</div>
+
+      <div class="track-grid">
+        <!-- TRACK 1 -->
+        <div class="track-card t1">
+          <div class="track-title t1">Track 1 — CoE</div>
+          <div class="track-sub">Managed AI platform for the state government. Government consumes AI through a governed API. All data stays within jurisdiction.</div>
+
+          <div class="form-row">
+            <label class="lbl">Anchor Ministry / Department</label>
+            <input type="text" id="f-anchorDept" placeholder="e.g. HP IT Dept / e-Governance" oninput="autoSave()">
+          </div>
+          <div class="form-row">
+            <label class="lbl">Anchor Offtake (₹ Cr/year)</label>
+            <input type="number" id="f-offtake" placeholder="12" oninput="autoSave();updateSidebarKPIs()">
+            <div class="field-hint">Minimum rate contract commitment from government. HAICE baseline: ₹12–15 Cr/yr</div>
+          </div>
+          <div class="form-row">
+            <label class="lbl">Rate Contract Duration (years)</label>
+            <input type="number" id="f-rcDuration" placeholder="3" oninput="autoSave()">
+          </div>
+          <div class="form-row">
+            <label class="lbl">Skills Academy Annual Intake</label>
+            <input type="number" id="f-skillsIntake" placeholder="300" oninput="autoSave()">
+          </div>
+          <div class="form-row">
+            <label class="lbl">Academic Partner</label>
+            <input type="text" id="f-acadPartner" placeholder="e.g. NIT Hamirpur" oninput="autoSave()">
+          </div>
+          <div class="form-grid" style="margin-bottom:10px">
+            <div>
+              <label class="lbl">Startup Sandbox</label>
+              <select id="f-sandbox" onchange="autoSave()">
+                <option value="yes">Yes — included</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+            <div>
+              <label class="lbl">Data Classification</label>
+              <select id="f-dataClass" onchange="autoSave()">
+                <option value="four-tier">4-tier (Secret → Public)</option>
+                <option value="three-tier">3-tier (Restricted → Public)</option>
+                <option value="standard">Standard (Confidential / Public)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRACK 2 -->
+        <div class="track-card t2">
+          <div class="track-title t2">Track 2 — Inferencing Factory</div>
+          <div class="track-sub">Commercial business. Sells AI inference nationally. Government earns GST. HP holds equity.</div>
+
+          <div class="form-row">
+            <label class="lbl">Commercial Entity Name</label>
+            <input type="text" id="f-entityName" placeholder="e.g. HPAIC Pvt Ltd" oninput="autoSave()">
+          </div>
+          <div class="form-grid" style="margin-bottom:10px">
+            <div>
+              <label class="lbl">Government Equity (%)</label>
+              <input type="number" id="f-govtEquity" placeholder="26" oninput="autoSave();updateSidebarKPIs()">
+              <div class="field-hint">In-kind (land + tariff concession). Zero cash.</div>
+            </div>
+            <div>
+              <label class="lbl">In-Kind Equity Value (₹ Cr)</label>
+              <input type="number" id="f-inkindVal" placeholder="175" oninput="autoSave()">
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="lbl">Revenue Models</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px" id="revenueModels"></div>
+          </div>
+          <div class="form-grid" style="margin-bottom:10px">
+            <div>
+              <label class="lbl">Target Customers</label>
+              <select id="f-targetCustomers" onchange="autoSave()">
+                <option value="all">Enterprise + Developer + SaaS + Govt</option>
+                <option value="enterprise">Enterprise & BFSI focus</option>
+                <option value="developer">Developer & Startup focus</option>
+                <option value="govt">Government-first</option>
+              </select>
+            </div>
+            <div>
+              <label class="lbl">Closed-Weight Reseller?</label>
+              <select id="f-closedWeight" onchange="autoSave()">
+                <option value="exploratory">Exploratory (Phase 2)</option>
+                <option value="yes">Yes — Phase 1</option>
+                <option value="no">No — open-weight only</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- USE CASES -->
+      <div class="section-hdr">📋 Track 1 — Priority Use Cases</div>
+      <div class="alert alert-info">Select government use cases for this territory. These anchor Track 1 and justify the rate contract value.</div>
+      <div class="uc-list" id="ucList"></div>
+      <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="addCustomUC()">+ Custom Use Case</button>
+
+      <!-- SITES -->
+      <div class="section-hdr" style="margin-top:24px">📍 Multi-Site Plan</div>
+      <div id="sitesList"></div>
+      <button class="btn btn-outline btn-sm" onclick="addSite()">+ Add Site</button>
+    </div>
+
+    <!-- STEP 4: FINANCIAL -->
+    <div class="step-page" id="step-4">
+      <div class="step-title">💰 Financial Parameters</div>
+      <div class="step-sub">Configure CapEx phasing, revenue projections, jobs, and debt structure. The tokenomics calculator auto-computes production cost and margin from your natural stack inputs.</div>
+
+      <!-- TOKENOMICS -->
+      <div class="card">
+        <div class="card-title">⚡ Tokenomics Calculator</div>
+        <div class="card-sub">Auto-calculated from power cost, PUE, and cooling profile. Edit inputs in Step 2 to update.</div>
+        <div id="tokenomicsOutput"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🏗️ CapEx by Phase</div>
+        <div class="form-grid-3">
+          <div>
+            <label class="lbl">Phase 1 CapEx (₹ Cr)</label>
+            <input type="number" id="f-capex1" placeholder="450" oninput="autoSave();updateSidebarKPIs()">
+            <div class="field-hint">Infrastructure, compute, civil works</div>
+          </div>
+          <div>
+            <label class="lbl">Phase 2 CapEx (₹ Cr)</label>
+            <input type="number" id="f-capex2" placeholder="600" oninput="autoSave()">
+          </div>
+          <div>
+            <label class="lbl">Phase 3 CapEx (₹ Cr)</label>
+            <input type="number" id="f-capex3" placeholder="300" oninput="autoSave()">
+          </div>
+        </div>
+      </div>
+
+      <div class="track-grid">
+        <div class="track-card t1">
+          <div class="track-title t1">Track 1 — CoE Financials</div>
+          <div class="form-row">
+            <label class="lbl">Anchor Offtake (₹ Cr/yr)</label>
+            <input type="number" id="f-t1Revenue" placeholder="13" oninput="autoSave();updateSidebarKPIs()">
+          </div>
+          <div class="form-row">
+            <label class="lbl">Total Depts by Year 3</label>
+            <input type="number" id="f-t1Depts" placeholder="7" oninput="autoSave()">
+          </div>
+          <div class="form-row">
+            <label class="lbl">Projected Annual Revenue Y3 (₹ Cr)</label>
+            <input type="number" id="f-t1RevY3" placeholder="40" oninput="autoSave()">
+          </div>
+        </div>
+        <div class="track-card t2">
+          <div class="track-title t2">Track 2 — Factory Financials</div>
+          <div class="form-row">
+            <label class="lbl">Projected Revenue Y1 (₹ Cr)</label>
+            <input type="number" id="f-t2RevY1" placeholder="85" oninput="autoSave();updateSidebarKPIs()">
+          </div>
+          <div class="form-row">
+            <label class="lbl">Projected Revenue Y3 (₹ Cr)</label>
+            <input type="number" id="f-t2RevY3" placeholder="580" oninput="autoSave()">
+          </div>
+          <div class="form-row">
+            <label class="lbl">GST to State Y1–Y5 (₹ Cr)</label>
+            <input type="number" id="f-gstTotal" placeholder="3500" oninput="autoSave();updateSidebarKPIs()">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">👥 Employment — Direct & Induced</div>
+        <div class="form-grid-3">
+          <div>
+            <label class="lbl">Direct Jobs — Phase 1</label>
+            <input type="number" id="f-jobs1" placeholder="50" oninput="autoSave()">
+          </div>
+          <div>
+            <label class="lbl">Direct Jobs — Phase 2</label>
+            <input type="number" id="f-jobs2" placeholder="175" oninput="autoSave()">
+          </div>
+          <div>
+            <label class="lbl">Direct Jobs — Phase 3+</label>
+            <input type="number" id="f-jobs3" placeholder="650" oninput="autoSave()">
+          </div>
+        </div>
+        <div class="form-grid-3">
+          <div>
+            <label class="lbl">IRR Target (%)</label>
+            <input type="number" id="f-irr" placeholder="28" oninput="autoSave()">
+          </div>
+          <div>
+            <label class="lbl">Debt Structure</label>
+            <select id="f-debt" onchange="autoSave()">
+              <option value="NaBFID">NaBFID (7.5%)</option>
+              <option value="Commercial">Commercial bank (10–12%)</option>
+              <option value="Mixed">Mixed NaBFID + Commercial</option>
+              <option value="FI">Financial institution</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Debt:Equity Ratio</label>
+            <input type="text" id="f-deRatio" placeholder="70:30" oninput="autoSave()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 5: POLICY -->
+    <div class="step-page" id="step-5">
+      <div class="step-title">🏛️ Policy Architecture</div>
+      <div class="step-sub">Auto-generated policy action plan for both tracks. All Track 1 actions are administrative — no legislature required. Track 2 actions include board resolutions and one optional legislative item.</div>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn btn-sm" style="background:rgba(0,178,144,0.1);color:var(--teal);border:1px solid rgba(0,178,144,0.3)" onclick="filterPolicy('all')">All Actions</button>
+        <button class="btn btn-sm" style="background:rgba(0,178,144,0.1);color:var(--teal);border:1px solid rgba(0,178,144,0.3)" onclick="filterPolicy('t1')">Track 1 Only</button>
+        <button class="btn btn-sm" style="background:rgba(255,85,57,0.1);color:var(--orange);border:1px solid rgba(255,85,57,0.3)" onclick="filterPolicy('t2')">Track 2 Only</button>
+        <button class="btn btn-sm" style="background:rgba(255,85,57,0.1);color:var(--orange);border:1px solid rgba(255,85,57,0.3)" onclick="filterPolicy('leg')">Legislature Required</button>
+      </div>
+
+      <div class="policy-list" id="policyList"></div>
+    </div>
+
+    <!-- STEP 6: REVIEW & EXPORT -->
+    <div class="step-page" id="step-6">
+      <div class="step-title">📋 Review & Export</div>
+      <div class="step-sub">Review the complete AI Centre configuration. Export the Project Definition file for downstream tool handoff, or generate a Vision Brief using Claude AI.</div>
+
+      <div class="export-bar">
+        <button class="btn btn-primary btn-lg" onclick="exportJSON()">⬇ Export JSON</button>
+        <button class="btn btn-teal" onclick="exportMarkdown()">⬇ Export Markdown</button>
+        <button class="btn btn-indigo" onclick="generateVisionBrief()">✨ Generate Vision Brief</button>
+        <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="exportKeyNumbers()">📊 Key Numbers Table</button>
+      </div>
+
+      <div id="reviewContent"></div>
+    </div>
+
+    <div class="nav-footer">
+      <button class="btn btn-outline" id="btnBack" onclick="prevStep()">← Back</button>
+      <span class="nav-info" id="navInfo">Step 1 of 6</span>
+      <button class="btn btn-primary" id="btnNext" onclick="nextStep()">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- VISION BRIEF MODAL -->
+<div class="modal-overlay" id="visionModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">✨ Vision Brief — <span id="visionModalTitle">—</span></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="visionModalBody">
+      <div style="text-align:center;padding:40px">
+        <div class="loading-icon">⚙️</div>
+        <div class="loading-text">Generating vision brief…</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">Close</button>
+      <button class="btn btn-teal btn-sm" id="visionCopyBtn" onclick="copyVision()" style="display:none">📋 Copy</button>
+      <button class="btn btn-primary btn-sm" id="visionDlBtn" onclick="downloadVision()" style="display:none">⬇ Download</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STATE PROFILES (India — top 15 AI-relevant states)
+// ═══════════════════════════════════════════════════════════════
+const STATE_PROFILES = {
+  'Himachal Pradesh': {
+    icon:'🏔️', tag:'Glacial + Hydel', score:'A+',
+    power:{source:'hydel',cost:3.5,renewablePct:95},
+    cooling:{source:'glacial',months:8,pue:1.15},
+    land:{costPct:12,nearestMetro:'Chandigarh / Delhi NCR'},
+    connectivity:{fibre:'BharatNet Phase 2',latency:18},
+    incentives:'Capital subsidy 15%, electricity duty exemption 10yr, HPIDB concessional land, single-window clearance',
+    gstCapture:'High — all inference billed by HP entity',
+    t2EntitySuffix:'AIC',
+    policyHooks:['IndiaAI Mission distributed node','HP Padhai with AI','NIT Hamirpur partnership'],
+    anchorDept:'HP IT Dept / e-Governance',
+    keyStats:[
+      {val:'₹3.5/kWh',lbl:'Power cost (hydel base)',src:'HPSEBL tariff schedule'},
+      {val:'<1.15',lbl:'Target PUE (glacial DLC)',src:'DLC-HPAC modelling'},
+      {val:'95%',lbl:'Renewable energy share',src:'HIMURJA 2024'},
+      {val:'₹0.62/M',lbl:'Production cost per M tokens',src:'Internal model'},
+      {val:'₹3,500Cr+',lbl:'GST to state over 5 years',src:'Base case projection'},
+      {val:'2,000+',lbl:'Direct + induced jobs (Phase 4)',src:'Employment multiplier 3×'},
+    ],
+    ucSuggestions:['GeoAI & Disaster Resilience','Horticulture AI','Smart Grid Optimisation','Remote Health AI','e-Governance & Citizen Services','HP Language Preservation','Tourism AI']
+  },
+  'Uttarakhand': {
+    icon:'🏔️', tag:'Hydel + Mountain', score:'A',
+    power:{source:'hydel',cost:4.2,renewablePct:85},
+    cooling:{source:'glacial',months:7,pue:1.18},
+    land:{costPct:15,nearestMetro:'Delhi NCR'},
+    connectivity:{fibre:'BharatNet Phase 2',latency:22},
+    incentives:'Invest Uttarakhand policy, IT/ITeS incentives, 5yr stamp duty waiver',
+    gstCapture:'High',t2EntitySuffix:'AIC',
+    policyHooks:['Invest Uttarakhand 2023','Dehradun Smart City'],
+    anchorDept:'UK IT Dept / NIC',
+    keyStats:[
+      {val:'₹4.2/kWh',lbl:'Power cost',src:'UPCL tariff'},
+      {val:'1.18',lbl:'Target PUE',src:'Estimate'},
+      {val:'85%',lbl:'Renewable share',src:'UREDA'},
+      {val:'₹0.78/M',lbl:'Production cost/M tokens',src:'Estimate'},
+    ],
+    ucSuggestions:['Disaster Early Warning (GLOF/Flood)','Tourism AI','Agriculture Advisory','Forest Monitoring','Smart City Services']
+  },
+  'Rajasthan': {
+    icon:'☀️', tag:'Solar + Wind', score:'A',
+    power:{source:'solar',cost:2.8,renewablePct:92},
+    cooling:{source:'ambient',months:4,pue:1.35},
+    land:{costPct:8,nearestMetro:'Jaipur / Delhi NCR'},
+    connectivity:{fibre:'BharatNet Phase 2',latency:12},
+    incentives:'RIPS 2022 incentives, solar park adjacency, dedicated industrial zones',
+    gstCapture:'High',t2EntitySuffix:'AIC',
+    policyHooks:['Rajasthan Rising 2030','IndiaAI Mission','Invest Rajasthan'],
+    anchorDept:'DoIT Rajasthan',
+    keyStats:[
+      {val:'₹2.8/kWh',lbl:'Power cost (solar)',src:'RRECL tariff'},
+      {val:'1.35',lbl:'Target PUE',src:'Estimate'},
+      {val:'92%',lbl:'Renewable share',src:'RRECL'},
+      {val:'₹0.72/M',lbl:'Production cost/M tokens',src:'Estimate'},
+    ],
+    ucSuggestions:['Agricultural AI (Drought/Crop)','Tourism AI (Heritage Sites)','e-Governance','Mining Monitoring','Water Resource Management']
+  },
+  'Gujarat': {
+    icon:'🌊', tag:'Solar + Port Access', score:'A',
+    power:{source:'solar',cost:3.2,renewablePct:80},
+    cooling:{source:'seawater',months:6,pue:1.25},
+    land:{costPct:18,nearestMetro:'Ahmedabad / Mumbai'},
+    connectivity:{fibre:'State OFC + NKN',latency:8},
+    incentives:'Gujarat IT/ITeS policy 2022–27, SEZ benefits, GIFT City proximity',
+    gstCapture:'Very High — large enterprise base',t2EntitySuffix:'AI',
+    policyHooks:['Vibrant Gujarat','GIFT City AI cluster','Gujarat Defence corridor'],
+    anchorDept:'GujaratInformatics Ltd (GIL)',
+    keyStats:[
+      {val:'₹3.2/kWh',lbl:'Power cost',src:'GUVNL'},
+      {val:'1.25',lbl:'Target PUE',src:'Estimate'},
+      {val:'80%',lbl:'Renewable share',src:'GERMI'},
+      {val:'₹0.68/M',lbl:'Production cost/M tokens',src:'Estimate'},
+    ],
+    ucSuggestions:['Port & Logistics AI','Manufacturing AI','MSME Advisory Platform','Pharma Drug Discovery','BFSI & GIFT City AI']
+  },
+  'Tamil Nadu': {
+    icon:'🌊', tag:'Wind + Port + Talent', score:'A',
+    power:{source:'wind',cost:4.5,renewablePct:75},
+    cooling:{source:'seawater',months:12,pue:1.3},
+    land:{costPct:35,nearestMetro:'Chennai'},
+    connectivity:{fibre:'State OFC + NKN + submarine cable',latency:5},
+    incentives:'Tamil Nadu Data Centre Policy 2021, TIDCO incentives, IT corridor',
+    gstCapture:'Very High',t2EntitySuffix:'AI',
+    policyHooks:['TN Data Centre Policy','TN Semiconductor Policy','Tamil Nadu Vision 2030'],
+    anchorDept:'ELCOT / TIDEL',
+    keyStats:[
+      {val:'₹4.5/kWh',lbl:'Power cost',src:'TANGEDCO'},
+      {val:'1.3',lbl:'Target PUE',src:'Estimate'},
+      {val:'75%',lbl:'Renewable share',src:'TANGEDCO'},
+      {val:'₹0.85/M',lbl:'Production cost/M tokens',src:'Estimate'},
+    ],
+    ucSuggestions:['Manufacturing AI (Auto/Electronics)','Tamil Language AI','Fisheries Advisory','Healthcare AI','Agri-Tech']
+  },
+  'Andhra Pradesh': {
+    icon:'☀️', tag:'Solar + Greenfield', score:'B+',
+    power:{source:'solar',cost:3.0,renewablePct:85},
+    cooling:{source:'ambient',months:4,pue:1.38},
+    land:{costPct:10,nearestMetro:'Hyderabad / Vizag'},
+    connectivity:{fibre:'BharatNet + State OFC',latency:12},
+    incentives:'AP Data Centre Policy 2021, AP Innovation Society, Amaravati digital cluster',
+    gstCapture:'High',t2EntitySuffix:'AIC',
+    policyHooks:['AP Data Centre Policy','YSR Rythu Bharosa (agriculture)','Vizag Industrial Hub'],
+    anchorDept:'AP Technology Services (APTS)',
+    keyStats:[
+      {val:'₹3.0/kWh',lbl:'Power cost',src:'APEPDCL estimate'},
+      {val:'1.38',lbl:'Target PUE',src:'Estimate'},
+      {val:'85%',lbl:'Renewable share',src:'APERC'},
+      {val:'₹0.70/M',lbl:'Production cost/M tokens',src:'Estimate'},
+    ],
+    ucSuggestions:['Agriculture AI (YSR Rythu)','Fisheries Monitoring','Mining AI','e-Governance','Aquaculture Advisory']
+  },
+  'Madhya Pradesh': {
+    icon:'🌿', tag:'Solar + Greenfield', score:'B+',
+    power:{source:'solar',cost:3.5,renewablePct:78},
+    cooling:{source:'ambient',months:5,pue:1.32},
+    land:{costPct:7,nearestMetro:'Indore / Bhopal'},
+    connectivity:{fibre:'BharatNet Phase 2',latency:15},
+    incentives:'MP IT Investment Policy 2023, data centre incentives, Indore smart city',
+    gstCapture:'Medium-High',t2EntitySuffix:'AIC',
+    policyHooks:['MP IT Policy 2023','MP Invest Summit','Indore Smart City'],
+    anchorDept:'MP State Electronics Development Corporation (MPSEDC)',
+    keyStats:[
+      {val:'₹3.5/kWh',lbl:'Power cost',src:'MPERC estimate'},
+      {val:'1.32',lbl:'Target PUE',src:'Estimate'},
+      {val:'78%',lbl:'Renewable share',src:'MPUVNL'},
+      {val:'₹0.74/M',lbl:'Production cost/M tokens',src:'Estimate'},
+    ],
+    ucSuggestions:['Agriculture AI','Forest Monitoring','Tribal Welfare AI','e-Governance','Mining Monitoring']
+  },
+  'Odisha': {
+    icon:'🌊', tag:'Hydel + Port', score:'B+',
+    power:{source:'hydel',cost:3.8,renewablePct:70},
+    cooling:{source:'seawater',months:8,pue:1.28},
+    land:{costPct:8,nearestMetro:'Bhubaneswar / Visakhapatnam'},
+    connectivity:{fibre:'BharatNet + State OFC',latency:18},
+    incentives:'Odisha IT Policy 2022, IDCO land, 5-year SGST reimbursement',
+    gstCapture:'Medium-High',t2EntitySuffix:'AIC',
+    policyHooks:['Make in Odisha','Odisha Start-up Policy','Steel & Mining AI'],
+    anchorDept:'OCAC (Odisha Computer Application Centre)',
+    keyStats:[
+      {val:'₹3.8/kWh',lbl:'Power cost',src:'GRIDCO'},
+      {val:'1.28',lbl:'Target PUE',src:'Estimate'},
+      {val:'70%',lbl:'Renewable share',src:'OREDA'},
+      {val:'₹0.78/M',lbl:'Production cost/M tokens',src:'Estimate'},
+    ],
+    ucSuggestions:['Steel & Mining AI','Cyclone & Disaster Management','Tribal Language AI','Fisheries AI','Agriculture Advisory']
+  },
+}
+
+// ═══════════════════════════════════════════════════════════════
+// POLICY TEMPLATES
+// ═══════════════════════════════════════════════════════════════
+function getPolicyActions(state, entityName, anchorDept){
+  const en = entityName || '[EntityName] Pvt Ltd'
+  const ad = anchorDept || '[Anchor Dept]'
+  return [
+    // TRACK 1 — Admin only
+    {track:'t1',month:'M1',action:'Nodal Officer Designation (HAICE CoE Programme Director)',instrument:`Office Order — ${ad}`,type:'admin'},
+    {track:'t1',month:'M1–2',action:'Priority IT Project Declaration',instrument:'Cabinet Resolution',type:'admin'},
+    {track:'t1',month:'M2–3',action:'AI Champion Network — HAS/IAS level per department',instrument:'IT Dept circular',type:'admin'},
+    {track:'t1',month:'M2–4',action:'Skills Academy MoU (NIT / State Technical University)',instrument:'MoU — Education Dept + IT Dept',type:'admin'},
+    {track:'t1',month:'M2–4',action:'State NIC Integration MoU',instrument:'MoU — IT Dept + NIC',type:'admin'},
+    {track:'t1',month:'M3–5',action:'Pilot Department MoUs (2 priority depts)',instrument:'MoU — Individual Dept Secretaries',type:'admin'},
+    {track:'t1',month:'M3–6',action:'Rate Contract / GeM Listing for AI Service Procurement',instrument:'GeM notification — IT Dept',type:'admin'},
+    {track:'t1',month:'M4–8',action:'DPDP Data Processor Designation',instrument:'Executive notification — IT Dept',type:'admin'},
+    {track:'t1',month:'M4–9',action:'IndiaAI Mission Empanelment Application',instrument:'Application — MeitY / IndiaAI',type:'admin'},
+    {track:'t1',month:'M10–12',action:'State CERT Security Clearance',instrument:'Govt IT security review',type:'admin'},
+    // TRACK 2 — Board resolutions + one legislature
+    {track:'t2',month:'M1–3',action:`State AI Strategy 2025–2035`,instrument:'Cabinet Resolution',type:'admin'},
+    {track:'t2',month:'M1–3',action:'State Industrial Development Board — AI Infrastructure Zone Designation',instrument:'Board Resolution — State IDB',type:'board'},
+    {track:'t2',month:'M2–4',action:`${en} incorporation (state as 26% equity)`,instrument:'Companies Act — RoC filing',type:'admin'},
+    {track:'t2',month:'M2–4',action:'State Electricity Board Preferential Tariff (AI Compute category)',instrument:'Board Resolution — State Electricity Board',type:'board'},
+    {track:'t2',month:'M3–5',action:'State Government 26% equity (in-kind: land + tariff)',instrument:'Finance Dept / Cabinet Finance Committee',type:'admin'},
+    {track:'t2',month:'M2–6',action:'Single-Window Clearance Guarantee',instrument:'Industries Dept notification',type:'admin'},
+    {track:'t2',month:'M4–9',action:'IndiaAI Mission Empanelment (commercial compute node)',instrument:'Application — MeitY',type:'admin'},
+    {track:'t2',month:'M6–18',action:'State IT / AI Governance Act Amendment',instrument:'State Legislative Assembly Bill',type:'leg'},
+    {track:'t2',month:'M4–18',action:'State AI Authority (SAIA) Establishment',instrument:'Cabinet resolution + State LA notification',type:'leg'},
+  ]
+}
+
+// ═══════════════════════════════════════════════════════════════
+// USE CASE TEMPLATES
+// ═══════════════════════════════════════════════════════════════
+const DEFAULT_UCS = [
+  {id:'uc-1',name:'GeoAI & Disaster Resilience',dept:'Revenue / SDMA',outcome:'48–72hr early warning; 40–60% faster response',selected:true},
+  {id:'uc-2',name:'Agriculture & Horticulture AI',dept:'Agriculture / Horticulture Dept',outcome:'₹500–1,000Cr annual farmer benefit',selected:true},
+  {id:'uc-3',name:'Smart Grid & Energy Optimisation',dept:'State Electricity Board',outcome:'₹150–250Cr annual saving; 15–20% better renewable use',selected:true},
+  {id:'uc-4',name:'Remote Health AI',dept:'Health Dept / NHM',outcome:'30–40% better diagnostic accuracy at remote PHCs',selected:true},
+  {id:'uc-5',name:'e-Governance & Citizen Services',dept:'IT Dept / CSCs',outcome:'Service delivery 7–21 days → 1–3 days',selected:true},
+  {id:'uc-6',name:'Regional Language AI',dept:'Language / Culture Dept',outcome:'First-ever AI for indigenous languages',selected:false},
+  {id:'uc-7',name:'Tourism AI',dept:'Tourism Dept',outcome:'₹300–500Cr additional annual tourism revenue',selected:false},
+  {id:'uc-8',name:'Forest & Environment Monitoring',dept:'Forest Dept / PCB',outcome:'Real-time deforestation & pollution detection',selected:false},
+  {id:'uc-9',name:'Mining & Resources AI',dept:'Mines Dept',outcome:'Illegal mining detection; safety monitoring',selected:false},
+  {id:'uc-10',name:'Road & Infrastructure Monitoring',dept:'PWD / NHDCL',outcome:'Predictive maintenance; accident hotspot mapping',selected:false},
+]
+
+const DEFAULT_SITES = [
+  {id:'site-1',name:'Primary Site',district:'TBD',phase:'Phase 1',role:'Full-stack inferencing + CoE + Skills Academy',jobs:200},
+  {id:'site-2',name:'DR / Secondary Site',district:'TBD',phase:'Phase 1→2',role:'Disaster recovery + Healthcare AI focus',jobs:150},
+  {id:'site-3',name:'Specialist Site',district:'TBD',phase:'Phase 2',role:'GeoAI + Sovereign / air-gap workloads',jobs:80},
+]
+
+const REV_MODELS = ['Open-weight inference API','Batch inference (async)','Fine-tuning as a service','HP Govt offtake (Track 1)','Closed-weight reseller (Phase 2)']
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const STEPS = [
+  {num:1,label:'Geography',sub:'Territory & centre name'},
+  {num:2,label:'Natural Stack',sub:'Power, cooling, land'},
+  {num:3,label:'Dual Track',sub:'CoE + Inferencing Factory'},
+  {num:4,label:'Financial',sub:'CapEx, revenue, jobs'},
+  {num:5,label:'Policy',sub:'Action plan & timeline'},
+  {num:6,label:'Review & Export',sub:'JSON, MD, Vision Brief'},
+]
+
+let S = {
+  step:1,
+  selectedState:null,
+  geoProfile:null,
+  useCases:[...DEFAULT_UCS.map(u=>({...u}))],
+  sites:[...DEFAULT_SITES.map(s=>({...s}))],
+  revModels:['Open-weight inference API','Batch inference (async)','HP Govt offtake (Track 1)'],
+  policyFilter:'all',
+  visionText:'',
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+function init(){
+  renderProgressBar()
+  renderSidebar()
+  renderStateGrid()
+  renderRevenueModels()
+  renderUCList()
+  renderSites()
+  renderPolicyList()
+  updateTokenomics()
+  updateSidebarKPIs()
+}
+
+function renderProgressBar(){
+  document.getElementById('progressBar').innerHTML = STEPS.map((s,i)=>
+    `<button class="step-btn ${S.step===s.num?'active':S.step>s.num?'done':''}" onclick="goToStep(${s.num})">
+      <span class="step-num">${S.step>s.num?'✓':s.num}</span>${s.label}
+    </button>${i<STEPS.length-1?'<span class="step-arrow">›</span>':''}`
+  ).join('')
+}
+
+function renderSidebar(){
+  document.getElementById('sidebarSteps').innerHTML = STEPS.map(s=>
+    `<div class="sb-step ${S.step===s.num?'active':S.step>s.num?'done':''}" onclick="goToStep(${s.num})">
+      <div class="sb-num">${S.step>s.num?'✓':s.num}</div>
+      <div><div class="sb-label">${s.label}</div><div class="sb-sub">${s.sub}</div></div>
+    </div>`
+  ).join('')
+}
+
+function updateSidebarKPIs(){
+  const power = parseFloat(v('f-powerCost'))||3.5
+  const pue = parseFloat(v('f-pue'))||1.15
+  const prodCost = calcProdCost(power,pue)
+  const gst = nv('f-gstTotal')||3500
+  const capex = (nv('f-capex1')||0)+(nv('f-capex2')||0)+(nv('f-capex3')||0)
+  const offtake = nv('f-offtake')||13
+  document.getElementById('sidebarKPIs').innerHTML = [
+    {val:'₹'+prodCost+'/M',lbl:'Production cost/M tokens'},
+    {val:'₹'+offtake+'Cr',lbl:'Track 1 anchor/yr'},
+    {val:'₹'+gst+'Cr',lbl:'GST to state (5yr)'},
+    {val:'₹'+capex+'Cr',lbl:'Total CapEx planned'},
+  ].map(k=>`<div class="sb-kpi"><div class="sb-kpi-val">${k.val}</div><div class="sb-kpi-lbl">${k.lbl}</div></div>`).join('')
+}
+
+function showStep(n){
+  document.querySelectorAll('.step-page').forEach(p=>p.classList.remove('active'))
+  document.getElementById(`step-${n}`).classList.add('active')
+  S.step=n
+  renderProgressBar()
+  renderSidebar()
+  document.getElementById('navInfo').textContent=`Step ${n} of 6`
+  document.getElementById('btnBack').disabled=n===1
+  document.getElementById('btnNext').textContent=n===6?'✓ Done':'Next →'
+  if(n===4) updateTokenomics()
+  if(n===5) renderPolicyList()
+  if(n===6) renderReview()
+  window.scrollTo(0,0)
+}
+
+function goToStep(n){ if(n<=S.step+1||n<S.step) showStep(n) }
+function nextStep(){ if(S.step<6){autoSave();showStep(S.step+1)} }
+function prevStep(){ if(S.step>1) showStep(S.step-1) }
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 1 — STATE GRID
+// ═══════════════════════════════════════════════════════════════
+function renderStateGrid(){
+  document.getElementById('stateGrid').innerHTML = Object.entries(STATE_PROFILES).map(([name,p])=>
+    `<div class="state-card ${S.selectedState===name?'selected':''}" onclick="selectState('${name}')">
+      <div style="font-size:24px">${p.icon}</div>
+      <div class="state-card__name">${name}</div>
+      <div class="state-card__tag">${p.tag}</div>
+      <div class="state-card__score" style="color:${p.score==='A+'?'var(--teal)':p.score==='A'?'var(--blue)':'var(--amber)'}">${p.score}</div>
+    </div>`
+  ).join('')
+}
+
+function selectState(name){
+  S.selectedState=name
+  S.geoProfile=STATE_PROFILES[name]
+  renderStateGrid()
+  loadStateProfile(name,S.geoProfile)
+}
+
+function loadStateProfile(name,p){
+  sv('f-state',name)
+  sv('f-centreName',name.split(' ').map(w=>w[0]).join('')+'IC')
+  sv('f-centreFullName',name+' AI Centre of Excellence')
+  sv('f-govtName','Government of '+name)
+  sv('f-powerSource',p.power.source)
+  sv('f-powerCost',p.power.cost)
+  sv('f-renewablePct',p.power.renewablePct)
+  sv('f-coolingSource',p.cooling.source)
+  sv('f-coolingMonths',p.cooling.months)
+  sv('f-pue',p.cooling.pue)
+  sv('f-landCost',p.land.costPct)
+  sv('f-nearestMetro',p.land.nearestMetro)
+  sv('f-fibre',p.connectivity.fibre)
+  sv('f-latency',p.connectivity.latency)
+  sv('f-incentives',p.incentives)
+  sv('f-anchorDept',p.anchorDept)
+  sv('f-entityName',name.split(' ').map(w=>w[0]).join('')+''+p.t2EntitySuffix+' Pvt Ltd')
+  // Load suggested UCs
+  if(p.ucSuggestions){
+    S.useCases.forEach(u=>u.selected=p.ucSuggestions.includes(u.name))
+  }
+  renderUCList()
+  // Show intel panel
+  showGeoIntel(p)
+  document.getElementById('geoLabel').textContent=name
+  document.getElementById('intelGrid').innerHTML=p.keyStats.map(k=>
+    `<div class="intel-item"><div class="intel-item-val">${k.val}</div><div class="intel-item-lbl">${k.lbl}</div><div class="intel-item-src">${k.src}</div></div>`
+  ).join('')
+  updateTokenomics()
+  updateSidebarKPIs()
+}
+
+function showGeoIntel(p){
+  const panel=document.getElementById('geoIntelPanel')
+  panel.style.display='block'
+  panel.innerHTML=`<div class="intel-panel">
+    <div class="intel-panel-title">⚡ Key Natural Advantages — ${v('f-state')}</div>
+    <div class="intel-grid">${p.keyStats.slice(0,6).map(k=>`<div class="intel-item"><div class="intel-item-val">${k.val}</div><div class="intel-item-lbl">${k.lbl}</div></div>`).join('')}</div>
+    ${p.policyHooks?`<div style="margin-top:10px;font-size:11px;color:var(--blue)">🔗 Policy hooks: ${p.policyHooks.join(' · ')}</div>`:''}
+  </div>`
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOKENOMICS CALCULATOR
+// ═══════════════════════════════════════════════════════════════
+function calcProdCost(powerCost,pue){
+  // Simplified: GPU power ~300W, server 10% overhead, memory 5%
+  // ~0.4 kW effective per GPU-hour on average inference workload
+  // M tokens per GPU-hour ≈ 2.5M (7B model, 40 tok/s)
+  // Cost/M = (0.4 × pue × powerCost) / 2.5
+  const costPerMToken = (0.4 * pue * powerCost) / 2.5
+  return costPerMToken.toFixed(2)
+}
+
+function updateTokenomics(){
+  const power=parseFloat(v('f-powerCost'))||3.5
+  const pue=parseFloat(v('f-pue'))||1.15
+  const prod=parseFloat(calcProdCost(power,pue))
+  const metro_prod=2.80
+
+  const tiers=[
+    {name:'Tier 1 — Frontier (Llama 3 70B+)',import:372,premium:1.15,margin:0.42},
+    {name:'Tier 2 — Enterprise (Llama 3 8B / Mistral)',import:51,premium:1.15,margin:0.40},
+    {name:'Tier 3 — Efficient (Phi-3, Gemma 2B)',import:13,premium:1.15,margin:0.38},
+    {name:'Tier 4 — Reasoning (DeepSeek R1 70B)',import:531,premium:1.15,margin:0.43},
+    {name:'Tier 5 — Indic (Sarvam / BharatGen)',import:19,premium:1.15,margin:0.45},
+  ]
+
+  const rows=tiers.map(t=>{
+    const sellingPrice=(prod*3.5*t.premium*(1/(1-t.margin))).toFixed(0)
+    const saving=Math.round((1-sellingPrice/t.import)*100)
+    const savingDisplay=saving>0?saving:Math.round((1-sellingPrice/t.import)*100)
+    return `<tr>
+      <td>${t.name}</td>
+      <td style="font-family:'Roboto Mono',monospace">₹${t.import}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-weight:700;color:var(--teal)">₹${sellingPrice}</td>
+      <td><span class="saving-pill">${Math.abs(saving)}% cheaper</span></td>
+      <td style="font-family:'Roboto Mono',monospace;color:var(--mid)">${Math.round(t.margin*100)}%</td>
+    </tr>`
+  }).join('')
+
+  document.getElementById('tokenomicsOutput').innerHTML=`
+    <div style="display:flex;gap:20px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="sb-kpi" style="flex:1;min-width:120px"><div class="sb-kpi-val" style="color:var(--teal)">₹${prod}/M</div><div class="sb-kpi-lbl">This geography production cost</div></div>
+      <div class="sb-kpi" style="flex:1;min-width:120px"><div class="sb-kpi-val" style="color:var(--mid)">₹${metro_prod}/M</div><div class="sb-kpi-lbl">Metro DC production cost</div></div>
+      <div class="sb-kpi" style="flex:1;min-width:120px"><div class="sb-kpi-val" style="color:var(--orange)">${Math.round((1-prod/metro_prod)*100)}%</div><div class="sb-kpi-lbl">Cost advantage vs metro DC</div></div>
+      <div class="sb-kpi" style="flex:1;min-width:120px"><div class="sb-kpi-val" style="color:var(--navy)">${pue}×</div><div class="sb-kpi-lbl">Target PUE</div></div>
+    </div>
+    <table class="token-table">
+      <thead><tr><th>Model Tier</th><th>Import Cost (₹/M)</th><th>This Geo Price (₹/M)</th><th>Customer Saving</th><th>Gross Margin</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="field-hint" style="margin-top:8px">Prices include 15% sovereignty premium. Open-weight models run fully on local hardware. Production cost = (0.4kW × PUE × ₹/kWh) / 2.5M tokens per GPU-hour.</div>`
+
+  updateSidebarKPIs()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// USE CASES
+// ═══════════════════════════════════════════════════════════════
+function renderUCList(){
+  document.getElementById('ucList').innerHTML=S.useCases.map((u,i)=>
+    `<div class="uc-item ${u.selected?'on':''}">
+      <input type="checkbox" ${u.selected?'checked':''} onchange="S.useCases[${i}].selected=this.checked;renderUCList()">
+      <div style="flex:1"><div class="uc-item-name">${u.name}</div><div class="uc-item-dept">${u.dept} · ${u.outcome}</div></div>
+    </div>`
+  ).join('')
+}
+function addCustomUC(){
+  const name=prompt('Use case name:'); if(!name)return
+  const dept=prompt('Department:','Government Dept')||'Government Dept'
+  S.useCases.push({id:'uc-'+Date.now(),name,dept,outcome:'TBD',selected:true})
+  renderUCList()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SITES
+// ═══════════════════════════════════════════════════════════════
+function renderSites(){
+  document.getElementById('sitesList').innerHTML=S.sites.map((s,i)=>
+    `<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center;padding:10px 12px;border:1px solid #e0e0e8;border-radius:var(--r);background:var(--white);margin-bottom:6px;font-size:12px">
+      <input type="text" value="${s.name}" placeholder="Site name" onchange="S.sites[${i}].name=this.value" style="font-size:12px">
+      <input type="text" value="${s.district}" placeholder="District / City" onchange="S.sites[${i}].district=this.value" style="font-size:12px">
+      <input type="text" value="${s.role}" placeholder="Specialisation" onchange="S.sites[${i}].role=this.value" style="font-size:12px">
+      <button onclick="S.sites.splice(${i},1);renderSites()" style="background:none;border:none;cursor:pointer;color:var(--mid);font-size:16px">×</button>
+    </div>`
+  ).join('')
+}
+function addSite(){
+  S.sites.push({id:'site-'+Date.now(),name:'New Site',district:'TBD',phase:'Phase 2',role:'Specialised',jobs:80})
+  renderSites()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REVENUE MODELS
+// ═══════════════════════════════════════════════════════════════
+function renderRevenueModels(){
+  document.getElementById('revenueModels').innerHTML=REV_MODELS.map((m,i)=>
+    `<div style="display:flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid #d0d0d8;border-radius:6px;font-size:11px;cursor:pointer;background:${S.revModels.includes(m)?'var(--navy)':'var(--white)'};color:${S.revModels.includes(m)?'var(--white)':'var(--dark)'}" onclick="toggleRevModel('${m}')">
+      ${m}
+    </div>`
+  ).join('')
+}
+function toggleRevModel(m){
+  if(S.revModels.includes(m)) S.revModels=S.revModels.filter(x=>x!==m)
+  else S.revModels.push(m)
+  renderRevenueModels()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// POLICY
+// ═══════════════════════════════════════════════════════════════
+function renderPolicyList(){
+  const state=v('f-state')||'[State]'
+  const entity=v('f-entityName')||'[Entity]'
+  const anchor=v('f-anchorDept')||'[Anchor Dept]'
+  const actions=getPolicyActions(state,entity,anchor)
+  const filtered=S.policyFilter==='all'?actions:
+    S.policyFilter==='t1'?actions.filter(a=>a.track==='t1'):
+    S.policyFilter==='t2'?actions.filter(a=>a.track==='t2'):
+    actions.filter(a=>a.type==='leg')
+
+  document.getElementById('policyList').innerHTML=filtered.map(a=>
+    `<div class="policy-item policy-track-${a.track}">
+      <span class="policy-month">${a.month}</span>
+      <div><div class="policy-action">${a.action}</div><div class="policy-inst">${a.instrument}</div></div>
+      <span style="font-size:10px;font-weight:700;color:${a.track==='t1'?'var(--teal)':'var(--orange)'}">${a.track==='t1'?'Track 1 CoE':'Track 2 Factory'}</span>
+      <span class="policy-type-pill type-${a.type}">${a.type==='admin'?'Admin/Executive':a.type==='board'?'Board Resolution':'Legislature Required'}</span>
+    </div>`
+  ).join('')
+}
+function filterPolicy(f){ S.policyFilter=f; renderPolicyList() }
+
+// ═══════════════════════════════════════════════════════════════
+// REVIEW
+// ═══════════════════════════════════════════════════════════════
+function renderReview(){
+  autoSave()
+  const state=v('f-state')||'—'
+  const centre=v('f-centreFullName')||'—'
+  const centreName=v('f-centreName')||'—'
+  const power=v('f-powerCost')||'—'
+  const pue=v('f-pue')||'—'
+  const prod=calcProdCost(parseFloat(power)||3.5,parseFloat(pue)||1.15)
+  const gst=nv('f-gstTotal')||0
+  const capex=(nv('f-capex1')||0)+(nv('f-capex2')||0)+(nv('f-capex3')||0)
+  const ucs=S.useCases.filter(u=>u.selected)
+  const t1rev=nv('f-t1Revenue')||0
+  const t2rev=nv('f-t2RevY1')||0
+  const jobs3=nv('f-jobs3')||0
+  const irr=nv('f-irr')||0
+
+  document.getElementById('reviewContent').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-box"><div class="kpi-val" style="color:var(--teal)">₹${prod}/M</div><div class="kpi-lbl">Production cost/M tokens</div></div>
+      <div class="kpi-box"><div class="kpi-val" style="color:var(--orange)">₹${gst}Cr</div><div class="kpi-lbl">GST to state (5yr)</div></div>
+      <div class="kpi-box"><div class="kpi-val" style="color:var(--navy)">₹${capex}Cr</div><div class="kpi-lbl">Total CapEx</div></div>
+      <div class="kpi-box"><div class="kpi-val" style="color:var(--blue)">${jobs3}+</div><div class="kpi-lbl">Direct + induced jobs (Phase 3)</div></div>
+    </div>
+    <div class="review-section">
+      <div class="review-title">🌍 Geography</div>
+      ${rr('State / Territory',state)}${rr('Centre',centre+' ('+centreName+')')}${rr('Primary Site',v('f-city')||'—')}${rr('Government',v('f-govtName')||'—')}
+    </div>
+    <div class="review-section">
+      <div class="review-title">⚡ Natural Stack</div>
+      ${rr('Power',v('f-powerSource')+' · ₹'+(v('f-powerCost')||'—')+'/kWh · '+(v('f-renewablePct')||'—')+'% renewable')}
+      ${rr('Cooling',v('f-coolingSource')+' · '+(v('f-coolingMonths')||'—')+' months/yr · PUE '+(v('f-pue')||'—'))}
+      ${rr('Land vs Metro',(v('f-landCost')||'—')+'% of metro cost')}
+      ${rr('Connectivity',v('f-fibre')+' · '+(v('f-latency')||'—')+'ms to '+v('f-nearestMetro'))}
+    </div>
+    <div class="track-grid">
+      <div class="review-section" style="margin-bottom:0">
+        <div class="review-title" style="color:var(--teal)">Track 1 — CoE</div>
+        ${rr('Anchor Dept',v('f-anchorDept')||'—')}
+        ${rr('Offtake',v('f-offtake')?'₹'+v('f-offtake')+'Cr/yr':'—')}
+        ${rr('Rate Contract',v('f-rcDuration')?v('f-rcDuration')+' years':'—')}
+        ${rr('Skills Academy',v('f-skillsIntake')?v('f-skillsIntake')+' intake/yr · '+v('f-acadPartner'):'—')}
+        ${rr('Use Cases',ucs.length+' selected')}
+        ${rr('Sandbox',v('f-sandbox')==='yes'?'Yes — included':'No')}
+      </div>
+      <div class="review-section" style="margin-bottom:0">
+        <div class="review-title" style="color:var(--orange)">Track 2 — Inferencing Factory</div>
+        ${rr('Entity',v('f-entityName')||'—')}
+        ${rr('Govt Equity',v('f-govtEquity')?v('f-govtEquity')+'% (in-kind)':'—')}
+        ${rr('In-Kind Value',v('f-inkindVal')?'₹'+v('f-inkindVal')+'Cr':'—')}
+        ${rr('Revenue Models',S.revModels.join(' · ')||'—')}
+        ${rr('Revenue Y1 / Y3','₹'+t2rev+'Cr / ₹'+(nv('f-t2RevY3')||0)+'Cr')}
+        ${rr('GST to State (5yr)','₹'+gst+'Cr')}
+      </div>
+    </div>
+    <div class="review-section" style="margin-top:14px">
+      <div class="review-title">💰 Financial Summary</div>
+      ${rr('Total CapEx (3 phases)','₹'+capex+'Cr')}
+      ${rr('IRR Target',irr+'%')}
+      ${rr('Debt Structure',v('f-debt')||'—')}
+      ${rr('Jobs (Phase 3+)',jobs3+' direct · ~'+Math.round(jobs3*3)+' induced')}
+      ${rr('Sites',S.sites.length+' planned')}
+    </div>`
+}
+
+function rr(k,val){ return `<div class="review-row"><span class="review-key">${k}</span><span class="review-val">${val}</span></div>` }
+
+// ═══════════════════════════════════════════════════════════════
+// VISION BRIEF — CLAUDE API
+// ═══════════════════════════════════════════════════════════════
+async function generateVisionBrief(){
+  autoSave()
+  document.getElementById('visionModal').classList.add('open')
+  document.getElementById('visionModalTitle').textContent=v('f-centreName')||'—'
+  document.getElementById('visionCopyBtn').style.display='none'
+  document.getElementById('visionDlBtn').style.display='none'
+  document.getElementById('visionModalBody').innerHTML=`<div style="text-align:center;padding:40px"><div class="loading-icon">⚙️</div><div class="loading-text">Generating vision brief…<br>Synthesising natural stack, dual-track model, and financial case.</div></div>`
+
+  const state=v('f-state')
+  const centre=v('f-centreFullName')
+  const centreName=v('f-centreName')
+  const govt=v('f-govtName')
+  const power=v('f-powerCost')
+  const pue=v('f-pue')
+  const cooling=v('f-coolingSource')
+  const coolingMonths=v('f-coolingMonths')
+  const prod=calcProdCost(parseFloat(power)||3.5,parseFloat(pue)||1.15)
+  const entity=v('f-entityName')
+  const equity=v('f-govtEquity')
+  const offtake=v('f-offtake')
+  const gst=v('f-gstTotal')
+  const capex=(nv('f-capex1')||0)+(nv('f-capex2')||0)+(nv('f-capex3')||0)
+  const irr=v('f-irr')
+  const jobs=v('f-jobs3')
+  const ucs=S.useCases.filter(u=>u.selected).map(u=>u.name).join(', ')
+  const incentives=v('f-incentives')
+  const anchor=v('f-anchorDept')
+  const revModels=S.revModels.join(', ')
+  const sites=S.sites.map(s=>s.name+(s.district!=='TBD'?' ('+s.district+')':'')).join(', ')
+
+  const prompt=`You are a senior strategic advisor drafting a Vision Brief for a government of an Indian state. Write a compelling, professional 2-page Vision Brief for the following AI centre proposal. The audience is the Chief Minister's office and senior Cabinet ministers — they need to understand the opportunity in 5 minutes.
+
+PROPOSAL: ${centre} (${centreName})
+SUBMITTED TO: ${govt}
+SUBMITTED BY: [OEM Name]
+
+THE THREE NATURAL ADVANTAGES:
+- Power: ${v('f-powerSource')} at ₹${power}/kWh (vs ₹7–9/kWh in metros) — ${v('f-renewablePct')}% renewable
+- Cooling: ${cooling} — ${coolingMonths} months/year free cooling — PUE target ${pue} (vs 1.5–1.8 metro average)
+- Production cost: ₹${prod}/M tokens (vs ₹2.80/M in metro DCs) — ${Math.round((1-parseFloat(prod)/2.80)*100)}% structural cost advantage
+
+TRACK 1 — STATE COE:
+- Managed AI platform for ${govt}
+- Anchor department: ${anchor}
+- Government ask: ₹${offtake} Cr/year rate contract (zero cash outlay — land + tariff in-kind)
+- Priority use cases: ${ucs}
+- Skills Academy: ${v('f-skillsIntake')} professionals/year
+- Academic partner: ${v('f-acadPartner')}
+
+TRACK 2 — INFERENCING FACTORY:
+- Commercial entity: ${entity} (${govt} as ${equity}% equity partner — zero cash, in-kind land + tariff)
+- Revenue models: ${revModels}
+- Projected revenue Y1: ₹${v('f-t2RevY1')}Cr, Y3: ₹${v('f-t2RevY3')}Cr
+- GST to state over 5 years: ₹${gst}Cr+ (capture from market that currently pays overseas)
+- Total CapEx: ₹${capex}Cr across 3 phases
+- IRR: ${irr}% (base case)
+- Jobs: ${jobs}+ direct + ~${Math.round(parseInt(jobs)||500)*3} induced (Phase 3+)
+- Sites: ${sites}
+
+STATE INCENTIVES REQUESTED: ${incentives}
+
+Write the Vision Brief with these sections using ## for headings:
+## The Opportunity in One Paragraph
+## Why ${state} — The Structural Advantage
+## The Dual-Track Model
+## Track 1: ${state}'s AI Platform (The CoE)
+## Track 2: ${state} as India's AI Inferencing Capital
+## What ${state} Contributes — And What It Earns
+## The Employment Engine
+## The Ask — Three Executive Actions
+
+Be specific to the numbers above. Ministerial tone — outcome-first, no jargon, no generic AI hype. Total length: approximately 700–900 words. This should read like it was written by a seasoned BD professional who deeply understands both technology and government.`
+
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})
+    })
+    const data=await res.json()
+    if(data.error) throw new Error(data.error.message)
+    const text=data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n')
+    S.visionText=text
+
+    let html=text
+      .replace(/^## (.+)$/gm,'<h2 style="font-size:15px;font-weight:700;color:var(--navy);margin:20px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--light)">$1</h2>')
+      .replace(/^### (.+)$/gm,'<h3 style="font-size:13px;font-weight:700;color:var(--dark);margin:14px 0 6px">$1</h3>')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/^- (.+)$/gm,'<li style="margin-bottom:4px">$1</li>')
+      .replace(/(<li[^>]*>.*<\/li>)/gs,'<ul style="margin:6px 0 10px 20px">$1</ul>')
+      .replace(/\n\n/g,'</p><p style="margin-bottom:10px">')
+
+    document.getElementById('visionModalBody').innerHTML=`
+      <div style="margin-bottom:12px;font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:1px;padding:4px 12px;background:rgba(255,85,57,0.06);border:1px dashed rgba(255,85,57,0.3);border-radius:6px;display:inline-block">DRAFT — Internal Use Only</div>
+      <div style="margin-bottom:16px"><div style="font-size:20px;font-weight:700;color:var(--navy)">${centre}</div>
+      <div style="font-size:12px;color:var(--mid);margin-top:4px">Submitted to: ${govt} · Prepared by: [OEM Name] · ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}</div></div>
+      <p style="margin-bottom:10px">${html}</p>`
+
+    document.getElementById('visionCopyBtn').style.display='inline-flex'
+    document.getElementById('visionDlBtn').style.display='inline-flex'
+  }catch(err){
+    document.getElementById('visionModalBody').innerHTML=`<div class="alert" style="background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);color:#DC2626"><strong>Error:</strong> ${err.message}</div>`
+  }
+}
+
+function closeModal(){ document.getElementById('visionModal').classList.remove('open') }
+
+function copyVision(){
+  navigator.clipboard.writeText(S.visionText).then(()=>{
+    const btn=document.getElementById('visionCopyBtn')
+    btn.textContent='✓ Copied'; setTimeout(()=>btn.innerHTML='📋 Copy',2000)
+  })
+}
+
+function downloadVision(){
+  if(!S.visionText)return
+  const state=v('f-state')||'State'
+  dl('VISION BRIEF\n'+'='.repeat(50)+'\n'+v('f-centreFullName')+'\n'+v('f-govtName')+'\n'+new Date().toLocaleDateString('en-IN')+'\nDRAFT — Internal Use Only\n'+'='.repeat(50)+'\n\n'+S.visionText,'text/plain','VisionBrief-'+state.replace(/\s/g,'_')+'-'+new Date().toISOString().slice(0,10)+'.txt')
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════════
+function buildConfig(){
+  autoSave()
+  const power=parseFloat(v('f-powerCost'))||3.5
+  const pue=parseFloat(v('f-pue'))||1.15
+  return {
+    meta:{schema_version:'1.0',tool:'ATLAS AI Centre Builder v1.0',created_at:new Date().toISOString()},
+    geography:{country:v('f-country'),state:v('f-state'),city:v('f-city'),centreName:v('f-centreName'),centreFullName:v('f-centreFullName'),govtName:v('f-govtName')},
+    naturalStack:{power:{source:v('f-powerSource'),costPerKwh:power,renewablePct:nv('f-renewablePct')},cooling:{source:v('f-coolingSource'),freeMonths:nv('f-coolingMonths'),pue},land:{costVsMetroPct:nv('f-landCost'),nearestMetro:v('f-nearestMetro')},connectivity:{fibre:v('f-fibre'),latencyMs:nv('f-latency')},incentives:v('f-incentives'),tokenomics:{prodCostPerMTokens:parseFloat(calcProdCost(power,pue))}},
+    track1:{anchorDept:v('f-anchorDept'),offtakeCrPerYear:nv('f-offtake'),rcDurationYears:nv('f-rcDuration'),skillsIntakePerYear:nv('f-skillsIntake'),academicPartner:v('f-acadPartner'),sandbox:v('f-sandbox'),dataClassification:v('f-dataClass'),useCases:S.useCases.filter(u=>u.selected).map(u=>({name:u.name,dept:u.dept,outcome:u.outcome}))},
+    track2:{entityName:v('f-entityName'),govtEquityPct:nv('f-govtEquity'),inkindValueCr:nv('f-inkindVal'),revenueModels:S.revModels,targetCustomers:v('f-targetCustomers'),closedWeight:v('f-closedWeight')},
+    financial:{capex:{phase1Cr:nv('f-capex1'),phase2Cr:nv('f-capex2'),phase3Cr:nv('f-capex3')},track1:{offtakeCrYr:nv('f-t1Revenue'),revenueY3Cr:nv('f-t1RevY3')},track2:{revenueY1Cr:nv('f-t2RevY1'),revenueY3Cr:nv('f-t2RevY3'),gstToStateY1Y5Cr:nv('f-gstTotal')},employment:{directPhase1:nv('f-jobs1'),directPhase2:nv('f-jobs2'),directPhase3:nv('f-jobs3')},irr:nv('f-irr'),debtStructure:v('f-debt'),deRatio:v('f-deRatio')},
+    sites:S.sites,
+  }
+}
+
+function buildMarkdownSummary(){
+  const c=buildConfig()
+  const g=c.geography,ns=c.naturalStack,t1=c.track1,t2=c.track2,fin=c.financial
+  return `# AI Centre Configuration: ${g.centreFullName} (${g.centreName})
+**Tool:** ATLAS AI Centre Builder v1.0 | **Date:** ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}
+
+## Geography
+${g.state}, ${g.country} · Primary site: ${g.city||'TBD'}
+Submitted to: ${g.govtName}
+
+## Natural Stack — Key Numbers
+- Power: ${ns.power.source} · ₹${ns.power.costPerKwh}/kWh · ${ns.power.renewablePct}% renewable
+- Cooling: ${ns.cooling.source} · ${ns.cooling.freeMonths} months/yr free cooling · PUE ${ns.cooling.pue}
+- Production cost: ₹${ns.tokenomics.prodCostPerMTokens}/M tokens (vs ₹2.80/M metro)
+- Land: ${ns.land.costVsMetroPct}% of metro cost
+- Connectivity: ${ns.connectivity.fibre} · ${ns.connectivity.latencyMs}ms to ${ns.land.nearestMetro}
+
+## Track 1 — CoE
+- Anchor: ${t1.anchorDept}
+- Government ask: ₹${t1.offtakeCrPerYear}Cr/yr · ${t1.rcDurationYears}yr rate contract
+- Skills Academy: ${t1.skillsIntakePerYear}/yr · ${t1.academicPartner}
+- Use cases: ${t1.useCases.map(u=>u.name).join(', ')}
+
+## Track 2 — Inferencing Factory
+- Entity: ${t2.entityName} · ${t2.govtEquityPct}% govt equity (in-kind)
+- Revenue models: ${t2.revenueModels.join(' · ')}
+- Revenue Y1: ₹${fin.track2.revenueY1Cr}Cr · Y3: ₹${fin.track2.revenueY3Cr}Cr
+- GST to state (5yr): ₹${fin.track2.gstToStateY1Y5Cr}Cr
+
+## Financial Summary
+- CapEx: Phase 1 ₹${fin.capex.phase1Cr}Cr · Phase 2 ₹${fin.capex.phase2Cr}Cr · Phase 3 ₹${fin.capex.phase3Cr}Cr
+- IRR: ${fin.irr}% · Debt: ${fin.debtStructure}
+- Jobs (Phase 3): ${fin.employment.directPhase3}+ direct · ~${Math.round((fin.employment.directPhase3||500)*3)} induced
+
+## Sites
+${c.sites.map(s=>`- ${s.name} (${s.district}): ${s.role}`).join('\n')}
+`
+}
+
+function exportKeyNumbers(){
+  const c=buildConfig()
+  const ns=c.naturalStack,fin=c.financial,t2=c.track2
+  const text=`KEY NUMBERS — ${c.geography.centreFullName}\n${'='.repeat(50)}\n\n`+
+    `| Number | What it is |\n|---|---|\n`+
+    `| ₹${ns.power.costPerKwh}/kWh | Power cost (${ns.power.source}) |\n`+
+    `| ${ns.cooling.pue} | Target PUE (${ns.cooling.source} cooling) |\n`+
+    `| ₹${ns.tokenomics.prodCostPerMTokens}/M tokens | Production cost per M tokens |\n`+
+    `| ${Math.round((1-ns.tokenomics.prodCostPerMTokens/2.80)*100)}% | Cost advantage vs metro DC |\n`+
+    `| ₹${fin.track1.offtakeCrYr}Cr/yr | Track 1 anchor offtake |\n`+
+    `| ${t2.govtEquityPct}% | Govt equity in ${t2.entityName} (zero cash) |\n`+
+    `| ₹${fin.track2.revenueY1Cr}Cr | Track 2 revenue Y1 |\n`+
+    `| ₹${fin.track2.revenueY3Cr}Cr | Track 2 revenue Y3 |\n`+
+    `| ₹${fin.track2.gstToStateY1Y5Cr}Cr+ | GST to state over 5 years |\n`+
+    `| ${fin.irr}% | Operating agency IRR (base case) |\n`+
+    `| ₹${(fin.capex.phase1Cr||0)+(fin.capex.phase2Cr||0)+(fin.capex.phase3Cr||0)}Cr | Total CapEx (3 phases) |\n`+
+    `| ${fin.employment.directPhase3}+ | Direct jobs Phase 3+ |\n`
+  dl(text,'text/plain','KeyNumbers-'+c.geography.state.replace(/\s/g,'_')+'.txt')
+}
+
+function exportJSON(){
+  const c=buildConfig()
+  const state=(c.geography.state||'State').replace(/\s/g,'_')
+  dl(JSON.stringify(c,null,2),'application/json','AICentreConfig-'+state+'-'+new Date().toISOString().slice(0,10)+'.json')
+}
+
+function exportMarkdown(){
+  const c=buildConfig()
+  const state=(c.geography.state||'State').replace(/\s/g,'_')
+  dl(buildMarkdownSummary(),'text/markdown','AICentreConfig-'+state+'-'+new Date().toISOString().slice(0,10)+'.md')
+}
+
+function dl(content,type,fname){
+  const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a')
+  a.href=url;a.download=fname;a.click();URL.revokeObjectURL(url)
+}
+
+function autoSave(){ /* inputs read live via v() */ updateSidebarKPIs() }
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function v(id){const el=document.getElementById(id);return el?el.value.trim():''}
+function nv(id){const val=parseFloat(v(id));return isNaN(val)?null:val}
+function sv(id,val){const el=document.getElementById(id);if(el)el.value=val}
+
+document.getElementById('visionModal').addEventListener('click',function(e){if(e.target===this)closeModal()})
+window.addEventListener('DOMContentLoaded',init)
+</script>
+</body>
+</html>
