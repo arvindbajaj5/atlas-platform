@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — Engagement Management</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
+  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--black:#0A0A0F;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);--shadow-lg:0 8px 32px rgba(0,0,0,0.2);
+  --r:8px;--r-sm:6px;--r-lg:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+
+/* HEADER */
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:300;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-center{font-size:13px;color:rgba(255,255,255,0.65);}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
+.hdr-user{font-size:11px;color:rgba(255,255,255,0.6);cursor:pointer;padding:4px 8px;border-radius:var(--r-sm);transition:background 0.15s;}
+.hdr-user:hover{background:rgba(255,255,255,0.1);}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-secondary{background:var(--navy);color:var(--white);}
+.btn-secondary:hover{background:#001d5c;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-danger{background:#DC2626;color:var(--white);}
+.btn-danger:hover{background:#b91c1c;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-xs{padding:3px 8px;font-size:10px;}
+.btn-icon{background:none;border:none;cursor:pointer;padding:4px;color:var(--mid);transition:color 0.15s;font-size:14px;}
+.btn-icon:hover{color:var(--dark);}
+
+/* NAV TABS */
+.nav-bar{background:var(--white);border-bottom:1px solid #e0e0e8;padding:0 24px;display:flex;gap:0;}
+.nav-tab{padding:12px 18px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border:none;background:transparent;border-bottom:3px solid transparent;font-family:inherit;transition:all 0.15s;}
+.nav-tab:hover{color:var(--dark);}
+.nav-tab.active{color:var(--navy);border-bottom-color:var(--orange);}
+
+/* LAYOUT */
+.page{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 88px);}
+.sidebar{background:var(--white);border-right:1px solid #e0e0e8;overflow-y:auto;display:flex;flex-direction:column;}
+.main{overflow-y:auto;padding:24px;}
+
+/* SIDEBAR */
+.sb-hdr{padding:14px 16px;border-bottom:1px solid #e0e0e8;display:flex;align-items:center;justify-content:space-between;}
+.sb-title{font-size:12px;font-weight:700;color:var(--navy);}
+.sb-search{padding:10px 12px;border-bottom:1px solid #e0e0e8;}
+.sb-search input{width:100%;padding:7px 10px;border:1px solid #d0d0d8;border-radius:20px;font-size:11px;font-family:inherit;outline:none;}
+.sb-search input:focus{border-color:var(--blue);}
+.sb-list{flex:1;overflow-y:auto;}
+.sb-customer{border-bottom:1px solid #f0f0f4;}
+.sb-customer-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;transition:background 0.15s;}
+.sb-customer-hdr:hover{background:var(--light);}
+.sb-customer-hdr.active{background:rgba(0,40,112,0.05);}
+.sb-customer-arrow{font-size:10px;color:var(--mid);transition:transform 0.2s;flex-shrink:0;}
+.sb-customer-arrow.open{transform:rotate(90deg);}
+.sb-customer-name{font-size:12px;font-weight:700;color:var(--dark);flex:1;}
+.sb-customer-meta{font-size:10px;color:var(--mid);}
+.sb-ownership-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.sb-divs{display:none;padding-left:0;}
+.sb-divs.open{display:block;}
+.sb-div{padding:7px 14px 7px 32px;cursor:pointer;font-size:11px;color:var(--mid);transition:all 0.15s;border-left:2px solid transparent;}
+.sb-div:hover{color:var(--dark);background:var(--light);}
+.sb-div.active{color:var(--navy);font-weight:600;border-left-color:var(--orange);}
+.sb-eng-count{font-size:10px;background:var(--light);padding:1px 6px;border-radius:8px;margin-left:auto;}
+.sb-empty{padding:20px;text-align:center;font-size:11px;color:var(--mid);}
+
+/* CARDS */
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:16px;line-height:1.6;}
+
+/* DASHBOARD */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.stat-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow);}
+.stat-val{font-size:28px;font-weight:900;color:var(--navy);}
+.stat-val.orange{color:var(--orange);}
+.stat-val.teal{color:var(--teal);}
+.stat-val.blue{color:var(--blue);}
+.stat-lbl{font-size:11px;color:var(--mid);margin-top:4px;}
+
+/* ENGAGEMENT CARDS */
+.eng-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.eng-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;cursor:pointer;transition:all 0.18s;position:relative;overflow:hidden;}
+.eng-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.eng-card.archetype-territory::before{background:var(--teal);}
+.eng-card.archetype-govt_sectorial::before{background:var(--blue);}
+.eng-card.archetype-enterprise::before{background:var(--amber);}
+.eng-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px);}
+.eng-card-id{font-size:10px;font-family:'Roboto Mono',monospace;color:var(--mid);margin-bottom:4px;}
+.eng-card-name{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:3px;}
+.eng-card-customer{font-size:11px;color:var(--mid);margin-bottom:8px;}
+.eng-card-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;}
+.tag-phase-strategy{background:rgba(255,182,0,0.12);color:#9a7000;}
+.tag-phase-presales{background:rgba(28,56,245,0.08);color:var(--blue);}
+.tag-phase-proposal{background:rgba(255,85,57,0.1);color:var(--orange);}
+.tag-phase-delivery{background:rgba(0,178,144,0.1);color:var(--teal);}
+.tag-phase-live{background:rgba(0,178,144,0.2);color:var(--teal);}
+.tag-archetype{background:rgba(0,40,112,0.07);color:var(--navy);}
+.tag-sector{background:var(--light);color:var(--mid);}
+.tag-status-active{background:rgba(0,178,144,0.1);color:var(--teal);}
+.tag-status-paused{background:rgba(255,182,0,0.1);color:#9a7000;}
+.tag-status-closed_won{background:rgba(0,178,144,0.2);color:var(--teal);}
+.tag-status-closed_lost{background:rgba(220,38,38,0.08);color:#DC2626;}
+.tag-status-on_hold{background:var(--light);color:var(--mid);}
+.eng-card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--light);}
+.eng-card-date{font-size:10px;color:var(--mid);}
+.eng-card-docs{font-size:10px;font-weight:700;color:var(--blue);}
+
+/* FORMS */
+label.lbl{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;}
+input[type=text],input[type=number],input[type=email],input[type=tel],select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+textarea{resize:vertical;min-height:80px;}
+.form-row{margin-bottom:16px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;}
+.field-hint{font-size:10px;color:var(--mid);margin-top:4px;}
+.section-hdr{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--light);}
+
+/* CONTACTS TABLE */
+.contact-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid #e0e0e8;border-radius:var(--r);background:var(--white);margin-bottom:6px;font-size:12px;}
+.influence-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;}
+.inf-decision_maker{background:rgba(255,85,57,0.1);color:var(--orange);}
+.inf-influencer{background:rgba(28,56,245,0.08);color:var(--blue);}
+.inf-champion{background:rgba(0,178,144,0.1);color:var(--teal);}
+.inf-blocker{background:rgba(220,38,38,0.1);color:#DC2626;}
+.inf-unknown{background:var(--light);color:var(--mid);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--white);border-radius:var(--r-lg);width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);}
+.modal-hdr{padding:18px 22px;border-bottom:1px solid var(--light);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.modal-title{font-size:15px;font-weight:700;color:var(--navy);}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--mid);}
+.modal-body{padding:22px;overflow-y:auto;flex:1;}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--light);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;}
+
+/* DETAIL VIEW */
+.detail-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+.detail-eng-id{font-size:11px;font-family:'Roboto Mono',monospace;color:var(--mid);margin-bottom:4px;}
+.detail-name{font-size:22px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.detail-customer{font-size:13px;color:var(--mid);}
+.detail-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.detail-section{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;}
+.detail-section.full{grid-column:1/-1;}
+.detail-section-title{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--light);}
+.detail-row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--light);}
+.detail-row:last-child{border-bottom:none;}
+.detail-key{color:var(--mid);}
+.detail-val{font-weight:600;color:var(--dark);text-align:right;max-width:60%;}
+
+/* BRIEFS */
+.brief-item{border:1px solid #e0e0e8;border-radius:var(--r);padding:12px 14px;margin-bottom:8px;background:var(--white);}
+.brief-item-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.brief-type{font-size:11px;font-weight:700;color:var(--navy);}
+.brief-meta{font-size:10px;color:var(--mid);}
+.brief-summary{font-size:11px;color:var(--dark);line-height:1.6;}
+.brief-actions{display:flex;gap:6px;margin-top:8px;}
+
+/* UC LIST */
+.uc-chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:rgba(0,178,144,0.08);color:var(--teal);margin:2px;}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:48px 20px;}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:0.4;}
+.empty-title{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:6px;}
+.empty-sub{font-size:12px;color:var(--mid);line-height:1.7;max-width:340px;margin:0 auto 16px;}
+
+/* OWNERSHIP COLORS */
+.own-GOV{background:rgba(0,178,144,0.1);color:var(--teal);}
+.own-MIL{background:rgba(60,0,180,0.1);color:var(--indigo);}
+.own-INT{background:rgba(60,0,180,0.12);color:var(--indigo);}
+.own-PSU{background:rgba(28,56,245,0.08);color:var(--blue);}
+.own-PVT{background:rgba(255,182,0,0.1);color:#9a7000;}
+
+.dot-GOV{background:var(--teal);}
+.dot-MIL{background:var(--indigo);}
+.dot-INT{background:var(--indigo);}
+.dot-PSU{background:var(--blue);}
+.dot-PVT{background:var(--amber);}
+
+@media(max-width:900px){.page{grid-template-columns:1fr;}.sidebar{display:none;}.stats-row{grid-template-columns:1fr 1fr;}.eng-grid{grid-template-columns:1fr;}.detail-grid{grid-template-columns:1fr;}.form-grid{grid-template-columns:1fr;}.form-grid-3{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div class="hdr-center">Engagement Management</div>
+  <div class="hdr-right">
+    <span class="hdr-user" id="hdrUser" onclick="openSettings()">👤 —</span>
+    <span class="hdr-badge">v1.0</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+  </div>
+</div>
+
+<div class="nav-bar">
+  <button class="nav-tab active" id="tab-dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+  <button class="nav-tab" id="tab-engagements" onclick="switchTab('engagements')">🤝 Engagements</button>
+  <button class="nav-tab" id="tab-customers" onclick="switchTab('customers')">🏢 Customers</button>
+  <button class="nav-tab" id="tab-briefs" onclick="switchTab('briefs')">📋 Saved Briefs</button>
+</div>
+
+<!-- DASHBOARD VIEW -->
+<div id="view-dashboard">
+  <div class="page">
+    <div class="sidebar">
+      <div class="sb-hdr">
+        <div class="sb-title">Customers</div>
+        <button class="btn btn-primary btn-xs" onclick="openNewCustomer()">+ New</button>
+      </div>
+      <div class="sb-search"><input type="text" placeholder="Search customers…" oninput="filterSidebar(this.value)" id="sbSearch"></div>
+      <div class="sb-list" id="sbList"></div>
+    </div>
+    <div class="main" id="dashMain">
+      <div class="stats-row" id="statsRow"></div>
+      <div id="dashContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ENGAGEMENTS VIEW -->
+<div id="view-engagements" style="display:none">
+  <div class="main" style="max-width:1200px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+      <div style="font-size:18px;font-weight:700;color:var(--navy)">All Engagements</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="filterPhase" onchange="renderEngagements()" style="font-size:11px;padding:5px 8px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-family:inherit">
+          <option value="">All phases</option>
+          <option>strategy</option><option>presales</option><option>proposal</option><option>delivery</option><option>live</option>
+        </select>
+        <select id="filterStatus" onchange="renderEngagements()" style="font-size:11px;padding:5px 8px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-family:inherit">
+          <option value="">All status</option>
+          <option>active</option><option>paused</option><option>closed_won</option><option>closed_lost</option><option>on_hold</option>
+        </select>
+        <select id="filterArchetype" onchange="renderEngagements()" style="font-size:11px;padding:5px 8px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-family:inherit">
+          <option value="">All archetypes</option>
+          <option value="territory_coe">Territory CoE</option>
+          <option value="govt_sectorial">Govt Sectorial</option>
+          <option value="enterprise">Enterprise</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="openNewEngagement()">+ New Engagement</button>
+      </div>
+    </div>
+    <div class="eng-grid" id="engGrid"></div>
+  </div>
+</div>
+
+<!-- CUSTOMERS VIEW -->
+<div id="view-customers" style="display:none">
+  <div class="main" style="max-width:1200px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+      <div style="font-size:18px;font-weight:700;color:var(--navy)">Customer Directory</div>
+      <button class="btn btn-primary btn-sm" onclick="openNewCustomer()">+ New Customer</button>
+    </div>
+    <div id="customerGrid"></div>
+  </div>
+</div>
+
+<!-- BRIEFS VIEW -->
+<div id="view-briefs" style="display:none">
+  <div class="main" style="max-width:960px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+      <div style="font-size:18px;font-weight:700;color:var(--navy)">Saved Briefs & Documents</div>
+      <select id="filterBriefType" onchange="renderBriefs()" style="font-size:11px;padding:5px 8px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-family:inherit">
+        <option value="">All types</option>
+        <option value="pei">PEI Brief</option>
+        <option value="vision_brief">Vision Brief</option>
+        <option value="tad">TAD</option>
+        <option value="proposal">Proposal</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div id="briefsList"></div>
+  </div>
+</div>
+
+<!-- ENGAGEMENT DETAIL VIEW -->
+<div id="view-detail" style="display:none">
+  <div class="main" style="max-width:960px;margin:0 auto" id="detailContent"></div>
+</div>
+
+<!-- ═══════════════════════════ MODALS ═══════════════════════════ -->
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr"><div class="modal-title">⚙️ Settings</div><button class="modal-close" onclick="closeModal('settingsModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="lbl">Your Name</label>
+        <input type="text" id="settingName" placeholder="Your full name — auto-stamped on briefs and documents">
+        <div class="field-hint">Saved locally. Used as the author on all saved briefs and documents.</div>
+      </div>
+      <div class="form-row">
+        <label class="lbl">Your Role</label>
+        <input type="text" id="settingRole" placeholder="e.g. Business Head, Pre-Sales Lead">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('settingsModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOMER MODAL -->
+<div class="modal-overlay" id="customerModal">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="customerModalTitle">New Customer</div><button class="modal-close" onclick="closeModal('customerModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="section-hdr">Identity</div>
+      <div class="form-row"><label class="lbl">Organisation Name *</label><input type="text" id="cName" placeholder="e.g. Indian Army"></div>
+      <div class="form-grid">
+        <div><label class="lbl">Short Name</label><input type="text" id="cShort" placeholder="e.g. IA"><div class="field-hint">Used in IDs and filenames.</div></div>
+        <div><label class="lbl">Country *</label>
+          <select id="cCountry">
+            <option value="India" selected>India</option><option value="UAE">UAE</option><option value="Saudi Arabia">Saudi Arabia</option>
+            <option value="Singapore">Singapore</option><option value="United Kingdom">United Kingdom</option>
+            <option value="United States">United States</option><option value="Australia">Australia</option>
+            <option value="Qatar">Qatar</option><option value="Kuwait">Kuwait</option><option value="Bahrain">Bahrain</option>
+            <option value="Oman">Oman</option><option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div><label class="lbl">Ownership Type *</label>
+          <select id="cOwnership">
+            <option value="GOV">GOV — Government / Ministry</option>
+            <option value="MIL">MIL — Military / Armed Forces</option>
+            <option value="INT">INT — Intelligence / Security</option>
+            <option value="PSU">PSU — Public Sector Undertaking</option>
+            <option value="PVT">PVT — Private Enterprise</option>
+          </select>
+        </div>
+        <div><label class="lbl">Functional Sector *</label>
+          <select id="cSector">
+            <option value="DEF">Defence & Armed Forces</option>
+            <option value="INT">Intelligence & Signals</option>
+            <option value="HLS">Homeland Security</option>
+            <option value="GOV">Governance & e-Governance</option>
+            <option value="SPC">Space & Aerospace / Aviation</option>
+            <option value="ENR">Energy & Utilities</option>
+            <option value="MIN">Mining & Natural Resources</option>
+            <option value="TEL">Telecom & Networks</option>
+            <option value="FIN">BFSI & Financial Services</option>
+            <option value="HLT">Health & Life Sciences</option>
+            <option value="MFG">Manufacturing & Industry</option>
+            <option value="AGR">Agriculture & Food</option>
+            <option value="GEO">Geospatial & EO</option>
+            <option value="TER">Territory / State CoE</option>
+            <option value="ENT">General Enterprise</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div><label class="lbl">State / Province</label><input type="text" id="cState" placeholder="e.g. Delhi"></div>
+        <div><label class="lbl">Organisation Type</label>
+          <select id="cOrgType">
+            <option value="Ministry">Ministry</option><option value="Department">Department</option>
+            <option value="Agency">Agency</option><option value="Command">Command</option>
+            <option value="PSU">PSU</option><option value="Enterprise">Enterprise</option>
+            <option value="State Govt">State Govt</option><option value="UT">UT</option><option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div><label class="lbl">Parent Organisation</label><input type="text" id="cParent" placeholder="e.g. Ministry of Defence"></div>
+        <div><label class="lbl">AI Maturity</label>
+          <select id="cAiMaturity">
+            <option value="none">None</option><option value="aware">Aware</option>
+            <option value="piloting">Piloting</option><option value="deploying">Deploying</option><option value="scaling">Scaling</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-hdr">Contacts</div>
+      <div id="contactsList"></div>
+      <button class="btn btn-outline btn-sm" onclick="addContact()">+ Add Contact</button>
+
+      <div class="section-hdr">Divisions / Units</div>
+      <div id="divisionsList"></div>
+      <button class="btn btn-outline btn-sm" onclick="addDivision()">+ Add Division</button>
+
+      <div class="section-hdr">Notes</div>
+      <textarea id="cNotes" placeholder="Any additional context about this customer…" rows="3"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('customerModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCustomer()">Save Customer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ENGAGEMENT MODAL -->
+<div class="modal-overlay" id="engModal">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="engModalTitle">New Engagement</div><button class="modal-close" onclick="closeModal('engModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row"><label class="lbl">Engagement Name *</label><input type="text" id="eName" placeholder="e.g. Border Surveillance AI Platform"></div>
+      <div class="form-grid">
+        <div><label class="lbl">Customer *</label>
+          <select id="eCustomer" onchange="populateDivisions()">
+            <option value="">Select customer…</option>
+          </select>
+        </div>
+        <div><label class="lbl">Division / Unit</label>
+          <select id="eDivision"><option value="">— Full organisation —</option></select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div><label class="lbl">Archetype *</label>
+          <select id="eArchetype">
+            <option value="territory_coe">Territory CoE</option>
+            <option value="govt_sectorial">Govt Sectorial</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </div>
+        <div><label class="lbl">Type</label>
+          <select id="eType">
+            <option value="new">New</option>
+            <option value="expansion">Expansion</option>
+            <option value="renewal">Renewal</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div><label class="lbl">Phase *</label>
+          <select id="ePhase">
+            <option value="strategy">Strategy</option>
+            <option value="presales">Presales</option>
+            <option value="proposal">Proposal</option>
+            <option value="delivery">Delivery</option>
+            <option value="live">Live</option>
+          </select>
+        </div>
+        <div><label class="lbl">Status</label>
+          <select id="eStatus">
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+            <option value="on_hold">On Hold</option>
+            <option value="closed_won">Closed Won</option>
+            <option value="closed_lost">Closed Lost</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div><label class="lbl">Primary Domain</label>
+          <select id="eDomain">
+            <option value="DEF">Defence</option><option value="INT">Intelligence</option>
+            <option value="HLS">Homeland Security</option><option value="GOV">Governance</option>
+            <option value="SPC">Space / Aerospace</option><option value="ENR">Energy</option>
+            <option value="GEO">Geospatial</option><option value="TEL">Telecom</option>
+            <option value="FIN">BFSI</option><option value="HLT">Health</option>
+            <option value="MFG">Manufacturing</option><option value="TER">Territory CoE</option>
+            <option value="ENT">General Enterprise</option>
+          </select>
+        </div>
+        <div><label class="lbl">Estimated Value</label>
+          <div style="display:flex;gap:6px">
+            <select id="eCurrency" style="width:80px">
+              <option>USD</option><option>INR</option><option>EUR</option><option>GBP</option><option>AED</option><option>SAR</option><option>SGD</option>
+            </select>
+            <input type="number" id="eValue" placeholder="0" style="flex:1">
+          </div>
+        </div>
+      </div>
+      <div class="form-row"><label class="lbl">Notes</label><textarea id="eNotes" placeholder="Engagement context, key objectives, constraints…" rows="3"></textarea></div>
+      <input type="hidden" id="eEditId">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('engModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEngagement()">Save Engagement</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAVE BRIEF MODAL -->
+<div class="modal-overlay" id="briefModal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-hdr"><div class="modal-title">📋 Save Brief / Document</div><button class="modal-close" onclick="closeModal('briefModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row"><label class="lbl">Linked Engagement</label>
+        <select id="briefEngagement"><option value="">— Not linked to engagement —</option></select>
+      </div>
+      <div class="form-grid">
+        <div><label class="lbl">Document Type</label>
+          <select id="briefType">
+            <option value="pei">PEI Brief</option>
+            <option value="vision_brief">Vision Brief</option>
+            <option value="tad">TAD</option>
+            <option value="proposal">Proposal</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div><label class="lbl">Title</label><input type="text" id="briefTitle" placeholder="e.g. Indian Army PEI Brief"></div>
+      </div>
+      <div class="form-row"><label class="lbl">Summary / Key Points</label>
+        <textarea id="briefSummary" placeholder="Paste a summary or key points from this brief…" rows="5"></textarea>
+      </div>
+      <div class="form-row"><label class="lbl">Full Content (optional)</label>
+        <textarea id="briefContent" placeholder="Paste the full content if you want to store it…" rows="4"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('briefModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBrief()">Save Brief</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA LAYER — localStorage
+// ═══════════════════════════════════════════════════════════════
+const STORE = {
+  get(key){ try{ return JSON.parse(localStorage.getItem('atlas_em_'+key)||'null') }catch{return null} },
+  set(key,val){ localStorage.setItem('atlas_em_'+key, JSON.stringify(val)) },
+  getList(key){ return this.get(key)||[] },
+}
+
+function getCustomers(){ return STORE.getList('customers') }
+function getEngagements(){ return STORE.getList('engagements') }
+function getBriefs(){ return STORE.getList('briefs') }
+function getSettings(){ return STORE.get('settings')||{name:'',role:''} }
+
+function saveCustomers(list){ STORE.set('customers',list) }
+function saveEngagements(list){ STORE.set('engagements',list) }
+function saveBriefs(list){ STORE.set('briefs',list) }
+
+function generateId(prefix){ return prefix+'-'+Date.now()+'-'+Math.floor(Math.random()*1000) }
+
+function generateEngId(sectorCode){
+  const year = new Date().getFullYear()
+  const engs = getEngagements()
+  const seq = String(engs.length+1).padStart(4,'0')
+  return 'ENG-'+year+'-'+(sectorCode||'GEN')+'-'+seq
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════════
+function openSettings(){
+  const s = getSettings()
+  document.getElementById('settingName').value = s.name||''
+  document.getElementById('settingRole').value = s.role||''
+  openModal('settingsModal')
+}
+function saveSettings(){
+  const s = {name:document.getElementById('settingName').value.trim(), role:document.getElementById('settingRole').value.trim()}
+  STORE.set('settings',s)
+  updateHdrUser()
+  closeModal('settingsModal')
+}
+function updateHdrUser(){
+  const s = getSettings()
+  document.getElementById('hdrUser').textContent = '👤 '+(s.name||'Set your name')
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+let currentTab = 'dashboard'
+function switchTab(tab){
+  ['dashboard','engagements','customers','briefs','detail'].forEach(t=>{
+    document.getElementById('view-'+t).style.display = t===tab?'block':'none'
+    const tabEl = document.getElementById('tab-'+t)
+    if(tabEl) tabEl.classList.toggle('active', t===tab)
+  })
+  currentTab = tab
+  if(tab==='dashboard'){ renderDashboard(); renderSidebar() }
+  if(tab==='engagements') renderEngagements()
+  if(tab==='customers') renderCustomers()
+  if(tab==='briefs') renderBriefs()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+let sbFilter = ''
+let openCustomers = {}
+let activeCustomerId = null
+let activeDivisionId = null
+
+function filterSidebar(val){ sbFilter = val.toLowerCase(); renderSidebar() }
+
+function renderSidebar(){
+  const customers = getCustomers().filter(c=>
+    !sbFilter || c.name.toLowerCase().includes(sbFilter) || (c.short||'').toLowerCase().includes(sbFilter)
+  )
+  const engs = getEngagements()
+
+  if(!customers.length){
+    document.getElementById('sbList').innerHTML = '<div class="sb-empty">No customers yet.<br>Click + New to add one.</div>'
+    return
+  }
+
+  document.getElementById('sbList').innerHTML = customers.map(c=>{
+    const custEngs = engs.filter(e=>e.customerId===c.id)
+    const isOpen = openCustomers[c.id]
+    const divs = c.divisions||[]
+    return '<div class="sb-customer">'
+      +'<div class="sb-customer-hdr '+(activeCustomerId===c.id?'active':'')+'" onclick="toggleSbCustomer(\''+c.id+'\')">'
+      +'<div class="sb-ownership-dot dot-'+c.ownership+'"></div>'
+      +'<div><div class="sb-customer-name">'+c.name+'</div>'
+      +'<div class="sb-customer-meta">'+c.ownership+' · '+c.sector+'</div></div>'
+      +'<span class="sb-eng-count">'+custEngs.length+'</span>'
+      +'<span class="sb-customer-arrow '+(isOpen?'open':'')+'">›</span>'
+      +'</div>'
+      +'<div class="sb-divs '+(isOpen?'open':'')+'">'
+      +'<div class="sb-div '+(activeCustomerId===c.id&&!activeDivisionId?'active':'')+'" onclick="selectSbCustomer(\''+c.id+'\',null)">All divisions ('+custEngs.length+')</div>'
+      +divs.map(d=>{
+        const divEngs = custEngs.filter(e=>e.divisionId===d.id)
+        return '<div class="sb-div '+(activeDivisionId===d.id?'active':'')+'" onclick="selectSbCustomer(\''+c.id+'\',\''+d.id+'\')">'+d.name+' ('+divEngs.length+')</div>'
+      }).join('')
+      +'</div>'
+      +'</div>'
+  }).join('')
+}
+
+function toggleSbCustomer(id){
+  openCustomers[id] = !openCustomers[id]
+  renderSidebar()
+}
+
+function selectSbCustomer(custId, divId){
+  activeCustomerId = custId
+  activeDivisionId = divId
+  renderSidebar()
+  renderDashboard()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function renderDashboard(){
+  const engs = getEngagements()
+  const customers = getCustomers()
+  const briefs = getBriefs()
+
+  let filtered = engs
+  if(activeCustomerId) filtered = filtered.filter(e=>e.customerId===activeCustomerId)
+  if(activeDivisionId) filtered = filtered.filter(e=>e.divisionId===activeDivisionId)
+
+  const active = filtered.filter(e=>e.status==='active').length
+  const won = filtered.filter(e=>e.status==='closed_won').length
+
+  document.getElementById('statsRow').innerHTML = [
+    {val:customers.length,lbl:'Total Customers',cls:''},
+    {val:engs.length,lbl:'Total Engagements',cls:'blue'},
+    {val:active,lbl:'Active Engagements',cls:'teal'},
+    {val:briefs.length,lbl:'Saved Briefs',cls:'orange'},
+  ].map(s=>'<div class="stat-card"><div class="stat-val '+s.cls+'">'+s.val+'</div><div class="stat-lbl">'+s.lbl+'</div></div>').join('')
+
+  if(!filtered.length){
+    document.getElementById('dashContent').innerHTML = '<div class="empty"><div class="empty-icon">🤝</div><div class="empty-title">'+(activeCustomerId?'No engagements for this customer':'No engagements yet')+'</div><div class="empty-sub">Create your first engagement to start tracking the pipeline.</div><button class="btn btn-primary" onclick="openNewEngagement()">+ New Engagement</button></div>'
+    return
+  }
+
+  document.getElementById('dashContent').innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:var(--navy)">'+filtered.length+' Engagement'+(filtered.length!==1?'s':'')+(activeCustomerId?' — '+customers.find(c=>c.id===activeCustomerId)?.name:'')+'</div><button class="btn btn-primary btn-sm" onclick="openNewEngagement()">+ New</button></div>'
+    +'<div class="eng-grid">'+filtered.map(e=>engCard(e)).join('')+'</div>'
+}
+
+function engCard(e){
+  const customers = getCustomers()
+  const cust = customers.find(c=>c.id===e.customerId)
+  const div = cust?.divisions?.find(d=>d.id===e.divisionId)
+  const briefs = getBriefs().filter(b=>b.engagementId===e.id)
+  return '<div class="eng-card archetype-'+e.archetype+'" onclick="openEngDetail(\''+e.id+'\')">'
+    +'<div class="eng-card-id">'+e.engId+'</div>'
+    +'<div class="eng-card-name">'+e.name+'</div>'
+    +'<div class="eng-card-customer">'+(cust?cust.name:'—')+(div?' · '+div.name:'')+'</div>'
+    +'<div class="eng-card-tags">'
+    +'<span class="tag tag-phase-'+e.phase+'">'+e.phase+'</span>'
+    +'<span class="tag tag-status-'+e.status+'">'+e.status.replace('_',' ')+'</span>'
+    +'<span class="tag tag-archetype">'+archetypeLabel(e.archetype)+'</span>'
+    +'</div>'
+    +'<div class="eng-card-footer">'
+    +'<span class="eng-card-date">'+fmtDate(e.createdAt)+'</span>'
+    +'<span class="eng-card-docs">'+briefs.length+' brief'+(briefs.length!==1?'s':'')+'</span>'
+    +'</div>'
+    +'</div>'
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENGAGEMENTS VIEW
+// ═══════════════════════════════════════════════════════════════
+function renderEngagements(){
+  let engs = getEngagements()
+  const phase = document.getElementById('filterPhase')?.value
+  const status = document.getElementById('filterStatus')?.value
+  const archetype = document.getElementById('filterArchetype')?.value
+  if(phase) engs = engs.filter(e=>e.phase===phase)
+  if(status) engs = engs.filter(e=>e.status===status)
+  if(archetype) engs = engs.filter(e=>e.archetype===archetype)
+
+  if(!engs.length){
+    document.getElementById('engGrid').innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">🤝</div><div class="empty-title">No engagements found</div><div class="empty-sub">Create your first engagement or adjust the filters.</div><button class="btn btn-primary" onclick="openNewEngagement()">+ New Engagement</button></div>'
+    return
+  }
+  document.getElementById('engGrid').innerHTML = engs.map(e=>engCard(e)).join('')
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CUSTOMERS VIEW
+// ═══════════════════════════════════════════════════════════════
+function renderCustomers(){
+  const customers = getCustomers()
+  const engs = getEngagements()
+
+  if(!customers.length){
+    document.getElementById('customerGrid').innerHTML = '<div class="empty"><div class="empty-icon">🏢</div><div class="empty-title">No customers yet</div><div class="empty-sub">Add your first customer to get started.</div><button class="btn btn-primary" onclick="openNewCustomer()">+ New Customer</button></div>'
+    return
+  }
+
+  document.getElementById('customerGrid').innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">'
+    +customers.map(c=>{
+      const custEngs = engs.filter(e=>e.customerId===c.id)
+      const divCount = (c.divisions||[]).length
+      const contCount = (c.contacts||[]).length
+      return '<div class="card" style="cursor:pointer;margin-bottom:0" onclick="openCustomerDetail(\''+c.id+'\')">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">'
+        +'<div><div style="font-size:13px;font-weight:700;color:var(--dark)">'+c.name+'</div>'
+        +'<div style="font-size:10px;color:var(--mid);margin-top:2px">'+c.country+' · '+c.orgType+'</div></div>'
+        +'<span class="tag own-'+c.ownership+'">'+c.ownership+'</span>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;margin-bottom:10px">'
+        +'<span class="tag tag-sector">'+c.sector+'</span>'
+        +'<span class="tag tag-sector">'+c.aiMaturity+' AI</span>'
+        +'</div>'
+        +'<div style="display:flex;gap:14px;font-size:11px;color:var(--mid)">'
+        +'<span>'+custEngs.length+' engagement'+(custEngs.length!==1?'s':'')+'</span>'
+        +'<span>'+divCount+' division'+(divCount!==1?'s':'')+'</span>'
+        +'<span>'+contCount+' contact'+(contCount!==1?'s':'')+'</span>'
+        +'</div>'
+        +'<div style="margin-top:10px;display:flex;gap:6px">'
+        +'<button class="btn btn-outline btn-xs" onclick="event.stopPropagation();editCustomer(\''+c.id+'\')">Edit</button>'
+        +'<button class="btn btn-primary btn-xs" onclick="event.stopPropagation();openNewEngagement(\''+c.id+'\')">+ Engagement</button>'
+        +'<button class="btn btn-xs" style="color:#DC2626;border:1px solid #DC2626;background:transparent;margin-left:auto" onclick="event.stopPropagation();deleteCustomer(\''+c.id+'\')">Delete</button>'
+        +'</div>'
+        +'</div>'
+    }).join('')+'</div>'
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BRIEFS VIEW
+// ═══════════════════════════════════════════════════════════════
+function renderBriefs(){
+  let briefs = getBriefs()
+  const type = document.getElementById('filterBriefType')?.value
+  if(type) briefs = briefs.filter(b=>b.type===type)
+  briefs = briefs.sort((a,b)=>new Date(b.savedAt)-new Date(a.savedAt))
+
+  const engs = getEngagements()
+  const customers = getCustomers()
+
+  if(!briefs.length){
+    document.getElementById('briefsList').innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No saved briefs yet</div><div class="empty-sub">Briefs saved from the PEI tool or engagement detail view will appear here.</div><button class="btn btn-primary" onclick="openSaveBrief()">+ Save Brief</button></div>'
+    return
+  }
+
+  document.getElementById('briefsList').innerHTML = briefs.map(b=>{
+    const eng = engs.find(e=>e.id===b.engagementId)
+    const cust = customers.find(c=>c.id===eng?.customerId)
+    return '<div class="brief-item">'
+      +'<div class="brief-item-hdr">'
+      +'<div><div class="brief-type">'+briefTypeLabel(b.type)+' — '+b.title+'</div>'
+      +(eng?'<div style="font-size:10px;color:var(--blue);margin-top:2px">'+eng.engId+(cust?' · '+cust.name:'')+'</div>':'')
+      +'</div>'
+      +'<div class="brief-meta">'+fmtDateTime(b.savedAt)+(b.author?' · '+b.author:'')+'</div>'
+      +'</div>'
+      +(b.summary?'<div class="brief-summary">'+b.summary+'</div>':'')
+      +'<div class="brief-actions">'
+      +(b.content?'<button class="btn btn-outline btn-xs" onclick="viewBriefContent(\''+b.id+'\')">View Full</button>':'')
+      +'<button class="btn btn-xs" style="color:#DC2626;border:1px solid #DC2626;background:transparent;margin-left:auto" onclick="deleteBrief(\''+b.id+'\')">Delete</button>'
+      +'</div>'
+      +'</div>'
+  }).join('')
+}
+
+function deleteBrief(id){
+  if(!confirm('Delete this brief?')) return
+  saveBriefs(getBriefs().filter(b=>b.id!==id))
+  renderBriefs()
+}
+
+function viewBriefContent(id){
+  const b = getBriefs().find(b=>b.id===id)
+  if(!b||!b.content) return
+  const w = window.open('','_blank')
+  w.document.write('<pre style="font-family:Roboto,sans-serif;padding:20px;white-space:pre-wrap">'+b.content+'</pre>')
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENGAGEMENT DETAIL
+// ═══════════════════════════════════════════════════════════════
+function openEngDetail(id){
+  const e = getEngagements().find(e=>e.id===id)
+  if(!e) return
+  const customers = getCustomers()
+  const cust = customers.find(c=>c.id===e.customerId)
+  const div = cust?.divisions?.find(d=>d.id===e.divisionId)
+  const briefs = getBriefs().filter(b=>b.engagementId===id).sort((a,b)=>new Date(b.savedAt)-new Date(a.savedAt))
+
+  document.getElementById('detailContent').innerHTML =
+    '<div style="margin-bottom:16px"><button class="btn btn-outline btn-sm" onclick="switchTab(\'dashboard\')">← Back</button></div>'
+    +'<div class="detail-hdr">'
+    +'<div><div class="detail-eng-id">'+e.engId+'</div>'
+    +'<div class="detail-name">'+e.name+'</div>'
+    +'<div class="detail-customer">'+(cust?cust.name:'—')+(div?' · '+div.name:'')+'</div>'
+    +'<div style="display:flex;gap:6px;margin-top:8px">'
+    +'<span class="tag tag-phase-'+e.phase+'">'+e.phase+'</span>'
+    +'<span class="tag tag-status-'+e.status+'">'+e.status.replace(/_/g,' ')+'</span>'
+    +'<span class="tag tag-archetype">'+archetypeLabel(e.archetype)+'</span>'
+    +'</div></div>'
+    +'<div class="detail-actions">'
+    +'<button class="btn btn-outline btn-sm" onclick="editEngagement(\''+id+'\')">✏️ Edit</button>'
+    +'<button class="btn btn-teal btn-sm" onclick="openSaveBrief(\''+id+'\')">📋 Save Brief</button>'
+    +'<button class="btn btn-sm" style="color:#DC2626;border:1px solid #DC2626;background:transparent" onclick="deleteEngagement(\''+id+'\')">🗑 Delete</button>'
+    +'</div></div>'
+
+    +'<div class="detail-grid">'
+    +'<div class="detail-section">'
+    +'<div class="detail-section-title">Engagement Details</div>'
+    +dr('Type', e.type||'—')
+    +dr('Archetype', archetypeLabel(e.archetype))
+    +dr('Phase', e.phase)
+    +dr('Status', e.status?.replace(/_/g,' '))
+    +dr('Primary Domain', e.domain||'—')
+    +dr('Estimated Value', e.value?(e.currency+' '+Number(e.value).toLocaleString()):'—')
+    +dr('Created', fmtDate(e.createdAt))
+    +dr('Updated', fmtDate(e.updatedAt))
+    +'</div>'
+    +'<div class="detail-section">'
+    +'<div class="detail-section-title">Customer</div>'
+    +dr('Organisation', cust?.name||'—')
+    +dr('Division / Unit', div?.name||'Full organisation')
+    +dr('Ownership', cust?.ownership||'—')
+    +dr('Sector', cust?.sector||'—')
+    +dr('Country', cust?.country||'—')
+    +dr('AI Maturity', cust?.aiMaturity||'—')
+    +'</div>'
+    +(e.notes?'<div class="detail-section full"><div class="detail-section-title">Notes</div><div style="font-size:12px;line-height:1.7;color:var(--dark)">'+e.notes+'</div></div>':'')
+    +'</div>'
+
+    +'<div class="card">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+    +'<div class="card-title" style="margin-bottom:0">📋 Saved Briefs & Documents</div>'
+    +'<button class="btn btn-teal btn-sm" onclick="openSaveBrief(\''+id+'\')">+ Save Brief</button>'
+    +'</div>'
+    +(briefs.length ? briefs.map(b=>
+      '<div class="brief-item">'
+      +'<div class="brief-item-hdr">'
+      +'<div class="brief-type">'+briefTypeLabel(b.type)+' — '+b.title+'</div>'
+      +'<div class="brief-meta">'+fmtDateTime(b.savedAt)+(b.author?' · '+b.author:'')+'</div>'
+      +'</div>'
+      +(b.summary?'<div class="brief-summary">'+b.summary+'</div>':'')
+      +'<div class="brief-actions">'
+      +(b.content?'<button class="btn btn-outline btn-xs" onclick="viewBriefContent(\''+b.id+'\')">View Full</button>':'')
+      +'<button class="btn btn-xs" style="color:#DC2626;border:1px solid #DC2626;background:transparent;margin-left:auto" onclick="deleteBriefAndRefresh(\''+b.id+'\',\''+id+'\')">Delete</button>'
+      +'</div></div>'
+    ).join('') : '<div style="font-size:12px;color:var(--mid);text-align:center;padding:20px">No briefs saved yet for this engagement.</div>')
+    +'</div>'
+
+  ['dashboard','engagements','customers','briefs'].forEach(t=>document.getElementById('view-'+t).style.display='none')
+  document.getElementById('view-detail').style.display='block'
+  ;['tab-dashboard','tab-engagements','tab-customers','tab-briefs'].forEach(t=>document.getElementById(t)?.classList.remove('active'))
+}
+
+function dr(key, val){ return '<div class="detail-row"><span class="detail-key">'+key+'</span><span class="detail-val">'+(val||'—')+'</span></div>' }
+
+function deleteBriefAndRefresh(briefId, engId){
+  if(!confirm('Delete this brief?')) return
+  saveBriefs(getBriefs().filter(b=>b.id!==briefId))
+  openEngDetail(engId)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CUSTOMER MODAL
+// ═══════════════════════════════════════════════════════════════
+let editingCustomerId = null
+let tempContacts = []
+let tempDivisions = []
+
+function openNewCustomer(){
+  editingCustomerId = null
+  tempContacts = []
+  tempDivisions = []
+  document.getElementById('customerModalTitle').textContent = 'New Customer'
+  ;['cName','cShort','cState','cParent','cNotes'].forEach(id=>document.getElementById(id).value='')
+  ;['cCountry','cOwnership','cSector','cOrgType','cAiMaturity'].forEach(id=>{ const el=document.getElementById(id); if(el) el.selectedIndex=0 })
+  renderContactsList()
+  renderDivisionsList()
+  openModal('customerModal')
+}
+
+function editCustomer(id){
+  const c = getCustomers().find(c=>c.id===id)
+  if(!c) return
+  editingCustomerId = id
+  tempContacts = [...(c.contacts||[])]
+  tempDivisions = [...(c.divisions||[])]
+  document.getElementById('customerModalTitle').textContent = 'Edit Customer'
+  document.getElementById('cName').value = c.name||''
+  document.getElementById('cShort').value = c.short||''
+  document.getElementById('cState').value = c.state||''
+  document.getElementById('cParent').value = c.parent||''
+  document.getElementById('cNotes').value = c.notes||''
+  sv('cCountry',c.country); sv('cOwnership',c.ownership); sv('cSector',c.sector)
+  sv('cOrgType',c.orgType); sv('cAiMaturity',c.aiMaturity)
+  renderContactsList()
+  renderDivisionsList()
+  openModal('customerModal')
+}
+
+function saveCustomer(){
+  const name = document.getElementById('cName').value.trim()
+  if(!name){ alert('Organisation name is required.'); return }
+  const customers = getCustomers()
+  const c = {
+    id: editingCustomerId || generateId('CUST'),
+    name, short: document.getElementById('cShort').value.trim()||name.slice(0,6).toUpperCase(),
+    country: v('cCountry'), ownership: v('cOwnership'), sector: v('cSector'),
+    orgType: v('cOrgType'), state: v('cState'), parent: v('cParent'),
+    aiMaturity: v('cAiMaturity'), notes: v('cNotes'),
+    contacts: tempContacts, divisions: tempDivisions,
+    createdAt: editingCustomerId ? customers.find(c=>c.id===editingCustomerId)?.createdAt : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+  if(editingCustomerId) saveCustomers(customers.map(x=>x.id===editingCustomerId?c:x))
+  else saveCustomers([...customers,c])
+  closeModal('customerModal')
+  renderSidebar(); renderDashboard(); renderCustomers()
+}
+
+function deleteCustomer(id){
+  if(!confirm('Delete this customer and all their engagements?')) return
+  saveCustomers(getCustomers().filter(c=>c.id!==id))
+  saveEngagements(getEngagements().filter(e=>e.customerId!==id))
+  renderSidebar(); renderDashboard(); renderCustomers()
+}
+
+// Contacts
+function addContact(){
+  tempContacts.push({id:generateId('C'),name:'',role:'',seniority:'director',influence:'unknown',dept:''})
+  renderContactsList()
+}
+function removeContact(i){ tempContacts.splice(i,1); renderContactsList() }
+function renderContactsList(){
+  document.getElementById('contactsList').innerHTML = tempContacts.map((c,i)=>
+    '<div class="contact-row">'
+    +'<input type="text" value="'+c.name+'" placeholder="Name" oninput="tempContacts['+i+'].name=this.value" style="font-size:11px">'
+    +'<input type="text" value="'+c.role+'" placeholder="Designation" oninput="tempContacts['+i+'].role=this.value" style="font-size:11px">'
+    +'<select oninput="tempContacts['+i+'].seniority=this.value" style="font-size:11px">'
+    +['c_suite','director','manager','technical','other'].map(s=>'<option '+(c.seniority===s?'selected':'')+' value="'+s+'">'+s+'</option>').join('')
+    +'</select>'
+    +'<select oninput="tempContacts['+i+'].influence=this.value" style="font-size:11px">'
+    +['decision_maker','influencer','champion','blocker','unknown'].map(s=>'<option '+(c.influence===s?'selected':'')+' value="'+s+'">'+s.replace('_',' ')+'</option>').join('')
+    +'</select>'
+    +'<button class="btn-icon" onclick="removeContact('+i+')">×</button>'
+    +'</div>'
+  ).join('')||'<div style="font-size:11px;color:var(--mid);padding:8px 0">No contacts added.</div>'
+}
+
+// Divisions
+function addDivision(){
+  tempDivisions.push({id:generateId('DIV'),name:'',type:'Department',location:''})
+  renderDivisionsList()
+}
+function removeDivision(i){ tempDivisions.splice(i,1); renderDivisionsList() }
+function renderDivisionsList(){
+  document.getElementById('divisionsList').innerHTML = tempDivisions.map((d,i)=>
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center;padding:8px;border:1px solid #e0e0e8;border-radius:var(--r);background:var(--white);margin-bottom:6px">'
+    +'<input type="text" value="'+d.name+'" placeholder="Division name" oninput="tempDivisions['+i+'].name=this.value" style="font-size:11px">'
+    +'<select oninput="tempDivisions['+i+'].type=this.value" style="font-size:11px">'
+    +['Command','Corps','Directorate','Department','Business Unit','Region','Other'].map(t=>'<option '+(d.type===t?'selected':'')+' value="'+t+'">'+t+'</option>').join('')
+    +'</select>'
+    +'<input type="text" value="'+d.location+'" placeholder="City / Base" oninput="tempDivisions['+i+'].location=this.value" style="font-size:11px">'
+    +'<button class="btn-icon" onclick="removeDivision('+i+')">×</button>'
+    +'</div>'
+  ).join('')||'<div style="font-size:11px;color:var(--mid);padding:8px 0">No divisions added.</div>'
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENGAGEMENT MODAL
+// ═══════════════════════════════════════════════════════════════
+let editingEngId = null
+
+function openNewEngagement(preCustomerId){
+  editingEngId = null
+  document.getElementById('engModalTitle').textContent = 'New Engagement'
+  document.getElementById('eEditId').value = ''
+  ;['eName','eNotes','eValue'].forEach(id=>document.getElementById(id).value='')
+  populateCustomerDropdown(preCustomerId)
+  if(preCustomerId){ sv('eCustomer',preCustomerId); populateDivisions() }
+  openModal('engModal')
+}
+
+function editEngagement(id){
+  const e = getEngagements().find(e=>e.id===id)
+  if(!e) return
+  editingEngId = id
+  document.getElementById('engModalTitle').textContent = 'Edit Engagement'
+  document.getElementById('eEditId').value = id
+  document.getElementById('eName').value = e.name||''
+  document.getElementById('eNotes').value = e.notes||''
+  document.getElementById('eValue').value = e.value||''
+  populateCustomerDropdown(e.customerId)
+  sv('eCustomer',e.customerId); populateDivisions()
+  sv('eDivision',e.divisionId||'')
+  sv('eArchetype',e.archetype); sv('eType',e.type); sv('ePhase',e.phase)
+  sv('eStatus',e.status); sv('eDomain',e.domain); sv('eCurrency',e.currency||'USD')
+  openModal('engModal')
+}
+
+function populateCustomerDropdown(selectedId){
+  const customers = getCustomers()
+  const sel = document.getElementById('eCustomer')
+  sel.innerHTML = '<option value="">Select customer…</option>'
+    + customers.map(c=>'<option value="'+c.id+'"'+(c.id===selectedId?' selected':'')+'>'+c.name+'</option>').join('')
+}
+
+function populateDivisions(){
+  const custId = v('eCustomer')
+  const cust = getCustomers().find(c=>c.id===custId)
+  const sel = document.getElementById('eDivision')
+  sel.innerHTML = '<option value="">— Full organisation —</option>'
+    +(cust?.divisions||[]).map(d=>'<option value="'+d.id+'">'+d.name+'</option>').join('')
+}
+
+function saveEngagement(){
+  const name = document.getElementById('eName').value.trim()
+  const custId = v('eCustomer')
+  if(!name){ alert('Engagement name is required.'); return }
+  if(!custId){ alert('Please select a customer.'); return }
+
+  const cust = getCustomers().find(c=>c.id===custId)
+  const engs = getEngagements()
+  const id = editingEngId || generateId('ENG')
+  const existing = editingEngId ? engs.find(e=>e.id===editingEngId) : null
+
+  const e = {
+    id, engId: existing?.engId || generateEngId(v('eDomain')),
+    name, customerId: custId, divisionId: v('eDivision')||null,
+    archetype: v('eArchetype'), type: v('eType'), phase: v('ePhase'),
+    status: v('eStatus'), domain: v('eDomain'),
+    currency: v('eCurrency'), value: document.getElementById('eValue').value||null,
+    notes: v('eNotes'),
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  if(editingEngId) saveEngagements(engs.map(x=>x.id===editingEngId?e:x))
+  else saveEngagements([...engs,e])
+
+  closeModal('engModal')
+  renderDashboard(); renderEngagements(); renderSidebar()
+}
+
+function deleteEngagement(id){
+  if(!confirm('Delete this engagement?')) return
+  saveEngagements(getEngagements().filter(e=>e.id!==id))
+  switchTab('dashboard')
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SAVE BRIEF
+// ═══════════════════════════════════════════════════════════════
+function openSaveBrief(engId){
+  const engs = getEngagements()
+  const sel = document.getElementById('briefEngagement')
+  sel.innerHTML = '<option value="">— Not linked —</option>'
+    + engs.map(e=>'<option value="'+e.id+'"'+(e.id===engId?' selected':'')+'>'+e.engId+' — '+e.name+'</option>').join('')
+  ;['briefTitle','briefSummary','briefContent'].forEach(id=>document.getElementById(id).value='')
+  sv('briefType','pei')
+  openModal('briefModal')
+}
+
+function saveBrief(){
+  const title = document.getElementById('briefTitle').value.trim()
+  if(!title){ alert('Brief title is required.'); return }
+  const settings = getSettings()
+  const b = {
+    id: generateId('BRF'),
+    engagementId: v('briefEngagement')||null,
+    type: v('briefType'),
+    title,
+    summary: document.getElementById('briefSummary').value.trim(),
+    content: document.getElementById('briefContent').value.trim(),
+    author: settings.name||'Unknown',
+    authorRole: settings.role||'',
+    savedAt: new Date().toISOString(),
+  }
+  saveBriefs([...getBriefs(),b])
+  closeModal('briefModal')
+  renderBriefs()
+  alert('Brief saved successfully.')
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CUSTOMER DETAIL (quick view)
+// ═══════════════════════════════════════════════════════════════
+function openCustomerDetail(id){
+  activeCustomerId = id
+  activeDivisionId = null
+  openCustomers[id] = true
+  switchTab('dashboard')
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function v(id){ const el=document.getElementById(id); return el?el.value:'' }
+function sv(id,val){ const el=document.getElementById(id); if(el) el.value=val||'' }
+function openModal(id){ document.getElementById(id).classList.add('open') }
+function closeModal(id){ document.getElementById(id).classList.remove('open') }
+function fmtDate(iso){ if(!iso) return '—'; return new Date(iso).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) }
+function fmtDateTime(iso){ if(!iso) return '—'; return new Date(iso).toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) }
+
+function archetypeLabel(a){
+  return {territory_coe:'Territory CoE',govt_sectorial:'Govt Sectorial',enterprise:'Enterprise'}[a]||a||'—'
+}
+function briefTypeLabel(t){
+  return {pei:'PEI Brief',vision_brief:'Vision Brief',tad:'TAD',proposal:'Proposal',other:'Document'}[t]||t||'Document'
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el=>{
+  el.addEventListener('click',e=>{ if(e.target===el) el.classList.remove('open') })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+function init(){
+  updateHdrUser()
+  renderSidebar()
+  renderDashboard()
+
+  // First time prompt
+  const s = getSettings()
+  if(!s.name){
+    setTimeout(()=>{
+      if(confirm('Welcome to ATLAS Engagement Management.\n\nWould you like to set your name? It will be stamped on all saved briefs and documents.')) openSettings()
+    }, 500)
+  }
+}
+
+window.addEventListener('DOMContentLoaded', init)
+</script>
+</body>
+</html>
