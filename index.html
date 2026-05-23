@@ -205,12 +205,18 @@ const TOOLS = {
   'hpc-monitor':         { label:'HPC Monitoring',            icon:'📡', ver:'v1.0', status:'ready',  cat:'ops',      url:BASE+'/tools/hpc-monitoring/', desc:'Live cluster dashboard — GPU utilisation, job queue, alerts, power & cooling' },
   'bom-validator':       { label:'GeoAI BOM Validator',       icon:'📐', ver:'v1.0', status:'ready',  cat:'presales', url:BASE+'/tools/bom-validator/', desc:'40 use cases, GPU sizing, power model, cost & margin, BOM vs reference validation' },
   'compass':             { label:'COMPASS',                   icon:'🧭', ver:'v2.0', status:'ready',  cat:'ops',      url:BASE+'/tools/compass-v2/', desc:'Token governance · MOAT token economy · Latency OLA · Load intelligence · Sovereign metrics' },
+
+  'ai-centre-builder': { label:'AI Centre Builder', icon:'🏙️', ver:'v1.1', status:'ready', cat:'presales', url:BASE+'/tools/ai-centre-builder/', desc:'Dual-track AI Centre proposal — CoE + Inferencing Factory, tokenomics, policy architecture, Vision Brief' },
+  'engagement-management': { label:'Engagement Management', icon:'🤝', ver:'v1.0', status:'ready', cat:'presales', url:BASE+'/tools/engagement-management/', desc:'Customer, division and engagement lifecycle management with saved briefs and PEI integration' },
+  'second-brain': { label:'Second Brain', icon:'🧠', ver:'v1.0', status:'ready', cat:'presales', url:BASE+'/tools/second-brain/', desc:'Domain intelligence engine — Foundation, Monthly Update, Weekly Pulse, UC recommendations' },
+  
+  
 }
 
 const CATEGORIES = [
   { id:'sales',    label:'01 · Sales Enablement',       icon:'📈', tools:['portfolio-portal','ai-sovereignty'] },
   { id:'opp',      label:'02 · Opportunity Management', icon:'🎯', tools:['rac-tool','deal-analysis'] },
-  { id:'presales', label:'03 · Presales',               icon:'🔭', tools:['domain-config','inferencing','vision-doc','benchmark','bom-validator','ai-center-builder'] },  
+  { id:'presales', label:'03 · Presales',               icon:'🔭', tools:['domain-config','inferencing','vision-doc','benchmark','bom-validator','ai-centre-builder','engagement-management','second-brain'],  
   { id:'ops',      label:'04 · Business Operations',    icon:'⚙️', tools:['hpc-monitor','compass'] },
 ]
 
