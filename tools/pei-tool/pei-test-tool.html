@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — PEI Test Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@9.0.2/build/index.umd.js"></script>
+<style>
+:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--r-sm:6px;--r-lg:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:100;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
+.hdr-note{font-size:11px;color:rgba(255,255,255,0.5);}
+.container{max-width:820px;margin:32px auto;padding:0 24px;}
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:24px;margin-bottom:20px;box-shadow:var(--shadow);}
+.card-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:18px;line-height:1.6;}
+label{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
+.field-hint{font-size:10px;color:var(--mid);margin-top:4px;line-height:1.5;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.form-row{margin-bottom:16px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:var(--r-sm);font-size:13px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-sm{padding:5px 12px;font-size:11px;}
+.alert{padding:10px 14px;border-radius:var(--r);font-size:11px;margin-bottom:14px;line-height:1.6;}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.3);color:#9a7000;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-error{background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);color:#DC2626;}
+
+/* LOADING */
+.loading{text-align:center;padding:40px;}
+.loading-icon{font-size:36px;animation:spin 1.5s linear infinite;display:inline-block;}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);};}
+.loading-text{font-size:12px;color:var(--mid);margin-top:10px;}
+
+/* PEI OUTPUT */
+.pei-output{display:none;}
+.pei-header{background:var(--navy);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;color:var(--white);}
+.pei-org{font-size:22px;font-weight:700;margin-bottom:4px;}
+.pei-meta{font-size:11px;color:rgba(255,255,255,0.55);display:flex;gap:16px;flex-wrap:wrap;}
+.pei-meta span{display:flex;align-items:center;gap:4px;}
+.draft-pill{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;background:rgba(255,85,57,0.2);color:var(--orange);border-radius:6px;margin-top:8px;}
+.pei-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.pei-section{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;}
+.pei-section.full{grid-column:1/-1;}
+.pei-section-title{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--light);}
+.pei-text{font-size:12px;line-height:1.7;color:var(--dark);}
+.pei-text ul{margin:6px 0 0 16px;}
+.pei-text li{margin-bottom:3px;}
+.maturity-bar{height:8px;background:var(--light);border-radius:4px;overflow:hidden;margin-top:8px;}
+.maturity-fill{height:100%;border-radius:4px;background:var(--teal);transition:width 0.5s;}
+.maturity-label{display:flex;justify-content:space-between;font-size:10px;color:var(--mid);margin-top:4px;}
+.confidence-pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;}
+.conf-high{background:rgba(0,178,144,0.1);color:var(--teal);}
+.conf-medium{background:rgba(255,182,0,0.1);color:#9a7000;}
+.conf-low{background:rgba(255,85,57,0.1);color:var(--orange);}
+.positioning-box{background:rgba(0,40,112,0.04);border:1px solid rgba(0,40,112,0.15);border-radius:var(--r);padding:14px;font-size:12px;line-height:1.7;color:var(--dark);}
+.positioning-box strong{color:var(--navy);}
+.vendor-tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--light);color:var(--mid);margin:2px;}
+.source-list{font-size:10px;color:var(--mid);margin-top:8px;}
+.source-list a{color:var(--blue);text-decoration:none;}
+.source-list a:hover{text-decoration:underline;}
+.actions-bar{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+
+@media(max-width:640px){.form-grid{grid-template-columns:1fr;}.pei-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div class="hdr-note">Pre-Engagement Intelligence · Test Tool</div>
+  <span class="hdr-badge">PEI v0.1</span>
+</div>
+
+<div class="container">
+
+  <div class="card">
+    <div class="card-title">⚙️ Configuration</div>
+    <div class="card-sub">Your Gemini API key is used only in your browser — it is never sent to any server other than Google's API. It is not stored anywhere after you close this tab.</div>
+
+    <div class="alert alert-warn">
+      🔒 Keep your API key private. Do not share this file with the key pre-filled. Clear the field before sharing.
+    </div>
+
+    <div class="form-row">
+      <label>Gemini API Key</label>
+      <input type="password" id="apiKey" placeholder="Paste your Gemini API key here…">
+      <div class="field-hint">Get your key from aistudio.google.com → Get API Key</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🏢 Organisation</div>
+    <div class="card-sub">Enter only publicly known information about the organisation. Do not enter any confidential internal data — this will be sent to the Gemini API for research.</div>
+
+    <div class="form-grid">
+      <div>
+        <label>Organisation Name</label>
+        <input type="text" id="orgName" placeholder="e.g. Indian Army" oninput="clearOutput()">
+      </div>
+      <div>
+        <label>Country</label>
+        <select id="orgCountry" onchange="clearOutput()">
+          <optgroup label="Asia Pacific">
+            <option value="Australia" data-currency="AUD">Australia</option>
+            <option value="Bangladesh" data-currency="BDT">Bangladesh</option>
+            <option value="China" data-currency="CNY">China</option>
+            <option value="Hong Kong" data-currency="HKD">Hong Kong</option>
+            <option value="India" data-currency="INR" selected>India</option>
+            <option value="Indonesia" data-currency="IDR">Indonesia</option>
+            <option value="Japan" data-currency="JPY">Japan</option>
+            <option value="Malaysia" data-currency="MYR">Malaysia</option>
+            <option value="Myanmar" data-currency="MMK">Myanmar</option>
+            <option value="Nepal" data-currency="NPR">Nepal</option>
+            <option value="New Zealand" data-currency="NZD">New Zealand</option>
+            <option value="Pakistan" data-currency="PKR">Pakistan</option>
+            <option value="Philippines" data-currency="PHP">Philippines</option>
+            <option value="Singapore" data-currency="SGD">Singapore</option>
+            <option value="South Korea" data-currency="KRW">South Korea</option>
+            <option value="Sri Lanka" data-currency="LKR">Sri Lanka</option>
+            <option value="Taiwan" data-currency="TWD">Taiwan</option>
+            <option value="Thailand" data-currency="THB">Thailand</option>
+            <option value="Vietnam" data-currency="VND">Vietnam</option>
+          </optgroup>
+          <optgroup label="Middle East">
+            <option value="Bahrain" data-currency="BHD">Bahrain</option>
+            <option value="Egypt" data-currency="EGP">Egypt</option>
+            <option value="Israel" data-currency="ILS">Israel</option>
+            <option value="Jordan" data-currency="JOD">Jordan</option>
+            <option value="Kuwait" data-currency="KWD">Kuwait</option>
+            <option value="Oman" data-currency="OMR">Oman</option>
+            <option value="Qatar" data-currency="QAR">Qatar</option>
+            <option value="Saudi Arabia" data-currency="SAR">Saudi Arabia</option>
+            <option value="UAE" data-currency="AED">UAE</option>
+          </optgroup>
+          <optgroup label="Europe">
+            <option value="Austria" data-currency="EUR">Austria</option>
+            <option value="Belgium" data-currency="EUR">Belgium</option>
+            <option value="Denmark" data-currency="DKK">Denmark</option>
+            <option value="France" data-currency="EUR">France</option>
+            <option value="Germany" data-currency="EUR">Germany</option>
+            <option value="Ireland" data-currency="EUR">Ireland</option>
+            <option value="Italy" data-currency="EUR">Italy</option>
+            <option value="Netherlands" data-currency="EUR">Netherlands</option>
+            <option value="Norway" data-currency="NOK">Norway</option>
+            <option value="Poland" data-currency="PLN">Poland</option>
+            <option value="Russia" data-currency="RUB">Russia</option>
+            <option value="Spain" data-currency="EUR">Spain</option>
+            <option value="Sweden" data-currency="SEK">Sweden</option>
+            <option value="Switzerland" data-currency="CHF">Switzerland</option>
+            <option value="Turkey" data-currency="TRY">Turkey</option>
+            <option value="United Kingdom" data-currency="GBP">United Kingdom</option>
+          </optgroup>
+          <optgroup label="Latin America">
+            <option value="Argentina" data-currency="ARS">Argentina</option>
+            <option value="Brazil" data-currency="BRL">Brazil</option>
+            <option value="Chile" data-currency="CLP">Chile</option>
+            <option value="Colombia" data-currency="COP">Colombia</option>
+            <option value="Mexico" data-currency="MXN">Mexico</option>
+            <option value="Peru" data-currency="PEN">Peru</option>
+          </optgroup>
+          <optgroup label="North America">
+            <option value="Canada" data-currency="CAD">Canada</option>
+            <option value="United States" data-currency="USD">United States</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div>
+        <label>Ownership Type</label>
+        <select id="orgOwnership" onchange="clearOutput()">
+          <option value="Government Ministry / Department">Government Ministry / Department</option>
+          <option value="Military / Armed Forces">Military / Armed Forces</option>
+          <option value="Intelligence / Security Agency">Intelligence / Security Agency</option>
+          <option value="Public Sector Undertaking (PSU)">Public Sector Undertaking (PSU)</option>
+          <option value="Private Enterprise">Private Enterprise</option>
+        </select>
+      </div>
+      <div>
+        <label>Functional Sector</label>
+        <select id="orgSector" onchange="clearOutput()">
+          <option value="Defence & Armed Forces">Defence & Armed Forces</option>
+          <option value="Intelligence & Signals">Intelligence & Signals</option>
+          <option value="Homeland Security">Homeland Security</option>
+          <option value="Governance & e-Governance">Governance & e-Governance</option>
+          <option value="Space & Aerospace / Aviation">Space & Aerospace / Aviation</option>
+          <option value="Energy & Utilities">Energy & Utilities</option>
+          <option value="Mining & Natural Resources">Mining & Natural Resources</option>
+          <option value="Telecom & Networks">Telecom & Networks</option>
+          <option value="BFSI & Financial Services">BFSI & Financial Services</option>
+          <option value="Health & Life Sciences">Health & Life Sciences</option>
+          <option value="Manufacturing & Industry">Manufacturing & Industry</option>
+          <option value="Agriculture & Food">Agriculture & Food</option>
+          <option value="Geospatial & Earth Observation">Geospatial & Earth Observation</option>
+          <option value="Territory / State CoE">Territory / State CoE</option>
+          <option value="General Enterprise">General Enterprise</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Division / Unit (optional)</label>
+      <input type="text" id="orgDivision" placeholder="e.g. Signals Corps, Northern Command — leave blank for full organisation" oninput="clearOutput()">
+      <div class="field-hint">If targeting a specific division or unit within the organisation.</div>
+    </div>
+
+    <div class="form-row">
+      <label>Additional Context (optional)</label>
+      <textarea id="orgContext" rows="2" placeholder="Any specific focus area, known challenge, or engagement context to steer the research…" oninput="clearOutput()"></textarea>
+      <div class="field-hint">This stays in your browser — it helps steer the research prompt but is not stored.</div>
+    </div>
+
+    <button class="btn btn-primary" id="generateBtn" onclick="generatePEI()">🔍 Generate PEI Brief</button>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loadingPanel" style="display:none">
+    <div class="loading">
+      <div class="loading-icon">🔍</div>
+      <div class="loading-text">Researching <span id="loadingOrg"></span>…<br>Gemini 3.5 Flash is scanning public sources.</div>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div id="errorPanel" style="display:none">
+    <div class="alert alert-error" id="errorText"></div>
+  </div>
+
+  <!-- PEI OUTPUT -->
+  <div class="pei-output" id="peiOutput">
+
+    <div class="actions-bar">
+      <button class="btn btn-outline btn-sm" onclick="copyJSON()">📋 Copy JSON</button>
+      <button class="btn btn-outline btn-sm" onclick="downloadJSON()">⬇ JSON</button>
+      <button class="btn btn-secondary btn-sm" onclick="downloadWord()" style="background:var(--navy);color:var(--white)">📄 Word (.docx)</button>
+      <button class="btn btn-primary btn-sm" onclick="downloadPPTX()">📊 PPTX</button>
+      <button class="btn btn-teal btn-sm" onclick="clearOutput()">↺ New Brief</button>
+    </div>
+
+    <div class="pei-header">
+      <div class="pei-org" id="out-org">—</div>
+      <div class="pei-meta">
+        <span>🏢 <span id="out-ownership">—</span></span>
+        <span>🏭 <span id="out-sector">—</span></span>
+        <span>🌍 <span id="out-country">—</span></span>
+        <span>⚙️ Gemini 3.5 Flash</span>
+        <span>📅 <span id="out-date">—</span></span>
+      </div>
+      <div class="draft-pill">DRAFT — Internal Use Only</div>
+    </div>
+
+    <div class="pei-grid">
+      <div class="pei-section full">
+        <div class="pei-section-title">🏢 Organisation Summary</div>
+        <div class="pei-text" id="out-summary">—</div>
+      </div>
+
+      <div class="pei-section">
+        <div class="pei-section-title">🤖 AI Maturity</div>
+        <div class="pei-text" id="out-maturity-label">—</div>
+        <div class="maturity-bar"><div class="maturity-fill" id="out-maturity-bar" style="width:0%"></div></div>
+        <div class="maturity-label"><span>None</span><span>Aware</span><span>Piloting</span><span>Deploying</span><span>Scaling</span></div>
+        <div class="pei-text" style="margin-top:8px" id="out-maturity-evidence">—</div>
+      </div>
+
+      <div class="pei-section">
+        <div class="pei-section-title">💻 Technology Profile</div>
+        <div class="pei-text" id="out-tech">—</div>
+        <div style="margin-top:8px" id="out-vendors"></div>
+      </div>
+
+      <div class="pei-section full">
+        <div class="pei-section-title">💰 Budget & Procurement</div>
+        <div class="pei-text" id="out-budget">—</div>
+      </div>
+
+      <div class="pei-section full">
+        <div class="pei-section-title">👤 Key Decision Makers</div>
+        <div id="out-decision-makers">—</div>
+      </div>
+
+      <div class="pei-section full">
+        <div class="pei-section-title">🗺️ Strategic Initiatives</div>
+        <div class="pei-text" id="out-initiatives">—</div>
+      </div>
+
+      <div class="pei-section">
+        <div class="pei-section-title">⚖️ Regulatory & Compliance</div>
+        <div class="pei-text" id="out-regulatory">—</div>
+      </div>
+
+      <div class="pei-section">
+        <div class="pei-section-title">⚠️ Known Challenges</div>
+        <div class="pei-text" id="out-challenges">—</div>
+      </div>
+
+      <div class="pei-section full">
+        <div class="pei-section-title">📰 Recent Activity</div>
+        <div class="pei-text" id="out-recent">—</div>
+      </div>
+
+      <div class="pei-section full">
+        <div class="pei-section-title">🏆 Known Suppliers & Competition</div>
+        <div class="pei-text" id="out-suppliers">—</div>
+      </div>
+
+      <div class="pei-section full">
+        <div class="pei-section-title">🔍 Competitive Signals</div>
+        <div class="pei-text" id="out-competitive">—</div>
+      </div>
+
+      <div class="pei-section">
+        <div class="pei-section-title">🤝 Partnership History</div>
+        <div class="pei-text" id="out-partnerships">—</div>
+      </div>
+
+      <div class="pei-section">
+        <div class="pei-section-title">🚩 Risk Flags</div>
+        <div class="pei-text" id="out-risks">—</div>
+      </div>
+
+      <div class="pei-section full">
+        <div class="pei-section-title">🎯 Solution Fit & Entry Points</div>
+        <div class="pei-text" id="out-solution-fit">—</div>
+      </div>
+
+      <div class="pei-section full">
+        <div class="pei-section-title">📋 Recommended Next Actions</div>
+        <div class="pei-text" id="out-next-actions">—</div>
+      </div>
+
+      <div class="pei-section full">
+        <div class="pei-section-title">🎯 Our Positioning — Suggested Opening Angle</div>
+        <div class="positioning-box" id="out-positioning">—</div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--mid)">Confidence:</span>
+          <span class="confidence-pill" id="out-confidence">—</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let PEI_DATA = null
+
+async function generatePEI(){
+  const apiKey = document.getElementById('apiKey').value.trim()
+  const orgName = document.getElementById('orgName').value.trim()
+  const country = document.getElementById('orgCountry').value
+  const ownership = document.getElementById('orgOwnership').value
+  const sector = document.getElementById('orgSector').value
+  const division = document.getElementById('orgDivision').value.trim()
+  const context = document.getElementById('orgContext').value.trim()
+
+  if(!apiKey){ alert('Please enter your Gemini API key.'); return }
+  if(!orgName){ alert('Please enter an organisation name.'); return }
+
+  // Show loading
+  document.getElementById('peiOutput').style.display = 'none'
+  document.getElementById('errorPanel').style.display = 'none'
+  document.getElementById('loadingPanel').style.display = 'block'
+  document.getElementById('loadingOrg').textContent = orgName
+  document.getElementById('generateBtn').disabled = true
+
+  const target = division ? orgName + ' — ' + division : orgName
+  const countrySelect = document.getElementById('orgCountry')
+  const currency = countrySelect.options[countrySelect.selectedIndex]?.dataset?.currency || 'USD'
+  const currencyNote = currency !== 'USD' ? currency + ' (with USD equivalent where relevant)' : 'USD'
+
+
+  const prompt = `You are a senior business intelligence analyst preparing a comprehensive Pre-Engagement Intelligence (PEI) brief for a BD team at an AI and HPC hardware/software OEM. Research the following organisation thoroughly using publicly available information only — news, press releases, tenders, annual reports, government documents, parliamentary questions, media interviews.
+
+TARGET: ${target}
+COUNTRY: ${country}
+OWNERSHIP TYPE: ${ownership}
+SECTOR: ${sector}
+${context ? 'ADDITIONAL CONTEXT: ' + context : ''}
+CURRENCY: Report all amounts in ${currencyNote}.
+
+Respond ONLY with a valid JSON object. No preamble, no markdown, no backticks. Use this exact schema — be specific, detailed, and evidence-based throughout:
+
+{
+  "organisation_summary": "3-4 sentence factual overview — what the organisation does, its scale, mandate, strategic importance, and current leadership priorities",
+
+  "ai_maturity": "none | aware | piloting | deploying | scaling",
+  "ai_maturity_evidence": "specific evidence — named programmes, published announcements, known AI deployments, budget allocations to AI",
+
+  "hpc_exposure": "none | limited | active",
+  "quantum_awareness": "none | exploring | active",
+
+  "technology_profile": {
+    "current_it_infrastructure": "what is known about their current IT/technology infrastructure, data centres, cloud usage",
+    "data_posture": "what is known about their data strategy, data sovereignty stance, cloud vs on-prem preference",
+    "key_technology_programmes": ["list of known technology modernisation or digital transformation programmes"],
+    "current_vendors": ["known AI, HPC, cloud, and enterprise IT vendors — public sources only"]
+  },
+
+  "budget_and_procurement": {
+    "annual_it_budget_estimate": "estimated annual IT/technology budget range if publicly known",
+    "recent_tender_sizes": "sizes and nature of recent technology tenders — amounts and categories",
+    "procurement_pattern": "how this organisation typically procures technology — tender, framework, direct, GeM, DPP etc",
+    "financial_year": "when their budget cycle runs",
+    "budget_authority": "who holds budget authority — Minister, Secretary, CTO, etc."
+  },
+
+  "key_decision_makers": [
+    {
+      "name": "publicly known name",
+      "role": "designation",
+      "relevance": "why they matter for an AI/HPC engagement",
+      "known_priorities": "publicly stated priorities or positions"
+    }
+  ],
+
+  "strategic_initiatives": ["list of known strategic programmes, digital transformation roadmaps, AI/data initiatives — named and described briefly"],
+
+  "regulatory_and_compliance": "relevant regulations, data protection requirements, security clearance requirements, compliance frameworks that govern this organisation's AI/data usage",
+
+  "known_challenges": ["5-7 specific operational or strategic challenges from public sources — be precise, not generic"],
+
+  "recent_activity": "detailed summary of recent tenders, budget allocations, programme announcements, leadership statements, parliamentary questions, audits relevant to AI/technology — last 18-24 months",
+
+  "known_suppliers": {
+    "ai_hpc_vendors": ["known AI and HPC hardware vendors active with this organisation"],
+    "software_vendors": ["known AI software, cloud, and enterprise software vendors"],
+    "si_partners": ["known system integrators or implementation partners"],
+    "notes": "any known contract values, durations, or recent wins/losses"
+  },
+
+  "competitive_signals": "detailed analysis of which technology vendors are active, what they have won, what is up for renewal, where incumbents may be vulnerable",
+
+  "partnership_history": "known MoUs, partnerships, collaborations, joint ventures relevant to technology or AI",
+
+  "risk_flags": ["political sensitivity, budget constraints, procurement delays, incumbent lock-in, security concerns, or other risks for a new vendor engaging this organisation"],
+
+  "solution_fit": {
+    "strongest_fit_areas": ["where an AI/HPC OEM's products most directly address this organisation's needs"],
+    "entry_point_recommendations": ["specific programmes, divisions, or use cases that represent the best entry point"],
+    "products_to_lead_with": ["types of products or capabilities to lead with given this organisation's profile"]
+  },
+
+  "recommended_next_actions": ["5-7 specific, actionable next steps for the BD team — e.g. attend specific event, contact specific role, respond to specific tender, request briefing on specific programme"],
+
+  "our_positioning": "detailed suggested opening angle — what pain point to lead with, what capability to emphasise, what strategic narrative resonates, what sovereign AI or Make in India angle applies, how to differentiate from incumbents",
+
+  "confidence": "high | medium | low",
+  "confidence_reason": "reason for confidence rating — volume and quality of public information available"
+}`
+
+  try {
+    const res = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + apiKey,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 8192,
+          }
+        })
+      }
+    )
+
+    if(!res.ok){
+      const err = await res.json()
+      throw new Error(err.error?.message || 'API error ' + res.status)
+    }
+
+    const data = await res.json()
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
+
+    if(!rawText) throw new Error('No response from Gemini. Check your API key and try again.')
+
+    // Robust JSON extraction
+    let cleaned = rawText.trim()
+    // Strip markdown code fences if present
+    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/,'').trim()
+    // Find the JSON object — look for first { and last }
+    const firstBrace = cleaned.indexOf('{')
+    const lastBrace = cleaned.lastIndexOf('}')
+    if(firstBrace === -1 || lastBrace === -1) throw new Error('Gemini did not return a valid JSON object. Try again.')
+    cleaned = cleaned.slice(firstBrace, lastBrace + 1)
+
+    let pei
+    try {
+      pei = JSON.parse(cleaned)
+    } catch(parseErr) {
+      // Try to fix common issues: truncated strings, trailing commas
+      // Remove last incomplete key-value pair and close the object
+      const lastComma = cleaned.lastIndexOf(',')
+      if(lastComma > 0) {
+        const truncated = cleaned.slice(0, lastComma) + '\n}'
+        try { pei = JSON.parse(truncated) }
+        catch(e2) { throw new Error('Response was truncated or malformed. Try again — this can happen occasionally with long responses.') }
+      } else {
+        throw new Error('Could not parse Gemini response. Try again.')
+      }
+    }
+
+    PEI_DATA = {
+      meta: {
+        organisation: target,
+        ownership_type: ownership,
+        functional_sector: sector,
+        country: country,
+        generated_at: new Date().toISOString(),
+        model: 'gemini-3.5-flash',
+        tool: 'ATLAS PEI Test Tool v0.1'
+      },
+      ...pei
+    }
+
+    renderPEI(PEI_DATA, target, ownership, sector, country)
+
+  } catch(err) {
+    document.getElementById('loadingPanel').style.display = 'none'
+    document.getElementById('errorPanel').style.display = 'block'
+    document.getElementById('errorText').innerHTML = '<strong>Error:</strong> ' + err.message +
+      (err.message.includes('API_KEY') ? '<br><br>Check that your API key is correct and has not expired.' : '') +
+      (err.message.includes('JSON') ? '<br><br>Gemini returned unexpected output. Try again.' : '')
+  } finally {
+    document.getElementById('generateBtn').disabled = false
+  }
+}
+
+function renderPEI(pei, target, ownership, sector, country){
+  document.getElementById('loadingPanel').style.display = 'none'
+  const date = new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'})
+
+  // Header
+  document.getElementById('out-org').textContent = target
+  document.getElementById('out-ownership').textContent = ownership
+  document.getElementById('out-sector').textContent = sector
+  document.getElementById('out-country').textContent = country
+  document.getElementById('out-date').textContent = date
+
+  // Summary
+  document.getElementById('out-summary').textContent = pei.organisation_summary || '—'
+
+  // AI Maturity
+  const maturityMap = {none:0, aware:25, piloting:50, deploying:75, scaling:100}
+  const maturityLabels = {none:'None',aware:'Aware',piloting:'Piloting',deploying:'Deploying',scaling:'Scaling'}
+  const mat = pei.ai_maturity || 'none'
+  document.getElementById('out-maturity-label').innerHTML = '<strong>' + (maturityLabels[mat]||mat) + '</strong>'
+  document.getElementById('out-maturity-bar').style.width = (maturityMap[mat]||0) + '%'
+  document.getElementById('out-maturity-evidence').textContent = pei.ai_maturity_evidence || '—'
+
+  // Technology profile
+  const tp = pei.technology_profile || {}
+  const hpcMap = {none:'No known HPC exposure',limited:'Limited HPC exposure',active:'Active HPC usage'}
+  const qMap = {none:'No quantum awareness',exploring:'Exploring quantum',active:'Active quantum programme'}
+  let techHtml = '<div style="margin-bottom:6px">HPC: <strong>' + (hpcMap[pei.hpc_exposure]||pei.hpc_exposure||'—') + '</strong></div>'
+  techHtml += '<div style="margin-bottom:8px">Quantum: <strong>' + (qMap[pei.quantum_awareness]||pei.quantum_awareness||'—') + '</strong></div>'
+  if(tp.current_it_infrastructure) techHtml += '<div style="margin-bottom:6px"><strong>Infrastructure:</strong> ' + tp.current_it_infrastructure + '</div>'
+  if(tp.data_posture) techHtml += '<div style="margin-bottom:6px"><strong>Data posture:</strong> ' + tp.data_posture + '</div>'
+  if(tp.key_technology_programmes?.length) techHtml += '<div style="margin-bottom:4px"><strong>Key programmes:</strong></div><ul>' + tp.key_technology_programmes.map(p=>'<li>'+p+'</li>').join('') + '</ul>'
+  document.getElementById('out-tech').innerHTML = techHtml
+  const vendors = tp.current_vendors || pei.current_vendors || []
+  document.getElementById('out-vendors').innerHTML = vendors.length
+    ? '<div style="font-size:10px;font-weight:700;color:var(--mid);margin-bottom:4px">KNOWN VENDORS</div>' + vendors.map(v=>'<span class="vendor-tag">'+v+'</span>').join('')
+    : '<span style="font-size:11px;color:var(--mid)">No known vendors identified</span>'
+
+  // Budget & Procurement
+  const bp = pei.budget_and_procurement || {}
+  let budgetHtml = ''
+  if(bp.annual_it_budget_estimate) budgetHtml += '<div style="margin-bottom:5px"><strong>Annual IT Budget:</strong> ' + bp.annual_it_budget_estimate + '</div>'
+  if(bp.recent_tender_sizes) budgetHtml += '<div style="margin-bottom:5px"><strong>Recent Tender Sizes:</strong> ' + bp.recent_tender_sizes + '</div>'
+  if(bp.procurement_pattern) budgetHtml += '<div style="margin-bottom:5px"><strong>Procurement Pattern:</strong> ' + bp.procurement_pattern + '</div>'
+  if(bp.financial_year) budgetHtml += '<div style="margin-bottom:5px"><strong>Financial Year:</strong> ' + bp.financial_year + '</div>'
+  if(bp.budget_authority) budgetHtml += '<div style="margin-bottom:5px"><strong>Budget Authority:</strong> ' + bp.budget_authority + '</div>'
+  document.getElementById('out-budget').innerHTML = budgetHtml || '—'
+
+  // Key Decision Makers
+  const dms = pei.key_decision_makers || []
+  document.getElementById('out-decision-makers').innerHTML = dms.length
+    ? '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      '<thead><tr style="background:var(--light)"><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Name</th><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Role</th><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Relevance</th><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Known Priorities</th></tr></thead><tbody>' +
+      dms.map(d=>'<tr style="border-bottom:1px solid var(--light)"><td style="padding:6px 8px;font-weight:600">' + (d.name||'—') + '</td><td style="padding:6px 8px;color:var(--mid)">' + (d.role||'—') + '</td><td style="padding:6px 8px">' + (d.relevance||'—') + '</td><td style="padding:6px 8px">' + (d.known_priorities||'—') + '</td></tr>').join('') +
+      '</tbody></table>'
+    : '<span style="font-size:11px;color:var(--mid)">No publicly known decision makers identified</span>'
+
+  // Strategic Initiatives
+  const initiatives = pei.strategic_initiatives || []
+  document.getElementById('out-initiatives').innerHTML = initiatives.length
+    ? '<ul>' + initiatives.map(i=>'<li>'+i+'</li>').join('') + '</ul>'
+    : '—'
+
+  // Regulatory
+  document.getElementById('out-regulatory').textContent = pei.regulatory_and_compliance || '—'
+
+  // Challenges
+  const challenges = pei.known_challenges || []
+  document.getElementById('out-challenges').innerHTML = challenges.length
+    ? '<ul>' + challenges.map(c=>'<li>'+c+'</li>').join('') + '</ul>'
+    : '—'
+
+  // Recent Activity
+  document.getElementById('out-recent').textContent = pei.recent_activity || '—'
+
+  // Known Suppliers
+  const ks = pei.known_suppliers || {}
+  let suppHtml = ''
+  if(ks.ai_hpc_vendors?.length) suppHtml += '<div style="margin-bottom:8px"><strong>AI & HPC Vendors:</strong><br>' + ks.ai_hpc_vendors.map(v=>'<span class="vendor-tag">'+v+'</span>').join('') + '</div>'
+  if(ks.software_vendors?.length) suppHtml += '<div style="margin-bottom:8px"><strong>Software & Cloud Vendors:</strong><br>' + ks.software_vendors.map(v=>'<span class="vendor-tag">'+v+'</span>').join('') + '</div>'
+  if(ks.si_partners?.length) suppHtml += '<div style="margin-bottom:8px"><strong>SI & Implementation Partners:</strong><br>' + ks.si_partners.map(v=>'<span class="vendor-tag">'+v+'</span>').join('') + '</div>'
+  if(ks.notes) suppHtml += '<div style="font-size:11px;color:var(--mid);margin-top:6px">'+ks.notes+'</div>'
+  document.getElementById('out-suppliers').innerHTML = suppHtml || '—'
+
+  // Competitive Signals
+  document.getElementById('out-competitive').textContent = pei.competitive_signals || '—'
+
+  // Partnership History
+  document.getElementById('out-partnerships').textContent = pei.partnership_history || '—'
+
+  // Risk Flags
+  const risks = pei.risk_flags || []
+  document.getElementById('out-risks').innerHTML = risks.length
+    ? '<ul>' + risks.map(r=>'<li>'+r+'</li>').join('') + '</ul>'
+    : '—'
+
+  // Solution Fit
+  const sf = pei.solution_fit || {}
+  let sfHtml = ''
+  if(sf.strongest_fit_areas?.length) sfHtml += '<div style="margin-bottom:8px"><strong>Strongest Fit Areas:</strong><ul>' + sf.strongest_fit_areas.map(a=>'<li>'+a+'</li>').join('') + '</ul></div>'
+  if(sf.entry_point_recommendations?.length) sfHtml += '<div style="margin-bottom:8px"><strong>Entry Point Recommendations:</strong><ul>' + sf.entry_point_recommendations.map(a=>'<li>'+a+'</li>').join('') + '</ul></div>'
+  if(sf.products_to_lead_with?.length) sfHtml += '<div><strong>Products / Capabilities to Lead With:</strong><ul>' + sf.products_to_lead_with.map(a=>'<li>'+a+'</li>').join('') + '</ul></div>'
+  document.getElementById('out-solution-fit').innerHTML = sfHtml || '—'
+
+  // Next Actions
+  const actions = pei.recommended_next_actions || []
+  document.getElementById('out-next-actions').innerHTML = actions.length
+    ? '<ol style="margin-left:16px">' + actions.map(a=>'<li style="margin-bottom:5px">'+a+'</li>').join('') + '</ol>'
+    : '—'
+
+  // Positioning
+  document.getElementById('out-positioning').innerHTML = pei.our_positioning
+    ? pei.our_positioning.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    : '—'
+
+  // Confidence
+  const conf = pei.confidence || 'low'
+  const confEl = document.getElementById('out-confidence')
+  confEl.textContent = conf.charAt(0).toUpperCase() + conf.slice(1) +
+    (pei.confidence_reason ? ' — ' + pei.confidence_reason : '')
+  confEl.className = 'confidence-pill conf-' + conf
+
+  document.getElementById('peiOutput').style.display = 'block'
+  document.getElementById('peiOutput').scrollIntoView({behavior:'smooth'})
+}
+
+function clearOutput(){
+  document.getElementById('peiOutput').style.display = 'none'
+  document.getElementById('errorPanel').style.display = 'none'
+  PEI_DATA = null
+}
+
+function copyJSON(){
+  if(!PEI_DATA) return
+  navigator.clipboard.writeText(JSON.stringify(PEI_DATA, null, 2)).then(()=>{
+    const btn = event.target; btn.textContent = '✓ Copied'
+    setTimeout(()=>btn.textContent='📋 Copy JSON', 2000)
+  })
+}
+
+function downloadJSON(){
+  if(!PEI_DATA) return
+  const org = document.getElementById('orgName').value.replace(/[^a-z0-9]/gi,'_').slice(0,30)
+  dl(JSON.stringify(PEI_DATA, null, 2), 'application/json', 'PEI-'+org+'-'+new Date().toISOString().slice(0,10)+'.json')
+}
+
+function downloadWord(){
+  if(!PEI_DATA) return
+  const p = PEI_DATA
+  const org = document.getElementById('orgName').value
+  const date = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
+  const maturityLabels = {none:'None',aware:'Aware',piloting:'Piloting',deploying:'Deploying',scaling:'Scaling'}
+  const tp = p.technology_profile || {}
+  const bp = p.budget_and_procurement || {}
+  const ks = p.known_suppliers || {}
+  const sf = p.solution_fit || {}
+  const dms = p.key_decision_makers || []
+
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
+    WidthType, BorderStyle, AlignmentType, ShadingType, PageNumber, Header, Footer } = docx
+
+  function h1(text){ return new Paragraph({heading:HeadingLevel.HEADING_1, children:[new TextRun({text,bold:true,color:'002870',size:40})]}) }
+  function h2(text){ return new Paragraph({heading:HeadingLevel.HEADING_2, spacing:{before:240,after:80}, children:[new TextRun({text,bold:true,color:'002870',size:26})]}) }
+  function para(text, opts={}){ return new Paragraph({spacing:{after:80}, children:[new TextRun({text:text||'—',...opts})]}) }
+  function bullet(text){ return new Paragraph({bullet:{level:0}, spacing:{after:60}, children:[new TextRun({text:text||''})]}) }
+  function numbered(text){ return new Paragraph({numbering:{reference:'default',level:0}, spacing:{after:60}, children:[new TextRun({text:text||''})]}) }
+  function kv(label, value){
+    return new TableRow({children:[
+      new TableCell({width:{size:35,type:WidthType.PERCENTAGE}, shading:{type:ShadingType.SOLID,color:'F5F5F7'}, children:[new Paragraph({children:[new TextRun({text:label,bold:true,color:'002870',size:20})]})]}),
+      new TableCell({width:{size:65,type:WidthType.PERCENTAGE}, children:[new Paragraph({children:[new TextRun({text:value||'—',size:20})]})]}),
+    ]})
+  }
+  function kvTable(rows){ return new Table({width:{size:100,type:WidthType.PERCENTAGE}, rows:rows.map(([l,v])=>kv(l,v))}) }
+
+  const sections = []
+
+  // Cover info
+  sections.push(new Paragraph({alignment:AlignmentType.LEFT, children:[new TextRun({text:'Pre-Engagement Intelligence Brief',bold:true,size:52,color:'002870'})]}))
+  sections.push(new Paragraph({spacing:{after:80}, children:[new TextRun({text:p.meta.organisation,size:32,color:'444444'})]}))
+  sections.push(new Paragraph({spacing:{after:80}, children:[new TextRun({text:p.meta.ownership_type+' · '+p.meta.functional_sector+' · '+p.meta.country,size:22,color:'888888'})]}))
+  sections.push(new Paragraph({spacing:{after:80}, children:[new TextRun({text:'Generated: '+date+' · Model: '+p.meta.model,size:18,color:'888888'})]}))
+  sections.push(new Paragraph({spacing:{after:200}, children:[new TextRun({text:'DRAFT — Internal Use Only',bold:true,color:'FF5539',size:20})]}))
+
+  // 1. Org Summary
+  sections.push(h2('1. Organisation Summary'))
+  sections.push(para(p.organisation_summary))
+
+  // 2. AI & Tech Profile
+  sections.push(h2('2. AI & Technology Profile'))
+  sections.push(kvTable([
+    ['AI Maturity', maturityLabels[p.ai_maturity]||p.ai_maturity||'—'],
+    ['AI Maturity Evidence', p.ai_maturity_evidence||'—'],
+    ['HPC Exposure', p.hpc_exposure||'—'],
+    ['Quantum Awareness', p.quantum_awareness||'—'],
+    ['IT Infrastructure', tp.current_it_infrastructure||'—'],
+    ['Data Posture', tp.data_posture||'—'],
+    ['Known Vendors', (tp.current_vendors||p.current_vendors||[]).join(', ')||'None identified'],
+  ]))
+  if(tp.key_technology_programmes?.length){
+    sections.push(para('Key Technology Programmes:',{bold:true,size:20}))
+    tp.key_technology_programmes.forEach(i=>sections.push(bullet(i)))
+  }
+
+  // 3. Budget
+  sections.push(h2('3. Budget & Procurement'))
+  sections.push(kvTable([
+    ['Annual IT Budget', bp.annual_it_budget_estimate||'—'],
+    ['Recent Tender Sizes', bp.recent_tender_sizes||'—'],
+    ['Procurement Pattern', bp.procurement_pattern||'—'],
+    ['Financial Year', bp.financial_year||'—'],
+    ['Budget Authority', bp.budget_authority||'—'],
+  ]))
+
+  // 4. Decision Makers
+  sections.push(h2('4. Key Decision Makers'))
+  if(dms.length){
+    dms.forEach(d=>{
+      sections.push(new Paragraph({spacing:{after:40}, children:[new TextRun({text:(d.name||'')+(d.role?' — '+d.role:''),bold:true,size:20})]}))
+      if(d.relevance) sections.push(para('Relevance: '+d.relevance,{size:19,color:'444444'}))
+      if(d.known_priorities) sections.push(para('Priorities: '+d.known_priorities,{size:19,color:'444444'}))
+    })
+  } else sections.push(para('No publicly known decision makers identified.'))
+
+  // 5. Strategic Initiatives
+  sections.push(h2('5. Strategic Initiatives'))
+  if(p.strategic_initiatives?.length) p.strategic_initiatives.forEach(i=>sections.push(bullet(i)))
+  else sections.push(para('—'))
+
+  // 6. Regulatory
+  sections.push(h2('6. Regulatory & Compliance'))
+  sections.push(para(p.regulatory_and_compliance))
+
+  // 7. Challenges
+  sections.push(h2('7. Known Challenges'))
+  if(p.known_challenges?.length) p.known_challenges.forEach(c=>sections.push(bullet(c)))
+  else sections.push(para('—'))
+
+  // 8. Recent Activity
+  sections.push(h2('8. Recent Activity'))
+  sections.push(para(p.recent_activity))
+
+  // 9. Known Suppliers
+  sections.push(h2('9. Known Suppliers & Competition'))
+  if(ks.ai_hpc_vendors?.length) sections.push(para('AI & HPC Vendors: '+ks.ai_hpc_vendors.join(', '),{bold:false}))
+  if(ks.software_vendors?.length) sections.push(para('Software & Cloud: '+ks.software_vendors.join(', ')))
+  if(ks.si_partners?.length) sections.push(para('SI Partners: '+ks.si_partners.join(', ')))
+  if(ks.notes) sections.push(para(ks.notes,{color:'666666',size:19}))
+  if(!ks.ai_hpc_vendors?.length && !ks.software_vendors?.length) sections.push(para('—'))
+
+  // 10. Competitive
+  sections.push(h2('10. Competitive Signals'))
+  sections.push(para(p.competitive_signals))
+
+  // 11. Partnerships
+  sections.push(h2('11. Partnership History'))
+  sections.push(para(p.partnership_history))
+
+  // 12. Risk Flags
+  sections.push(h2('12. Risk Flags'))
+  if(p.risk_flags?.length) p.risk_flags.forEach(r=>sections.push(bullet(r)))
+  else sections.push(para('—'))
+
+  // 13. Solution Fit
+  sections.push(h2('13. Solution Fit & Entry Points'))
+  if(sf.strongest_fit_areas?.length){ sections.push(para('Strongest Fit Areas:',{bold:true,size:20})); sf.strongest_fit_areas.forEach(a=>sections.push(bullet(a))) }
+  if(sf.entry_point_recommendations?.length){ sections.push(para('Entry Points:',{bold:true,size:20})); sf.entry_point_recommendations.forEach(a=>sections.push(bullet(a))) }
+  if(sf.products_to_lead_with?.length){ sections.push(para('Lead With:',{bold:true,size:20})); sf.products_to_lead_with.forEach(a=>sections.push(bullet(a))) }
+
+  // 14. Next Actions
+  sections.push(h2('14. Recommended Next Actions'))
+  if(p.recommended_next_actions?.length) p.recommended_next_actions.forEach(a=>sections.push(bullet(a)))
+  else sections.push(para('—'))
+
+  // 15. Positioning
+  sections.push(h2('15. Our Positioning — Suggested Opening Angle'))
+  sections.push(para(p.our_positioning,{color:'002870'}))
+  sections.push(new Paragraph({spacing:{before:160,after:80}, children:[
+    new TextRun({text:'Confidence: ',bold:true,size:20}),
+    new TextRun({text:(p.confidence||'').toUpperCase(),bold:true,color:p.confidence==='high'?'00B290':p.confidence==='medium'?'FFB600':'FF5539',size:20}),
+    new TextRun({text:p.confidence_reason?' — '+p.confidence_reason:'',size:19,color:'666666'}),
+  ]}))
+
+  const doc = new Document({
+    numbering:{config:[{reference:'default',levels:[{level:0,format:'bullet',text:'•',alignment:AlignmentType.LEFT,style:{paragraph:{indent:{left:720,hanging:360}}}}]}]},
+    sections:[{properties:{}, children:sections}]
+  })
+
+  Packer.toBlob(doc).then(blob=>{
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'PEI-'+org.replace(/[^a-z0-9]/gi,'_').slice(0,30)+'-'+new Date().toISOString().slice(0,10)+'.docx'
+    a.click()
+    URL.revokeObjectURL(url)
+  })
+}
+
+
+
+async function downloadPPTX(){
+  if(!PEI_DATA) return
+  const p = PEI_DATA
+  const org = document.getElementById('orgName').value
+  const date = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
+  const maturityLabels = {none:'None',aware:'Aware',piloting:'Piloting',deploying:'Deploying',scaling:'Scaling'}
+  const maturityPct = {none:0,aware:0.25,piloting:0.5,deploying:0.75,scaling:1.0}
+  const tp = p.technology_profile || {}
+  const bp = p.budget_and_procurement || {}
+  const ks = p.known_suppliers || {}
+  const sf = p.solution_fit || {}
+  const N='002870',O='FF5539',T='00B290',W='FFFFFF',L='F5F5F7',M='B4B4BE',D='282832'
+
+  const pptx = new PptxGenJS()
+  pptx.layout = 'LAYOUT_WIDE'
+
+  function hdr(sl, title){
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.33,h:0.9,fill:{color:N}})
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:0.9,w:13.33,h:0.05,fill:{color:O}})
+    sl.addText('ATLAS · Pre-Engagement Intelligence · DRAFT',{x:0.3,y:0.06,w:9,h:0.28,fontSize:8,fontFace:'Calibri',color:W,transparency:35})
+    sl.addText(title,{x:0.3,y:0.32,w:9,h:0.5,fontSize:16,fontFace:'Calibri',bold:true,color:W})
+    sl.addText(p.meta.organisation+' · '+date,{x:9.5,y:0.06,w:3.5,h:0.78,fontSize:8,fontFace:'Calibri',color:W,align:'right',transparency:30})
+  }
+  function footer(sl, n, total){
+    sl.addText('DRAFT - Internal Use Only · '+p.meta.model+' · '+date,{x:0.3,y:7.25,w:10,h:0.2,fontSize:7,fontFace:'Calibri',color:M})
+    sl.addText(n+' / '+total,{x:12.5,y:7.25,w:0.8,h:0.2,fontSize:7,fontFace:'Calibri',color:M,align:'right'})
+  }
+  function box(sl,x,y,w,h,title,content,accent){
+    sl.addShape(pptx.ShapeType.rect,{x,y,w,h,fill:{color:'F8F9FF'},line:{color:'E0E0E8',pt:0.5}})
+    sl.addShape(pptx.ShapeType.rect,{x,y,w,h:0.05,fill:{color:accent||N}})
+    sl.addText(title,{x:x+0.1,y:y+0.08,w:w-0.2,h:0.25,fontSize:8,fontFace:'Calibri',bold:true,color:accent||N})
+    sl.addText(content,{x:x+0.1,y:y+0.35,w:w-0.2,h:h-0.45,fontSize:8.5,fontFace:'Calibri',color:D,valign:'top'})
+  }
+
+  // SLIDE 1: Cover
+  let sl = pptx.addSlide()
+  sl.background={color:N}
+  sl.addShape(pptx.ShapeType.rect,{x:0,y:5.2,w:13.33,h:0.06,fill:{color:O}})
+  sl.addShape(pptx.ShapeType.rect,{x:0,y:5.26,w:13.33,h:2.24,fill:{color:'001a4d'}})
+  sl.addText('PRE-ENGAGEMENT INTELLIGENCE',{x:0.6,y:0.9,w:12,h:0.4,fontSize:12,fontFace:'Calibri',color:W,transparency:25,charSpacing:4})
+  sl.addText(p.meta.organisation,{x:0.6,y:1.4,w:11,h:1.4,fontSize:40,fontFace:'Calibri',bold:true,color:W})
+  sl.addText(p.meta.ownership_type+' · '+p.meta.functional_sector+' · '+p.meta.country,{x:0.6,y:2.9,w:11,h:0.4,fontSize:14,fontFace:'Calibri',color:W,transparency:20})
+  sl.addText(p.organisation_summary||'',{x:0.6,y:3.45,w:11,h:1.5,fontSize:11,fontFace:'Calibri',color:W,transparency:15})
+  sl.addText('DRAFT - Internal Use Only',{x:0.6,y:5.35,w:5,h:0.3,fontSize:10,fontFace:'Calibri',bold:true,color:O})
+  sl.addText('Generated: '+date+' · '+p.meta.model,{x:0.6,y:5.75,w:8,h:0.25,fontSize:9,fontFace:'Calibri',color:W,transparency:40})
+
+  // SLIDE 2: Profile (AI maturity, tech, budget, decision makers)
+  sl = pptx.addSlide()
+  sl.background={color:W}
+  hdr(sl,'Organisation Profile')
+
+  // AI Maturity bar
+  sl.addText('AI MATURITY',{x:0.3,y:1.05,w:4,h:0.22,fontSize:8,fontFace:'Calibri',bold:true,color:N})
+  const matLevels=['None','Aware','Piloting','Deploying','Scaling']
+  const matIdx=matLevels.map(l=>l.toLowerCase()).indexOf(p.ai_maturity||'none')
+  matLevels.forEach((lbl,i)=>{
+    const on=i<=matIdx
+    sl.addShape(pptx.ShapeType.rect,{x:0.3+i*2.54,y:1.3,w:2.38,h:0.38,fill:{color:on?T:L},line:{color:on?T:'E0E0E8',pt:0.5}})
+    sl.addText(lbl,{x:0.3+i*2.54,y:1.3,w:2.38,h:0.38,fontSize:9,fontFace:'Calibri',bold:on,color:on?W:'888888',align:'center'})
+  })
+  sl.addText(p.ai_maturity_evidence||'',{x:0.3,y:1.72,w:12.7,h:0.45,fontSize:8.5,fontFace:'Calibri',color:'444444'})
+
+  // Tech, Budget, Suppliers row
+  const vendors = (tp.current_vendors||p.current_vendors||[]).join(', ')||'Not identified'
+  const techContent = ['HPC: '+(p.hpc_exposure||'-'),'Quantum: '+(p.quantum_awareness||'-'),'Vendors: '+vendors,tp.current_it_infrastructure||''].join(' | ')
+  const budgetContent = ['Budget: '+(bp.annual_it_budget_estimate||'-'),'Tenders: '+(bp.recent_tender_sizes||'-'),'Proc: '+(bp.procurement_pattern||'-'),'Auth: '+(bp.budget_authority||'-')].join(' | ')
+  const suppContent = ['AI/HPC: '+((ks.ai_hpc_vendors||[]).join(', ')||'-'),'SW: '+((ks.software_vendors||[]).join(', ')||'-'),'SI: '+((ks.si_partners||[]).join(', ')||'-')].join(' | ')
+  box(sl,0.3,2.25,4.2,2.0,'Technology Profile',techContent,N)
+  box(sl,4.7,2.25,4.2,2.0,'Budget & Procurement',budgetContent,O)
+  box(sl,9.1,2.25,4.0,2.0,'Known Suppliers',suppContent,T)
+
+  // Decision Makers
+  sl.addText('KEY DECISION MAKERS',{x:0.3,y:4.35,w:5,h:0.22,fontSize:8,fontFace:'Calibri',bold:true,color:N})
+  const dms = p.key_decision_makers || []
+  if(dms.length){
+    const dmText = dms.slice(0,4).map(d=>(d.name||'')+(d.role?' ('+d.role+')':'')+': '+(d.known_priorities||'')).join(' | ')
+    sl.addText(dmText,{x:0.3,y:4.6,w:12.7,h:1.0,fontSize:8.5,fontFace:'Calibri',color:D,valign:'top'})
+  } else {
+    sl.addText('No publicly known decision makers identified.',{x:0.3,y:4.6,w:12.7,h:0.4,fontSize:8.5,fontFace:'Calibri',color:M})
+  }
+
+  // Strategic initiatives
+  sl.addText('STRATEGIC INITIATIVES: '+(p.strategic_initiatives||[]).slice(0,3).join(' · ')||'-',{x:0.3,y:5.7,w:12.7,h:0.45,fontSize:8.5,fontFace:'Calibri',color:'444444'})
+  footer(sl,2,3)
+
+  // SLIDE 3: Intelligence (challenges, competitive, positioning, next actions)
+  sl = pptx.addSlide()
+  sl.background={color:W}
+  hdr(sl,'Intelligence & Positioning')
+
+  // Challenges + Recent Activity
+  const challText = (p.known_challenges||[]).slice(0,5).map((c,i)=>(i+1)+'. '+c).join(' | ')
+  box(sl,0.3,1.05,6.3,2.1,'Known Challenges',challText,O)
+  box(sl,6.8,1.05,6.2,2.1,'Recent Activity',p.recent_activity||'-',N)
+
+  // Competitive + Risk
+  const compText = [(p.competitive_signals||'-'),'RISKS: '+(p.risk_flags||[]).slice(0,3).join(' | ')].join(' || ')
+  box(sl,0.3,3.25,6.3,1.8,'Competitive Signals & Risk Flags',compText,M)
+
+  // Solution fit
+  const fitText = ['FIT: '+((sf.strongest_fit_areas||[]).slice(0,2).join('; ')||'-'),'ENTRY: '+((sf.entry_point_recommendations||[]).slice(0,2).join('; ')||'-'),'LEAD: '+((sf.products_to_lead_with||[]).slice(0,2).join('; ')||'-')].join(' | ')
+  box(sl,6.8,3.25,6.2,1.8,'Solution Fit & Entry Points',fitText,T)
+
+  // Positioning
+  sl.addShape(pptx.ShapeType.rect,{x:0.3,y:5.15,w:13.0,h:1.55,fill:{color:'EEF2FF'},line:{color:N,pt:0.5}})
+  sl.addShape(pptx.ShapeType.rect,{x:0.3,y:5.15,w:0.1,h:1.55,fill:{color:N}})
+  sl.addText('OUR POSITIONING',{x:0.55,y:5.2,w:5,h:0.25,fontSize:8,fontFace:'Calibri',bold:true,color:N})
+  sl.addText(p.our_positioning||'-',{x:0.55,y:5.45,w:11.0,h:1.15,fontSize:9,fontFace:'Calibri',color:N,valign:'top'})
+  const confColors={high:T,medium:'FFB600',low:O}
+  sl.addShape(pptx.ShapeType.rect,{x:11.7,y:5.2,w:1.5,h:0.35,fill:{color:confColors[p.confidence]||M},rectRadius:0.06})
+  sl.addText('Confidence: '+(p.confidence||'').toUpperCase(),{x:11.7,y:5.2,w:1.5,h:0.35,fontSize:8,fontFace:'Calibri',bold:true,color:W,align:'center'})
+
+  // Next actions
+  sl.addText('NEXT ACTIONS: '+(p.recommended_next_actions||[]).slice(0,3).map((a,i)=>(i+1)+'. '+a).join('  '),{x:0.3,y:6.85,w:12.7,h:0.35,fontSize:8,fontFace:'Calibri',color:'444444'})
+  footer(sl,3,3)
+
+  await pptx.writeFile({fileName:'PEI-'+org.replace(/[^a-z0-9]/gi,'_').slice(0,30)+'-'+new Date().toISOString().slice(0,10)+'.pptx'})
+}
+
+
+
+function dl(content, type, fname){
+  const blob = new Blob([content], {type})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = fname; a.click()
+  URL.revokeObjectURL(url)
+}
+</script>
+</body>
+</html>
