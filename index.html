@@ -239,18 +239,14 @@ function doLogout(){
 }
 
 function renderSidebar(){
-  var access=ROLES[user.role].access
-  var canSee=function(id){return access==='all'||access.indexOf(id)>=0}
   var h='<div class="nav-item active" onclick="renderHome()">&#127968; &nbsp;Portal Home</div>'
-  CATEGORIES.forEach(function(cat){
-    if(!canSee(cat.id))return
-    h+='<div class="nav-cat">'+cat.label+'</div>'
-    cat.tools.forEach(function(id){
-      var t=TOOLS[id];if(!t)return
-      var badge=t.status==='ready'?'<span class="nav-badge ready">Live</span>':'<span class="nav-badge soon">Soon</span>'
-      h+='<div class="nav-item" data-tool="'+id+'" onclick="launchTool(this.dataset.tool)">'+t.icon+' '+t.label+badge+'</div>'
-    })
-  })
+  h+='<div class="nav-cat">Stages</div>'
+  for(var i=0;i<STAGES.length;i++){
+    var s=STAGES[i]
+    var access=ROLES[user.role].access
+    if(access!=='all'&&access.indexOf(s.id)<0)continue
+    h+='<div class="nav-item" data-stage="'+s.id+'" onclick="renderHome();setTimeout(function(){showStageTools(\''+s.id+'\')},100)">'+s.icon+' '+s.label+'</div>'
+  }
   if(user.role==='BUSINESS_HEAD'){
     h+='<div class="nav-cat">Engineering</div>'
     h+='<div class="nav-item" onclick="showTodo()">&#128231; &nbsp;Engineering To-Do</div>'
@@ -258,7 +254,6 @@ function renderSidebar(){
   }
   document.getElementById('sidebar').innerHTML=h
 }
-
 function renderHome(){
   var access=ROLES[user.role].access
   var canSee=function(id){return access==='all'||access.indexOf(id)>=0}
