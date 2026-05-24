@@ -42,7 +42,7 @@ header{grid-column:1/-1;background:var(--navy);display:flex;align-items:center;j
 .ctx-project{color:var(--dark);}
 .ctx-meta{color:var(--mid);margin-left:auto;}
 .ctx-bar.active{background:rgba(0,178,144,0.1);border-color:var(--teal);}
-sidebar{background:var(--navy);padding:16px 0;overflow-y:auto;}
+#sidebar{background:var(--navy);padding:16px 0;overflow-y:auto;}
 .nav-cat{font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;padding:16px 16px 6px;}
 .nav-item{display:flex;align-items:center;gap:8px;padding:9px 16px;font-size:13px;color:rgba(255,255,255,0.7);cursor:pointer;transition:all 0.15s;border-left:3px solid transparent;}
 .nav-item:hover,.nav-item.active{color:var(--white);background:rgba(255,255,255,0.08);border-left-color:var(--orange);}
@@ -142,7 +142,7 @@ tr:hover td{background:rgba(0,0,0,0.02);}
     <span class="ctx-project" id="ctxProject">No project selected &mdash; tap to select or create</span>
     <span class="ctx-meta" id="ctxMeta">&mdash;</span>
   </div>
-  <sidebar id="sidebar"></sidebar>
+  <div id="sidebar"></div>
   <main id="main"></main>
 </div>
 
