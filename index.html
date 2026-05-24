@@ -394,7 +394,7 @@ function showStageTools(stageId){
     const badgeHtml=t.status==='ready'?`<span class="badge ready">Live</span>`:
       t.status==='update'?`<span class="badge update">Update pending</span>`:
       `<span class="badge soon">Coming soon</span>`
-    return `<div class="tool-card cat-${stageId} ${!isLive?'dim':''}" onclick="${isLive?`launchTool('${id}')`:``}">
+    return `<div class="tool-card cat-${stageId} ${!isLive?'dim':''}" onclick="${isLive?'launchTool(\''+id+'\')':''}">
       <div class="tc-icon">${t.icon}</div>
       <div class="tc-name">${t.label}</div>
       <div class="tc-ver">${t.ver||'—'}</div>
