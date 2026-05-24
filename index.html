@@ -391,27 +391,28 @@ function showStageTools(stageId){
   const toolsHtml=stageTools.map(id=>{
     const t=TOOLS[id]
     const isLive=t.status==='ready'||t.status==='update'
-    const badgeHtml=t.status==='ready'?`<span class="badge ready">Live</span>`:
-      t.status==='update'?`<span class="badge update">Update pending</span>`:
-      `<span class="badge soon">Coming soon</span>`
-    return `<div class="tool-card cat-${stageId} ${!isLive?'dim':''}" onclick="${isLive?'launchTool(\''+id+'\')':''}">
-      <div class="tc-icon">${t.icon}</div>
-      <div class="tc-name">${t.label}</div>
-      <div class="tc-ver">${t.ver||'—'}</div>
-      <div style="font-size:11px;color:var(--mid);margin-bottom:6px;line-height:1.5">${t.desc}</div>
-      ${badgeHtml}
-    </div>`
+    const badgeHtml=t.status==='ready'?'<span class="badge ready">Live</span>':
+      t.status==='update'?'<span class="badge update">Update pending</span>':
+      '<span class="badge soon">Coming soon</span>'
+    const clickAttr=isLive?'onclick="launchTool(\''+id+'\')"':''
+    return '<div class="tool-card cat-'+stageId+' '+(isLive?'':'dim')+'" '+clickAttr+'>'
+      +'<div class="tc-icon">'+t.icon+'</div>'
+      +'<div class="tc-name">'+t.label+'</div>'
+      +'<div class="tc-ver">'+(t.ver||'—')+'</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-bottom:6px;line-height:1.5">'+t.desc+'</div>'
+      +badgeHtml
+      +'</div>'
   }).join('')
 
-  document.getElementById('stageToolsPanel').innerHTML=`
-    <div class="section-title" style="margin-top:24px">
-      <span>${stage.icon} ${stage.label}</span>
-      <span style="font-size:10px;font-weight:500;color:var(--mid)">${stageTools.length} tool${stageTools.length!==1?'s':''}</span>
-    </div>
-    <div class="tool-grid">${toolsHtml}</div>`
+  document.getElementById('stageToolsPanel').innerHTML=
+    '<div class="section-title" style="margin-top:24px">'
+    +'<span>'+stage.icon+' '+stage.label+'</span>'
+    +'<span style="font-size:10px;font-weight:500;color:var(--mid)">'+stageTools.length+' tool'+(stageTools.length!==1?'s':'')+'</span>'
+    +'</div>'
+    +'<div class="tool-grid">'+toolsHtml+'</div>'
+
   document.getElementById('stageToolsPanel').scrollIntoView({behavior:'smooth',block:'start'})
 }
-
 function showComingSoon(name){
   document.getElementById('main').innerHTML=`
     <div class="coming-soon">
