@@ -202,7 +202,8 @@ const ROLES = {
 const TOOLS = {
   // Strategy & Intelligence
   'second-brain':          { label:'Second Brain',             icon:'🧠', ver:'v1.0', status:'ready', cat:'strategy',  url:BASE+'/tools/second-brain/', desc:'Domain intelligence engine — Foundation, Monthly Update, Weekly Pulse, UC recommendations' },
-
+'pei-tool': { label:'Customer Intelligence', icon:'🔍', ver:'v0.1', status:'ready', cat:'strategy', url:BASE+'/tools/pei-tool/', desc:'Pre-Engagement Intelligence — Gemini-powered customer research brief with Word and PPTX export' },
+  
   // Business Development
   'engagement-management': { label:'Engagement Management',    icon:'🤝', ver:'v1.0', status:'ready', cat:'bd',        url:BASE+'/tools/engagement-management/', desc:'Customer, division and engagement lifecycle management with saved briefs and PEI integration' },
   'ai-centre-builder':     { label:'AI Centre Builder',        icon:'🏙️', ver:'v1.1', status:'ready', cat:'bd',        url:BASE+'/tools/ai-centre-builder/', desc:'Dual-track AI Centre proposal — CoE + Inferencing Factory, tokenomics, policy architecture, Vision Brief' },
@@ -226,7 +227,7 @@ const TOOLS = {
 }
   
 const CATEGORIES = [
-  { id:'strategy', label:'01 · Strategy & Intelligence',  icon:'🧠', tools:['second-brain'] },
+  {{ id:'strategy', label:'01 · Intelligence Engine', icon:'🧠', tools:['second-brain','pei-tool'] },
   { id:'bd',       label:'02 · Business Development',     icon:'🤝', tools:['engagement-management','ai-centre-builder','pei-tool','vision-doc','portfolio-portal'] },
   { id:'presales', label:'03 · Pre-Sales',                icon:'⚙️', tools:['domain-config','inferencing','benchmark','ai-sovereignty'] },
   { id:'sales',    label:'04 · Sales',                    icon:'💼', tools:['rac-tool','deal-analysis'] },
