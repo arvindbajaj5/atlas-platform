@@ -187,39 +187,39 @@ const ROLES = {
 }
 
 const TOOLS = {
-  // Sales Enablement
-  'portfolio-portal':    { label:'AI Portfolio Portal',       icon:'🗺️', ver:'v1.0', status:'ready',  cat:'sales',    url:BASE+'/tools/portfolio-portal/', desc:'26 portfolio items, Value Map, opportunity creation' },
-  'ai-sovereignty':      { label:'AI Sovereignty Index',      icon:'🏛️', ver:'v2.0', status:'ready',  cat:'sales',    url:BASE+'/tools/ai-sovereignty-index/', desc:'LASI scoring, PPTX + Excel export, multi-proposal comparison' },
+  // Strategy & Intelligence
+  'second-brain':          { label:'Second Brain',             icon:'🧠', ver:'v1.0', status:'ready', cat:'strategy',  url:BASE+'/tools/second-brain/', desc:'Domain intelligence engine — Foundation, Monthly Update, Weekly Pulse, UC recommendations' },
 
-  // Opportunity Management
-  'rac-tool':            { label:'RAC Pipeline',              icon:'🎯', ver:'v2.0', status:'ready',  cat:'opp',      url:BASE+'/tools/rac-tool/', desc:'Kanban pipeline, activity feed, import from Portfolio Portal' },
-  'deal-analysis':       { label:'Deal Analysis Tool',        icon:'📊', ver:'v1.0', status:'ready',  cat:'opp',      url:BASE+'/tools/deal-analysis/', desc:'13-tab commercial model — P&L, cash flow, milestones, risk, IFRS 15, forex, PPTX export' },
+  // Business Development
+  'engagement-management': { label:'Engagement Management',    icon:'🤝', ver:'v1.0', status:'ready', cat:'bd',        url:BASE+'/tools/engagement-management/', desc:'Customer, division and engagement lifecycle management with saved briefs and PEI integration' },
+  'ai-centre-builder':     { label:'AI Centre Builder',        icon:'🏙️', ver:'v1.1', status:'ready', cat:'bd',        url:BASE+'/tools/ai-centre-builder/', desc:'Dual-track AI Centre proposal — CoE + Inferencing Factory, tokenomics, policy architecture, Vision Brief' },
+  'pei-tool':              { label:'PEI Tool',                 icon:'🔍', ver:'v0.1', status:'ready', cat:'bd',        url:BASE+'/tools/pei-tool/', desc:'Pre-Engagement Intelligence — Gemini-powered customer research brief' },
+  'vision-doc':            { label:'Vision Document Factory',  icon:'📄', ver:'v1.0', status:'ready', cat:'bd',        url:BASE+'/tools/vision-document/', desc:'Claude API — CEO-to-CEO vision documents' },
+  'portfolio-portal':      { label:'AI Portfolio Portal',      icon:'🗺️', ver:'v1.0', status:'ready', cat:'bd',        url:BASE+'/tools/portfolio-portal/', desc:'26 portfolio items, Value Map, opportunity creation' },
 
-  // Presales
-  'domain-config':       { label:'Domain Configurator',       icon:'⚙️', ver:'v2.0', status:'ready',  cat:'presales', url:BASE+'/tools/domain-configurator/', desc:'7-step project definition — personas, use cases, volumetrics, site-wise infra' },
-  'inferencing':         { label:'AI Inferencing Factory',    icon:'🏭', ver:'v3.0', status:'ready',  cat:'presales', url:BASE+'/tools/inferencing-factory/', desc:'Domain-aware BOM, power, network sizing' },
-  'vision-doc':          { label:'Vision Document Factory',   icon:'📄', ver:'v1.0', status:'ready',  cat:'presales', url:BASE+'/tools/vision-document/', desc:'Claude API — CEO-to-CEO vision documents' },
-  'benchmark':           { label:'Benchmark Tool',            icon:'⚡', ver:'v1.0', status:'ready',  cat:'presales', url:BASE+'/tools/benchmark-tool/', desc:'35 curated benchmarks, run scripts, extrapolation engine' },
+  // Pre-Sales
+  'domain-config':         { label:'Domain Configurator',      icon:'⚙️', ver:'v3.0', status:'ready', cat:'presales',  url:BASE+'/tools/domain-configurator/', desc:'8-step project definition — domain packs, personas, use cases, architecture, volumetrics' },
+  'inferencing':           { label:'AI Inferencing Factory',   icon:'🏭', ver:'v2.3', status:'ready', cat:'presales',  url:BASE+'/tools/inferencing-factory/', desc:'BOM, services, manpower, TAD — domain-aware sizing' },
+  'benchmark':             { label:'Benchmark Tool',           icon:'⚡', ver:'v1.0', status:'ready', cat:'presales',  url:BASE+'/tools/benchmark-tool/', desc:'35 curated benchmarks, run scripts, extrapolation engine' },
+  'ai-sovereignty':        { label:'AI Sovereignty Index',     icon:'🏛️', ver:'v2.1', status:'ready', cat:'presales',  url:BASE+'/tools/ai-sovereignty-index/', desc:'LASI scoring, evaluation report, PPTX + Excel export' },
+
+  // Sales
+  'rac-tool':              { label:'RAC Pipeline',             icon:'🎯', ver:'v2.0', status:'ready', cat:'sales',     url:BASE+'/tools/rac-tool/', desc:'Kanban pipeline, activity feed, import from Portfolio Portal' },
+  'deal-analysis':         { label:'Deal Analysis Tool',       icon:'📊', ver:'v1.0', status:'ready', cat:'sales',     url:BASE+'/tools/deal-analysis/', desc:'13-tab commercial model — P&L, cash flow, milestones, risk, IFRS 15, forex, PPTX export' },
 
   // Operations
-  'hpc-monitor':         { label:'HPC Monitoring',            icon:'📡', ver:'v1.0', status:'ready',  cat:'ops',      url:BASE+'/tools/hpc-monitoring/', desc:'Live cluster dashboard — GPU utilisation, job queue, alerts, power & cooling' },
-  'bom-validator':       { label:'GeoAI BOM Validator',       icon:'📐', ver:'v1.0', status:'ready',  cat:'presales', url:BASE+'/tools/bom-validator/', desc:'40 use cases, GPU sizing, power model, cost & margin, BOM vs reference validation' },
-  'compass':             { label:'COMPASS',                   icon:'🧭', ver:'v2.0', status:'ready',  cat:'ops',      url:BASE+'/tools/compass-v2/', desc:'Token governance · MOAT token economy · Latency OLA · Load intelligence · Sovereign metrics' },
-
-  'ai-centre-builder': { label:'AI Centre Builder', icon:'🏙️', ver:'v1.1', status:'ready', cat:'presales', url:BASE+'/tools/ai-centre-builder/', desc:'Dual-track AI Centre proposal — CoE + Inferencing Factory, tokenomics, policy architecture, Vision Brief' },
-  'engagement-management': { label:'Engagement Management', icon:'🤝', ver:'v1.0', status:'ready', cat:'presales', url:BASE+'/tools/engagement-management/', desc:'Customer, division and engagement lifecycle management with saved briefs and PEI integration' },
-  'second-brain': { label:'Second Brain', icon:'🧠', ver:'v1.0', status:'ready', cat:'presales', url:BASE+'/tools/second-brain/', desc:'Domain intelligence engine — Foundation, Monthly Update, Weekly Pulse, UC recommendations' },
-  
-  
+  'hpc-monitor':           { label:'HPC Monitoring',           icon:'📡', ver:'v1.0', status:'ready', cat:'ops',       url:BASE+'/tools/hpc-monitoring/', desc:'Live cluster dashboard — GPU utilisation, job queue, alerts, power & cooling' },
+  'compass':               { label:'COMPASS',                  icon:'🧭', ver:'v2.0', status:'ready', cat:'ops',       url:BASE+'/tools/compass-v2/', desc:'Token governance · MOAT token economy · Latency OLA · Load intelligence · Sovereign metrics' },
 }
-
+  
 const CATEGORIES = [
-  { id:'sales',    label:'01 · Sales Enablement',       icon:'📈', tools:['portfolio-portal','ai-sovereignty'] },
-  { id:'opp',      label:'02 · Opportunity Management', icon:'🎯', tools:['rac-tool','deal-analysis'] },
-  { id:'presales', label:'03 · Presales',               icon:'🔭', tools:['domain-config','inferencing','vision-doc','benchmark','bom-validator','ai-centre-builder','engagement-management','second-brain']},  
-  { id:'ops',      label:'04 · Business Operations',    icon:'⚙️', tools:['hpc-monitor','compass'] },
+  { id:'strategy', label:'01 · Strategy & Intelligence',  icon:'🧠', tools:['second-brain'] },
+  { id:'bd',       label:'02 · Business Development',     icon:'🤝', tools:['engagement-management','ai-centre-builder','pei-tool','vision-doc','portfolio-portal'] },
+  { id:'presales', label:'03 · Pre-Sales',                icon:'⚙️', tools:['domain-config','inferencing','benchmark','ai-sovereignty'] },
+  { id:'sales',    label:'04 · Sales',                    icon:'💼', tools:['rac-tool','deal-analysis'] },
+  { id:'ops',      label:'05 · Operations',               icon:'🔧', tools:['hpc-monitor','compass'] },
 ]
-
+  
 const LC_STAGES = [
   {name:'Prospect',    color:'#6366F1', tools:['portfolio-portal','ai-sovereignty']},
   {name:'Qualify',     color:'#1C38F5', tools:['rac-tool']},
