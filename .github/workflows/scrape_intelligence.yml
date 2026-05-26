@@ -1,0 +1,45 @@
+name: ATLAS Intelligence Scraper
+
+on:
+  schedule:
+    # Domain Intelligence — every Monday at 6am UTC
+    - cron: '0 6 * * 1'
+    # Market News — every Monday at 6am UTC (same run)
+  workflow_dispatch:
+    # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Domain Intelligence Scraper
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scripts/scrape/domain_intelligence_scraper.py
+
+      - name: Run Market News Scraper
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scripts/scrape/market_news_scraper.py
+
+      - name: Commit scraped data
+        run: |
+          git config --local user.email "atlas-bot@github.com"
+          git config --local user.name "ATLAS Intelligence Bot"
+          git add data/raw/
+          git diff --staged --quiet || git commit -m "Intelligence scrape $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
