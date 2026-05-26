@@ -67,16 +67,31 @@ def should_run(meta, topic_id):
     days_since = (datetime.datetime.utcnow() - datetime.datetime.fromisoformat(last)).days
     return days_since >= MIN_DAYS_BETWEEN_RUNS
 
-def call_gemini(prompt):
+def call_gemini(prompt, retries=3, backoff=60):
+    import time
     body = {
         "contents": [{"parts": [{"text": prompt}]}],
         "tools": [{"google_search": {}}],
         "generationConfig": {"temperature": 0.2, "maxOutputTokens": 4096}
     }
-    resp = requests.post(GEMINI_URL, json=body, timeout=60)
-    resp.raise_for_status()
-    data = resp.json()
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+    for attempt in range(retries):
+        try:
+            resp = requests.post(GEMINI_URL, json=body, timeout=60)
+            if resp.status_code == 429:
+                wait = backoff * (attempt + 1)
+                print(f"  Rate limited. Waiting {wait}s before retry {attempt+1}/{retries}...")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except requests.exceptions.HTTPError as e:
+            if attempt < retries - 1:
+                print(f"  HTTP error: {e}. Retrying in {backoff}s...")
+                time.sleep(backoff)
+            else:
+                raise
+    raise Exception(f"Failed after {retries} retries")
 
 def parse_json_response(text):
     text = text.strip()
@@ -172,6 +187,8 @@ def main():
             continue
 
         print(f"[{tid}] Scraping: {topic['label']}...")
+        import time
+        time.sleep(8)
         try:
             new_items = scrape_topic(topic)
             existing = load_existing(tid)
