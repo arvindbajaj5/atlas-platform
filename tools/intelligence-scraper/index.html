@@ -720,50 +720,93 @@ function extractItems(raw, code, name, sourceType){
 
 async function scrapeDomain(domain){
   var cfg3 = getConfig()
-  var n = cfg3.itemCount || 10
-  var prompt = 'You are a senior intelligence analyst for an AI and HPC hardware OEM selling to Indian government, defence, and enterprise customers.'
-    + ' Generate exactly ' + n + ' intelligence items about AI and technology adoption in the following sector.'
-    + ' SECTOR: ' + domain.name + '. FOCUS AREAS: ' + domain.focus + '.'
-    + ' Cover a mix of: known AI deployments, active programmes, procurement tenders, competitive landscape, technology gaps, emerging use cases, and key challenges.'
-    + ' Be specific — name real organisations, cite known programmes, mention specific technologies where applicable.'
-    + ' Each item must be a JSON object with these exact keys:'
-    + ' title (string, max 80 chars),'
-    + ' summary (string, 2-3 sentences, max 250 chars),'
-    + ' type (one of: deployment/tender/programme/vendor_win/challenge/technology_gap/emerging_uc),'
-    + ' intelligence_value (one of: high/medium/low),'
-    + ' organisations (array of up to 3 org names),'
-    + ' tags (array of 3-5 relevant tags),'
-    + ' opportunity (string, specific opportunity for an AI/HPC OEM, max 150 chars),'
-    + ' competitor_signals (string, any known competitors or incumbents, max 100 chars, or empty string),'
-    + ' uc_suggest (string, suggested use case name if applicable, or empty string),'
-    + ' confidence (one of: high/medium/low).'
-    + ' Return ONLY a JSON array of exactly ' + n + ' objects. No explanation. No markdown. Start with [ end with ].'
+  var n = cfg3.itemCount || 5
+  var items = []
+  var usedTitles = []
 
-  var raw = await callGemini(prompt, domain.code)
-  var items = extractItems(raw, domain.code, domain.name, 'domain')
+  // Topic areas to rotate through for variety
+  var topicAreas = [
+    'known AI deployments and active programmes',
+    'procurement tenders and budget allocations',
+    'competitive landscape and incumbent vendors',
+    'technology gaps and infrastructure challenges',
+    'emerging use cases being piloted or discussed',
+    'key organisations and their AI maturity level',
+    'regulatory and policy developments',
+    'recent partnerships and MoUs',
+    'workforce and skills developments',
+    'international comparisons and best practices'
+  ]
+
+  for(var i=0; i<n; i++){
+    var topic = topicAreas[i % topicAreas.length]
+    var avoidStr = usedTitles.length > 0 ? ' Do NOT repeat these topics already covered: ' + usedTitles.slice(-3).join('; ') + '.' : ''
+    var prompt = 'You are a senior intelligence analyst for an AI and HPC hardware OEM targeting Indian government, defence, and enterprise sectors.'
+      + ' Generate ONE intelligence item about ' + topic + ' in the following sector.'
+      + ' SECTOR: ' + domain.name + '. FOCUS: ' + domain.focus + '.'
+      + ' Be specific — name real organisations, cite known programmes, mention specific technologies.' + avoidStr
+      + ' Respond with a single JSON object only. No array brackets. No explanation. No markdown. Example:'
+      + ' {"title":"DRDO deploys edge AI for border surveillance","summary":"DRDO has deployed Nvidia Jetson-based edge AI systems along the Line of Actual Control for real-time threat detection, requiring ruggedised GPU compute.","type":"deployment","intelligence_value":"high","organisations":["DRDO","Indian Army"],"tags":["edge-AI","surveillance","defence"],"opportunity":"Ruggedised edge inference hardware","competitor_signals":"Nvidia Jetson incumbent","uc_suggest":"Border Surveillance AI","confidence":"high"}'
+
+    try{
+      var raw = await callGemini(prompt, domain.code + ' [' + (i+1) + '/' + n + ']')
+      var extracted = extractItems(raw, domain.code, domain.name, 'domain')
+      if(extracted.length > 0){
+        var item = extracted[0]
+        if(item.title) usedTitles.push(item.title)
+        items.push(item)
+      }
+    }catch(err){
+      log('Item ' + (i+1) + ' failed for ' + domain.code + ': ' + err.message, 'warn')
+    }
+    // Small delay between items to avoid rate limits
+    if(i < n-1) await new Promise(function(r){setTimeout(r,1500)})
+  }
   return items
 }
 
 async function scrapeNews(topic){
   var cfg4 = getConfig()
-  var n2 = cfg4.itemCount || 10
-  var prompt = 'You are a market intelligence analyst for an AI and HPC hardware OEM.'
-    + ' Generate exactly ' + n2 + ' market intelligence items about the following topic.'
-    + ' TOPIC: ' + topic.name + '. FOCUS: ' + topic.focus + '.'
-    + ' Be specific — name real organisations, deals, policies, and market developments.'
-    + ' Each item must be a JSON object with these exact keys:'
-    + ' title (string, max 80 chars),'
-    + ' summary (string, 2-3 sentences, max 250 chars),'
-    + ' type (one of: contract_award/tender/product_launch/policy/partnership/investment/market_shift),'
-    + ' organisations (array of up to 3 org names),'
-    + ' urgency (one of: high/medium/low),'
-    + ' tags (array of 3-5 tags),'
-    + ' relevance (string, why this matters for AI/HPC sales, max 150 chars),'
-    + ' confidence (one of: high/medium/low).'
-    + ' Return ONLY a JSON array of exactly ' + n2 + ' objects. No explanation. No markdown. Start with [ end with ].'
+  var n2 = cfg4.itemCount || 5
+  var items = []
+  var usedTitlesN = []
 
-  var raw = await callGemini(prompt, 'NEWS/' + topic.code)
-  var items = extractItems(raw, topic.code, topic.name, 'news')
+  var newsAngles = [
+    'contract awards and vendor wins',
+    'government tenders and RFPs',
+    'policy and regulatory developments',
+    'technology partnerships and MoUs',
+    'market investments and funding',
+    'product launches and announcements',
+    'competitive moves and market shifts',
+    'procurement patterns and budget signals',
+    'international deals with India angle',
+    'startup and ecosystem developments'
+  ]
+
+  for(var j=0; j<n2; j++){
+    var angle = newsAngles[j % newsAngles.length]
+    var avoidStrN = usedTitlesN.length > 0 ? ' Do NOT repeat: ' + usedTitlesN.slice(-3).join('; ') + '.' : ''
+    var prompt2 = 'You are a market intelligence analyst for an AI and HPC hardware OEM.'
+      + ' Generate ONE market intelligence item about ' + angle + ' related to the following topic.'
+      + ' TOPIC: ' + topic.name + '. FOCUS: ' + topic.focus + '.'
+      + ' Be specific — name real organisations and deals.' + avoidStrN
+      + ' Respond with a single JSON object only. No array brackets. No explanation. No markdown. Example:'
+      + ' {"title":"NVIDIA wins MeitY AI compute contract","summary":"NVIDIA secured a contract to supply H100 GPUs for MeitY National AI Mission supercomputing initiative.","type":"contract_award","organisations":["NVIDIA","MeitY"],"urgency":"high","tags":["NVIDIA","MeitY","contract"],"relevance":"Competitor win in govt sector - key account to watch","confidence":"medium"}'
+
+    try{
+      var raw2 = await callGemini(prompt2, 'NEWS/' + topic.code + ' [' + (j+1) + '/' + n2 + ']')
+      var extracted2 = extractItems(raw2, topic.code, topic.name, 'news')
+      if(extracted2.length > 0){
+        var item2 = extracted2[0]
+        if(item2.title) usedTitlesN.push(item2.title)
+        items.push(item2)
+      }
+    }catch(err2){
+      log('News item ' + (j+1) + ' failed for ' + topic.code + ': ' + err2.message, 'warn')
+    }
+    if(j < n2-1) await new Promise(function(r){setTimeout(r,1500)})
+  }
   return items
 }
 
