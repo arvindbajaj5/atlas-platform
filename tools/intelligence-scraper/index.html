@@ -1,1 +1,333 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS &mdash; Intelligence Scraper</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--r-sm:6px;--r-lg:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:100;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-primary:disabled{opacity:0.4;cursor:not-allowed;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-xs{padding:3px 8px;font-size:10px;}
+.container{max-width:1100px;margin:0 auto;padding:24px;}
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:14px;line-height:1.6;}
+label.lbl{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;}
+input[type=password],input[type=text],select{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
+input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
+input:focus,select:focus{border-color:var(--blue);}
+.field-hint{font-size:10px;color:var(--mid);margin-top:4px;}
+.alert{padding:10px 14px;border-radius:var(--r);font-size:11px;margin-bottom:12px;line-height:1.6;}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.3);color:#9a7000;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-error{background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);color:#DC2626;}
+.alert-success{background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.2);color:var(--teal);}
+
+/* DOMAIN GRID */
+.domain-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:16px;}
+.domain-card{border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:14px 16px;cursor:pointer;transition:all 0.15s;background:var(--white);position:relative;}
+.domain-card.selected{border-color:var(--navy);background:rgba(0,40,112,0.03);}
+.domain-card.selected .domain-check{background:var(--navy);border-color:var(--navy);}
+.domain-card.selected .domain-check::after{display:block;}
+.domain-card.running{border-color:var(--blue);background:rgba(28,56,245,0.03);}
+.domain-card.done{border-color:var(--teal);background:rgba(0,178,144,0.03);}
+.domain-card.error{border-color:var(--orange);background:rgba(255,85,57,0.03);}
+.domain-card-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.domain-icon{font-size:20px;}
+.domain-check{width:18px;height:18px;border:2px solid #d0d0d8;border-radius:4px;flex-shrink:0;margin-left:auto;position:relative;transition:all 0.15s;}
+.domain-check::after{content:'';display:none;position:absolute;top:2px;left:5px;width:5px;height:9px;border:2px solid var(--white);border-top:none;border-left:none;transform:rotate(45deg);}
+.domain-name{font-size:12px;font-weight:700;color:var(--dark);}
+.domain-code{font-size:10px;font-family:'Roboto Mono',monospace;color:var(--mid);}
+.domain-meta{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--mid);margin-top:6px;}
+.domain-status{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;}
+.status-never{background:var(--light);color:var(--mid);}
+.status-fresh{background:rgba(0,178,144,0.1);color:var(--teal);}
+.status-stale{background:rgba(255,182,0,0.1);color:#9a7000;}
+.status-running{background:rgba(28,56,245,0.1);color:var(--blue);}
+.status-done{background:rgba(0,178,144,0.1);color:var(--teal);}
+.status-error{background:rgba(255,85,57,0.1);color:var(--orange);}
+.domain-progress{height:3px;background:var(--light);border-radius:2px;margin-top:8px;overflow:hidden;display:none;}
+.domain-progress.show{display:block;}
+.domain-progress-bar{height:100%;background:var(--blue);border-radius:2px;width:0%;transition:width 0.5s;}
+.domain-progress-bar.pulse{animation:pulse 1.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat-box{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:14px 16px;box-shadow:var(--shadow);}
+.stat-val{font-size:24px;font-weight:900;color:var(--navy);}
+.stat-val.teal{color:var(--teal);}
+.stat-val.orange{color:var(--orange);}
+.stat-val.blue{color:var(--blue);}
+.stat-lbl{font-size:10px;color:var(--mid);margin-top:3px;}
+
+/* TOKEN METER */
+.token-row{display:flex;gap:10px;align-items:center;padding:10px 14px;background:rgba(28,56,245,0.04);border:1px solid rgba(28,56,245,0.15);border-radius:var(--r);margin-bottom:12px;font-size:11px;}
+.token-label{color:var(--mid);flex:1;}
+.token-val{font-family:'Roboto Mono',monospace;font-weight:700;color:var(--navy);}
+.token-cost{font-family:'Roboto Mono',monospace;color:var(--teal);font-size:10px;}
+
+/* LOG */
+.log-wrap{background:#0a0a0f;border-radius:var(--r-lg);padding:16px;max-height:320px;overflow-y:auto;font-family:'Roboto Mono',monospace;font-size:11px;line-height:1.7;}
+.log-line{padding:1px 0;}
+.log-info{color:#7fb3ff;}
+.log-success{color:#56d49b;}
+.log-warn{color:#ffd166;}
+.log-error{color:#ff7e72;}
+.log-data{color:#c8c8d0;}
+.log-dim{color:#555;}
+
+/* RESULTS */
+.result-section{margin-top:16px;}
+.result-domain{border:1px solid #e0e0e8;border-radius:var(--r-lg);margin-bottom:10px;overflow:hidden;}
+.result-domain-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--light);cursor:pointer;}
+.result-domain-hdr:hover{background:#e8e8f0;}
+.result-domain-title{font-size:12px;font-weight:700;color:var(--navy);}
+.result-domain-count{font-size:11px;font-weight:700;color:var(--teal);background:rgba(0,178,144,0.1);padding:2px 8px;border-radius:8px;}
+.result-items{display:none;padding:12px 14px;}
+.result-items.open{display:block;}
+.result-item{border:1px solid #e0e0e8;border-radius:var(--r);padding:10px 12px;margin-bottom:6px;background:var(--white);}
+.result-item-title{font-size:12px;font-weight:600;color:var(--dark);margin-bottom:3px;}
+.result-item-summary{font-size:11px;color:var(--mid);line-height:1.6;margin-bottom:5px;}
+.result-item-tags{display:flex;gap:4px;flex-wrap:wrap;}
+.tag{font-size:9px;font-weight:600;padding:1px 6px;border-radius:5px;background:var(--light);color:var(--mid);}
+.tag-type{background:rgba(0,40,112,0.07);color:var(--navy);}
+.tag-high{background:rgba(255,85,57,0.1);color:var(--orange);}
+.tag-uc{background:rgba(0,178,144,0.1);color:var(--teal);}
+
+/* SECTION DIVIDER */
+.section-hdr{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--light);display:flex;align-items:center;justify-content:space-between;}
+
+@media(max-width:700px){.stats-row{grid-template-columns:1fr 1fr;}.domain-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.65)">Intelligence Scraper</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">v1.0</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">&#8592; Portal</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- API KEY -->
+  <div class="card">
+    <div class="card-title">&#9889; Configuration</div>
+    <div class="card-sub">Your Gemini API key is stored only in this browser. It is never sent anywhere except Google's Gemini API.</div>
+    <div class="alert alert-warn">&#128274; Keep your API key private. This tool uses Gemini Flash without grounding &mdash; no live web search, synthesis from model knowledge. Lower token cost, no rate limit issues.</div>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <label class="lbl">Gemini API Key</label>
+        <input type="password" id="apiKey" placeholder="Paste your Gemini API key here">
+        <div class="field-hint">Get from aistudio.google.com &rarr; Get API Key</div>
+      </div>
+      <div style="min-width:160px">
+        <label class="lbl">Model</label>
+        <select id="modelSelect">
+          <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+          <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (cheapest)</option>
+        </select>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="saveConfig()">Save Config</button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-box"><div class="stat-val" id="statDomains">0</div><div class="stat-lbl">Domains scraped</div></div>
+    <div class="stat-box"><div class="stat-val teal" id="statItems">0</div><div class="stat-lbl">Total intel items</div></div>
+    <div class="stat-box"><div class="stat-val blue" id="statTokens">0</div><div class="stat-lbl">Tokens used (session)</div></div>
+    <div class="stat-box"><div class="stat-val orange" id="statCost">$0.000</div><div class="stat-lbl">Est. cost (session)</div></div>
+  </div>
+
+  <!-- DOMAIN SELECTION -->
+  <div class="section-hdr">
+    <span>&#128270; Intelligence Domains</span>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-outline btn-xs" onclick="selectAll()">Select All</button>
+      <button class="btn btn-outline btn-xs" onclick="selectNone()">Clear</button>
+    </div>
+  </div>
+
+  <div class="domain-grid" id="domainGrid"></div>
+
+  <!-- NEWS TOPICS -->
+  <div class="section-hdr" style="margin-top:20px">
+    <span>&#128240; Market News Topics</span>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-outline btn-xs" onclick="selectAllNews()">Select All</button>
+      <button class="btn btn-outline btn-xs" onclick="selectNoneNews()">Clear</button>
+    </div>
+  </div>
+
+  <div class="domain-grid" id="newsGrid"></div>
+
+  <!-- RUN CONTROLS -->
+  <div class="card" style="margin-top:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="card-title" style="margin-bottom:2px">Run Scraper</div>
+        <div id="selectedCount" style="font-size:11px;color:var(--mid)">0 domains/topics selected</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="exportIntelligence()" id="exportBtn" disabled>&#11015; Export JSON</button>
+        <button class="btn btn-outline btn-sm" onclick="clearIntelligence()" id="clearBtn">&#128465; Clear Database</button>
+        <button class="btn btn-primary" id="runBtn" onclick="runScraper()" disabled>&#9654; Run Scraper</button>
+      </div>
+    </div>
+
+    <!-- TOKEN METER -->
+    <div id="tokenMeter" style="display:none;margin-top:14px">
+      <div class="token-row">
+        <span class="token-label">Session tokens used</span>
+        <span class="token-val" id="meterTokens">0</span>
+        <span class="token-cost" id="meterCost">~$0.000</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE LOG -->
+  <div id="logSection" style="display:none">
+    <div class="section-hdr"><span>&#128196; Live Log</span><button class="btn btn-xs btn-outline" onclick="clearLog()">Clear</button></div>
+    <div class="log-wrap" id="logWrap"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="resultsSection" style="display:none">
+    <div class="section-hdr">
+      <span>&#9989; Intelligence Items</span>
+      <span id="resultsCount" style="font-size:11px;color:var(--mid)"></span>
+    </div>
+    <div id="resultsDom"></div>
+  </div>
+
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+var DOMAINS = [
+  {code:'DEF', name:'Defence & Armed Forces',        icon:'&#128737;', focus:'Indian defence AI, military technology, DRDO, DPSUs, defence procurement, border surveillance'},
+  {code:'GEO', name:'Geospatial & Earth Observation',icon:'&#128752;', focus:'satellite imagery AI, ISRO, remote sensing, GIS platforms, geospatial analytics India'},
+  {code:'GOV', name:'Governance & e-Governance',     icon:'&#127963;', focus:'Indian government AI adoption, digital India, e-governance, citizen services AI, smart cities'},
+  {code:'HLT', name:'Health & Life Sciences',        icon:'&#127973;', focus:'healthcare AI India, diagnostic AI, hospital technology, pharma AI, medical imaging'},
+  {code:'ENR', name:'Energy & Utilities',            icon:'&#9889;',   focus:'energy sector AI India, smart grid, renewable energy technology, oil and gas AI'},
+  {code:'TEL', name:'Telecom & Networks',            icon:'&#128225;', focus:'telecom AI India, 5G AI, network optimisation, subscriber analytics'},
+  {code:'FIN', name:'BFSI & Financial Services',     icon:'&#127981;', focus:'banking AI India, fintech AI, fraud detection, insurance AI, payments'},
+  {code:'MFG', name:'Manufacturing & Industry',      icon:'&#9881;',   focus:'manufacturing AI India, Industry 4.0, predictive maintenance, MSME AI'},
+  {code:'TER', name:'Territory / State CoE',         icon:'&#127960;', focus:'state government AI centres India, sovereign AI platforms, AI CoE programmes'},
+  {code:'HLS', name:'Homeland Security',             icon:'&#128274;', focus:'border security AI India, surveillance technology, paramilitary AI, critical infrastructure'},
+]
+
+var NEWS_TOPICS = [
+  {code:'AI_HPC',   name:'AI & HPC in India',          icon:'&#128204;', focus:'AI HPC supercomputer India government enterprise market developments 2026'},
+  {code:'COMP',     name:'Competitor & Vendor Activity',icon:'&#127942;', focus:'NVIDIA AMD Intel HPE Dell Atos AI HPC India wins contracts announcements 2026'},
+  {code:'TENDERS',  name:'Government AI Tenders',       icon:'&#128196;', focus:'India government AI tender RFP procurement supercomputer technology 2026'},
+  {code:'DEF_TECH', name:'Defence Technology News',     icon:'&#128737;', focus:'India defence AI military technology DRDO armed forces digital transformation 2026'},
+  {code:'SOV_AI',   name:'Sovereign AI & Policy',       icon:'&#127963;', focus:'sovereign AI data localisation India on-premise government cloud policy regulation 2026'},
+]
+
+var selectedDomains = new Set()
+var selectedNews = new Set()
+var sessionTokens = 0
+var sessionCost = 0
+var running = false
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+function getIntelDB(){
+  try{ return JSON.parse(localStorage.getItem('atlas_intel_db')||'{}') }catch{return {}}
+}
+function setIntelDB(db){ localStorage.setItem('atlas_intel_db',JSON.stringify(db)) }
+function getMetaDB(){
+  try{ return JSON.parse(localStorage.getItem('atlas_intel_meta')||'{}') }catch{return {}}
+}
+function setMetaDB(db){ localStorage.setItem('atlas_intel_meta',JSON.stringify(db)) }
+function getConfig(){
+  try{ return JSON.parse(localStorage.getItem('atlas_intel_config')||'{}') }catch{return {}}
+}
+function setConfig(c){ localStorage.setItem('atlas_intel_config',JSON.stringify(c)) }
+
+function saveConfig(){
+  var key = document.getElementById('apiKey').value.trim()
+  var model = document.getElementById('modelSelect').value
+  if(!key){ alert('Please enter your Gemini API key.'); return }
+  setConfig({key:key, model:model})
+  log('Config saved. Model: ' + model, 'success')
+  updateRunBtn()
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+function init(){
+  var cfg = getConfig()
+  if(cfg.key) document.getElementById('apiKey').value = cfg.key
+  if(cfg.model) document.getElementById('modelSelect').value = cfg.model
+  renderDomainGrid()
+  renderNewsGrid()
+  updateStats()
+  updateRunBtn()
+}
+
+function renderDomainGrid(){
+  var meta = getMetaDB()
+  var db = getIntelDB()
+  document.getElementById('domainGrid').innerHTML = DOMAINS.map(function(d){
+    var m = meta[d.code] || {}
+    var items = (db[d.code] || []).length
+    var status = getStatus(m.last_scraped)
+    var statusLabel = status === 'never' ? 'Never scraped' : status === 'fresh' ? 'Fresh' : 'Stale'
+    var lastStr = m.last_scraped ? new Date(m.last_scraped).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : 'Never'
+    var sel = selectedDomains.has(d.code)
+    return '<div class="domain-card ' + (sel?'selected':'') + '" id="dc-' + d.code + '" data-code="' + d.code + '" data-type="domain" onclick="toggleDomain(this)">'
+      + '<div class="domain-card-hdr">'
+      + '<span class="domain-icon">' + d.icon + '</span>'
+      + '<div><div class="domain-name">' + d.name + '</div><div class="domain-code">' + d.code + '</div></div>'
+      + '<div class="domain-check" id="chk-' + d.code + '"></div>'
+      + '</div>'
+      + '<div class="domain-meta">'
+      + '<span>Last: ' + lastStr + '</span>'
+      + '<span class="domain-status status-' + status + '">' + statusLabel + '</span>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--mid);margin-top:4px">' + items + ' items in database</div>'
+      + '<div class="domain-progress" id="prog-' + d.code + '"><div class="domain-progress-bar" id="progbar-' + d.code + '"></div></div>'
+      + '</div>'
+  }).join('')
+}
+
+function renderNewsGrid(){
+  var meta = getMetaDB()
+  var db = getIntelDB()
+  document.getElementById('newsGrid').innerHTML = NEWS_TOPICS.map(function(t){
+    var m = meta['news_' + t.code] || {}
+    var items = (db['news_' + t.code] || []).length
+    var status = getStatus(m.last_scraped)
+    var statusLabel = status === 'never' ? 'Never scraped' : status === 'fresh' ? 'Fresh' : 'Stale'
+    var lastStr = m.last_scraped ? new Date(m.last_scraped).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : 'Never'
+    var sel = selectedNews.has(t.code)
+    return '<div class="domain-card ' + (sel?'selected':'') + '" id="dc-news-' + t.code + '" data-code="' + t.code + '" data-type="news" onclick="toggleNews(this)">'
+      + '<div class="domain-card-hdr">'
+      + '<span class="domain-icon">' + t.icon + '</span>'
+      + '<div><div class="domain-name">' + t.name + '</div><div class="domain-code">NEWS &middot; ' + t.code + '</div></div>'
+      + '<div class="domai
