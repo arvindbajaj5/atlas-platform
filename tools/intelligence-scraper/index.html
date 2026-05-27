@@ -589,7 +589,10 @@ function extractItems(raw, code, name, sourceType){
   }
 
   if(items.length === 0){
-    log('Could not extract any items from response. Raw length: ' + raw.length, 'error')
+    log('Could not extract any items. Raw length: ' + raw.length, 'error')
+    // Dump first 500 chars of raw response to log
+    var preview = raw.slice(0,500).replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    log('RAW RESPONSE: ' + preview, 'warn')
     return []
   }
 
