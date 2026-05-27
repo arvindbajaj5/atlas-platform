@@ -19,7 +19,7 @@ MODEL          = "gemini-3.5-flash"
 GEMINI_URL     = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={GEMINI_API_KEY}"
 MIN_DAYS_BETWEEN_RUNS = 6
 
-NEWS_TOPICS = [
+ALL_NEWS_TOPICS = [
     {
         "id": "ai_hpc_india",
         "label": "AI & HPC in India",
@@ -47,6 +47,12 @@ NEWS_TOPICS = [
     },
 ]
 
+# Rotate 2 topics per run based on week number
+import datetime as _dt2
+_week2 = _dt2.datetime.utcnow().isocalendar()[1]
+_news_batches = [[0,1],[2,3],[4,0],[1,2]]
+NEWS_TOPICS = [ALL_NEWS_TOPICS[i] for i in _news_batches[_week2 % 4]]
+
 def load_metadata():
     if os.path.exists(METADATA_FILE):
         with open(METADATA_FILE) as f:
@@ -67,7 +73,7 @@ def should_run(meta, topic_id):
     days_since = (datetime.datetime.utcnow() - datetime.datetime.fromisoformat(last)).days
     return days_since >= MIN_DAYS_BETWEEN_RUNS
 
-def call_gemini(prompt, retries=3, backoff=60):
+def call_gemini(prompt, retries=3, backoff=20):
     import time
     body = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -188,7 +194,7 @@ def main():
 
         print(f"[{tid}] Scraping: {topic['label']}...")
         import time
-        time.sleep(8)
+        time.sleep(5)
         try:
             new_items = scrape_topic(topic)
             existing = load_existing(tid)
