@@ -157,8 +157,8 @@ input:focus,select:focus{border-color:var(--blue);}
       <div>
         <label class="lbl">Items per domain</label>
         <select id="itemCount" style="width:120px">
-          <option value="5">5 items</option>
-          <option value="10" selected>10 items</option>
+          <option value="5" selected>5 items</option>
+          <option value="10">10 items</option>
           <option value="15">15 items</option>
           <option value="20">20 items</option>
         </select>
@@ -468,7 +468,7 @@ async function callGemini(prompt, label){
       {role: 'model', parts: [{text: 'Understood. I will respond with raw JSON only.'}]},
       {role: 'user', parts: [{text: prompt}]}
     ],
-    generationConfig: {temperature: 0.1, maxOutputTokens: 8192, responseMimeType: 'application/json'}
+    generationConfig: {temperature: 0.1, maxOutputTokens: 2048, responseMimeType: 'application/json'}
   }
   if(cfg2.useGrounding && document.getElementById('useGrounding').checked){
     body.tools = [{google_search: {}}]
@@ -608,7 +608,7 @@ function extractItems(raw, code, name, sourceType){
   var now = new Date().toISOString()
   var items = []
 
-  // Method 1: direct JSON parse
+  // Method 1: direct JSON parse with partial recovery
   try{
     var text = raw.trim()
     var fence = String.fromCharCode(96,96,96)
@@ -620,17 +620,36 @@ function extractItems(raw, code, name, sourceType){
         if(pt.startsWith('[') || pt.startsWith('{')){ text = pt; break }
       }
     }
+    // Find start of array
     var first = text.indexOf('[')
-    var last = text.lastIndexOf(']')
-    if(first >= 0 && last > first){
-      var parsed = JSON.parse(text.slice(first, last+1))
-      if(Array.isArray(parsed) && parsed.length > 0){
-        log('Parsed ' + parsed.length + ' items via method 1', 'dim')
-        items = parsed
+    if(first >= 0){
+      var arrText = text.slice(first)
+      // Try full parse first
+      try{
+        var parsed = JSON.parse(arrText)
+        if(Array.isArray(parsed) && parsed.length > 0){
+          log('Parsed ' + parsed.length + ' items via method 1', 'dim')
+          items = parsed
+        }
+      }catch(innerE){
+        // Try recovery: find last },  and close the array
+        var lastObjEnd = arrText.lastIndexOf('},')
+        if(lastObjEnd < 0) lastObjEnd = arrText.lastIndexOf('}')
+        if(lastObjEnd > 0){
+          var recovered = arrText.slice(0, lastObjEnd+1) + ']'
+          try{
+            var partial = JSON.parse(recovered)
+            if(Array.isArray(partial) && partial.length > 0){
+              log('Parsed ' + partial.length + ' items via method 1 (partial recovery)', 'dim')
+              items = partial
+            }
+          }catch(e2){ /* fall through to method 2 */ }
+        }
+        if(items.length === 0) log('Method 1 failed: ' + innerE.message.slice(0,60) + ' - trying method 2', 'warn')
       }
     }
   }catch(e1){
-    log('Method 1 failed: ' + e1.message.slice(0,60) + ' - trying method 2', 'warn')
+    log('Method 1 outer failed: ' + e1.message.slice(0,40) + ' - trying method 2', 'warn')
   }
 
   // Method 2: extract individual {} blocks
