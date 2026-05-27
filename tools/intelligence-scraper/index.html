@@ -147,7 +147,7 @@ input:focus,select:focus{border-color:var(--blue);}
         <label class="lbl">Model</label>
         <select id="modelSelect">
           <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
-          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+          <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (recommended)</option>
           <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (cheapest)</option>
         </select>
       </div>
@@ -562,6 +562,48 @@ function parseJSON(text){
 
 // \u2500\u2500 Scraping \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
+
+function parseMarkdownItems(raw){
+  var items = []
+  // Split on item markers: *Item N:*, **Item N**, Item N:
+  var itemBlocks = raw.split(/\*{0,2}Item\s+\d+[:\*]/i)
+  if(itemBlocks.length < 2){
+    // Try splitting on numbered list pattern
+    itemBlocks = raw.split(/\n\d+\.\s+/)
+  }
+  itemBlocks.forEach(function(block){
+    if(!block.trim()) return
+    var item = {}
+    // Extract fields using regex patterns for * key: "value" or * **key**: value
+    var patterns = {
+      title: /[*-]\s*(?:\*{1,2})?[Tt]itle(?:\*{1,2})?[:\s]+[*"']?([^"'\n*]+)[*"']?/,
+      summary: /[*-]\s*(?:\*{1,2})?[Ss]ummary(?:\*{1,2})?[:\s]+"?([^"\n]+(?:\n(?![*-])[^\n]+)*)"?/,
+      type: /[*-]\s*(?:\*{1,2})?[Tt]ype(?:\*{1,2})?[:\s]+"?([\w_]+)"?/,
+      intelligence_value: /[*-]\s*(?:\*{1,2})?[Ii]ntelligence[_\s][Vv]alue(?:\*{1,2})?[:\s]+"?(high|medium|low)"?/i,
+      opportunity: /[*-]\s*(?:\*{1,2})?[Oo]pportunity(?:\*{1,2})?[:\s]+"?([^"\n]+)"?/,
+      confidence: /[*-]\s*(?:\*{1,2})?[Cc]onfidence(?:\*{1,2})?[:\s]+"?(high|medium|low)"?/i,
+      competitor_signals: /[*-]\s*(?:\*{1,2})?[Cc]ompetitor[_\s][Ss]ignals?(?:\*{1,2})?[:\s]+"?([^"\n]+)"?/,
+      uc_suggest: /[*-]\s*(?:\*{1,2})?[Uu][Cc][_\s][Ss]uggest(?:\*{1,2})?[:\s]+"?([^"\n]+)"?/,
+    }
+    for(var field in patterns){
+      var m = block.match(patterns[field])
+      if(m) item[field] = m[1].trim().replace(/[*"']/g,'').replace(/\s*\(\d+\s+chars\)/,'').trim()
+    }
+    // Extract tags array
+    var tagsMatch = block.match(/[*-]\s*(?:\*{1,2})?[Tt]ags?(?:\*{1,2})?[:\s]+\[?([^\]\n]+)\]?/)
+    if(tagsMatch){
+      item.tags = tagsMatch[1].split(/[,;]+/).map(function(t){ return t.trim().replace(/["\'\[\]]/g,'') }).filter(Boolean).slice(0,5)
+    }
+    // Extract organisations
+    var orgMatch = block.match(/[*-]\s*(?:\*{1,2})?[Oo]rganisations?(?:\*{1,2})?[:\s]+\[?([^\]\n]+)\]?/)
+    if(orgMatch){
+      item.organisations = orgMatch[1].split(/[,;]+/).map(function(o){ return o.trim().replace(/["\'\[\]]/g,'') }).filter(Boolean).slice(0,3)
+    }
+    if(item.title && item.title.length > 3) items.push(item)
+  })
+  return items
+}
+
 function extractItems(raw, code, name, sourceType){
   var now = new Date().toISOString()
   var items = []
@@ -621,9 +663,21 @@ function extractItems(raw, code, name, sourceType){
     }
   }
 
+  // Method 3: parse markdown bullet format (* key: value)
+  if(items.length === 0){
+    try{
+      var mdItems = parseMarkdownItems(raw)
+      if(mdItems.length > 0){
+        log('Extracted ' + mdItems.length + ' items via method 3 (markdown parser)', 'dim')
+        items = mdItems
+      }
+    }catch(e3){
+      log('Method 3 failed: ' + e3.message.slice(0,60), 'warn')
+    }
+  }
+
   if(items.length === 0){
     log('Could not extract any items. Raw length: ' + raw.length, 'error')
-    // Dump first 500 chars of raw response to log
     var preview = raw.slice(0,500).replace(/</g,'&lt;').replace(/>/g,'&gt;')
     log('RAW RESPONSE: ' + preview, 'warn')
     return []
