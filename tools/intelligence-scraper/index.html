@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -230,24 +229,24 @@ input:focus,select:focus{border-color:var(--blue);}
 <script>
 // ── Data ──────────────────────────────────────────────────────────────────────
 var DOMAINS = [
-  {code:'DEF', name:'Defence & Armed Forces',        icon:'&#128737;', focus:'Indian defence AI, military technology, DRDO, DPSUs, defence procurement, border surveillance'},
-  {code:'GEO', name:'Geospatial & Earth Observation',icon:'&#128752;', focus:'satellite imagery AI, ISRO, remote sensing, GIS platforms, geospatial analytics India'},
-  {code:'GOV', name:'Governance & e-Governance',     icon:'&#127963;', focus:'Indian government AI adoption, digital India, e-governance, citizen services AI, smart cities'},
-  {code:'HLT', name:'Health & Life Sciences',        icon:'&#127973;', focus:'healthcare AI India, diagnostic AI, hospital technology, pharma AI, medical imaging'},
-  {code:'ENR', name:'Energy & Utilities',            icon:'&#9889;',   focus:'energy sector AI India, smart grid, renewable energy technology, oil and gas AI'},
-  {code:'TEL', name:'Telecom & Networks',            icon:'&#128225;', focus:'telecom AI India, 5G AI, network optimisation, subscriber analytics'},
-  {code:'FIN', name:'BFSI & Financial Services',     icon:'&#127981;', focus:'banking AI India, fintech AI, fraud detection, insurance AI, payments'},
-  {code:'MFG', name:'Manufacturing & Industry',      icon:'&#9881;',   focus:'manufacturing AI India, Industry 4.0, predictive maintenance, MSME AI'},
-  {code:'TER', name:'Territory / State CoE',         icon:'&#127960;', focus:'state government AI centres India, sovereign AI platforms, AI CoE programmes'},
-  {code:'HLS', name:'Homeland Security',             icon:'&#128274;', focus:'border security AI India, surveillance technology, paramilitary AI, critical infrastructure'},
+  {code:'DEF', name:'Defence & Armed Forces',        icon:'🛡', focus:'Indian defence AI, military technology, DRDO, DPSUs, defence procurement, border surveillance'},
+  {code:'GEO', name:'Geospatial & Earth Observation',icon:'🛰', focus:'satellite imagery AI, ISRO, remote sensing, GIS platforms, geospatial analytics India'},
+  {code:'GOV', name:'Governance & e-Governance',     icon:'🏛', focus:'Indian government AI adoption, digital India, e-governance, citizen services AI, smart cities'},
+  {code:'HLT', name:'Health & Life Sciences',        icon:'🏥', focus:'healthcare AI India, diagnostic AI, hospital technology, pharma AI, medical imaging'},
+  {code:'ENR', name:'Energy & Utilities',            icon:'⚡',   focus:'energy sector AI India, smart grid, renewable energy technology, oil and gas AI'},
+  {code:'TEL', name:'Telecom & Networks',            icon:'📡', focus:'telecom AI India, 5G AI, network optimisation, subscriber analytics'},
+  {code:'FIN', name:'BFSI & Financial Services',     icon:'🏭', focus:'banking AI India, fintech AI, fraud detection, insurance AI, payments'},
+  {code:'MFG', name:'Manufacturing & Industry',      icon:'⚙',   focus:'manufacturing AI India, Industry 4.0, predictive maintenance, MSME AI'},
+  {code:'TER', name:'Territory / State CoE',         icon:'🏘', focus:'state government AI centres India, sovereign AI platforms, AI CoE programmes'},
+  {code:'HLS', name:'Homeland Security',             icon:'🔒', focus:'border security AI India, surveillance technology, paramilitary AI, critical infrastructure'},
 ]
 
 var NEWS_TOPICS = [
-  {code:'AI_HPC',   name:'AI & HPC in India',          icon:'&#128204;', focus:'AI HPC supercomputer India government enterprise market developments 2026'},
-  {code:'COMP',     name:'Competitor & Vendor Activity',icon:'&#127942;', focus:'NVIDIA AMD Intel HPE Dell Atos AI HPC India wins contracts announcements 2026'},
-  {code:'TENDERS',  name:'Government AI Tenders',       icon:'&#128196;', focus:'India government AI tender RFP procurement supercomputer technology 2026'},
-  {code:'DEF_TECH', name:'Defence Technology News',     icon:'&#128737;', focus:'India defence AI military technology DRDO armed forces digital transformation 2026'},
-  {code:'SOV_AI',   name:'Sovereign AI & Policy',       icon:'&#127963;', focus:'sovereign AI data localisation India on-premise government cloud policy regulation 2026'},
+  {code:'AI_HPC',   name:'AI & HPC in India',          icon:'📌', focus:'AI HPC supercomputer India government enterprise market developments 2026'},
+  {code:'COMP',     name:'Competitor & Vendor Activity',icon:'🏆', focus:'NVIDIA AMD Intel HPE Dell Atos AI HPC India wins contracts announcements 2026'},
+  {code:'TENDERS',  name:'Government AI Tenders',       icon:'📄', focus:'India government AI tender RFP procurement supercomputer technology 2026'},
+  {code:'DEF_TECH', name:'Defence Technology News',     icon:'🛡', focus:'India defence AI military technology DRDO armed forces digital transformation 2026'},
+  {code:'SOV_AI',   name:'Sovereign AI & Policy',       icon:'🏛', focus:'sovereign AI data localisation India on-premise government cloud policy regulation 2026'},
 ]
 
 var selectedDomains = new Set()
@@ -330,4 +329,382 @@ function renderNewsGrid(){
       + '<div class="domain-card-hdr">'
       + '<span class="domain-icon">' + t.icon + '</span>'
       + '<div><div class="domain-name">' + t.name + '</div><div class="domain-code">NEWS &middot; ' + t.code + '</div></div>'
-      + '<div class="domai
+      + '<div class="domain-check" id="chk-news-' + t.code + '"></div>'
+      + '</div>'
+      + '<div class="domain-meta">'
+      + '<span>Last: ' + lastStr + '</span>'
+      + '<span class="domain-status status-' + status + '">' + statusLabel + '</span>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--mid);margin-top:4px">' + items + ' items in database</div>'
+      + '<div class="domain-progress" id="prog-news-' + t.code + '"><div class="domain-progress-bar" id="progbar-news-' + t.code + '"></div></div>'
+      + '</div>'
+  }).join('')
+}
+
+function getStatus(lastScraped){
+  if(!lastScraped) return 'never'
+  var days = (Date.now() - new Date(lastScraped).getTime()) / (1000*60*60*24)
+  return days < 8 ? 'fresh' : 'stale'
+}
+
+function toggleDomain(el){
+  if(running) return
+  var code = el.dataset.code
+  if(selectedDomains.has(code)) selectedDomains.delete(code)
+  else selectedDomains.add(code)
+  renderDomainGrid()
+  updateSelectedCount()
+  updateRunBtn()
+}
+
+function toggleNews(el){
+  if(running) return
+  var code = el.dataset.code
+  if(selectedNews.has(code)) selectedNews.delete(code)
+  else selectedNews.add(code)
+  renderNewsGrid()
+  updateSelectedCount()
+  updateRunBtn()
+}
+
+function selectAll(){ DOMAINS.forEach(function(d){selectedDomains.add(d.code)}); renderDomainGrid(); updateSelectedCount(); updateRunBtn() }
+function selectNone(){ selectedDomains.clear(); renderDomainGrid(); updateSelectedCount(); updateRunBtn() }
+function selectAllNews(){ NEWS_TOPICS.forEach(function(t){selectedNews.add(t.code)}); renderNewsGrid(); updateSelectedCount(); updateRunBtn() }
+function selectNoneNews(){ selectedNews.clear(); renderNewsGrid(); updateSelectedCount(); updateRunBtn() }
+
+function updateSelectedCount(){
+  var total = selectedDomains.size + selectedNews.size
+  document.getElementById('selectedCount').textContent = total + ' domain' + (total!==1?'s':'') + '/topic' + (total!==1?'s':'') + ' selected'
+}
+
+function updateRunBtn(){
+  var cfg = getConfig()
+  var hasKey = !!(cfg.key || document.getElementById('apiKey').value.trim())
+  var hasSelection = selectedDomains.size > 0 || selectedNews.size > 0
+  document.getElementById('runBtn').disabled = !hasKey || !hasSelection || running
+  document.getElementById('exportBtn').disabled = Object.keys(getIntelDB()).length === 0
+}
+
+function updateStats(){
+  var db = getIntelDB()
+  var meta = getMetaDB()
+  var domains = Object.keys(meta).filter(function(k){return !k.startsWith('news_') && meta[k].last_scraped}).length
+  var total = Object.values(db).reduce(function(sum,arr){return sum + arr.length},0)
+  document.getElementById('statDomains').textContent = domains
+  document.getElementById('statItems').textContent = total
+  document.getElementById('statTokens').textContent = sessionTokens.toLocaleString()
+  document.getElementById('statCost').textContent = '$' + sessionCost.toFixed(4)
+}
+
+// ── Logging ───────────────────────────────────────────────────────────────────
+function log(msg, type){
+  type = type || 'info'
+  var wrap = document.getElementById('logWrap')
+  document.getElementById('logSection').style.display = 'block'
+  var line = document.createElement('div')
+  line.className = 'log-line log-' + type
+  var time = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})
+  line.textContent = '[' + time + '] ' + msg
+  wrap.appendChild(line)
+  wrap.scrollTop = wrap.scrollHeight
+}
+
+function clearLog(){
+  document.getElementById('logWrap').innerHTML = ''
+}
+
+function setDomainStatus(code, status, isNews){
+  var prefix = isNews ? 'dc-news-' : 'dc-'
+  var el = document.getElementById(prefix + code)
+  if(!el) return
+  el.className = 'domain-card ' + status
+  var prog = document.getElementById('prog-' + (isNews?'news-':'') + code)
+  var bar = document.getElementById('progbar-' + (isNews?'news-':'') + code)
+  if(status === 'running'){
+    prog.classList.add('show')
+    bar.style.width = '100%'
+    bar.classList.add('pulse')
+  } else {
+    bar.classList.remove('pulse')
+    bar.style.width = status === 'done' ? '100%' : '0%'
+    if(status !== 'done') prog.classList.remove('show')
+  }
+}
+
+// ── Gemini API ────────────────────────────────────────────────────────────────
+async function callGemini(prompt, label){
+  var cfg = getConfig()
+  var key = cfg.key || document.getElementById('apiKey').value.trim()
+  var model = document.getElementById('modelSelect').value
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key
+
+  var body = {
+    contents: [{parts: [{text: prompt}]}],
+    generationConfig: {temperature: 0.2, maxOutputTokens: 4096}
+  }
+
+  var resp = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+  if(!resp.ok){
+    var err = await resp.json()
+    throw new Error((err.error && err.error.message) || 'API error ' + resp.status)
+  }
+  var data = await resp.json()
+
+  // Track tokens
+  var usage = data.usageMetadata || {}
+  var inTokens = usage.promptTokenCount || 0
+  var outTokens = usage.candidatesTokenCount || 0
+  var totalTok = inTokens + outTokens
+  sessionTokens += totalTok
+
+  // Cost estimate: Gemini 3.5 Flash ~$0.30/M input, $2.50/M output (rough)
+  sessionCost += (inTokens * 0.0000003) + (outTokens * 0.0000025)
+
+  document.getElementById('statTokens').textContent = sessionTokens.toLocaleString()
+  document.getElementById('statCost').textContent = '$' + sessionCost.toFixed(4)
+  document.getElementById('meterTokens').textContent = sessionTokens.toLocaleString()
+  document.getElementById('meterCost').textContent = '~$' + sessionCost.toFixed(4)
+  document.getElementById('tokenMeter').style.display = 'block'
+
+  log(label + ' &mdash; tokens: in=' + inTokens + ' out=' + outTokens + ' cost=~$' + ((inTokens*0.0000003)+(outTokens*0.0000025)).toFixed(5), 'dim')
+
+  var text = data.candidates[0].content.parts[0].text
+  return text
+}
+
+function parseJSON(text){
+  text = text.trim()
+  var fence = String.fromCharCode(96,96,96)
+  if(text.startsWith(fence)){
+    var parts = text.split(fence)
+    text = parts[1] || parts[0]
+    if(text.startsWith('json')) text = text.slice(4)
+  }
+  text = text.trim()
+  var first = -1
+  for(var i=0;i<text.length;i++){if(text[i]==='['||text[i]==='{'){first=i;break}}
+  var last = -1
+  for(var j=text.length-1;j>=0;j--){if(text[j]===']'||text[j]==='}'){last=j;break}}
+  if(first>=0&&last>=0) text = text.slice(first,last+1)
+  return JSON.parse(text)
+}
+
+// ── Scraping ──────────────────────────────────────────────────────────────────
+async function scrapeDomain(domain){
+  var p1 = 'You are an intelligence analyst for an AI and HPC hardware company targeting the Indian market.'
+  var p2 = 'Generate a structured intelligence report on the following sector based on your knowledge up to your training cutoff.'
+  var p3 = 'SECTOR: ' + domain.name + ' | FOCUS: ' + domain.focus
+  var p4 = 'Generate 6-10 intelligence items covering: recent AI deployments and programmes, key organisations and their AI maturity, procurement patterns and major tenders in the last 12-18 months, competitive landscape, technology shifts, emerging use cases, and key challenges.'
+  var p5 = 'Respond ONLY with a valid JSON array. No preamble, no code fences.'
+  var schema = '[{"title":"Short descriptive title","summary":"2-3 sentence factual summary","type":"deployment|tender|announcement|regulation|programme|vendor_win|research|challenge","intelligence_value":"high|medium|low","key_signals":["signal1","signal2"],"organisations_involved":["org1","org2"],"tags":["tag1","tag2","tag3"],"related_sectors":["' + domain.code + '"],"opportunity_signals":"Specific opportunity for an AI/HPC OEM","competitor_signals":"Known competitors or incumbents in this space","uc_recommendation":{"suggest":true,"uc_name":"Use case name","cluster":"UC cluster","rationale":"Why add"},"confidence":"high|medium|low"}]'
+  var prompt = p1 + ' ' + p2 + ' ' + p3 + ' ' + p4 + ' ' + p5 + ' ' + schema
+
+  var raw = await callGemini(prompt, domain.code)
+  var items = parseJSON(raw)
+  var now = new Date().toISOString()
+  items.forEach(function(item, i){
+    item.id = 'intel-' + domain.code + '-' + Date.now() + '-' + i
+    item.domain_code = domain.code
+    item.domain_name = domain.name
+    item.scraped_at = now
+    item.source_type = 'domain'
+  })
+  return items
+}
+
+async function scrapeNews(topic){
+  var p1 = 'You are an intelligence analyst for an AI and HPC hardware company.'
+  var p2 = 'Generate a structured market intelligence report on the following news topic based on your knowledge.'
+  var p3 = 'TOPIC: ' + topic.name + ' | FOCUS: ' + topic.focus
+  var p4 = 'Generate 5-8 intelligence items covering recent developments, key players, market movements, and signals relevant to selling AI and HPC solutions in India.'
+  var p5 = 'Respond ONLY with a valid JSON array. No preamble, no code fences.'
+  var schema = '[{"title":"News headline or development title","summary":"2-3 sentence factual summary","type":"contract_award|tender|product_launch|policy|partnership|investment|market_shift|other","organisations":["org1","org2"],"relevance_to_atlas":"Why this matters for AI/HPC solution sales","tags":["tag1","tag2"],"related_sectors":["sector_code"],"urgency":"high|medium|low","confidence":"high|medium|low"}]'
+  var prompt = p1 + ' ' + p2 + ' ' + p3 + ' ' + p4 + ' ' + p5 + ' ' + schema
+
+  var raw = await callGemini(prompt, 'NEWS/' + topic.code)
+  var items = parseJSON(raw)
+  var now = new Date().toISOString()
+  items.forEach(function(item, i){
+    item.id = 'news-' + topic.code + '-' + Date.now() + '-' + i
+    item.topic_code = topic.code
+    item.topic_name = topic.name
+    item.scraped_at = now
+    item.source_type = 'news'
+  })
+  return items
+}
+
+
+function mergeItems(existing, newItems){
+  var existingTitles = {}
+  existing.forEach(function(item){ existingTitles[item.title.toLowerCase().trim()] = true })
+  var added = newItems.filter(function(item){ return !existingTitles[item.title.toLowerCase().trim()] })
+  return {merged: existing.concat(added), added: added.length}
+}
+
+// ── Main run ──────────────────────────────────────────────────────────────────
+async function runScraper(){
+  if(running) return
+  var cfg = getConfig()
+  var key = cfg.key || document.getElementById('apiKey').value.trim()
+  if(!key){ alert('Please enter and save your Gemini API key.'); return }
+  if(selectedDomains.size === 0 && selectedNews.size === 0){ alert('Please select at least one domain or topic.'); return }
+
+  running = true
+  document.getElementById('runBtn').disabled = true
+  document.getElementById('runBtn').textContent = '▶ Running...'
+  clearLog()
+  log('Starting intelligence scraper...', 'info')
+  log('Model: ' + document.getElementById('modelSelect').value, 'dim')
+  log('Domains: ' + Array.from(selectedDomains).join(', '), 'dim')
+  log('News topics: ' + Array.from(selectedNews).join(', '), 'dim')
+
+  var db = getIntelDB()
+  var meta = getMetaDB()
+  var totalAdded = 0
+
+  // Scrape domains
+  var domainList = DOMAINS.filter(function(d){ return selectedDomains.has(d.code) })
+  for(var i=0; i<domainList.length; i++){
+    var domain = domainList[i]
+    setDomainStatus(domain.code, 'running', false)
+    log('Scraping domain: ' + domain.name + '...', 'info')
+    try{
+      var items = await scrapeDomain(domain)
+      var existing = db[domain.code] || []
+      var result = mergeItems(existing, items)
+      db[domain.code] = result.merged
+      setIntelDB(db)
+      meta[domain.code] = {last_scraped: new Date().toISOString(), total_items: result.merged.length, added_last_run: result.added}
+      setMetaDB(meta)
+      totalAdded += result.added
+      setDomainStatus(domain.code, 'done', false)
+      log('Done: ' + domain.code + ' &mdash; ' + result.added + ' new items added (' + result.merged.length + ' total)', 'success')
+    }catch(err){
+      setDomainStatus(domain.code, 'error', false)
+      log('ERROR: ' + domain.code + ' &mdash; ' + err.message, 'error')
+    }
+    // Small delay between calls
+    if(i < domainList.length-1) await new Promise(function(r){setTimeout(r,2000)})
+  }
+
+  // Scrape news
+  var newsList = NEWS_TOPICS.filter(function(t){ return selectedNews.has(t.code) })
+  for(var j=0; j<newsList.length; j++){
+    var topic = newsList[j]
+    setDomainStatus(topic.code, 'running', true)
+    log('Scraping news: ' + topic.name + '...', 'info')
+    try{
+      var nitems = await scrapeNews(topic)
+      var nexisting = db['news_' + topic.code] || []
+      var nresult = mergeItems(nexisting, nitems)
+      db['news_' + topic.code] = nresult.merged
+      setIntelDB(db)
+      meta['news_' + topic.code] = {last_scraped: new Date().toISOString(), total_items: nresult.merged.length, added_last_run: nresult.added}
+      setMetaDB(meta)
+      totalAdded += nresult.added
+      setDomainStatus(topic.code, 'done', true)
+      log('Done: NEWS/' + topic.code + ' &mdash; ' + nresult.added + ' new items (' + nresult.merged.length + ' total)', 'success')
+    }catch(err){
+      setDomainStatus(topic.code, 'error', true)
+      log('ERROR: NEWS/' + topic.code + ' &mdash; ' + err.message, 'error')
+    }
+    if(j < newsList.length-1) await new Promise(function(r){setTimeout(r,2000)})
+  }
+
+  log('Scraping complete. ' + totalAdded + ' new items added. Total tokens: ' + sessionTokens.toLocaleString() + ' (~$' + sessionCost.toFixed(4) + ')', 'success')
+  running = false
+  document.getElementById('runBtn').disabled = false
+  document.getElementById('runBtn').textContent = '▶ Run Scraper'
+  document.getElementById('exportBtn').disabled = false
+  updateStats()
+  renderDomainGrid()
+  renderNewsGrid()
+  renderResults()
+}
+
+// ── Results ───────────────────────────────────────────────────────────────────
+function renderResults(){
+  var db = getIntelDB()
+  var keys = Object.keys(db).filter(function(k){ return db[k].length > 0 })
+  if(keys.length === 0) return
+
+  var total = keys.reduce(function(sum,k){return sum+db[k].length},0)
+  document.getElementById('resultsSection').style.display = 'block'
+  document.getElementById('resultsCount').textContent = total + ' items across ' + keys.length + ' domains/topics'
+
+  document.getElementById('resultsDom').innerHTML = keys.map(function(key){
+    var items = db[key]
+    var label = key.startsWith('news_') ? key.replace('news_','NEWS: ') : key
+    return '<div class="result-domain">'
+      + '<div class="result-domain-hdr" onclick="toggleResultSection(this)">'
+      + '<div class="result-domain-title">' + label + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<span class="result-domain-count">' + items.length + ' items</span>'
+      + '<span style="color:var(--mid);font-size:12px">▼</span>'
+      + '</div></div>'
+      + '<div class="result-items">'
+      + items.slice(0,10).map(function(item){
+          var ucTag = (item.uc_recommendation && item.uc_recommendation.suggest) ? '<span class="tag tag-uc">UC suggested</span>' : ''
+          var valTag = item.intelligence_value === 'high' ? '<span class="tag tag-high">High value</span>' : ''
+          var typeTag = '<span class="tag tag-type">' + (item.type||'') + '</span>'
+          var tags = (item.tags||[]).slice(0,3).map(function(t){return '<span class="tag">'+t+'</span>'}).join('')
+          return '<div class="result-item">'
+            + '<div class="result-item-title">' + item.title + '</div>'
+            + '<div class="result-item-summary">' + (item.summary||item.relevance_to_atlas||'') + '</div>'
+            + '<div class="result-item-tags">' + typeTag + valTag + ucTag + tags + '</div>'
+            + '</div>'
+        }).join('')
+      + (items.length > 10 ? '<div style="font-size:11px;color:var(--mid);padding:6px 0">...and ' + (items.length-10) + ' more items</div>' : '')
+      + '</div></div>'
+  }).join('')
+}
+
+function toggleResultSection(hdr){
+  var body = hdr.nextElementSibling
+  body.classList.toggle('open')
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+function exportIntelligence(){
+  var db = getIntelDB()
+  var meta = getMetaDB()
+  var export_data = {
+    exported_at: new Date().toISOString(),
+    version: '1.0',
+    tool: 'ATLAS Intelligence Scraper v1.0',
+    metadata: meta,
+    intelligence: db
+  }
+  var blob = new Blob([JSON.stringify(export_data, null, 2)], {type:'application/json'})
+  var url = URL.createObjectURL(blob)
+  var a = document.createElement('a')
+  a.href = url
+  a.download = 'atlas-intelligence-' + new Date().toISOString().slice(0,10) + '.json'
+  a.click()
+  URL.revokeObjectURL(url)
+  log('Intelligence database exported as JSON.', 'success')
+}
+
+function clearIntelligence(){
+  if(!confirm('Clear all intelligence data from this browser? This cannot be undone.')) return
+  localStorage.removeItem('atlas_intel_db')
+  localStorage.removeItem('atlas_intel_meta')
+  sessionTokens = 0
+  sessionCost = 0
+  renderDomainGrid()
+  renderNewsGrid()
+  updateStats()
+  document.getElementById('resultsSection').style.display = 'none'
+  log('Intelligence database cleared.', 'warn')
+}
+
+window.addEventListener('DOMContentLoaded', function(){
+  init()
+  // Show any existing results
+  var db = getIntelDB()
+  if(Object.keys(db).length > 0) renderResults()
+})
+</script>
+</body>
+</html>
