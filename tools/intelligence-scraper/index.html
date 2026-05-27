@@ -463,11 +463,17 @@ async function callGemini(prompt, label){
 
   var cfg2 = getConfig()
   var body = {
-    contents: [{parts: [{text: prompt}]}],
-    generationConfig: {temperature: 0.2, maxOutputTokens: 4096}
+    contents: [
+      {role: 'user', parts: [{text: 'SYSTEM: You are a JSON API. You must respond with valid JSON only. Never use markdown, never use bullet points, never use backticks. Only output raw JSON.'}]},
+      {role: 'model', parts: [{text: 'Understood. I will respond with raw JSON only.'}]},
+      {role: 'user', parts: [{text: prompt}]}
+    ],
+    generationConfig: {temperature: 0.1, maxOutputTokens: 8192, responseMimeType: 'application/json'}
   }
   if(cfg2.useGrounding && document.getElementById('useGrounding').checked){
     body.tools = [{google_search: {}}]
+    // Note: responseMimeType not supported with grounding - remove it
+    delete body.generationConfig.responseMimeType
   }
 
   var resp = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
@@ -691,8 +697,11 @@ async function scrapeNews(topic){
 
 function mergeItems(existing, newItems){
   var existingTitles = {}
-  existing.forEach(function(item){ existingTitles[item.title.toLowerCase().trim()] = true })
-  var added = newItems.filter(function(item){ return !existingTitles[item.title.toLowerCase().trim()] })
+  existing.forEach(function(item){ if(item.title) existingTitles[item.title.toLowerCase().trim()] = true })
+  var added = newItems.filter(function(item){ 
+    if(!item.title) return false
+    return !existingTitles[item.title.toLowerCase().trim()] 
+  })
   return {merged: existing.concat(added), added: added.length}
 }
 
