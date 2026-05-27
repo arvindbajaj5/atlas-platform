@@ -20,18 +20,29 @@ MODEL          = "gemini-3.5-flash"
 GEMINI_URL     = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={GEMINI_API_KEY}"
 MIN_DAYS_BETWEEN_RUNS = 6
 
-DOMAINS = [
+ALL_DOMAINS = [
     {"code": "DEF", "name": "Defence & Armed Forces",        "focus": "Indian defence AI, military technology, DRDO, DPSUs, defence procurement"},
     {"code": "GEO", "name": "Geospatial & Earth Observation","focus": "satellite imagery AI, ISRO, remote sensing, GIS platforms, geospatial analytics India"},
     {"code": "GOV", "name": "Governance & e-Governance",     "focus": "Indian government AI adoption, digital India, e-governance, citizen services AI"},
     {"code": "HLT", "name": "Health & Life Sciences",        "focus": "healthcare AI India, diagnostic AI, hospital tech, pharma AI"},
     {"code": "ENR", "name": "Energy & Utilities",            "focus": "energy sector AI India, smart grid, renewable energy tech, oil & gas AI"},
-    {"code": "TEL", "name": "Telecom & Networks",            "focus": "telecom AI India, 5G AI, network optimisation, BSNL BSNL Airtel Jio AI"},
+    {"code": "TEL", "name": "Telecom & Networks",            "focus": "telecom AI India, 5G AI, network optimisation, BSNL Airtel Jio AI"},
     {"code": "FIN", "name": "BFSI & Financial Services",     "focus": "banking AI India, fintech AI, RBI regulation AI, fraud detection"},
     {"code": "MFG", "name": "Manufacturing & Industry",      "focus": "manufacturing AI India, Industry 4.0, predictive maintenance, MSME AI"},
     {"code": "TER", "name": "Territory / State CoE",         "focus": "state government AI centres India, sovereign AI platforms, AI CoE programmes"},
     {"code": "HLS", "name": "Homeland Security",             "focus": "border security AI India, surveillance technology, paramilitary AI, critical infrastructure"},
 ]
+
+# Rotate 3 domains per run based on week number (covers all 10 over ~4 weeks)
+import datetime as _dt
+_week = _dt.datetime.utcnow().isocalendar()[1]
+_batches = [
+    [0,1,2],  # week % 4 == 0: DEF, GEO, GOV
+    [3,4,5],  # week % 4 == 1: HLT, ENR, TEL
+    [6,7,8],  # week % 4 == 2: FIN, MFG, TER
+    [9,0,1],  # week % 4 == 3: HLS, DEF, GEO (overlap for high-priority)
+]
+DOMAINS = [ALL_DOMAINS[i] for i in _batches[_week % 4]]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def load_metadata():
@@ -54,7 +65,7 @@ def should_run(meta, domain_code):
     days_since = (datetime.datetime.utcnow() - datetime.datetime.fromisoformat(last)).days
     return days_since >= MIN_DAYS_BETWEEN_RUNS
 
-def call_gemini(prompt, retries=3, backoff=60):
+def call_gemini(prompt, retries=3, backoff=20):
     import time
     body = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -181,7 +192,7 @@ def main():
 
         print(f"[{code}] Scraping {domain['name']}...")
         import time
-        time.sleep(8)  # Rate limit: max 15 req/min on free tier
+        time.sleep(5)  # Rate limit: max 15 req/min on free tier
         try:
             new_items = scrape_domain(domain)
             existing = load_existing_raw(code)
