@@ -528,47 +528,110 @@ function parseJSON(text){
 }
 
 // \u2500\u2500 Scraping \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function scrapeDomain(domain){
-  var p1 = 'You are an intelligence analyst for an AI and HPC hardware company targeting the Indian market.'
-  var p2 = 'Generate a structured intelligence report on the following sector based on your knowledge up to your training cutoff.'
-  var p3 = 'SECTOR: ' + domain.name + ' | FOCUS: ' + domain.focus
-  var p4 = 'Generate 6-10 intelligence items covering: recent AI deployments and programmes, key organisations and their AI maturity, procurement patterns and major tenders in the last 12-18 months, competitive landscape, technology shifts, emerging use cases, and key challenges.'
-  var p5 = 'CRITICAL: Respond with ONLY a JSON array. Start your response with [ and end with ]. No text before or after. No code fences. No markdown. Pure JSON only. Keep string values concise, under 200 characters each.'
-  var schema = '[{"title":"Short descriptive title","summary":"2-3 sentence factual summary","type":"deployment|tender|announcement|regulation|programme|vendor_win|research|challenge","intelligence_value":"high|medium|low","key_signals":["signal1","signal2"],"organisations_involved":["org1","org2"],"tags":["tag1","tag2","tag3"],"related_sectors":["' + domain.code + '"],"opportunity_signals":"Specific opportunity for an AI/HPC OEM","competitor_signals":"Known competitors or incumbents in this space","uc_recommendation":{"suggest":true,"uc_name":"Use case name","cluster":"UC cluster","rationale":"Why add"},"confidence":"high|medium|low"}]'
-  var prompt = p1 + ' ' + p2 + ' ' + p3 + ' ' + p4 + ' ' + p5 + ' ' + schema
 
-  var raw = await callGemini(prompt, domain.code)
-  var items = parseJSON(raw)
+function extractItems(raw, code, name, sourceType){
   var now = new Date().toISOString()
+  var items = []
+
+  // Method 1: direct JSON parse
+  try{
+    var text = raw.trim()
+    var fence = String.fromCharCode(96,96,96)
+    if(text.indexOf(fence) >= 0){
+      var parts = text.split(fence)
+      for(var pi=0;pi<parts.length;pi++){
+        var pt = parts[pi].trim()
+        if(pt.startsWith('json')) pt = pt.slice(4).trim()
+        if(pt.startsWith('[') || pt.startsWith('{')){ text = pt; break }
+      }
+    }
+    var first = text.indexOf('[')
+    var last = text.lastIndexOf(']')
+    if(first >= 0 && last > first){
+      var parsed = JSON.parse(text.slice(first, last+1))
+      if(Array.isArray(parsed) && parsed.length > 0){
+        log('Parsed ' + parsed.length + ' items via method 1', 'dim')
+        items = parsed
+      }
+    }
+  }catch(e1){
+    log('Method 1 failed: ' + e1.message.slice(0,60) + ' - trying method 2', 'warn')
+  }
+
+  // Method 2: extract individual {} blocks
+  if(items.length === 0){
+    try{
+      var depth = 0
+      var start = -1
+      var found = []
+      for(var i=0; i<raw.length; i++){
+        if(raw[i] === '{'){
+          if(depth === 0) start = i
+          depth++
+        } else if(raw[i] === '}'){
+          depth--
+          if(depth === 0 && start >= 0){
+            try{
+              var obj = JSON.parse(raw.slice(start, i+1))
+              if(obj.title) found.push(obj)
+            }catch(e){ /* skip malformed object */ }
+            start = -1
+          }
+        }
+      }
+      if(found.length > 0){
+        log('Extracted ' + found.length + ' items via method 2 (individual objects)', 'dim')
+        items = found
+      }
+    }catch(e2){
+      log('Method 2 failed: ' + e2.message.slice(0,60), 'warn')
+    }
+  }
+
+  if(items.length === 0){
+    log('Could not extract any items from response. Raw length: ' + raw.length, 'error')
+    return []
+  }
+
+  // Normalise and stamp items
   items.forEach(function(item, i){
-    item.id = 'intel-' + domain.code + '-' + Date.now() + '-' + i
-    item.domain_code = domain.code
-    item.domain_name = domain.name
+    item.id = (sourceType==='news'?'news':'intel') + '-' + code + '-' + Date.now() + '-' + i
+    if(sourceType === 'domain'){ item.domain_code = code; item.domain_name = name }
+    else { item.topic_code = code; item.topic_name = name }
     item.scraped_at = now
-    item.source_type = 'domain'
+    item.source_type = sourceType
+    // Normalise field names
+    if(!item.summary && item.description) item.summary = item.description
+    if(!item.intelligence_value) item.intelligence_value = item.urgency || 'medium'
+    if(!item.opportunity_signals && item.opportunity) item.opportunity_signals = item.opportunity
+    if(!item.relevance_to_atlas && item.relevance) item.relevance_to_atlas = item.relevance
   })
   return items
 }
 
+async function scrapeDomain(domain){
+  var prompt = 'You are an intelligence analyst. Generate exactly 5 intelligence items about AI and technology adoption in the following sector in India.'
+    + ' SECTOR: ' + domain.name + '. FOCUS: ' + domain.focus + '.'
+    + ' Return a JSON array of exactly 5 objects. Each object must have these exact keys: title (string, max 80 chars), summary (string, max 200 chars), type (one of: deployment/tender/programme/vendor_win/challenge), intelligence_value (one of: high/medium/low), tags (array of 3 strings), opportunity (string, max 150 chars), confidence (one of: high/medium/low).'
+    + ' Example of ONE item: {"title":"DRDO AI platform deployment","summary":"DRDO deployed edge AI for border surveillance in 2024.","type":"deployment","intelligence_value":"high","tags":["defence","AI","surveillance"],"opportunity":"HPC edge inference systems","confidence":"high"}'
+    + ' Return ONLY the JSON array. No explanation. No markdown. Start with [ end with ].'
+
+  var raw = await callGemini(prompt, domain.code)
+
+  // Ultra-robust extraction: find each { } block individually
+  var items = extractItems(raw, domain.code, domain.name, 'domain')
+  return items
+}
+
 async function scrapeNews(topic){
-  var p1 = 'You are an intelligence analyst for an AI and HPC hardware company.'
-  var p2 = 'Generate a structured market intelligence report on the following news topic based on your knowledge.'
-  var p3 = 'TOPIC: ' + topic.name + ' | FOCUS: ' + topic.focus
-  var p4 = 'Generate 5-8 intelligence items covering recent developments, key players, market movements, and signals relevant to selling AI and HPC solutions in India.'
-  var p5 = 'CRITICAL: Respond with ONLY a JSON array. Start your response with [ and end with ]. No text before or after. No code fences. No markdown. Pure JSON only. Keep string values concise, under 200 characters each.'
-  var schema = '[{"title":"News headline or development title","summary":"2-3 sentence factual summary","type":"contract_award|tender|product_launch|policy|partnership|investment|market_shift|other","organisations":["org1","org2"],"relevance_to_atlas":"Why this matters for AI/HPC solution sales","tags":["tag1","tag2"],"related_sectors":["sector_code"],"urgency":"high|medium|low","confidence":"high|medium|low"}]'
-  var prompt = p1 + ' ' + p2 + ' ' + p3 + ' ' + p4 + ' ' + p5 + ' ' + schema
+  var prompt = 'You are a market intelligence analyst. Generate exactly 5 market intelligence items about the following topic related to AI and HPC in India.'
+    + ' TOPIC: ' + topic.name + '. FOCUS: ' + topic.focus + '.'
+    + ' Return a JSON array of exactly 5 objects. Each object must have these exact keys: title (string, max 80 chars), summary (string, max 200 chars), type (one of: contract_award/tender/product_launch/policy/partnership/market_shift), urgency (one of: high/medium/low), tags (array of 3 strings), relevance (string, max 150 chars), confidence (one of: high/medium/low).'
+    + ' Example of ONE item: {"title":"NVIDIA wins DRDO contract","summary":"NVIDIA signed a contract with DRDO for AI accelerators.","type":"contract_award","urgency":"high","tags":["NVIDIA","DRDO","defence"],"relevance":"Competitor win in defence sector","confidence":"medium"}'
+    + ' Return ONLY the JSON array. No explanation. No markdown. Start with [ end with ].'
 
   var raw = await callGemini(prompt, 'NEWS/' + topic.code)
-  var items = parseJSON(raw)
-  var now = new Date().toISOString()
-  items.forEach(function(item, i){
-    item.id = 'news-' + topic.code + '-' + Date.now() + '-' + i
-    item.topic_code = topic.code
-    item.topic_name = topic.name
-    item.scraped_at = now
-    item.source_type = 'news'
-  })
+  var items = extractItems(raw, topic.code, topic.name, 'news')
   return items
 }
 
