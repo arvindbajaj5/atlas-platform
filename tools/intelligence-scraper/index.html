@@ -153,6 +153,25 @@ input:focus,select:focus{border-color:var(--blue);}
       </div>
       <button class="btn btn-outline btn-sm" onclick="saveConfig()">Save Config</button>
     </div>
+    <div style="display:flex;gap:20px;margin-top:14px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <label class="lbl">Items per domain</label>
+        <select id="itemCount" style="width:120px">
+          <option value="5">5 items</option>
+          <option value="10" selected>10 items</option>
+          <option value="15">15 items</option>
+          <option value="20">20 items</option>
+        </select>
+        <div class="field-hint">More items = more tokens</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding-bottom:18px">
+        <input type="checkbox" id="useGrounding" style="width:16px;height:16px;margin:0">
+        <div>
+          <label class="lbl" style="margin-bottom:0;cursor:pointer" for="useGrounding">Enable live web search (grounding)</label>
+          <div class="field-hint">Uses Google Search quota &mdash; current events, live tenders</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- STATS -->
@@ -272,9 +291,11 @@ function setConfig(c){ localStorage.setItem('atlas_intel_config',JSON.stringify(
 function saveConfig(){
   var key = document.getElementById('apiKey').value.trim()
   var model = document.getElementById('modelSelect').value
+  var itemCount = parseInt(document.getElementById('itemCount').value) || 10
+  var useGrounding = document.getElementById('useGrounding').checked
   if(!key){ alert('Please enter your Gemini API key.'); return }
-  setConfig({key:key, model:model})
-  log('Config saved. Model: ' + model, 'success')
+  setConfig({key:key, model:model, itemCount:itemCount, useGrounding:useGrounding})
+  log('Config saved. Model: ' + model + ' | Items: ' + itemCount + ' | Grounding: ' + useGrounding, 'success')
   updateRunBtn()
 }
 
@@ -283,6 +304,8 @@ function init(){
   var cfg = getConfig()
   if(cfg.key) document.getElementById('apiKey').value = cfg.key
   if(cfg.model) document.getElementById('modelSelect').value = cfg.model
+  if(cfg.itemCount) document.getElementById('itemCount').value = cfg.itemCount
+  if(cfg.useGrounding) document.getElementById('useGrounding').checked = cfg.useGrounding
   renderDomainGrid()
   renderNewsGrid()
   updateStats()
@@ -438,9 +461,13 @@ async function callGemini(prompt, label){
   var model = document.getElementById('modelSelect').value
   var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key
 
+  var cfg2 = getConfig()
   var body = {
     contents: [{parts: [{text: prompt}]}],
     generationConfig: {temperature: 0.2, maxOutputTokens: 4096}
+  }
+  if(cfg2.useGrounding && document.getElementById('useGrounding').checked){
+    body.tools = [{google_search: {}}]
   }
 
   var resp = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
@@ -613,25 +640,48 @@ function extractItems(raw, code, name, sourceType){
 }
 
 async function scrapeDomain(domain){
-  var prompt = 'You are an intelligence analyst. Generate exactly 5 intelligence items about AI and technology adoption in the following sector in India.'
-    + ' SECTOR: ' + domain.name + '. FOCUS: ' + domain.focus + '.'
-    + ' Return a JSON array of exactly 5 objects. Each object must have these exact keys: title (string, max 80 chars), summary (string, max 200 chars), type (one of: deployment/tender/programme/vendor_win/challenge), intelligence_value (one of: high/medium/low), tags (array of 3 strings), opportunity (string, max 150 chars), confidence (one of: high/medium/low).'
-    + ' Example of ONE item: {"title":"DRDO AI platform deployment","summary":"DRDO deployed edge AI for border surveillance in 2024.","type":"deployment","intelligence_value":"high","tags":["defence","AI","surveillance"],"opportunity":"HPC edge inference systems","confidence":"high"}'
-    + ' Return ONLY the JSON array. No explanation. No markdown. Start with [ end with ].'
+  var cfg3 = getConfig()
+  var n = cfg3.itemCount || 10
+  var prompt = 'You are a senior intelligence analyst for an AI and HPC hardware OEM selling to Indian government, defence, and enterprise customers.'
+    + ' Generate exactly ' + n + ' intelligence items about AI and technology adoption in the following sector.'
+    + ' SECTOR: ' + domain.name + '. FOCUS AREAS: ' + domain.focus + '.'
+    + ' Cover a mix of: known AI deployments, active programmes, procurement tenders, competitive landscape, technology gaps, emerging use cases, and key challenges.'
+    + ' Be specific — name real organisations, cite known programmes, mention specific technologies where applicable.'
+    + ' Each item must be a JSON object with these exact keys:'
+    + ' title (string, max 80 chars),'
+    + ' summary (string, 2-3 sentences, max 250 chars),'
+    + ' type (one of: deployment/tender/programme/vendor_win/challenge/technology_gap/emerging_uc),'
+    + ' intelligence_value (one of: high/medium/low),'
+    + ' organisations (array of up to 3 org names),'
+    + ' tags (array of 3-5 relevant tags),'
+    + ' opportunity (string, specific opportunity for an AI/HPC OEM, max 150 chars),'
+    + ' competitor_signals (string, any known competitors or incumbents, max 100 chars, or empty string),'
+    + ' uc_suggest (string, suggested use case name if applicable, or empty string),'
+    + ' confidence (one of: high/medium/low).'
+    + ' Return ONLY a JSON array of exactly ' + n + ' objects. No explanation. No markdown. Start with [ end with ].'
 
   var raw = await callGemini(prompt, domain.code)
-
-  // Ultra-robust extraction: find each { } block individually
   var items = extractItems(raw, domain.code, domain.name, 'domain')
   return items
 }
 
 async function scrapeNews(topic){
-  var prompt = 'You are a market intelligence analyst. Generate exactly 5 market intelligence items about the following topic related to AI and HPC in India.'
+  var cfg4 = getConfig()
+  var n2 = cfg4.itemCount || 10
+  var prompt = 'You are a market intelligence analyst for an AI and HPC hardware OEM.'
+    + ' Generate exactly ' + n2 + ' market intelligence items about the following topic.'
     + ' TOPIC: ' + topic.name + '. FOCUS: ' + topic.focus + '.'
-    + ' Return a JSON array of exactly 5 objects. Each object must have these exact keys: title (string, max 80 chars), summary (string, max 200 chars), type (one of: contract_award/tender/product_launch/policy/partnership/market_shift), urgency (one of: high/medium/low), tags (array of 3 strings), relevance (string, max 150 chars), confidence (one of: high/medium/low).'
-    + ' Example of ONE item: {"title":"NVIDIA wins DRDO contract","summary":"NVIDIA signed a contract with DRDO for AI accelerators.","type":"contract_award","urgency":"high","tags":["NVIDIA","DRDO","defence"],"relevance":"Competitor win in defence sector","confidence":"medium"}'
-    + ' Return ONLY the JSON array. No explanation. No markdown. Start with [ end with ].'
+    + ' Be specific — name real organisations, deals, policies, and market developments.'
+    + ' Each item must be a JSON object with these exact keys:'
+    + ' title (string, max 80 chars),'
+    + ' summary (string, 2-3 sentences, max 250 chars),'
+    + ' type (one of: contract_award/tender/product_launch/policy/partnership/investment/market_shift),'
+    + ' organisations (array of up to 3 org names),'
+    + ' urgency (one of: high/medium/low),'
+    + ' tags (array of 3-5 tags),'
+    + ' relevance (string, why this matters for AI/HPC sales, max 150 chars),'
+    + ' confidence (one of: high/medium/low).'
+    + ' Return ONLY a JSON array of exactly ' + n2 + ' objects. No explanation. No markdown. Start with [ end with ].'
 
   var raw = await callGemini(prompt, 'NEWS/' + topic.code)
   var items = extractItems(raw, topic.code, topic.name, 'news')
