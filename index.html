@@ -159,6 +159,7 @@ var ROLES={
 var TOOLS={
   'second-brain':          {label:'Second Brain',            icon:'&#129504;',ver:'v1.0',status:'ready',cat:'strategy',url:BASE+'/tools/second-brain/',         desc:'Domain intelligence &mdash; Foundation, Monthly Update, Weekly Pulse, UC recommendations'},
   'pei-tool':              {label:'Customer Intelligence',   icon:'&#128269;',ver:'v0.1',status:'ready',cat:'strategy',url:BASE+'/tools/pei-tool/',              desc:'Pre-Engagement Intelligence &mdash; Gemini-powered customer research brief'},
+  'intelligence-scraper': {label:'Intelligence Scraper', icon:'&#128270;', ver:'v1.0', status:'ready', cat:'strategy', url:BASE+'/tools/intelligence-scraper/', desc:'On-demand domain intelligence scraper &mdash; 10 domains, 5 news topics, token tracking, export JSON'},
   'engagement-management': {label:'Engagement Management',   icon:'&#129309;',ver:'v1.0',status:'ready',cat:'bd',     url:BASE+'/tools/engagement-management/', desc:'Customer, division and engagement lifecycle management with saved briefs'},
   'ai-centre-builder':     {label:'AI Centre Builder',       icon:'&#127961;',ver:'v1.1',status:'ready',cat:'bd',     url:BASE+'/tools/ai-centre-builder/',      desc:'Dual-track AI Centre proposal &mdash; CoE + Inferencing Factory, tokenomics, policy architecture'},
   'portfolio-portal':      {label:'AI Portfolio Portal',     icon:'&#128506;',ver:'v1.0',status:'ready',cat:'bd',     url:BASE+'/tools/portfolio-portal/',       desc:'26 portfolio items, Value Map, opportunity creation'},
@@ -182,7 +183,7 @@ var CATEGORIES=[
 ]
 
 var STAGES=[
-  {id:'strategy',icon:'&#129504;',label:'Intelligence Engine',   color:'var(--indigo)', desc:'Domain intelligence, customer research and market awareness',       tools:['second-brain','pei-tool']},
+  {id:'strategy', icon:'&#129504;', label:'Intelligence Engine', color:'var(--indigo)', desc:'Domain intelligence, customer research and market awareness', tools:['second-brain','pei-tool','intelligence-scraper']},
   {id:'bd',      icon:'&#128640;',label:'Engagement Initiation', color:'var(--orange)', desc:'Manage customers, engagements, portfolio and vision documents',      tools:['engagement-management','ai-centre-builder','portfolio-portal','vision-doc']},
   {id:'presales',icon:'&#9881;',  label:'Pre-Sales',             color:'var(--teal)',   desc:'Use case identification, solution sizing and sovereignty assessment', tools:['domain-config','inferencing','benchmark','ai-sovereignty']},
   {id:'sales',   icon:'&#128188;',label:'Sales',                 color:'var(--blue)',   desc:'Pipeline management, deal analysis and commercial modelling',        tools:['rac-tool','deal-analysis']},
