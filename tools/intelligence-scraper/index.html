@@ -474,19 +474,54 @@ async function callGemini(prompt, label){
 
 function parseJSON(text){
   text = text.trim()
+  // Strip code fences
   var fence = String.fromCharCode(96,96,96)
-  if(text.startsWith(fence)){
+  if(text.indexOf(fence) >= 0){
     var parts = text.split(fence)
-    text = parts[1] || parts[0]
-    if(text.startsWith('json')) text = text.slice(4)
+    for(var pi=0;pi<parts.length;pi++){
+      var pt = parts[pi].trim()
+      if(pt.startsWith('json')) pt = pt.slice(4).trim()
+      if(pt.startsWith('[') || pt.startsWith('{')){ text = pt; break }
+    }
   }
   text = text.trim()
+  // Find outermost array or object
   var first = -1
   for(var i=0;i<text.length;i++){if(text[i]==='['||text[i]==='{'){first=i;break}}
+  if(first < 0) throw new Error('No JSON array or object found in response')
+  var opener = text[first]
+  var closer = opener === '[' ? ']' : '}'
+  // Find matching closer by counting depth
+  var depth = 0
   var last = -1
-  for(var j=text.length-1;j>=0;j--){if(text[j]===']'||text[j]==='}'){last=j;break}}
-  if(first>=0&&last>=0) text = text.slice(first,last+1)
-  return JSON.parse(text)
+  for(var j=first;j<text.length;j++){
+    if(text[j]===opener) depth++
+    else if(text[j]===closer){ depth--; if(depth===0){last=j;break} }
+  }
+  if(last < 0) last = text.lastIndexOf(closer)
+  text = text.slice(first, last+1)
+  // Try parsing, if fails try to truncate at last valid item
+  try{
+    return JSON.parse(text)
+  }catch(e){
+    // Try to recover partial JSON array
+    log('JSON parse failed, attempting recovery...', 'warn')
+    if(opener === '['){
+      // Find last complete object in array
+      var lastComma = text.lastIndexOf('},')
+      if(lastComma > 0){
+        var partial = text.slice(0, lastComma+1) + ']'
+        try{ return JSON.parse(partial) }catch(e2){}
+      }
+      // Try removing last incomplete item
+      var lastBrace = text.lastIndexOf('}')
+      if(lastBrace > 0){
+        var partial2 = text.slice(0, lastBrace+1) + ']'
+        try{ return JSON.parse(partial2) }catch(e3){}
+      }
+    }
+    throw new Error('Could not parse JSON: ' + e.message)
+  }
 }
 
 // \u2500\u2500 Scraping \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -495,7 +530,7 @@ async function scrapeDomain(domain){
   var p2 = 'Generate a structured intelligence report on the following sector based on your knowledge up to your training cutoff.'
   var p3 = 'SECTOR: ' + domain.name + ' | FOCUS: ' + domain.focus
   var p4 = 'Generate 6-10 intelligence items covering: recent AI deployments and programmes, key organisations and their AI maturity, procurement patterns and major tenders in the last 12-18 months, competitive landscape, technology shifts, emerging use cases, and key challenges.'
-  var p5 = 'Respond ONLY with a valid JSON array. No preamble, no code fences.'
+  var p5 = 'CRITICAL: Respond with ONLY a JSON array. Start your response with [ and end with ]. No text before or after. No code fences. No markdown. Pure JSON only. Keep string values concise, under 200 characters each.'
   var schema = '[{"title":"Short descriptive title","summary":"2-3 sentence factual summary","type":"deployment|tender|announcement|regulation|programme|vendor_win|research|challenge","intelligence_value":"high|medium|low","key_signals":["signal1","signal2"],"organisations_involved":["org1","org2"],"tags":["tag1","tag2","tag3"],"related_sectors":["' + domain.code + '"],"opportunity_signals":"Specific opportunity for an AI/HPC OEM","competitor_signals":"Known competitors or incumbents in this space","uc_recommendation":{"suggest":true,"uc_name":"Use case name","cluster":"UC cluster","rationale":"Why add"},"confidence":"high|medium|low"}]'
   var prompt = p1 + ' ' + p2 + ' ' + p3 + ' ' + p4 + ' ' + p5 + ' ' + schema
 
@@ -517,7 +552,7 @@ async function scrapeNews(topic){
   var p2 = 'Generate a structured market intelligence report on the following news topic based on your knowledge.'
   var p3 = 'TOPIC: ' + topic.name + ' | FOCUS: ' + topic.focus
   var p4 = 'Generate 5-8 intelligence items covering recent developments, key players, market movements, and signals relevant to selling AI and HPC solutions in India.'
-  var p5 = 'Respond ONLY with a valid JSON array. No preamble, no code fences.'
+  var p5 = 'CRITICAL: Respond with ONLY a JSON array. Start your response with [ and end with ]. No text before or after. No code fences. No markdown. Pure JSON only. Keep string values concise, under 200 characters each.'
   var schema = '[{"title":"News headline or development title","summary":"2-3 sentence factual summary","type":"contract_award|tender|product_launch|policy|partnership|investment|market_shift|other","organisations":["org1","org2"],"relevance_to_atlas":"Why this matters for AI/HPC solution sales","tags":["tag1","tag2"],"related_sectors":["sector_code"],"urgency":"high|medium|low","confidence":"high|medium|low"}]'
   var prompt = p1 + ' ' + p2 + ' ' + p3 + ' ' + p4 + ' ' + p5 + ' ' + schema
 
