@@ -2,15 +2,13 @@ name: ATLAS Intelligence Scraper
 
 on:
   schedule:
-    # Domain Intelligence — every Monday at 6am UTC
     - cron: '0 6 * * 1'
-    # Market News — every Monday at 6am UTC (same run)
   workflow_dispatch:
-    # Allow manual trigger from GitHub Actions UI
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
 
