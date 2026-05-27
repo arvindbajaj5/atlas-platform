@@ -226,27 +226,27 @@ input:focus,select:focus{border-color:var(--blue);}
 
 </div>
 
-<script>
-// ── Data ──────────────────────────────────────────────────────────────────────
+<script charset="utf-8">
+// \u2500\u2500 Data \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 var DOMAINS = [
-  {code:'DEF', name:'Defence & Armed Forces',        icon:'🛡', focus:'Indian defence AI, military technology, DRDO, DPSUs, defence procurement, border surveillance'},
-  {code:'GEO', name:'Geospatial & Earth Observation',icon:'🛰', focus:'satellite imagery AI, ISRO, remote sensing, GIS platforms, geospatial analytics India'},
-  {code:'GOV', name:'Governance & e-Governance',     icon:'🏛', focus:'Indian government AI adoption, digital India, e-governance, citizen services AI, smart cities'},
-  {code:'HLT', name:'Health & Life Sciences',        icon:'🏥', focus:'healthcare AI India, diagnostic AI, hospital technology, pharma AI, medical imaging'},
-  {code:'ENR', name:'Energy & Utilities',            icon:'⚡',   focus:'energy sector AI India, smart grid, renewable energy technology, oil and gas AI'},
-  {code:'TEL', name:'Telecom & Networks',            icon:'📡', focus:'telecom AI India, 5G AI, network optimisation, subscriber analytics'},
-  {code:'FIN', name:'BFSI & Financial Services',     icon:'🏭', focus:'banking AI India, fintech AI, fraud detection, insurance AI, payments'},
-  {code:'MFG', name:'Manufacturing & Industry',      icon:'⚙',   focus:'manufacturing AI India, Industry 4.0, predictive maintenance, MSME AI'},
-  {code:'TER', name:'Territory / State CoE',         icon:'🏘', focus:'state government AI centres India, sovereign AI platforms, AI CoE programmes'},
-  {code:'HLS', name:'Homeland Security',             icon:'🔒', focus:'border security AI India, surveillance technology, paramilitary AI, critical infrastructure'},
+  {code:'DEF', name:'Defence & Armed Forces',        icon:'\u{1F6E1}', focus:'Indian defence AI, military technology, DRDO, DPSUs, defence procurement, border surveillance'},
+  {code:'GEO', name:'Geospatial & Earth Observation',icon:'\u{1F6F0}', focus:'satellite imagery AI, ISRO, remote sensing, GIS platforms, geospatial analytics India'},
+  {code:'GOV', name:'Governance & e-Governance',     icon:'\u{1F3DB}', focus:'Indian government AI adoption, digital India, e-governance, citizen services AI, smart cities'},
+  {code:'HLT', name:'Health & Life Sciences',        icon:'\u{1F3E5}', focus:'healthcare AI India, diagnostic AI, hospital technology, pharma AI, medical imaging'},
+  {code:'ENR', name:'Energy & Utilities',            icon:'\u26A1',   focus:'energy sector AI India, smart grid, renewable energy technology, oil and gas AI'},
+  {code:'TEL', name:'Telecom & Networks',            icon:'\u{1F4E1}', focus:'telecom AI India, 5G AI, network optimisation, subscriber analytics'},
+  {code:'FIN', name:'BFSI & Financial Services',     icon:'\u{1F3ED}', focus:'banking AI India, fintech AI, fraud detection, insurance AI, payments'},
+  {code:'MFG', name:'Manufacturing & Industry',      icon:'\u2699',   focus:'manufacturing AI India, Industry 4.0, predictive maintenance, MSME AI'},
+  {code:'TER', name:'Territory / State CoE',         icon:'\u{1F3D8}', focus:'state government AI centres India, sovereign AI platforms, AI CoE programmes'},
+  {code:'HLS', name:'Homeland Security',             icon:'\u{1F512}', focus:'border security AI India, surveillance technology, paramilitary AI, critical infrastructure'},
 ]
 
 var NEWS_TOPICS = [
-  {code:'AI_HPC',   name:'AI & HPC in India',          icon:'📌', focus:'AI HPC supercomputer India government enterprise market developments 2026'},
-  {code:'COMP',     name:'Competitor & Vendor Activity',icon:'🏆', focus:'NVIDIA AMD Intel HPE Dell Atos AI HPC India wins contracts announcements 2026'},
-  {code:'TENDERS',  name:'Government AI Tenders',       icon:'📄', focus:'India government AI tender RFP procurement supercomputer technology 2026'},
-  {code:'DEF_TECH', name:'Defence Technology News',     icon:'🛡', focus:'India defence AI military technology DRDO armed forces digital transformation 2026'},
-  {code:'SOV_AI',   name:'Sovereign AI & Policy',       icon:'🏛', focus:'sovereign AI data localisation India on-premise government cloud policy regulation 2026'},
+  {code:'AI_HPC',   name:'AI & HPC in India',          icon:'\u{1F4CC}', focus:'AI HPC supercomputer India government enterprise market developments 2026'},
+  {code:'COMP',     name:'Competitor & Vendor Activity',icon:'\u{1F3C6}', focus:'NVIDIA AMD Intel HPE Dell Atos AI HPC India wins contracts announcements 2026'},
+  {code:'TENDERS',  name:'Government AI Tenders',       icon:'\u{1F4C4}', focus:'India government AI tender RFP procurement supercomputer technology 2026'},
+  {code:'DEF_TECH', name:'Defence Technology News',     icon:'\u{1F6E1}', focus:'India defence AI military technology DRDO armed forces digital transformation 2026'},
+  {code:'SOV_AI',   name:'Sovereign AI & Policy',       icon:'\u{1F3DB}', focus:'sovereign AI data localisation India on-premise government cloud policy regulation 2026'},
 ]
 
 var selectedDomains = new Set()
@@ -255,7 +255,7 @@ var sessionTokens = 0
 var sessionCost = 0
 var running = false
 
-// ── Storage ───────────────────────────────────────────────────────────────────
+// \u2500\u2500 Storage \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function getIntelDB(){
   try{ return JSON.parse(localStorage.getItem('atlas_intel_db')||'{}') }catch{return {}}
 }
@@ -278,7 +278,7 @@ function saveConfig(){
   updateRunBtn()
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function init(){
   var cfg = getConfig()
   if(cfg.key) document.getElementById('apiKey').value = cfg.key
@@ -396,7 +396,7 @@ function updateStats(){
   document.getElementById('statCost').textContent = '$' + sessionCost.toFixed(4)
 }
 
-// ── Logging ───────────────────────────────────────────────────────────────────
+// \u2500\u2500 Logging \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function log(msg, type){
   type = type || 'info'
   var wrap = document.getElementById('logWrap')
@@ -431,7 +431,7 @@ function setDomainStatus(code, status, isNews){
   }
 }
 
-// ── Gemini API ────────────────────────────────────────────────────────────────
+// \u2500\u2500 Gemini API \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function callGemini(prompt, label){
   var cfg = getConfig()
   var key = cfg.key || document.getElementById('apiKey').value.trim()
@@ -489,7 +489,7 @@ function parseJSON(text){
   return JSON.parse(text)
 }
 
-// ── Scraping ──────────────────────────────────────────────────────────────────
+// \u2500\u2500 Scraping \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function scrapeDomain(domain){
   var p1 = 'You are an intelligence analyst for an AI and HPC hardware company targeting the Indian market.'
   var p2 = 'Generate a structured intelligence report on the following sector based on your knowledge up to your training cutoff.'
@@ -542,7 +542,7 @@ function mergeItems(existing, newItems){
   return {merged: existing.concat(added), added: added.length}
 }
 
-// ── Main run ──────────────────────────────────────────────────────────────────
+// \u2500\u2500 Main run \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function runScraper(){
   if(running) return
   var cfg = getConfig()
@@ -552,7 +552,7 @@ async function runScraper(){
 
   running = true
   document.getElementById('runBtn').disabled = true
-  document.getElementById('runBtn').textContent = '▶ Running...'
+  document.getElementById('runBtn').textContent = '\u25B6 Running...'
   clearLog()
   log('Starting intelligence scraper...', 'info')
   log('Model: ' + document.getElementById('modelSelect').value, 'dim')
@@ -615,7 +615,7 @@ async function runScraper(){
   log('Scraping complete. ' + totalAdded + ' new items added. Total tokens: ' + sessionTokens.toLocaleString() + ' (~$' + sessionCost.toFixed(4) + ')', 'success')
   running = false
   document.getElementById('runBtn').disabled = false
-  document.getElementById('runBtn').textContent = '▶ Run Scraper'
+  document.getElementById('runBtn').textContent = '\u25B6 Run Scraper'
   document.getElementById('exportBtn').disabled = false
   updateStats()
   renderDomainGrid()
@@ -623,7 +623,7 @@ async function runScraper(){
   renderResults()
 }
 
-// ── Results ───────────────────────────────────────────────────────────────────
+// \u2500\u2500 Results \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function renderResults(){
   var db = getIntelDB()
   var keys = Object.keys(db).filter(function(k){ return db[k].length > 0 })
@@ -641,7 +641,7 @@ function renderResults(){
       + '<div class="result-domain-title">' + label + '</div>'
       + '<div style="display:flex;align-items:center;gap:8px">'
       + '<span class="result-domain-count">' + items.length + ' items</span>'
-      + '<span style="color:var(--mid);font-size:12px">▼</span>'
+      + '<span style="color:var(--mid);font-size:12px">\u25BC</span>'
       + '</div></div>'
       + '<div class="result-items">'
       + items.slice(0,10).map(function(item){
@@ -665,7 +665,7 @@ function toggleResultSection(hdr){
   body.classList.toggle('open')
 }
 
-// ── Export ────────────────────────────────────────────────────────────────────
+// \u2500\u2500 Export \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function exportIntelligence(){
   var db = getIntelDB()
   var meta = getMetaDB()
