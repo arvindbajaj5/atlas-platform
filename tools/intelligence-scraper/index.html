@@ -631,7 +631,7 @@ async function callGemini(prompt, label){
   var cfg2 = getConfig()
   var body = {
     contents: [{role: 'user', parts: [{text: prompt}]}],
-    generationConfig: {temperature: 0.1, maxOutputTokens: 1024, responseMimeType: 'application/json'}
+    generationConfig: {temperature: 0.1, maxOutputTokens: 1024}
   }
   if(cfg2.useGrounding && document.getElementById('useGrounding').checked){
     body.tools = [{google_search: {}}]
