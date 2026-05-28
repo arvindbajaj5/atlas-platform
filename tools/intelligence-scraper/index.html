@@ -125,7 +125,7 @@ input:focus,select:focus{border-color:var(--blue);}
   <div class="hdr-brand">ATL<span>A</span>S</div>
   <div style="font-size:13px;color:rgba(255,255,255,0.65)">Intelligence Scraper</div>
   <div class="hdr-right">
-    <span class="hdr-badge">v1.0</span>
+    <span class="hdr-badge">v1.2</span>
     <button class="btn btn-ghost btn-sm" onclick="window.history.back()">&#8592; Portal</button>
   </div>
 </div>
@@ -146,8 +146,8 @@ input:focus,select:focus{border-color:var(--blue);}
       <div style="min-width:160px">
         <label class="lbl">Model</label>
         <select id="modelSelect">
-          <option value="gemini-3.5-flash" selected>Gemini 3.5 Flash (latest)</option>
-          <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (fast &amp; cheap)</option>
+          <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+          <option value="gemini-3.1-flash-lite" selected>Gemini 3.1 Flash-Lite (recommended)</option>
           <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
           <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
         </select>
@@ -181,6 +181,13 @@ input:focus,select:focus{border-color:var(--blue);}
         <div>
           <label class="lbl" style="margin-bottom:0;cursor:pointer" for="useGrounding">Enable live web search (grounding)</label>
           <div class="field-hint">Uses Google Search quota &mdash; current events, live tenders</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding-bottom:18px">
+        <input type="checkbox" id="useEnrich" style="width:16px;height:16px;margin:0" checked>
+        <div>
+          <label class="lbl" style="margin-bottom:0;cursor:pointer" for="useEnrich">Enable Phase 2 Enrichment</label>
+          <div class="field-hint">After scraping, enriches each item with problem statement, technical context, UC signals</div>
         </div>
       </div>
     </div>
@@ -472,11 +479,12 @@ function saveConfig(){
   var model = document.getElementById('modelSelect').value
   var itemCount = parseInt(document.getElementById('itemCount').value) || 10
   var useGrounding = document.getElementById('useGrounding').checked
+  var useEnrich = document.getElementById('useEnrich').checked
   var sbUrl = document.getElementById('supabaseUrl').value.trim()
   var sbKey = document.getElementById('supabaseKey').value.trim()
   if(!key){ alert('Please enter your Gemini API key.'); return }
-  setConfig({key:key, model:model, itemCount:itemCount, useGrounding:useGrounding, sbUrl:sbUrl, sbKey:sbKey})
-  log('Config saved. Model: ' + model + ' | Items: ' + itemCount + ' | Supabase: ' + (sbUrl?'connected':'not set'), 'success')
+  setConfig({key:key, model:model, itemCount:itemCount, useGrounding:useGrounding, useEnrich:useEnrich, sbUrl:sbUrl, sbKey:sbKey})
+  log('Config saved. Model: ' + model + ' | Items: ' + itemCount + ' | Enrich: ' + useEnrich + ' | Supabase: ' + (sbUrl?'connected':'not set'), 'success')
   if(sbUrl && sbKey) testSupabase()
   updateRunBtn()
 }
@@ -490,6 +498,7 @@ function init(){
   if(cfg.useGrounding) document.getElementById('useGrounding').checked = cfg.useGrounding
   if(cfg.sbUrl) document.getElementById('supabaseUrl').value = cfg.sbUrl
   if(cfg.sbKey) document.getElementById('supabaseKey').value = cfg.sbKey
+  if(cfg.useEnrich !== undefined) document.getElementById('useEnrich').checked = cfg.useEnrich
   renderDomainGrid()
   renderNewsGrid()
   updateStats()
@@ -963,50 +972,57 @@ async function scrapeDomain(domain){
   var items = []
   var usedTitles = []
 
-  // Topic areas to rotate through for variety
-  var topicAreas = [
-    'known AI deployments and active programmes',
-    'procurement tenders and budget allocations',
-    'competitive landscape and incumbent vendors',
-    'technology gaps and infrastructure challenges',
-    'emerging use cases being piloted or discussed',
-    'key organisations and their AI maturity level',
-    'regulatory and policy developments',
-    'recent partnerships and MoUs',
-    'workforce and skills developments',
-    'international comparisons and best practices'
+  // Three prompt types rotating for variety
+  var STREAM_TYPES = [
+    {
+      stream: 'market_pulse',
+      label: 'Market Pulse',
+      angle: 'Indian and APAC market developments — tenders, contracts, vendor wins, government procurement, budget allocations',
+      focus: 'India and Asia-Pacific only. Recent and specific. Name actual organisations, tender numbers, contract values where known.'
+    },
+    {
+      stream: 'domain_intel',
+      label: 'Domain Intelligence',
+      angle: 'global use cases, AI architectures, deployment patterns, proven solutions, and emerging applications',
+      focus: 'Global — US, Europe, Middle East, and India. What specific problems are being solved. What AI approaches are working. What infrastructure is needed.'
+    },
+    {
+      stream: 'tech_watch',
+      label: 'Technology Watch',
+      angle: 'emerging technology capabilities, new AI model types, infrastructure patterns, and hardware trends relevant to this domain',
+      focus: 'Global technology developments. New capabilities from research labs and vendors. Infrastructure shifts. What is becoming possible that was not before.'
+    }
   ]
 
   for(var i=0; i<n; i++){
-    var topic = topicAreas[i % topicAreas.length]
-    var avoidStr = usedTitles.length > 0 ? ' Do NOT repeat these topics already covered: ' + usedTitles.slice(-3).join('; ') + '.' : ''
-    var prompt = 'You are a senior intelligence analyst for an AI and HPC hardware OEM targeting Indian government, defence, and enterprise sectors.'
-      + ' Generate ONE intelligence item about ' + topic + ' in the following sector.'
+    var st = STREAM_TYPES[i % STREAM_TYPES.length]
+    var avoidStr = usedTitles.length > 0 ? ' Do NOT cover these already captured: ' + usedTitles.slice(-3).join('; ') + '.' : ''
+    var prompt = 'You are a senior intelligence analyst for an AI and HPC hardware OEM.'
+      + ' Generate ONE intelligence item about ' + st.angle + ' for the following sector.'
       + ' SECTOR: ' + domain.name + '. FOCUS: ' + domain.focus + '.'
-      + ' Be specific — name real organisations, cite known programmes, mention specific technologies. Keep the summary under 80 words. All string values must be short.' + avoidStr
-      + ' Respond with a single JSON object only. No array brackets. No explanation. No markdown. No backticks. Use ONLY these exact field names: title, summary, type, intelligence_value, organisations, tags, opportunity, competitor_signals, uc_suggest, confidence. Start with { end with }.'
+      + ' Geographic scope: ' + st.focus + avoidStr
+      + ' Keep summary under 80 words. All string values concise.'
+      + ' Use ONLY these exact field names: title, summary, type, intelligence_value, organisations, tags, opportunity, competitor_signals, uc_suggest, confidence.'
+      + ' Respond with a SINGLE JSON object only. Start with { end with }. No markdown. No backticks.'
 
     try{
-      var raw = await callGemini(prompt, domain.code + ' [' + (i+1) + '/' + n + ']')
+      var raw = await callGemini(prompt, domain.code + ' [' + st.label + ' ' + (i+1) + '/' + n + ']')
       var extracted = extractItems(raw, domain.code, domain.name, 'domain')
       if(extracted.length > 0){
         var item = extracted[0]
+        item.intelligence_stream = st.stream
         if(item.title) usedTitles.push(item.title)
         items.push(item)
-        log('Writing to Supabase: ' + (item.title||'').slice(0,40), 'dim')
-        var writeOk = await sbUpsertItem(item)
-        log('Supabase domain write result: ' + writeOk, 'dim')
-        if(item.uc_suggest) sbUpsertUC({id:'uc-'+item.id,uc_name:item.uc_suggest,cluster:'',rationale:'From '+domain.name+' scrape',source_intel_id:item.id,source_title:item.title,domain_code:domain.code,status:'pending'})
+        if(item.id) sbUpsertItem(item)
+        if(item.uc_suggest) sbUpsertUC({id:'uc-'+item.id, uc_name:item.uc_suggest, cluster:'', rationale:'From '+domain.name+' scrape ('+st.label+')', source_intel_id:item.id, source_title:item.title, domain_code:domain.code, status:'pending'})
       }
     }catch(err){
       log('Item ' + (i+1) + ' failed for ' + domain.code + ': ' + err.message, 'warn')
     }
-    // Small delay between items to avoid rate limits
     if(i < n-1) await new Promise(function(r){setTimeout(r,1500)})
   }
   return items
 }
-
 async function scrapeNews(topic){
   var cfg4 = getConfig()
   var n2 = parseInt(cfg4.itemCount) || 5
@@ -1064,6 +1080,85 @@ function mergeItems(existing, newItems){
 }
 
 // \u2500\u2500 Main run \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+// ── Phase 2: Enrichment ───────────────────────────────────────────────────────
+async function enrichItem(item){
+  var prompt = 'You are a senior intelligence analyst. Enrich the following intelligence item with deeper analysis.'
+    + ' INPUT: title="' + (item.title||'').slice(0,80) + '" summary="' + (item.summary||'').slice(0,200) + '" domain=' + (item.domain_code||item.topic_code||'') + ' stream=' + (item.intelligence_stream||'') + '.'
+    + ' Analyse this item and respond with a SINGLE JSON object using ONLY these fields:'
+    + ' problem_statement (the specific problem being solved, 1-2 sentences),'
+    + ' technical_context (AI architecture, model types, infrastructure patterns involved),'
+    + ' infrastructure_signals (array of 3-5 strings: compute patterns like edge/central/air-gapped/gpu/cpu),'
+    + ' uc_name (specific use case name if this implies one, else empty string),'
+    + ' uc_cluster (which UC cluster this belongs to, else empty string),'
+    + ' uc_hardware (what hardware is needed for this UC, else empty string),'
+    + ' depth_score (integer 1-10, how actionable and specific this intelligence is).'
+    + ' Start with { end with }. No markdown. No backticks.'
+
+  try{
+    var raw = await callGemini(prompt, 'ENRICH ' + (item.domain_code||item.topic_code||''))
+    var extracted = extractItems(raw, item.domain_code||item.topic_code||'', item.domain_name||item.topic_name||'', 'enrich')
+    if(extracted.length > 0){
+      var enriched = extracted[0]
+      var sb = getSupabase()
+      if(!sb.url||!sb.key) return
+      // Update the item in Supabase with enriched fields
+      await fetch(sb.url + '/rest/v1/intelligence_items?id=eq.' + item.id, {
+        method: 'PATCH',
+        headers: {
+          'apikey': sb.key,
+          'Authorization': 'Bearer ' + sb.key,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          problem_statement: enriched.problem_statement || '',
+          technical_context: enriched.technical_context || '',
+          infrastructure_signals: Array.isArray(enriched.infrastructure_signals) ? enriched.infrastructure_signals : [],
+          uc_extracted: {
+            uc_name: enriched.uc_name || '',
+            uc_cluster: enriched.uc_cluster || '',
+            uc_hardware: enriched.uc_hardware || ''
+          },
+          depth_score: parseInt(enriched.depth_score) || 5,
+          enriched_at: new Date().toISOString()
+        })
+      })
+      // If UC found, add to uc_queue
+      if(enriched.uc_name){
+        sbUpsertUC({
+          id: 'uc-enrich-' + item.id,
+          uc_name: enriched.uc_name,
+          cluster: enriched.uc_cluster||'',
+          rationale: 'Enrichment: ' + enriched.uc_hardware,
+          source_intel_id: item.id,
+          source_title: item.title,
+          domain_code: item.domain_code||item.topic_code||'',
+          status: 'pending'
+        })
+      }
+      log('Enriched: ' + (item.title||'').slice(0,40) + ' (depth=' + (enriched.depth_score||'?') + ')', 'dim')
+    }
+  }catch(e){
+    log('Enrich failed: ' + e.message.slice(0,60), 'warn')
+  }
+}
+
+async function runEnrichmentPhase(allItems){
+  var cfg = getConfig()
+  if(!cfg.useEnrich) return
+  if(!allItems || allItems.length === 0) return
+  log('', 'dim')
+  log('Phase 2 — Enriching ' + allItems.length + ' items...', 'info')
+  for(var i=0; i<allItems.length; i++){
+    if(allItems[i].id){
+      await enrichItem(allItems[i])
+      if(i < allItems.length-1) await new Promise(function(r){setTimeout(r,1200)})
+    }
+  }
+  log('Enrichment complete.', 'success')
+}
+
 async function runScraper(){
   if(running) return
   var cfg = getConfig()
@@ -1083,6 +1178,7 @@ async function runScraper(){
   var db = getIntelDB()
   var meta = getMetaDB()
   var totalAdded = 0
+  var allNewItems = []
 
   // Scrape domains
   var domainList = DOMAINS.filter(function(d){ return selectedDomains.has(d.code) })
@@ -1099,6 +1195,7 @@ async function runScraper(){
       meta[domain.code] = {last_scraped: new Date().toISOString(), total_items: result.merged.length, added_last_run: result.added}
       setMetaDB(meta)
       totalAdded += result.added
+      allNewItems = allNewItems.concat(result.merged.slice(-result.added))
       setDomainStatus(domain.code, 'done', false)
       log('Done: ' + domain.code + ' &mdash; ' + result.added + ' new items added (' + result.merged.length + ' total)', 'success')
     }catch(err){
@@ -1125,6 +1222,7 @@ async function runScraper(){
       setMetaDB(meta)
       sbUpsertMeta('news_' + topic.code, nresult.merged.length, nresult.added)
       totalAdded += nresult.added
+      allNewItems = allNewItems.concat(nresult.merged.slice(-nresult.added))
       setDomainStatus(topic.code, 'done', true)
       log('Done: NEWS/' + topic.code + ' &mdash; ' + nresult.added + ' new items (' + nresult.merged.length + ' total)', 'success')
     }catch(err){
@@ -1134,6 +1232,8 @@ async function runScraper(){
     if(j < newsList.length-1) await new Promise(function(r){setTimeout(r,2000)})
   }
 
+  // Phase 2: Enrich all newly scraped items
+  await runEnrichmentPhase(allNewItems)
   log('Scraping complete. ' + totalAdded + ' new items added. Total tokens: ' + sessionTokens.toLocaleString() + ' (~$' + sessionCost.toFixed(4) + ')', 'success')
   running = false
   document.getElementById('runBtn').disabled = false
@@ -1148,39 +1248,65 @@ async function runScraper(){
 // \u2500\u2500 Results \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function renderResults(){
   var db = getIntelDB()
+  var meta = getMetaDB()
   var keys = Object.keys(db).filter(function(k){ return db[k].length > 0 })
-  if(keys.length === 0) return
 
-  var total = keys.reduce(function(sum,k){return sum+db[k].length},0)
+  // If no localStorage items, show metadata summary from Supabase
+  if(keys.length === 0){
+    var metaKeys = Object.keys(meta).filter(function(k){ return meta[k].total_items > 0 })
+    if(metaKeys.length > 0){
+      document.getElementById('resultsSection').style.display = 'block'
+      document.getElementById('resultsCount').textContent = 'Items stored in Supabase'
+      document.getElementById('resultsDom').innerHTML = metaKeys.map(function(k){
+        var m = meta[k]
+        var label = k.startsWith('news_') ? k.replace('news_','NEWS: ') : k
+        return '<div class="result-domain">'
+          + '<div class="result-domain-hdr" style="cursor:default">'
+          + '<div class="result-domain-title">' + label + '</div>'
+          + '<div style="display:flex;align-items:center;gap:8px">'
+          + '<span class="result-domain-count">' + m.total_items + ' total</span>'
+          + (m.added_last_run ? '<span style="font-size:10px;color:var(--teal);font-weight:600;margin-left:4px">+' + m.added_last_run + ' new</span>' : '')
+          + '</div></div></div>'
+      }).join('')
+    }
+    return
+  }
+
+  var total = keys.reduce(function(sum,k){return sum + db[k].length}, 0)
   document.getElementById('resultsSection').style.display = 'block'
   document.getElementById('resultsCount').textContent = total + ' items across ' + keys.length + ' domains/topics'
 
   document.getElementById('resultsDom').innerHTML = keys.map(function(key){
     var items = db[key]
+    var m = meta[key] || {}
     var label = key.startsWith('news_') ? key.replace('news_','NEWS: ') : key
+    var newBadge = m.added_last_run ? '<span style="font-size:10px;color:var(--teal);font-weight:600;margin-left:4px">+' + m.added_last_run + ' new</span>' : ''
     return '<div class="result-domain">'
       + '<div class="result-domain-hdr" onclick="toggleResultSection(this)">'
       + '<div class="result-domain-title">' + label + '</div>'
       + '<div style="display:flex;align-items:center;gap:8px">'
       + '<span class="result-domain-count">' + items.length + ' items</span>'
-      + '<span style="color:var(--mid);font-size:12px">\u25BC</span>'
+      + newBadge
+      + '<span style="color:var(--mid);font-size:12px">&#9660;</span>'
       + '</div></div>'
       + '<div class="result-items">'
       + items.slice(0,10).map(function(item){
-          var ucTag = (item.uc_recommendation && item.uc_recommendation.suggest) ? '<span class="tag tag-uc">UC suggested</span>' : ''
+          var streamBadge = item.intelligence_stream ? '<span class="tag tag-type">' + item.intelligence_stream.replace('_',' ') + '</span>' : ''
+          var ucTag = (item.uc_suggest) ? '<span class="tag tag-uc">UC: ' + item.uc_suggest.slice(0,30) + '</span>' : ''
           var valTag = item.intelligence_value === 'high' ? '<span class="tag tag-high">High value</span>' : ''
           var typeTag = '<span class="tag tag-type">' + (item.type||'') + '</span>'
           var tags = (item.tags||[]).slice(0,3).map(function(t){return '<span class="tag">'+t+'</span>'}).join('')
           return '<div class="result-item">'
-            + '<div class="result-item-title">' + item.title + '</div>'
+            + '<div class="result-item-title">' + (item.title||'') + '</div>'
             + '<div class="result-item-summary">' + (item.summary||item.relevance_to_atlas||'') + '</div>'
-            + '<div class="result-item-tags">' + typeTag + valTag + ucTag + tags + '</div>'
+            + '<div class="result-item-tags">' + streamBadge + typeTag + valTag + ucTag + tags + '</div>'
             + '</div>'
         }).join('')
       + (items.length > 10 ? '<div style="font-size:11px;color:var(--mid);padding:6px 0">...and ' + (items.length-10) + ' more items</div>' : '')
       + '</div></div>'
   }).join('')
 }
+
 
 function toggleResultSection(hdr){
   var body = hdr.nextElementSibling
