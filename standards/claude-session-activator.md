@@ -183,6 +183,7 @@ Stage 2 — PROCESSING (MacBook, Ollama + Qwen 3.5 4B) — NOT YET BUILT
 |---|---|---|
 | 1 | Intelligence Scraper — restore item count below log | 🟡 Next iteration |
 | 2 | Customer Intelligence (PEI) — save API key in config | 🟡 Next iteration |
+| 2b | Customer Intelligence (PEI) — query Supabase intel DB before Gemini call, match by sector/country/ownership, incorporate as context + show "From Intelligence DB" section in output | 🟡 Next iteration |
 | 3 | AI Centre Builder — form empty, investigate and fix | 🔴 Check first |
 | 4 | Second Brain v2 — redesign to read from Supabase | 🔴 Next major build |
 | 5 | MacBook processing script (Ollama + Qwen) | 🔴 After scraper stable |
