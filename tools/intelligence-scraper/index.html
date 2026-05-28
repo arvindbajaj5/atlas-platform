@@ -327,20 +327,36 @@ async function sbUpsertItem(item){
   var sb = getSupabase()
   if(!sb.url||!sb.key) return false
   // Normalise to match Supabase schema exactly
+  // Handle all possible field name variants from the model
+  var t = item.title || item.headline || item.event || item.programme || item.program || item.initiative || ''
+  var s = item.summary || item.description || item.details || item.overview || item.context || ''
+  // If no summary, construct from available fields
+  if(!s && item.organisation) s = (item.organisation||'') + (item.technology?' is working on '+item.technology:'') + (item.status?' ('+item.status+')':'')
+  if(!s && item.organization) s = (item.organization||'') + (item.focus?' focus: '+item.focus:'')
+  var orgs = []
+  if(Array.isArray(item.organisations)) orgs = item.organisations
+  else if(Array.isArray(item.organizations)) orgs = item.organizations
+  else if(item.organisation) orgs = [item.organisation]
+  else if(item.organization) orgs = [item.organization]
+  else if(item.partner) orgs = [item.partner]
+  var tgs = []
+  if(Array.isArray(item.tags)) tgs = item.tags
+  else if(item.technology) tgs = [item.technology]
+  else if(item.focus) tgs = item.focus.split(',').slice(0,3).map(function(x){return x.trim()})
   var row = {
     id: item.id,
     domain_code: item.domain_code || item.topic_code || '',
     source_type: item.source_type || 'domain',
-    title: (item.title||'').slice(0,500),
-    summary: (item.summary||'').slice(0,1000),
-    type: item.type||'',
-    intelligence_value: item.intelligence_value || item.urgency || 'medium',
-    organisations: Array.isArray(item.organisations) ? item.organisations : [],
-    tags: Array.isArray(item.tags) ? item.tags : [],
-    opportunity: (item.opportunity || item.opportunity_signals || '').slice(0,500),
-    competitor_signals: (item.competitor_signals||'').slice(0,500),
-    uc_suggest: (item.uc_suggest||'').slice(0,200),
-    confidence: item.confidence||'medium',
+    title: (t||'Untitled').slice(0,500),
+    summary: (s||'').slice(0,1000),
+    type: item.type || item.category || item.event_type || '',
+    intelligence_value: item.intelligence_value || item.urgency || item.priority || 'medium',
+    organisations: orgs,
+    tags: tgs,
+    opportunity: (item.opportunity || item.opportunity_signals || item.relevance || item.relevance_to_atlas || '').slice(0,500),
+    competitor_signals: (item.competitor_signals || item.incumbents || item.competitors || item.vendor || '').slice(0,500),
+    uc_suggest: (item.uc_suggest || item.use_case || '').slice(0,200),
+    confidence: item.confidence || 'medium',
     scraped_at: item.scraped_at || new Date().toISOString(),
     scraped_by: getConfig().scraperName || 'ATLAS',
     topic_code: item.topic_code||null,
@@ -951,7 +967,7 @@ async function scrapeDomain(domain){
       + ' Generate ONE intelligence item about ' + topic + ' in the following sector.'
       + ' SECTOR: ' + domain.name + '. FOCUS: ' + domain.focus + '.'
       + ' Be specific — name real organisations, cite known programmes, mention specific technologies. Keep the summary under 80 words. All string values must be short.' + avoidStr
-      + ' Respond with a single JSON object only. No array brackets. No explanation. No markdown. No backticks. Start with { and end with }.'
+      + ' Respond with a single JSON object only. No array brackets. No explanation. No markdown. No backticks. Use ONLY these exact field names: title, summary, type, intelligence_value, organisations, tags, opportunity, competitor_signals, uc_suggest, confidence. Start with { end with }.'
 
     try{
       var raw = await callGemini(prompt, domain.code + ' [' + (i+1) + '/' + n + ']')
@@ -1000,7 +1016,7 @@ async function scrapeNews(topic){
       + ' Generate ONE market intelligence item about ' + angle + ' related to the following topic.'
       + ' TOPIC: ' + topic.name + '. FOCUS: ' + topic.focus + '.'
       + ' Be specific — name real organisations and deals. Keep the summary under 80 words. All string values must be short.' + avoidStrN
-      + ' Respond with a single JSON object only. No array brackets. No explanation. No markdown. No backticks. Start with { and end with }.'
+      + ' Respond with a single JSON object only. No array brackets. No explanation. No markdown. No backticks. Use ONLY these exact field names: title, summary, type, intelligence_value, organisations, tags, opportunity, competitor_signals, uc_suggest, confidence. Start with { end with }.'
 
     try{
       var raw2 = await callGemini(prompt2, 'NEWS/' + topic.code + ' [' + (j+1) + '/' + n2 + ']')
