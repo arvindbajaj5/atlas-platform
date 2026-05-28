@@ -3,794 +3,687 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ATLAS — Second Brain</title>
+<title>ATLAS &mdash; Second Brain</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{
-  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;
-  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;
-  --shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);--shadow-lg:0 8px 32px rgba(0,0,0,0.2);
-  --r:8px;--r-sm:6px;--r-lg:12px;
-}
+:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--shadow:0 2px 8px rgba(0,0,0,0.08);}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
-
-.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:200;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;display:flex;flex-direction:column;}
+.hdr{background:var(--navy);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
 .hdr-brand span{color:var(--orange);}
-.hdr-center{font-size:13px;color:rgba(255,255,255,0.65);}
 .hdr-right{display:flex;align-items:center;gap:8px;}
 .hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
-
-.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
 .btn-primary{background:var(--orange);color:var(--white);}
 .btn-primary:hover{background:#e6421f;}
 .btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
 .btn-ghost:hover{background:rgba(255,255,255,0.25);}
-.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid #d0d0d8;}
 .btn-outline:hover{background:var(--navy);color:var(--white);}
 .btn-teal{background:var(--teal);color:var(--white);}
 .btn-teal:hover{background:#009a7c;}
-.btn-indigo{background:var(--indigo);color:var(--white);}
 .btn-amber{background:var(--amber);color:var(--dark);}
-.btn-sm{padding:4px 10px;font-size:11px;}
+.btn-sm{padding:5px 10px;font-size:11px;}
 .btn-xs{padding:3px 8px;font-size:10px;}
-.btn:disabled{opacity:0.4;cursor:not-allowed;}
-
-/* LAYOUT */
-.layout{display:grid;grid-template-columns:240px 1fr;height:calc(100vh - 52px);}
-.sidebar{background:var(--white);border-right:1px solid #e0e0e8;overflow-y:auto;display:flex;flex-direction:column;}
-.main{overflow-y:auto;padding:24px;background:var(--light);}
-
-/* SIDEBAR */
-.sb-hdr{padding:14px 16px;border-bottom:1px solid #e0e0e8;display:flex;align-items:center;justify-content:space-between;}
-.sb-title{font-size:12px;font-weight:700;color:var(--navy);}
-.sb-key-row{padding:10px 12px;border-bottom:1px solid #e0e0e8;}
-.sb-key-row label{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:4px;}
-.sb-key-row input{width:100%;padding:6px 8px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:11px;font-family:'Roboto Mono',monospace;letter-spacing:1px;}
-.sb-key-row input:focus{outline:none;border-color:var(--blue);}
-.domain-item{padding:12px 16px;cursor:pointer;border-bottom:1px solid #f0f0f4;transition:all 0.15s;display:flex;align-items:center;justify-content:space-between;}
-.domain-item:hover{background:var(--light);}
-.domain-item.active{background:rgba(0,40,112,0.06);border-left:3px solid var(--orange);}
-.domain-item-left{display:flex;align-items:center;gap:10px;}
-.domain-icon{font-size:18px;}
-.domain-name{font-size:12px;font-weight:700;color:var(--dark);}
-.domain-code{font-size:10px;color:var(--mid);font-family:'Roboto Mono',monospace;}
-.domain-badges{display:flex;flex-direction:column;align-items:flex-end;gap:3px;}
-.status-dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
-.dot-fresh{background:var(--teal);}
-.dot-stale{background:var(--amber);}
-.dot-empty{background:#e0e0e8;}
-.pending-pill{font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(255,85,57,0.12);color:var(--orange);}
-
-/* MAIN */
-.domain-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
-.domain-hdr-left{display:flex;align-items:center;gap:12px;}
-.domain-hdr-icon{font-size:32px;}
-.domain-hdr-name{font-size:22px;font-weight:700;color:var(--navy);}
-.domain-hdr-code{font-size:11px;font-family:'Roboto Mono',monospace;color:var(--mid);}
-.domain-hdr-actions{display:flex;gap:8px;flex-wrap:wrap;}
-
-/* LAYER CARDS */
-.layer-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);margin-bottom:16px;overflow:hidden;box-shadow:var(--shadow);}
-.layer-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #f0f0f4;cursor:pointer;user-select:none;}
-.layer-hdr:hover{background:var(--light);}
-.layer-hdr-left{display:flex;align-items:center;gap:10px;}
-.layer-indicator{width:4px;height:32px;border-radius:2px;flex-shrink:0;}
-.ind-foundation{background:var(--navy);}
-.ind-monthly{background:var(--blue);}
-.ind-pulse{background:var(--orange);}
-.ind-ucs{background:var(--teal);}
-.layer-title{font-size:13px;font-weight:700;color:var(--dark);}
-.layer-sub{font-size:10px;color:var(--mid);margin-top:2px;}
-.layer-meta{font-size:10px;color:var(--mid);text-align:right;}
-.layer-meta strong{color:var(--dark);}
-.layer-actions{display:flex;gap:6px;align-items:center;}
-.layer-arrow{font-size:12px;color:var(--mid);transition:transform 0.2s;margin-left:8px;}
-.layer-arrow.open{transform:rotate(90deg);}
-.layer-body{display:none;padding:18px;}
-.layer-body.open{display:block;}
-
-/* CONTENT DISPLAY */
-.content-area{font-size:12px;line-height:1.8;color:var(--dark);white-space:pre-wrap;font-family:'Roboto',sans-serif;}
-.content-area h2{font-size:13px;font-weight:700;color:var(--navy);margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--light);}
-.content-area h3{font-size:12px;font-weight:700;color:var(--dark);margin:10px 0 4px;}
-.content-area ul{margin:4px 0 8px 16px;}
-.content-area li{margin-bottom:3px;}
-.content-area strong{color:var(--navy);}
-.content-empty{text-align:center;padding:32px 20px;color:var(--mid);font-size:12px;}
-.content-empty-icon{font-size:32px;margin-bottom:8px;opacity:0.4;}
-
-/* EDITOR */
-.editor-wrap{position:relative;}
-textarea.editor{width:100%;padding:12px;border:1px solid #d0d0d8;border-radius:var(--r);font-size:12px;font-family:'Roboto',sans-serif;line-height:1.7;resize:vertical;min-height:300px;outline:none;}
-textarea.editor:focus{border-color:var(--blue);}
-.editor-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:8px;}
-
-/* LOADING */
-.loading-bar{height:3px;background:linear-gradient(90deg,var(--navy),var(--orange),var(--teal));background-size:200% 100%;animation:loading 1.5s linear infinite;border-radius:2px;margin-bottom:12px;}
-@keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.loading-text{font-size:11px;color:var(--mid);text-align:center;padding:20px;}
-
-/* UC QUEUE */
-.uc-queue{display:flex;flex-direction:column;gap:8px;}
-.uc-rec{border:1px solid #e0e0e8;border-radius:var(--r);padding:12px 14px;background:var(--white);}
-.uc-rec-name{font-size:12px;font-weight:700;color:var(--dark);margin-bottom:3px;}
-.uc-rec-cluster{font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(0,178,144,0.08);color:var(--teal);display:inline-block;margin-bottom:6px;}
-.uc-rec-rationale{font-size:11px;color:var(--mid);line-height:1.5;margin-bottom:8px;}
-.uc-rec-actions{display:flex;gap:6px;}
-.uc-accepted{opacity:0.5;pointer-events:none;}
-.uc-library-item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border:1px solid #e0e0e8;border-radius:var(--r-sm);margin-bottom:5px;font-size:12px;background:var(--white);}
-.uc-cluster-tag{font-size:10px;font-weight:600;padding:1px 6px;border-radius:5px;background:rgba(28,56,245,0.07);color:var(--blue);}
-
-/* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;display:none;align-items:center;justify-content:center;padding:20px;}
+.btn-danger{background:transparent;color:#DC2626;border:1px solid #DC2626;}
+.btn-danger:hover{background:#DC2626;color:var(--white);}
+.shell{display:flex;flex:1;overflow:hidden;}
+.sidebar{width:220px;background:var(--navy);overflow-y:auto;flex-shrink:0;padding:12px 0;}
+.sb-section{font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;padding:12px 16px 5px;}
+.sb-item{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;font-size:12px;color:rgba(255,255,255,0.7);cursor:pointer;transition:all 0.15s;border-left:3px solid transparent;}
+.sb-item:hover,.sb-item.active{color:var(--white);background:rgba(255,255,255,0.08);border-left-color:var(--orange);}
+.sb-item-label{display:flex;align-items:center;gap:7px;}
+.sb-count{font-size:10px;font-weight:700;background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:8px;color:rgba(255,255,255,0.5);}
+.sb-count.has-data{background:rgba(0,178,144,0.2);color:var(--teal);}
+.main{flex:1;overflow-y:auto;padding:0;}
+.domain-hdr{padding:20px 24px 0;border-bottom:1px solid #e0e0e8;background:var(--white);}
+.domain-title{font-size:20px;font-weight:700;color:var(--navy);margin-bottom:2px;}
+.domain-meta{font-size:12px;color:var(--mid);margin-bottom:14px;}
+.tabs{display:flex;gap:0;border-bottom:2px solid #e0e0e8;}
+.tab{padding:10px 20px;font-size:13px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
+.tab:hover{color:var(--navy);}
+.tab.active{color:var(--navy);border-bottom-color:var(--orange);}
+.tab-content{padding:20px 24px;display:none;}
+.tab-content.active{display:block;}
+.filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.filter-btn{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #d0d0d8;background:var(--white);color:var(--mid);cursor:pointer;transition:all 0.15s;}
+.filter-btn:hover{border-color:var(--navy);color:var(--navy);}
+.filter-btn.active{background:var(--navy);color:var(--white);border-color:var(--navy);}
+.filter-btn.mp{background:rgba(255,85,57,0.1);color:var(--orange);border-color:rgba(255,85,57,0.3);}
+.filter-btn.mp.active{background:var(--orange);color:var(--white);border-color:var(--orange);}
+.filter-btn.di{background:rgba(0,40,112,0.08);color:var(--navy);border-color:rgba(0,40,112,0.2);}
+.filter-btn.di.active{background:var(--navy);color:var(--white);}
+.filter-btn.tw{background:rgba(0,178,144,0.08);color:var(--teal);border-color:rgba(0,178,144,0.3);}
+.filter-btn.tw.active{background:var(--teal);color:var(--white);border-color:var(--teal);}
+.intel-grid{display:flex;flex-direction:column;gap:10px;}
+.intel-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);}
+.intel-card:hover{border-color:#c0c0cc;}
+.intel-card-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
+.intel-title{font-size:13px;font-weight:700;color:var(--dark);line-height:1.4;flex:1;}
+.intel-badges{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:0.3px;}
+.badge-mp{background:rgba(255,85,57,0.12);color:var(--orange);}
+.badge-di{background:rgba(0,40,112,0.1);color:var(--navy);}
+.badge-tw{background:rgba(0,178,144,0.12);color:var(--teal);}
+.badge-high{background:rgba(255,85,57,0.12);color:var(--orange);}
+.badge-medium{background:rgba(255,182,0,0.12);color:#9a7000;}
+.badge-low{background:rgba(180,180,190,0.2);color:var(--mid);}
+.badge-depth{background:rgba(28,56,245,0.1);color:var(--blue);}
+.intel-summary{font-size:12px;color:#555;line-height:1.6;margin-bottom:8px;}
+.intel-expanded{display:none;border-top:1px solid #f0f0f5;margin-top:8px;padding-top:8px;}
+.intel-expanded.open{display:block;}
+.intel-field{margin-bottom:6px;}
+.intel-field-label{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:2px;}
+.intel-field-val{font-size:12px;color:var(--dark);line-height:1.5;}
+.intel-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;}
+.tag{font-size:10px;padding:2px 6px;border-radius:5px;background:var(--light);color:var(--mid);}
+.tag-opp{background:rgba(0,178,144,0.08);color:var(--teal);}
+.tag-comp{background:rgba(255,85,57,0.08);color:var(--orange);}
+.intel-actions{display:flex;gap:6px;margin-top:10px;}
+.uc-grid{display:flex;flex-direction:column;gap:10px;}
+.uc-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);}
+.uc-card-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
+.uc-name{font-size:13px;font-weight:700;color:var(--dark);}
+.uc-cluster{font-size:11px;color:var(--mid);margin-bottom:6px;}
+.uc-rationale{font-size:12px;color:#555;line-height:1.5;margin-bottom:10px;}
+.uc-status{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;}
+.uc-status.pending{background:rgba(255,182,0,0.15);color:#9a7000;}
+.uc-status.accepted{background:rgba(0,178,144,0.15);color:var(--teal);}
+.uc-status.rejected{background:rgba(180,180,190,0.2);color:var(--mid);}
+.action-grid{display:flex;flex-direction:column;gap:10px;}
+.action-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);}
+.action-card.status-new{border-left:4px solid var(--blue);}
+.action-card.status-in_progress{border-left:4px solid var(--amber);}
+.action-card.status-converted{border-left:4px solid var(--teal);}
+.action-card.status-closed{border-left:4px solid var(--mid);opacity:0.7;}
+.action-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
+.action-title{font-size:13px;font-weight:700;color:var(--dark);}
+.action-meta{font-size:11px;color:var(--mid);margin-bottom:8px;}
+.action-desc{font-size:12px;color:#555;line-height:1.5;margin-bottom:10px;}
+.action-status{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;}
+.action-status.new{background:rgba(28,56,245,0.1);color:var(--blue);}
+.action-status.in_progress{background:rgba(255,182,0,0.15);color:#9a7000;}
+.action-status.converted{background:rgba(0,178,144,0.15);color:var(--teal);}
+.action-status.closed{background:rgba(180,180,190,0.2);color:var(--mid);}
+.empty-state{text-align:center;padding:60px 24px;color:var(--mid);}
+.empty-state .icon{font-size:40px;margin-bottom:12px;}
+.empty-state h3{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:6px;}
+.empty-state p{font-size:13px;line-height:1.6;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--white);border-radius:var(--r-lg);width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);}
-.modal-hdr{padding:16px 20px;border-bottom:1px solid var(--light);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
-.modal-title{font-size:14px;font-weight:700;color:var(--navy);}
-.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--mid);}
-.modal-body{padding:20px;overflow-y:auto;flex:1;}
-.modal-footer{padding:14px 20px;border-top:1px solid var(--light);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;}
-
-.alert{padding:10px 14px;border-radius:var(--r);font-size:11px;margin-bottom:12px;line-height:1.6;}
-.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.3);color:#9a7000;}
-.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
-
-.empty-state{text-align:center;padding:60px 20px;}
-.empty-icon{font-size:48px;margin-bottom:12px;opacity:0.4;}
-.empty-title{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:8px;}
-.empty-sub{font-size:12px;color:var(--mid);line-height:1.7;max-width:360px;margin:0 auto;}
-
-@media(max-width:800px){.layout{grid-template-columns:1fr;}.sidebar{display:none;}}
+.modal{background:var(--white);border-radius:12px;padding:24px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.modal-title{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:16px;}
+label.lbl{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px;}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:6px;font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;margin-bottom:12px;}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+textarea{resize:vertical;min-height:80px;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;}
+.config-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:16px;margin:16px 24px;box-shadow:var(--shadow);}
+.config-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;}
+.loading{display:flex;align-items:center;gap:8px;color:var(--mid);font-size:13px;padding:40px 24px;}
+.spin{width:16px;height:16px;border:2px solid #e0e0e8;border-top-color:var(--orange);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.search-bar{padding:16px 24px 0;}
+.search-input{width:100%;padding:9px 14px;border:1px solid #d0d0d8;border-radius:20px;font-size:13px;font-family:inherit;outline:none;background:var(--white);}
+.search-input:focus{border-color:var(--blue);}
 </style>
 </head>
 <body>
 
 <div class="hdr">
-  <div class="hdr-brand">ATL<span>A</span>S</div>
-  <div class="hdr-center">Second Brain — Domain Intelligence</div>
+  <div class="hdr-brand">ATL<span>A</span>S &mdash; Second Brain</div>
   <div class="hdr-right">
-    <span class="hdr-badge">v1.0</span>
-    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← Portal</button>
+    <span class="hdr-badge">v2.0</span>
+    <button class="btn btn-ghost btn-sm" onclick="showConfig()">&#9881; Config</button>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">&#8592; Portal</button>
   </div>
 </div>
 
-<div class="layout">
-  <!-- SIDEBAR -->
-  <div class="sidebar">
-    <div class="sb-hdr">
-      <div class="sb-title">Domains</div>
-      <span style="font-size:10px;color:var(--mid)" id="sbStats">—</span>
-    </div>
-    <div class="sb-key-row">
-      <label>Gemini API Key</label>
-      <input type="password" id="geminiKey" placeholder="Paste key…" oninput="saveKey()">
-    </div>
+<div class="shell">
+  <div class="sidebar" id="sidebar">
+    <div class="sb-section">Intelligence Engine</div>
     <div id="domainList"></div>
+    <div class="sb-section" style="margin-top:8px">Market News</div>
+    <div id="newsList"></div>
   </div>
-
-  <!-- MAIN -->
-  <div class="main" id="mainPanel">
-    <div class="empty-state">
-      <div class="empty-icon">🧠</div>
-      <div class="empty-title">Second Brain</div>
-      <div class="empty-sub">Select a domain from the sidebar to view and update its intelligence layers. Enter your Gemini API key above to enable live scans.</div>
+  <div class="main" id="main">
+    <div class="config-card" id="configCard">
+      <div class="config-title">&#9881; Supabase Configuration</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <label class="lbl">Supabase Project URL</label>
+          <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" style="margin-bottom:0">
+        </div>
+        <div style="flex:2;min-width:200px">
+          <label class="lbl">Supabase Anon Key</label>
+          <input type="password" id="sbKey" placeholder="eyJ..." style="margin-bottom:0">
+        </div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:1px">
+          <button class="btn btn-primary btn-sm" onclick="saveConfig()">Save &amp; Connect</button>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
-
-<!-- FOUNDATION EDITOR MODAL -->
-<div class="modal-overlay" id="foundationModal">
-  <div class="modal" style="max-width:720px">
-    <div class="modal-hdr">
-      <div class="modal-title" id="foundationModalTitle">Edit Foundation — —</div>
-      <button class="modal-close" onclick="closeModal('foundationModal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="alert alert-info">The Foundation layer is static, human-curated content. Write in Markdown. Use ## for sections and - for bullet points. This content is read by Claude at session start to provide domain context.</div>
-      <textarea class="editor" id="foundationEditor" style="min-height:420px" placeholder="## Sector Overview
-Describe what this sector is and how it operates...
-
-## Key Challenges
-- Challenge 1
-- Challenge 2
-
-## How Customers Use AI
-Describe known AI adoption patterns...
-
-## Customer Archetypes
-Who buys AI in this sector, what roles, what decision criteria...
-
-## Our Positioning
-How we pitch to this sector, what we lead with...
-
-## Regulatory Context
-Key compliance requirements..."></textarea>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('foundationModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveFoundation()">Save Foundation</button>
+    <div id="mainContent">
+      <div class="empty-state">
+        <div class="icon">&#129504;</div>
+        <h3>Second Brain v2.0</h3>
+        <p>Configure your Supabase connection above, then select a domain from the sidebar to explore intelligence.</p>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- UC DETAIL MODAL -->
-<div class="modal-overlay" id="ucDetailModal">
-  <div class="modal" style="max-width:500px">
-    <div class="modal-hdr">
-      <div class="modal-title">UC Library — <span id="ucDetailDomain">—</span></div>
-      <button class="modal-close" onclick="closeModal('ucDetailModal')">✕</button>
+<!-- Create Action Modal -->
+<div class="modal-overlay" id="actionModal">
+  <div class="modal">
+    <div class="modal-title">&#9889; Create Sales Action</div>
+    <input type="hidden" id="actionIntelId">
+    <input type="hidden" id="actionIntelTitle">
+    <input type="hidden" id="actionDomainCode">
+    <label class="lbl">Action Title *</label>
+    <input type="text" id="actionTitle" placeholder="e.g. Follow up with DRDO CAIR on edge AI RFP">
+    <label class="lbl">Description</label>
+    <textarea id="actionDesc" placeholder="What needs to be done..."></textarea>
+    <label class="lbl">Suggested Approach</label>
+    <input type="text" id="actionApproach" placeholder="e.g. Schedule demo, send white paper...">
+    <label class="lbl">Assign To</label>
+    <input type="text" id="actionAssignee" placeholder="Salesperson name" list="teamList">
+    <datalist id="teamList" id="teamList"></datalist>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1">
+        <label class="lbl">Priority</label>
+        <select id="actionPriority">
+          <option value="high">High</option>
+          <option value="medium" selected>Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <label class="lbl">Due Date</label>
+        <input type="date" id="actionDue">
+      </div>
     </div>
-    <div class="modal-body" id="ucDetailBody"></div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('ucDetailModal')">Close</button>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('actionModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveAction()">Create Action</button>
     </div>
   </div>
 </div>
 
-<script>
-// ═══════════════════════════════════════════════════════════════
-// DOMAINS
-// ═══════════════════════════════════════════════════════════════
-const DOMAINS = [
-  {code:'GEO', name:'Geospatial & EO', icon:'🛰️', focus:'Satellite imagery, remote sensing, GIS, environmental monitoring, precision agriculture'},
-  {code:'DEF', name:'Defence & Armed Forces', icon:'🛡️', focus:'ISR, C4ISR, border surveillance, battlefield AI, defence logistics'},
-  {code:'INT', name:'Intelligence & Signals', icon:'📡', focus:'SIGINT, OSINT, threat intelligence, pattern analysis, CDR analytics'},
-  {code:'HLS', name:'Homeland Security', icon:'🔒', focus:'Border management, coast guard, paramilitary, disaster response, CBRN'},
-  {code:'SPC', name:'Space & Aerospace / Aviation', icon:'✈️', focus:'ISRO, civil aviation, DGCA, ATC, predictive maintenance, flight safety'},
-  {code:'ENR', name:'Energy & Utilities', icon:'⚡', focus:'Power grid AI, renewable energy, oil & gas, smart metering, pipeline monitoring'},
-  {code:'MIN', name:'Mining & Natural Resources', icon:'⛏️', focus:'Predictive maintenance, ore grade estimation, safety, environmental monitoring'},
-  {code:'TEL', name:'Telecom & Networks', icon:'📶', focus:'Network AI, fraud detection, QoS, 5G optimisation, subscriber analytics'},
-  {code:'HLT', name:'Health & Life Sciences', icon:'🏥', focus:'Diagnostic imaging, clinical decision support, drug discovery, genomics, hospital ops'},
-  {code:'TER', name:'Territory / State CoE', icon:'🏛️', focus:'State-level AI centres, sovereign platforms, citizen services, skills development'},
+<!-- Convert to Engagement Modal -->
+<div class="modal-overlay" id="engModal">
+  <div class="modal">
+    <div class="modal-title">&#128640; Convert to Engagement</div>
+    <input type="hidden" id="engActionId">
+    <label class="lbl">Engagement ID</label>
+    <input type="text" id="engId" placeholder="ENG-2026-DEF-001">
+    <label class="lbl">Notes</label>
+    <textarea id="engNotes" placeholder="Context for the engagement team..."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('engModal')">Cancel</button>
+      <button class="btn btn-teal btn-sm" onclick="convertToEngagement()">Convert</button>
+    </div>
+  </div>
+</div>
+
+<script charset="utf-8">
+// \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var DOMAINS = [
+  {code:'DEF', name:'Defence & Armed Forces',        icon:'&#128737;'},
+  {code:'GEO', name:'Geospatial & Earth Observation',icon:'&#128752;'},
+  {code:'GOV', name:'Governance & e-Governance',     icon:'&#127963;'},
+  {code:'HLT', name:'Health & Life Sciences',        icon:'&#127973;'},
+  {code:'ENR', name:'Energy & Utilities',            icon:'&#9889;'},
+  {code:'TEL', name:'Telecom & Networks',            icon:'&#128225;'},
+  {code:'FIN', name:'BFSI & Financial Services',     icon:'&#127981;'},
+  {code:'MFG', name:'Manufacturing & Industry',      icon:'&#9881;'},
+  {code:'TER', name:'Territory / State CoE',         icon:'&#127960;'},
+  {code:'HLS', name:'Homeland Security',             icon:'&#128274;'},
 ]
 
-// ═══════════════════════════════════════════════════════════════
-// STORAGE
-// ═══════════════════════════════════════════════════════════════
-const SB = {
-  key(domain, layer){ return 'sb2_'+domain+'_'+layer },
-  get(domain, layer){ try{ return JSON.parse(localStorage.getItem(this.key(domain,layer))||'null') }catch{return null} },
-  set(domain, layer, val){ localStorage.setItem(this.key(domain,layer), JSON.stringify(val)) },
-  getKey(){ return localStorage.getItem('sb2_gemini_key')||'' },
-  setKey(k){ localStorage.setItem('sb2_gemini_key',k) },
+var NEWS_TOPICS = [
+  {code:'news_AI_HPC',   name:'AI & HPC in India',           icon:'&#128204;'},
+  {code:'news_COMP',     name:'Competitor & Vendor Activity', icon:'&#127942;'},
+  {code:'news_TENDERS',  name:'Government AI Tenders',        icon:'&#128196;'},
+  {code:'news_DEF_TECH', name:'Defence Technology News',      icon:'&#128737;'},
+  {code:'news_SOV_AI',   name:'Sovereign AI & Policy',        icon:'&#127963;'},
+]
+
+var ALL_ENTRIES = DOMAINS.concat(NEWS_TOPICS.map(function(t){
+  return {code: t.code, name: t.name, icon: t.icon, isNews: true}
+}))
+
+var currentDomain = null
+var currentTab = 'intelligence'
+var currentFilter = 'all'
+var itemCounts = {}
+
+// \u2500\u2500 Storage \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function getSBConfig(){
+  try{ return JSON.parse(localStorage.getItem('atlas_sb2_config')||'{}') }catch{return {}}
+}
+function setSBConfig(c){ localStorage.setItem('atlas_sb2_config',JSON.stringify(c)) }
+function getTeam(){
+  try{ return JSON.parse(localStorage.getItem('atlas_sb2_team')||'[]') }catch{return []} 
 }
 
-function saveKey(){ SB.setKey(document.getElementById('geminiKey').value.trim()); updateSbStats() }
-
-// ═══════════════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════════════
-let activeDomain = null
-
-function init(){
-  const k = SB.getKey()
-  if(k) document.getElementById('geminiKey').value = k
-  renderDomainList()
-  updateSbStats()
-}
-
-function updateSbStats(){
-  let withData = 0
-  DOMAINS.forEach(d=>{ if(SB.get(d.code,'foundation')||SB.get(d.code,'pulse')) withData++ })
-  document.getElementById('sbStats').textContent = withData+'/'+DOMAINS.length+' active'
-}
-
-function renderDomainList(){
-  document.getElementById('domainList').innerHTML = DOMAINS.map(d=>{
-    const hasFoundation = !!SB.get(d.code,'foundation')
-    const pulse = SB.get(d.code,'pulse')
-    const monthly = SB.get(d.code,'monthly')
-    const ucs = SB.get(d.code,'uc_queue')||[]
-    const pending = ucs.filter(u=>u.status==='pending').length
-    const pulseAge = pulse ? daysSince(pulse.runAt) : null
-    const pulseStatus = !pulse ? 'empty' : pulseAge < 8 ? 'fresh' : 'stale'
-
-    return '<div class="domain-item '+(activeDomain===d.code?'active':'')+'" onclick="selectDomain(\''+d.code+'\',\''+d.name+'\')">'
-      +'<div class="domain-item-left">'
-      +'<span class="domain-icon">'+d.icon+'</span>'
-      +'<div><div class="domain-name">'+d.name+'</div><div class="domain-code">'+d.code+'</div></div>'
-      +'</div>'
-      +'<div class="domain-badges">'
-      +'<div style="display:flex;gap:5px;align-items:center">'
-      +'<span title="Foundation" class="status-dot '+(hasFoundation?'dot-fresh':'dot-empty')+'"></span>'
-      +'<span title="Monthly" class="status-dot '+(monthly?(daysSince(monthly.runAt)<32?'dot-fresh':'dot-stale'):'dot-empty')+'"></span>'
-      +'<span title="Pulse" class="status-dot dot-'+pulseStatus+'"></span>'
-      +'</div>'
-      +(pending>0?'<span class="pending-pill">'+pending+' UC'+(pending!==1?'s':'')+'</span>':'')
-      +'</div>'
-      +'</div>'
-  }).join('')
-}
-
-function daysSince(iso){ return Math.floor((Date.now()-new Date(iso).getTime())/(1000*60*60*24)) }
-
-// ═══════════════════════════════════════════════════════════════
-// SELECT DOMAIN
-// ═══════════════════════════════════════════════════════════════
-function selectDomain(code, name){
-  activeDomain = code
-  renderDomainList()
-  renderDomainMain(code)
-}
-
-function renderDomainMain(code){
-  const d = DOMAINS.find(d=>d.code===code)
-  const foundation = SB.get(code,'foundation')
-  const monthly = SB.get(code,'monthly')
-  const pulse = SB.get(code,'pulse')
-  const ucQueue = SB.get(code,'uc_queue')||[]
-  const ucLib = SB.get(code,'uc_library')||[]
-  const pendingUCs = ucQueue.filter(u=>u.status==='pending')
-
-  document.getElementById('mainPanel').innerHTML =
-    '<div class="domain-hdr">'
-    +'<div class="domain-hdr-left">'
-    +'<span class="domain-hdr-icon">'+d.icon+'</span>'
-    +'<div><div class="domain-hdr-name">'+d.name+'</div><div class="domain-hdr-code">'+d.code+' · '+d.focus+'</div></div>'
-    +'</div>'
-    +'<div class="domain-hdr-actions">'
-    +'<button class="btn btn-outline btn-sm" onclick="exportDomain(\''+code+'\')">⬇ Export MD</button>'
-    +'<button class="btn btn-outline btn-sm" onclick="copyDomain(\''+code+'\')">📋 Copy</button>'
-    +'</div>'
-    +'</div>'
-
-    // LAYER 1: FOUNDATION
-    +layerCard('foundation','ind-foundation','📚 Foundation','Static knowledge base — curated manually. Slow-moving sector context.',
-      foundation ? fmtMeta(foundation.savedAt, foundation.author) : 'Not yet created',
-      '<button class="btn btn-secondary btn-sm" onclick="openFoundationEditor(\''+code+'\',\''+d.name+'\')">✏️ '+(foundation?'Edit':'Create Foundation')+'</button>',
-      foundation ? renderMarkdown(foundation.content) : '<div class="content-empty"><div class="content-empty-icon">📚</div>Build the foundation for this domain — sector overview, challenges, customer archetypes, our positioning, regulatory context.</div>',
-      !foundation
-    )
-
-    // LAYER 2: MONTHLY UPDATE
-    +layerCard('monthly','ind-monthly','📊 Monthly Update','Competitive landscape, customer AI adoption, procurement signals. Gemini Flash synthesis.',
-      monthly ? fmtMeta(monthly.runAt, null, daysSince(monthly.runAt)+' days ago') : 'Never run',
-      '<button class="btn btn-sm" style="background:var(--blue);color:var(--white)" onclick="runMonthly(\''+code+'\',\''+d.name+'\')">🔄 Refresh</button>',
-      monthly ? renderMonthly(monthly) : '<div class="content-empty"><div class="content-empty-icon">📊</div>Run a monthly update to get competitive intelligence, AI adoption trends, and procurement signals for this domain.</div>',
-      !monthly
-    )
-
-    // LAYER 3: WEEKLY PULSE
-    +layerCard('pulse','ind-pulse','⚡ Weekly Pulse','New tenders, announcements, emerging use cases. Gemini Flash with grounding.',
-      pulse ? fmtMeta(pulse.runAt, null, daysSince(pulse.runAt)+' days ago') : 'Never run',
-      '<button class="btn btn-primary btn-sm" onclick="runPulse(\''+code+'\',\''+d.name+'\')">⚡ Run Pulse</button>',
-      pulse ? renderPulse(pulse) : '<div class="content-empty"><div class="content-empty-icon">⚡</div>Run the weekly pulse to get the latest tenders, announcements, and emerging use cases for this domain.</div>',
-      !pulse
-    )
-
-    // UC RECOMMENDATION QUEUE
-    +layerCard('ucs','ind-ucs',
-      '🔵 UC Library & Recommendations'+(pendingUCs.length?` <span style="font-size:10px;font-weight:700;color:var(--orange)">${pendingUCs.length} pending</span>`:''),
-      'Use cases recommended from Pulse & Monthly. Accept to add to library.',
-      ucLib.length+' in library · '+pendingUCs.length+' pending review',
-      '<button class="btn btn-teal btn-sm" onclick="viewUCLibrary(\''+code+'\',\''+d.name+'\')">View Library ('+ucLib.length+')</button>',
-      renderUCQueue(code, ucQueue),
-      pendingUCs.length===0 && ucLib.length===0
-    )
-}
-
-function layerCard(id, indClass, title, sub, meta, actionHtml, bodyHtml, startOpen){
-  const bodyId = 'layer-body-'+id
-  const arrowId = 'layer-arrow-'+id
-  return '<div class="layer-card">'
-    +'<div class="layer-hdr" onclick="toggleLayer(\''+bodyId+'\',\''+arrowId+'\')">'
-    +'<div class="layer-hdr-left">'
-    +'<div class="layer-indicator '+indClass+'"></div>'
-    +'<div><div class="layer-title">'+title+'</div><div class="layer-sub">'+sub+'</div></div>'
-    +'</div>'
-    +'<div style="display:flex;align-items:center;gap:12px">'
-    +'<div class="layer-meta">'+meta+'</div>'
-    +'<div class="layer-actions" onclick="event.stopPropagation()">'+actionHtml+'</div>'
-    +'<span class="layer-arrow '+(startOpen?'open':'')+'" id="'+arrowId+'">›</span>'
-    +'</div>'
-    +'</div>'
-    +'<div class="layer-body '+(startOpen?'open':'')+'" id="'+bodyId+'">'+bodyHtml+'</div>'
-    +'</div>'
-}
-
-function toggleLayer(bodyId, arrowId){
-  const body = document.getElementById(bodyId)
-  const arrow = document.getElementById(arrowId)
-  const isOpen = body.classList.contains('open')
-  body.classList.toggle('open', !isOpen)
-  if(arrow) arrow.classList.toggle('open', !isOpen)
-}
-
-function fmtMeta(iso, author, ago){
-  if(!iso) return '—'
-  const d = new Date(iso)
-  const str = d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})
-  return '<strong>'+str+'</strong>'+(author?' · '+author:'')+(ago?' · '+ago:'')
-}
-
-// ═══════════════════════════════════════════════════════════════
-// FOUNDATION EDITOR
-// ═══════════════════════════════════════════════════════════════
-let editingFoundationCode = null
-
-function openFoundationEditor(code, name){
-  editingFoundationCode = code
-  document.getElementById('foundationModalTitle').textContent = 'Edit Foundation — '+name
-  const existing = SB.get(code,'foundation')
-  document.getElementById('foundationEditor').value = existing?.content||''
-  openModal('foundationModal')
-}
-
-function saveFoundation(){
-  const content = document.getElementById('foundationEditor').value.trim()
-  if(!content){ alert('Foundation content cannot be empty.'); return }
-  const settings = getSettings()
-  SB.set(editingFoundationCode,'foundation',{
-    content, savedAt: new Date().toISOString(), author: settings.name||'Unknown'
-  })
-  closeModal('foundationModal')
-  renderDomainMain(editingFoundationCode)
-  renderDomainList()
-  updateSbStats()
-}
-
-// ═══════════════════════════════════════════════════════════════
-// MONTHLY UPDATE — Gemini Flash (no grounding)
-// ═══════════════════════════════════════════════════════════════
-async function runMonthly(code, name){
-  const key = SB.getKey()
-  if(!key){ alert('Please enter your Gemini API key in the sidebar.'); return }
-
-  const foundation = SB.get(code,'foundation')
-  const previous = SB.get(code,'monthly')
-
-  setLayerLoading('monthly', 'Generating monthly update via Gemini 3.5 Flash…')
-
-  const prompt = 'You are a domain intelligence analyst. Generate a Monthly Intelligence Update for the following domain.\n\nDOMAIN: '+name+'\n'
-    +(foundation?'FOUNDATION CONTEXT:\n'+foundation.content.slice(0,1500)+'\n\n':'')
-    +(previous?'PREVIOUS UPDATE ('+daysSince(previous.runAt)+' days ago):\n'+JSON.stringify(previous.data).slice(0,1000)+'\n\n':'')
-    +'\nRespond ONLY with a valid JSON object. No preamble, no markdown backticks:\n\n'
-    +'{\n'
-    +'"competitive_landscape": "Who are the key vendors active in this domain, what are they winning, what is their positioning",\n'
-    +'"customer_ai_adoption": "How are customers in this domain using AI — known deployments, case studies, patterns",\n'
-    +'"procurement_signals": "Budget cycles, major tenders expected, framework contracts, government programme allocations",\n'
-    +'"technology_shifts": "New model capabilities, platforms, or approaches becoming relevant to this domain",\n'
-    +'"emerging_use_cases": ["list of 3-5 use cases gaining traction in this domain"],\n'
-    +'"key_developments": "3-4 most important developments in this domain in the last 30 days",\n'
-    +'"delta_from_previous": "What has changed since the last update — only if previous context was provided"\n'
-    +'}'
-
+// \u2500\u2500 Supabase helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function sbGet(table, params){
+  var cfg = getSBConfig()
+  if(!cfg.url||!cfg.key) return []
+  var url = cfg.url + '/rest/v1/' + table + '?' + params
   try{
-    const res = await callGemini(key, prompt, false)
-    const data = parseJSON(res)
-    SB.set(code,'monthly',{data, runAt:new Date().toISOString()})
-
-    // Extract UC recommendations via Haiku-style extraction from monthly
-    await extractUCsFromMonthly(code, name, data)
-    renderDomainMain(code)
-    renderDomainList()
-  }catch(err){
-    showLayerError('monthly', err.message)
-  }
-}
-
-function renderMonthly(monthly){
-  const d = monthly.data
-  if(!d) return '<div class="content-empty">No data</div>'
-  let html = '<div class="content-area">'
-  if(d.key_developments) html += '<h2>Key Developments</h2><p>'+d.key_developments+'</p>'
-  if(d.competitive_landscape) html += '<h2>Competitive Landscape</h2><p>'+d.competitive_landscape+'</p>'
-  if(d.customer_ai_adoption) html += '<h2>Customer AI Adoption</h2><p>'+d.customer_ai_adoption+'</p>'
-  if(d.procurement_signals) html += '<h2>Procurement Signals</h2><p>'+d.procurement_signals+'</p>'
-  if(d.technology_shifts) html += '<h2>Technology Shifts</h2><p>'+d.technology_shifts+'</p>'
-  if(d.emerging_use_cases?.length) html += '<h2>Emerging Use Cases</h2><ul>'+d.emerging_use_cases.map(u=>'<li>'+u+'</li>').join('')+'</ul>'
-  if(d.delta_from_previous) html += '<h2>Delta Since Last Update</h2><p>'+d.delta_from_previous+'</p>'
-  html += '</div>'
-  return html
-}
-
-// ═══════════════════════════════════════════════════════════════
-// WEEKLY PULSE — Gemini Flash + grounding
-// ═══════════════════════════════════════════════════════════════
-async function runPulse(code, name){
-  const key = SB.getKey()
-  if(!key){ alert('Please enter your Gemini API key in the sidebar.'); return }
-
-  setLayerLoading('pulse', 'Scanning the web via Gemini 3.5 Flash with grounding…')
-
-  const prompt = 'You are a domain intelligence analyst. Search the web for the very latest developments in the following domain and generate a Weekly Pulse report. Focus on news from the last 7-14 days only.\n\nDOMAIN: '+name+'\n\nSearch for: new AI tenders, technology announcements, vendor wins, government programme updates, regulatory changes, leadership appointments, and emerging use cases in this domain.\n\nRespond ONLY with a valid JSON object. No preamble, no markdown backticks:\n\n'
-    +'{\n'
-    +'"new_tenders": ["list of new tenders or RFPs identified — with organisation, value if known, deadline if known"],\n'
-    +'"announcements": ["key announcements, programme launches, or policy changes in the last 2 weeks"],\n'
-    +'"vendor_activity": "what vendors have announced wins, partnerships, or new offerings in this domain",\n'
-    +'"emerging_uc_signals": ["2-4 new or emerging use cases being piloted or discussed publicly"],\n'
-    +'"leadership_changes": ["any leadership changes at key organisations in this domain"],\n'
-    +'"to_watch": "the one most important signal from this week that the sales team should act on"\n'
-    +'}'
-
-  try{
-    const res = await callGemini(key, prompt, true)
-    const data = parseJSON(res)
-    SB.set(code,'pulse',{data, runAt:new Date().toISOString()})
-
-    await extractUCsFromPulse(code, name, data)
-    renderDomainMain(code)
-    renderDomainList()
-  }catch(err){
-    showLayerError('pulse', err.message)
-  }
-}
-
-function renderPulse(pulse){
-  const d = pulse.data
-  if(!d) return '<div class="content-empty">No data</div>'
-  let html = '<div class="content-area">'
-  if(d.to_watch) html += '<div style="background:rgba(255,85,57,0.06);border:1px solid rgba(255,85,57,0.2);border-radius:var(--r);padding:12px 14px;margin-bottom:14px"><div style="font-size:10px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">⚡ To Watch This Week</div><div style="font-size:12px;color:var(--dark)">'+d.to_watch+'</div></div>'
-  if(d.new_tenders?.length) html += '<h2>New Tenders & RFPs</h2><ul>'+d.new_tenders.map(t=>'<li>'+t+'</li>').join('')+'</ul>'
-  if(d.announcements?.length) html += '<h2>Announcements</h2><ul>'+d.announcements.map(a=>'<li>'+a+'</li>').join('')+'</ul>'
-  if(d.vendor_activity) html += '<h2>Vendor Activity</h2><p>'+d.vendor_activity+'</p>'
-  if(d.emerging_uc_signals?.length) html += '<h2>Emerging Use Case Signals</h2><ul>'+d.emerging_uc_signals.map(u=>'<li>'+u+'</li>').join('')+'</ul>'
-  if(d.leadership_changes?.length && d.leadership_changes[0]) html += '<h2>Leadership Changes</h2><ul>'+d.leadership_changes.map(l=>'<li>'+l+'</li>').join('')+'</ul>'
-  html += '</div>'
-  return html
-}
-
-// ═══════════════════════════════════════════════════════════════
-// UC EXTRACTION — Claude Haiku via Anthropic API
-// ═══════════════════════════════════════════════════════════════
-async function extractUCsFromPulse(code, name, pulseData){
-  try{
-    const signals = (pulseData.emerging_uc_signals||[]).join('; ')
-    if(!signals) return
-
-    const prompt = 'Extract use case recommendations from these signals for the '+name+' domain.\n\nSIGNALS: '+signals+'\n\nRespond ONLY with JSON array:\n[{"name":"Use case name","cluster":"Topic cluster","rationale":"Why this is relevant","priority":"high|medium|low"}]'
-
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,messages:[{role:'user',content:prompt}]})
+    var resp = await fetch(url, {
+      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Range':'0-199'}
     })
-    const data = await res.json()
-    const text = data.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'[]'
-    const ucs = parseJSON(text)
-    if(!Array.isArray(ucs)) return
-
-    const existing = SB.get(code,'uc_queue')||[]
-    const newUCs = ucs.map(u=>({...u,id:'uc-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),source:'pulse',addedAt:new Date().toISOString(),status:'pending'}))
-    SB.set(code,'uc_queue',[...existing,...newUCs])
-  }catch(e){ /* silent fail - UC extraction is best-effort */ }
+    if(resp.ok) return await resp.json()
+  }catch(e){ console.error('SB error:', e) }
+  return []
 }
 
-async function extractUCsFromMonthly(code, name, monthlyData){
+async function sbPost(table, data){
+  var cfg = getSBConfig()
+  if(!cfg.url||!cfg.key) return false
   try{
-    const signals = (monthlyData.emerging_use_cases||[]).join('; ')
-    if(!signals) return
-
-    const prompt = 'Extract structured use case recommendations from these emerging use cases for the '+name+' domain.\n\nEMERGING UCs: '+signals+'\n\nRespond ONLY with JSON array:\n[{"name":"Use case name","cluster":"Topic cluster","rationale":"Why add to library","priority":"high|medium|low"}]'
-
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,messages:[{role:'user',content:prompt}]})
+    var resp = await fetch(cfg.url+'/rest/v1/'+table, {
+      method:'POST',
+      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates'},
+      body: JSON.stringify(data)
     })
-    const data = await res.json()
-    const text = data.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'[]'
-    const ucs = parseJSON(text)
-    if(!Array.isArray(ucs)) return
-
-    const existing = SB.get(code,'uc_queue')||[]
-    const newUCs = ucs.map(u=>({...u,id:'uc-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),source:'monthly',addedAt:new Date().toISOString(),status:'pending'}))
-    SB.set(code,'uc_queue',[...existing,...newUCs])
-  }catch(e){ /* silent fail */ }
+    return resp.ok
+  }catch(e){ return false }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// UC QUEUE UI
-// ═══════════════════════════════════════════════════════════════
-function renderUCQueue(code, queue){
-  const pending = queue.filter(u=>u.status==='pending')
-  const accepted = queue.filter(u=>u.status==='accepted')
-
-  if(!pending.length && !accepted.length){
-    return '<div class="content-empty"><div class="content-empty-icon">🔵</div>No UC recommendations yet. Run the Pulse or Monthly Update to generate recommendations.</div>'
-  }
-
-  let html = ''
-  if(pending.length){
-    html += '<div style="font-size:11px;font-weight:700;color:var(--orange);margin-bottom:10px">'+pending.length+' Pending Review</div>'
-    html += '<div class="uc-queue">'
-    +pending.map(u=>
-      '<div class="uc-rec" id="uc-rec-'+u.id+'">'
-      +'<div class="uc-rec-name">'+u.name+'</div>'
-      +'<span class="uc-rec-cluster">'+u.cluster+'</span>'
-      +'<div class="uc-rec-rationale">'+u.rationale+'</div>'
-      +'<div style="font-size:9px;color:var(--mid);margin-bottom:6px">Source: '+u.source+' · Priority: '+u.priority+'</div>'
-      +'<div class="uc-rec-actions">'
-      +'<button class="btn btn-teal btn-xs" onclick="acceptUC(\''+code+'\',\''+u.id+'\')">✓ Accept → Library</button>'
-      +'<button class="btn btn-xs" style="border:1px solid #d0d0d8;background:transparent;color:var(--mid)" onclick="rejectUC(\''+code+'\',\''+u.id+'\')">✕ Dismiss</button>'
-      +'</div>'
-      +'</div>'
-    ).join('')
-    +'</div>'
-  }
-
-  if(accepted.length){
-    html += '<div style="font-size:11px;font-weight:700;color:var(--teal);margin:14px 0 8px">'+accepted.length+' Recently Accepted</div>'
-    html += accepted.slice(0,5).map(u=>'<div style="font-size:11px;color:var(--mid);padding:4px 0;border-bottom:1px solid var(--light)">✓ '+u.name+'</div>').join('')
-  }
-
-  return html
+async function sbPatch(table, filter, data){
+  var cfg = getSBConfig()
+  if(!cfg.url||!cfg.key) return false
+  try{
+    var resp = await fetch(cfg.url+'/rest/v1/'+table+'?'+filter, {
+      method:'PATCH',
+      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(data)
+    })
+    return resp.ok
+  }catch(e){ return false }
 }
 
-function acceptUC(code, ucId){
-  const queue = SB.get(code,'uc_queue')||[]
-  const uc = queue.find(u=>u.id===ucId)
-  if(!uc) return
-  uc.status = 'accepted'
-  uc.acceptedAt = new Date().toISOString()
-  SB.set(code,'uc_queue',queue)
-
-  // Add to library
-  const lib = SB.get(code,'uc_library')||[]
-  lib.push({id:uc.id,name:uc.name,cluster:uc.cluster,rationale:uc.rationale,priority:uc.priority,source:uc.source,addedAt:new Date().toISOString()})
-  SB.set(code,'uc_library',lib)
-
-  renderDomainMain(code)
-  renderDomainList()
-}
-
-function rejectUC(code, ucId){
-  const queue = SB.get(code,'uc_queue')||[]
-  const uc = queue.find(u=>u.id===ucId)
-  if(uc) uc.status = 'rejected'
-  SB.set(code,'uc_queue',queue)
-  renderDomainMain(code)
-}
-
-function viewUCLibrary(code, name){
-  const lib = SB.get(code,'uc_library')||[]
-  document.getElementById('ucDetailDomain').textContent = name
-  document.getElementById('ucDetailBody').innerHTML = lib.length
-    ? '<div style="margin-bottom:12px;font-size:11px;color:var(--mid)">'+lib.length+' use cases in library for '+name+'</div>'
-      +lib.map(u=>'<div class="uc-library-item"><div><div style="font-size:12px;font-weight:600">'+u.name+'</div><div style="font-size:10px;color:var(--mid)">'+u.cluster+' · '+u.priority+' priority</div></div><span class="uc-cluster-tag">'+u.source+'</span></div>').join('')
-    : '<div class="content-empty"><div class="content-empty-icon">🔵</div>No use cases in library yet. Accept recommendations from the queue to build the library.</div>'
-  openModal('ucDetailModal')
-}
-
-// ═══════════════════════════════════════════════════════════════
-// GEMINI API
-// ═══════════════════════════════════════════════════════════════
-async function callGemini(key, prompt, useGrounding){
-  const body = {
-    contents:[{parts:[{text:prompt}]}],
-    generationConfig:{temperature:0.2,maxOutputTokens:4096}
-  }
-  if(useGrounding){
-    body.tools = [{google_search:{}}]
-  }
-  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key,{
-    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
-  })
-  if(!res.ok){
-    const err = await res.json()
-    throw new Error(err.error?.message||'Gemini API error '+res.status)
-  }
-  const data = await res.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-  if(!text) throw new Error('No response from Gemini. Check your API key.')
-  return text
-}
-
-function parseJSON(text){
-  let cleaned = text.trim()
-  cleaned = cleaned.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/\s*```$/,'').trim()
-  const first = cleaned.indexOf('{')>-1?cleaned.indexOf('{'):cleaned.indexOf('[')
-  const last = cleaned.lastIndexOf('}')?cleaned.lastIndexOf('}'):cleaned.lastIndexOf(']')
-  if(first>-1&&last>-1) cleaned = cleaned.slice(first,last+1)
-  try{ return JSON.parse(cleaned) }catch(e){
-    const lc = cleaned.lastIndexOf(',')
-    if(lc>0){
-      try{ return JSON.parse(cleaned.slice(0,lc)+(cleaned.trim().startsWith('[')?']':'}')) }catch{}
+async function getCount(table, filter){
+  var cfg = getSBConfig()
+  if(!cfg.url||!cfg.key) return 0
+  try{
+    var resp = await fetch(cfg.url+'/rest/v1/'+table+'?'+filter+'&limit=1', {
+      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Prefer':'count=exact'}
+    })
+    if(resp.ok){
+      var cr = resp.headers.get('content-range')
+      if(cr) return parseInt(cr.split('/')[1])||0
     }
-    throw new Error('Could not parse response. Try again.')
+  }catch(e){}
+  return 0
+}
+
+// \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function saveConfig(){
+  var url = document.getElementById('sbUrl').value.trim()
+  var key = document.getElementById('sbKey').value.trim()
+  if(!url||!key){ alert('Please enter both Supabase URL and key.'); return }
+  setSBConfig({url:url, key:key})
+  document.getElementById('configCard').style.display='none'
+  loadSidebar()
+}
+
+function showConfig(){
+  var card = document.getElementById('configCard')
+  card.style.display = card.style.display==='none'?'block':'none'
+  var cfg = getSBConfig()
+  if(cfg.url) document.getElementById('sbUrl').value=cfg.url
+  if(cfg.key) document.getElementById('sbKey').value=cfg.key
+}
+
+// \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function loadSidebar(){
+  var cfg = getSBConfig()
+  if(!cfg.url||!cfg.key) return
+
+  // Load item counts for all domains
+  for(var i=0;i<DOMAINS.length;i++){
+    var c = await getCount('intelligence_items', 'domain_code=eq.'+DOMAINS[i].code)
+    itemCounts[DOMAINS[i].code] = c
+  }
+  for(var j=0;j<NEWS_TOPICS.length;j++){
+    var c2 = await getCount('intelligence_items', 'domain_code=eq.'+NEWS_TOPICS[j].code)
+    itemCounts[NEWS_TOPICS[j].code] = c2
+  }
+  renderSidebar()
+}
+
+function renderSidebar(){
+  var domHtml = DOMAINS.map(function(d){
+    var count = itemCounts[d.code]||0
+    var hasData = count > 0
+    var isActive = currentDomain && currentDomain.code === d.code
+    return '<div class="sb-item ' + (isActive?'active':'') + '" data-code="' + d.code + '" onclick="selectDomain(this.dataset.code)">'
+      + '<div class="sb-item-label">' + d.icon + ' ' + d.name + '</div>'
+      + '<span class="sb-count ' + (hasData?'has-data':'') + '">' + count + '</span>'
+      + '</div>'
+  }).join('')
+
+  var newsHtml = NEWS_TOPICS.map(function(t){
+    var count = itemCounts[t.code]||0
+    var hasData = count > 0
+    var isActive = currentDomain && currentDomain.code === t.code
+    return '<div class="sb-item ' + (isActive?'active':'') + '" data-code="' + t.code + '" onclick="selectDomain(this.dataset.code)">'
+      + '<div class="sb-item-label">' + t.icon + ' ' + t.name + '</div>'
+      + '<span class="sb-count ' + (hasData?'has-data':'') + '">' + count + '</span>'
+      + '</div>'
+  }).join('')
+
+  document.getElementById('domainList').innerHTML = domHtml
+  document.getElementById('newsList').innerHTML = newsHtml
+}
+
+async function selectDomain(code){
+  var entry = ALL_ENTRIES.find(function(e){return e.code===code})
+  if(!entry) return
+  currentDomain = entry
+  currentTab = 'intelligence'
+  currentFilter = 'all'
+  document.querySelectorAll('.sb-item').forEach(function(el){el.classList.remove('active')})
+  document.querySelectorAll('.sb-item[data-code="'+code+'"]').forEach(function(el){el.classList.add('active')})
+  await renderDomainView()
+}
+
+// \u2500\u2500 Domain View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function renderDomainView(){
+  var d = currentDomain
+  if(!d) return
+
+  // Get counts for tabs
+  var intelCount = await getCount('intelligence_items','domain_code=eq.'+d.code)
+  var ucCount = await getCount('uc_queue','domain_code=eq.'+d.code+'&status=eq.pending')
+  var actionCount = await getCount('sales_actions','domain_code=eq.'+d.code+'&status=neq.closed')
+
+  document.getElementById('mainContent').innerHTML =
+    '<div class="domain-hdr">'
+    + '<div class="domain-title">' + d.icon + ' ' + d.name + '</div>'
+    + '<div class="domain-meta" id="domainMeta">' + intelCount + ' intelligence items</div>'
+    + '<div class="tabs">'
+    + '<div class="tab ' + (currentTab==='intelligence'?'active':'') + '" data-tab="intelligence" onclick="switchTab(this.dataset.tab)">Intelligence <span style="font-size:10px;opacity:0.7">(' + intelCount + ')</span></div>'
+    + '<div class="tab ' + (currentTab==='usecases'?'active':'') + '" data-tab="usecases" onclick="switchTab(this.dataset.tab)">Use Cases <span style="font-size:10px;opacity:0.7">(' + ucCount + ')</span></div>'
+    + '<div class="tab ' + (currentTab==='actions'?'active':'') + '" data-tab="actions" onclick="switchTab(this.dataset.tab)">Sales Actions <span style="font-size:10px;opacity:0.7">(' + actionCount + ')</span></div>'
+    + '</div></div>'
+    + '<div id="tabIntelligence" class="tab-content ' + (currentTab==='intelligence'?'active':'') + '">'
+    + '<div class="loading"><div class="spin"></div> Loading intelligence...</div>'
+    + '</div>'
+    + '<div id="tabUsecases" class="tab-content ' + (currentTab==='usecases'?'active':'') + '">'
+    + '<div class="loading"><div class="spin"></div> Loading use cases...</div>'
+    + '</div>'
+    + '<div id="tabActions" class="tab-content ' + (currentTab==='actions'?'active':'') + '">'
+    + '<div class="loading"><div class="spin"></div> Loading actions...</div>'
+    + '</div>'
+
+  // Load the active tab
+  if(currentTab==='intelligence') await loadIntelligence()
+  else if(currentTab==='usecases') await loadUseCases()
+  else await loadActions()
+}
+
+function switchTab(tab){
+  currentTab = tab
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')})
+  document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active')})
+  document.querySelector('.tab[data-tab="'+tab+'"]').classList.add('active')
+  document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active')
+  if(tab==='intelligence') loadIntelligence()
+  else if(tab==='usecases') loadUseCases()
+  else loadActions()
+}
+
+// \u2500\u2500 Intelligence Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function loadIntelligence(){
+  var d = currentDomain
+  var filterParam = currentFilter==='all' ? '' : '&intelligence_stream=eq.'+currentFilter
+  var items = await sbGet('intelligence_items', 'domain_code=eq.'+d.code+'&order=scraped_at.desc'+filterParam)
+  
+  var el = document.getElementById('tabIntelligence')
+  if(!el) return
+
+  if(items.length===0){
+    el.innerHTML = '<div class="empty-state"><div class="icon">&#128270;</div><h3>No Intelligence Yet</h3><p>Run the Intelligence Scraper for ' + d.name + ' to populate this domain.</p></div>'
+    return
+  }
+
+  var filterBar = '<div class="filter-bar">'
+    + '<span style="font-size:11px;color:var(--mid);font-weight:600">Filter:</span>'
+    + '<button class="filter-btn ' + (currentFilter==='all'?'active':'') + '" data-filter="all" onclick="setFilter(this.dataset.filter)">All (' + items.length + ')</button>'
+    + '<button class="filter-btn mp ' + (currentFilter==='market_pulse'?'active':'') + '" data-filter="market_pulse" onclick="setFilter(this.dataset.filter)">Market Pulse</button>'
+    + '<button class="filter-btn di ' + (currentFilter==='domain_intel'?'active':'') + '" data-filter="domain_intel" onclick="setFilter(this.dataset.filter)">Domain Intel</button>'
+    + '<button class="filter-btn tw ' + (currentFilter==='tech_watch'?'active':'') + '" data-filter="tech_watch" onclick="setFilter(this.dataset.filter)">Tech Watch</button>'
+    + '</div>'
+
+  var cardsHtml = items.map(function(item){
+    var streamClass = item.intelligence_stream==='market_pulse'?'badge-mp':item.intelligence_stream==='domain_intel'?'badge-di':'badge-tw'
+    var streamLabel = item.intelligence_stream ? item.intelligence_stream.replace('_',' ') : ''
+    var valClass = 'badge-' + (item.intelligence_value||'medium')
+    var depthBadge = item.depth_score ? '<span class="badge badge-depth">depth ' + item.depth_score + '</span>' : ''
+    var streamBadge = streamLabel ? '<span class="badge ' + streamClass + '">' + streamLabel + '</span>' : ''
+    var valBadge = '<span class="badge ' + valClass + '">' + (item.intelligence_value||'medium') + '</span>'
+
+    var expandedHtml = ''
+    if(item.problem_statement) expandedHtml += '<div class="intel-field"><div class="intel-field-label">Problem Statement</div><div class="intel-field-val">' + item.problem_statement + '</div></div>'
+    if(item.technical_context) expandedHtml += '<div class="intel-field"><div class="intel-field-label">Technical Context</div><div class="intel-field-val">' + item.technical_context + '</div></div>'
+    if(item.opportunity) expandedHtml += '<div class="intel-field"><div class="intel-field-label">Opportunity Signal</div><div class="intel-field-val"><span class="tag tag-opp">' + item.opportunity + '</span></div></div>'
+    if(item.competitor_signals) expandedHtml += '<div class="intel-field"><div class="intel-field-label">Competitor Signals</div><div class="intel-field-val"><span class="tag tag-comp">' + item.competitor_signals + '</span></div></div>'
+    var infra = Array.isArray(item.infrastructure_signals) ? item.infrastructure_signals : []
+    if(infra.length > 0) expandedHtml += '<div class="intel-field"><div class="intel-field-label">Infrastructure Signals</div><div class="intel-tags">' + infra.map(function(s){return '<span class="tag">'+s+'</span>'}).join('') + '</div></div>'
+    var uc = item.uc_extracted || {}
+    if(uc.uc_name) expandedHtml += '<div class="intel-field"><div class="intel-field-label">UC Signal</div><div class="intel-field-val" style="color:var(--teal);font-weight:600">' + uc.uc_name + (uc.uc_hardware?' &mdash; '+uc.uc_hardware:'') + '</div></div>'
+
+    var tags = Array.isArray(item.tags) ? item.tags : []
+    var tagsHtml = tags.slice(0,5).map(function(t){return '<span class="tag">'+t+'</span>'}).join('')
+
+    return '<div class="intel-card">'
+      + '<div class="intel-card-hdr">'
+      + '<div class="intel-title">' + (item.title||'') + '</div>'
+      + '<div class="intel-badges">' + streamBadge + valBadge + depthBadge + '</div>'
+      + '</div>'
+      + '<div class="intel-summary">' + (item.summary||'') + '</div>'
+      + (tagsHtml ? '<div class="intel-tags">' + tagsHtml + '</div>' : '')
+      + (expandedHtml ? '<div class="intel-expanded" id="exp-' + item.id + '">' + expandedHtml + '</div>' : '')
+      + '<div class="intel-actions">'
+      + (expandedHtml ? '<button class="btn btn-outline btn-xs" data-eid="'+item.id+'" onclick="toggleExpand(this.dataset.eid)" id="expbtn-'+item.id+'">&#9660; More</button>' : '')
+      + '<button class="btn btn-teal btn-xs" data-id="' + item.id + '" data-title="' + (item.title||'').replace(/"/g,'') + '" data-domain="' + (item.domain_code||'') + '" onclick="openActionModal(this.dataset.id, this.dataset.title, this.dataset.domain)">&#9889; Create Action</button>'
+      + '</div>'
+      + '</div>'
+  }).join('')
+
+  el.innerHTML = filterBar + '<div class="intel-grid">' + cardsHtml + '</div>'
+}
+
+function setFilter(filter){
+  currentFilter = filter
+  loadIntelligence()
+}
+
+function toggleExpand(id){
+  var exp = document.getElementById('exp-'+id)
+  var btn = document.getElementById('expbtn-'+id)
+  if(!exp) return
+  exp.classList.toggle('open')
+  if(exp.classList.contains('open')){
+    btn.textContent = '\u25B2 Less'
+  } else {
+    btn.innerHTML = '&#9660; More'
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// LOADING / ERROR STATES
-// ═══════════════════════════════════════════════════════════════
-function setLayerLoading(layerKey, msg){
-  const body = document.getElementById('layer-body-'+layerKey)
-  if(!body) return
-  body.classList.add('open')
-  body.innerHTML = '<div class="loading-bar"></div><div class="loading-text">'+msg+'</div>'
-  document.getElementById('layer-arrow-'+layerKey)?.classList.add('open')
-}
+// \u2500\u2500 Use Cases Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function loadUseCases(){
+  var d = currentDomain
+  var items = await sbGet('uc_queue', 'domain_code=eq.'+d.code+'&order=suggested_at.desc')
+  var el = document.getElementById('tabUsecases')
+  if(!el) return
 
-function showLayerError(layerKey, msg){
-  const body = document.getElementById('layer-body-'+layerKey)
-  if(!body) return
-  body.innerHTML = '<div class="alert" style="background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);color:#DC2626"><strong>Error:</strong> '+msg+'</div>'
-}
-
-// ═══════════════════════════════════════════════════════════════
-// MARKDOWN RENDERER
-// ═══════════════════════════════════════════════════════════════
-function renderMarkdown(text){
-  if(!text) return '<div class="content-empty">Empty</div>'
-  let html = text
-    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
-    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/^- (.+)$/gm,'<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/gs,'<ul>$1</ul>')
-    .replace(/\n\n/g,'</p><p>')
-  return '<div class="content-area"><p>'+html+'</p></div>'
-}
-
-// ═══════════════════════════════════════════════════════════════
-// EXPORT
-// ═══════════════════════════════════════════════════════════════
-function buildDomainMD(code){
-  const d = DOMAINS.find(d=>d.code===code)
-  const foundation = SB.get(code,'foundation')
-  const monthly = SB.get(code,'monthly')
-  const pulse = SB.get(code,'pulse')
-  const lib = SB.get(code,'uc_library')||[]
-
-  let md = '# Second Brain — '+d.name+' ('+d.code+')\n'
-  md += 'Generated: '+new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})+'\n\n'
-  md += '---\n\n'
-
-  if(foundation) md += '## Foundation\n'+foundation.content+'\n\n---\n\n'
-  if(monthly){
-    const m = monthly.data
-    md += '## Monthly Update ('+new Date(monthly.runAt).toLocaleDateString('en-IN')+')\n\n'
-    if(m.key_developments) md += '### Key Developments\n'+m.key_developments+'\n\n'
-    if(m.competitive_landscape) md += '### Competitive Landscape\n'+m.competitive_landscape+'\n\n'
-    if(m.customer_ai_adoption) md += '### Customer AI Adoption\n'+m.customer_ai_adoption+'\n\n'
-    if(m.procurement_signals) md += '### Procurement Signals\n'+m.procurement_signals+'\n\n'
-    md += '---\n\n'
+  if(items.length===0){
+    el.innerHTML = '<div class="empty-state"><div class="icon">&#128161;</div><h3>No Use Cases Yet</h3><p>Use cases are suggested automatically when intelligence items are scraped and enriched.</p></div>'
+    return
   }
-  if(pulse){
-    const p = pulse.data
-    md += '## Weekly Pulse ('+new Date(pulse.runAt).toLocaleDateString('en-IN')+')\n\n'
-    if(p.to_watch) md += '**To Watch:** '+p.to_watch+'\n\n'
-    if(p.new_tenders?.length) md += '### New Tenders\n'+p.new_tenders.map(t=>'- '+t).join('\n')+'\n\n'
-    if(p.announcements?.length) md += '### Announcements\n'+p.announcements.map(a=>'- '+a).join('\n')+'\n\n'
-    if(p.vendor_activity) md += '### Vendor Activity\n'+p.vendor_activity+'\n\n'
-    md += '---\n\n'
+
+  var html = '<div class="uc-grid">' + items.map(function(item){
+    return '<div class="uc-card">'
+      + '<div class="uc-card-hdr">'
+      + '<div><div class="uc-name">' + (item.uc_name||'') + '</div>'
+      + '<div class="uc-cluster">' + (item.cluster||'Uncategorised') + '</div></div>'
+      + '<span class="uc-status ' + (item.status||'pending') + '">' + (item.status||'pending') + '</span>'
+      + '</div>'
+      + '<div class="uc-rationale">' + (item.rationale||'') + '</div>'
+      + (item.source_title ? '<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Source: ' + item.source_title.slice(0,60) + '</div>' : '')
+      + '<div style="display:flex;gap:6px">'
+      + (item.status==='pending' ? '<button class="btn btn-teal btn-xs" data-id="' + item.id + '" data-status="accepted" onclick="updateUCStatus(this.dataset.id,this.dataset.status)">&#10003; Accept</button>' : '')
+      + (item.status==='pending' ? '<button class="btn btn-danger btn-xs" data-id="' + item.id + '" data-status="rejected" onclick="updateUCStatus(this.dataset.id,this.dataset.status)">&#10007; Reject</button>' : '')
+      + (item.status==='accepted' ? '<button class="btn btn-outline btn-xs" data-id="' + item.id + '" data-name="' + (item.uc_name||'').replace(/"/g,'') + '" data-domain="' + d.code + '" onclick="openActionModal(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9889; Create Action</button>' : '')
+      + '</div>'
+      + '</div>'
+  }).join('') + '</div>'
+
+  el.innerHTML = html
+}
+
+async function updateUCStatus(id, status){
+  await sbPatch('uc_queue', 'id=eq.'+id, {status:status})
+  loadUseCases()
+}
+
+// \u2500\u2500 Sales Actions Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function loadActions(){
+  var d = currentDomain
+  var items = await sbGet('sales_actions', 'domain_code=eq.'+d.code+'&order=created_at.desc')
+  var el = document.getElementById('tabActions')
+  if(!el) return
+
+  var newActionBtn = '<div style="display:flex;justify-content:flex-end;margin-bottom:14px">'
+    + '<button class="btn btn-primary btn-sm" data-domain="'+d.code+'" onclick="newAction(this.dataset.domain)">+ New Action</button>'
+    + '</div>'
+
+  if(items.length===0){
+    el.innerHTML = newActionBtn + '<div class="empty-state"><div class="icon">&#9889;</div><h3>No Sales Actions Yet</h3><p>Create actions from intelligence items or use cases, or click New Action above.</p></div>'
+    return
   }
-  if(lib.length){
-    md += '## UC Library ('+lib.length+' use cases)\n'
-    md += lib.map(u=>'- **'+u.name+'** ('+u.cluster+') — '+u.rationale).join('\n')
-    md += '\n'
+
+  var html = newActionBtn + '<div class="action-grid">' + items.map(function(item){
+    var statusClass = (item.status||'new').replace('_','-')
+    var assignedStr = item.assigned_to ? 'Assigned to: <strong>' + item.assigned_to + '</strong>' : 'Unassigned'
+    var dueStr = item.due_date ? ' &middot; Due: ' + item.due_date : ''
+    return '<div class="action-card status-' + statusClass + '">'
+      + '<div class="action-hdr">'
+      + '<div><div class="action-title">' + (item.action_title||'') + '</div>'
+      + '<div class="action-meta">' + assignedStr + dueStr + '</div></div>'
+      + '<span class="action-status ' + (item.status||'new') + '">' + (item.status||'new').replace('_',' ') + '</span>'
+      + '</div>'
+      + (item.action_description ? '<div class="action-desc">' + item.action_description + '</div>' : '')
+      + (item.source_title ? '<div style="font-size:11px;color:var(--mid);margin-bottom:8px">From: ' + item.source_title.slice(0,60) + '</div>' : '')
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      + (item.status==='new' ? '<button class="btn btn-outline btn-xs" data-id="'+item.id+'" data-status="in_progress" onclick="updateActionStatus(this.dataset.id,this.dataset.status)">Start</button>' : '')
+      + (item.status==='in_progress' ? '<button class="btn btn-teal btn-xs" data-id="'+item.id+'" data-aid="'+item.id+'" onclick="openEngModal(this.dataset.aid)">&#128640; Convert to Engagement</button>' : '')
+      + (item.status!=='closed'&&item.status!=='converted' ? '<button class="btn btn-danger btn-xs" data-id="'+item.id+'" data-status="closed" onclick="updateActionStatus(this.dataset.id,this.dataset.status)">Close</button>' : '')
+      + '</div>'
+      + '</div>'
+  }).join('') + '</div>'
+
+  el.innerHTML = html
+}
+
+async function updateActionStatus(id, status){
+  await sbPatch('sales_actions', 'id=eq.'+id, {status:status})
+  loadActions()
+}
+
+// \u2500\u2500 Modals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function newAction(domainCode){ openActionModal('','',domainCode) }
+
+function openActionModal(intelId, intelTitle, domainCode){
+  document.getElementById('actionIntelId').value = intelId||''
+  document.getElementById('actionIntelTitle').value = intelTitle||''
+  document.getElementById('actionDomainCode').value = domainCode||''
+  document.getElementById('actionTitle').value = ''
+  document.getElementById('actionDesc').value = ''
+  document.getElementById('actionApproach').value = ''
+  document.getElementById('actionAssignee').value = ''
+  document.getElementById('actionPriority').value = 'medium'
+  document.getElementById('actionDue').value = ''
+  // Populate team datalist
+  var team = getTeam()
+  var dl = document.getElementById('teamList')
+  dl.innerHTML = team.map(function(m){return '<option value="'+m+'">'}).join('')
+  document.getElementById('actionModal').classList.add('open')
+}
+
+async function saveAction(){
+  var title = document.getElementById('actionTitle').value.trim()
+  if(!title){ alert('Please enter an action title.'); return }
+  var action = {
+    id: 'act-' + Date.now(),
+    source_intel_id: document.getElementById('actionIntelId').value||null,
+    source_title: document.getElementById('actionIntelTitle').value||null,
+    domain_code: document.getElementById('actionDomainCode').value||null,
+    action_title: title,
+    action_description: document.getElementById('actionDesc').value.trim()||null,
+    suggested_approach: document.getElementById('actionApproach').value.trim()||null,
+    assigned_to: document.getElementById('actionAssignee').value.trim()||null,
+    priority: document.getElementById('actionPriority').value,
+    status: 'new',
+    created_at: new Date().toISOString(),
+    created_by: 'ATLAS',
+    due_date: document.getElementById('actionDue').value||null
   }
-  return md
+  var ok = await sbPost('sales_actions', action)
+  if(ok){
+    closeModal('actionModal')
+    await loadActions()
+    if(currentTab!=='actions') switchTab('actions')
+  } else {
+    alert('Failed to save action. Check Supabase connection.')
+  }
 }
 
-function exportDomain(code){
-  const d = DOMAINS.find(d=>d.code===code)
-  const md = buildDomainMD(code)
-  const blob = new Blob([md],{type:'text/markdown'})
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href=url; a.download='SecondBrain-'+code+'-'+new Date().toISOString().slice(0,10)+'.md'
-  a.click(); URL.revokeObjectURL(url)
+function openEngModal(actionId){
+  document.getElementById('engActionId').value = actionId
+  document.getElementById('engId').value = ''
+  document.getElementById('engNotes').value = ''
+  document.getElementById('engModal').classList.add('open')
 }
 
-function copyDomain(code){
-  navigator.clipboard.writeText(buildDomainMD(code)).then(()=>alert('Copied to clipboard.'))
+async function convertToEngagement(){
+  var actionId = document.getElementById('engActionId').value
+  var engId = document.getElementById('engId').value.trim()
+  var notes = document.getElementById('engNotes').value.trim()
+  if(!engId){ alert('Please enter an Engagement ID.'); return }
+  await sbPatch('sales_actions', 'id=eq.'+actionId, {
+    status: 'converted',
+    converted_to_eng_id: engId,
+    converted_at: new Date().toISOString(),
+    notes: notes
+  })
+  closeModal('engModal')
+  loadActions()
 }
 
-// ═══════════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════════
-function openModal(id){ document.getElementById(id).classList.add('open') }
-function closeModal(id){ document.getElementById(id).classList.remove('open') }
-function getSettings(){ try{ return JSON.parse(localStorage.getItem('atlas_em_settings')||'{}') }catch{return {}} }
-function v(id){ const el=document.getElementById(id); return el?el.value.trim():'' }
+function closeModal(id){
+  document.getElementById(id).classList.remove('open')
+}
 
-document.querySelectorAll('.modal-overlay').forEach(el=>{
-  el.addEventListener('click',e=>{ if(e.target===el) el.classList.remove('open') })
+// \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+window.addEventListener('DOMContentLoaded', function(){
+  var cfg = getSBConfig()
+  if(cfg.url && cfg.key){
+    document.getElementById('configCard').style.display = 'none'
+    loadSidebar()
+  } else {
+    document.getElementById('sbUrl').value = cfg.url||''
+    document.getElementById('sbKey').value = cfg.key||''
+  }
 })
-
-window.addEventListener('DOMContentLoaded', init)
 </script>
 </body>
 </html>
