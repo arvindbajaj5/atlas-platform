@@ -258,6 +258,9 @@ var currentDomain = null
 var currentTab = 'intelligence'
 var currentFilter = 'all'
 var itemCounts = {}
+var cachedIntel = []
+var cachedUC = []
+var cachedActions = []
 
 // \u2500\u2500 Storage \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function getSBConfig(){
@@ -389,6 +392,10 @@ async function selectDomain(code){
   currentDomain = entry
   currentTab = 'intelligence'
   currentFilter = 'all'
+  // Clear cache when switching domains
+  cachedIntel = []
+  cachedUC = []
+  cachedActions = []
   document.querySelectorAll('.sb-item').forEach(function(el){el.classList.remove('active')})
   document.querySelectorAll('.sb-item[data-code="'+code+'"]').forEach(function(el){el.classList.add('active')})
   await renderDomainView()
@@ -443,9 +450,17 @@ function switchTab(tab){
 // \u2500\u2500 Intelligence Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function loadIntelligence(){
   var d = currentDomain
-  var filterParam = currentFilter==='all' ? '' : '&intelligence_stream=eq.'+currentFilter
-  var items = await sbGet('intelligence_items', 'domain_code=eq.'+d.code+'&order=scraped_at.desc'+filterParam)
+  // Only fetch from Supabase if no cache or filter is 'all'
+  if(cachedIntel.length === 0 || currentFilter === 'all'){
+    var fetchedItems = await sbGet('intelligence_items', 'domain_code=eq.'+d.code+'&order=scraped_at.desc')
+    if(currentFilter === 'all') cachedIntel = fetchedItems
+  }
+  var items = currentFilter === 'all' ? cachedIntel : cachedIntel.filter(function(item){ return item.intelligence_stream === currentFilter })
   
+  renderIntelligenceItems(items)
+}
+
+function renderIntelligenceItems(items){
   var el = document.getElementById('tabIntelligence')
   if(!el) return
 
@@ -503,7 +518,12 @@ async function loadIntelligence(){
 
 function setFilter(filter){
   currentFilter = filter
-  loadIntelligence()
+  renderIntelligenceFromCache()
+}
+
+function renderIntelligenceFromCache(){
+  var items = currentFilter === 'all' ? cachedIntel : cachedIntel.filter(function(item){ return item.intelligence_stream === currentFilter })
+  renderIntelligenceItems(items)
 }
 
 function toggleExpand(id){
@@ -521,7 +541,8 @@ function toggleExpand(id){
 // \u2500\u2500 Use Cases Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function loadUseCases(){
   var d = currentDomain
-  var items = await sbGet('uc_queue', 'domain_code=eq.'+d.code+'&order=suggested_at.desc')
+  if(cachedUC.length === 0) cachedUC = await sbGet('uc_queue', 'domain_code=eq.'+d.code+'&order=suggested_at.desc')
+  var items = cachedUC
   var el = document.getElementById('tabUsecases')
   if(!el) return
 
@@ -552,13 +573,15 @@ async function loadUseCases(){
 
 async function updateUCStatus(id, status){
   await sbPatch('uc_queue', 'id=eq.'+id, {status:status})
+  cachedUC = []
   loadUseCases()
 }
 
 // \u2500\u2500 Sales Actions Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function loadActions(){
   var d = currentDomain
-  var items = await sbGet('sales_actions', 'domain_code=eq.'+d.code+'&order=created_at.desc')
+  if(cachedActions.length === 0) cachedActions = await sbGet('sales_actions', 'domain_code=eq.'+d.code+'&order=created_at.desc')
+  var items = cachedActions
   var el = document.getElementById('tabActions')
   if(!el) return
 
@@ -596,6 +619,7 @@ async function loadActions(){
 
 async function updateActionStatus(id, status){
   await sbPatch('sales_actions', 'id=eq.'+id, {status:status})
+  cachedActions = []
   loadActions()
 }
 
@@ -640,6 +664,7 @@ async function saveAction(){
   var ok = await sbPost('sales_actions', action)
   if(ok){
     closeModal('actionModal')
+    cachedActions = []
     await loadActions()
     if(currentTab!=='actions') switchTab('actions')
   } else {
@@ -666,6 +691,7 @@ async function convertToEngagement(){
     notes: notes
   })
   closeModal('engModal')
+  cachedActions = []
   loadActions()
 }
 
