@@ -272,13 +272,14 @@ function getTeam(){
 }
 
 // \u2500\u2500 Supabase helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function sbGet(table, params){
+async function sbGet(table, params, limit){
   var cfg = getSBConfig()
   if(!cfg.url||!cfg.key) return []
-  var url = cfg.url + '/rest/v1/' + table + '?' + params
+  limit = limit || 100
+  var url = cfg.url + '/rest/v1/' + table + '?' + params + '&limit=' + limit
   try{
     var resp = await fetch(url, {
-      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Range':'0-199'}
+      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key}
     })
     if(resp.ok) return await resp.json()
   }catch(e){ console.error('SB error:', e) }
@@ -458,7 +459,7 @@ async function loadIntelligence(){
   var d = currentDomain
   // Fetch from Supabase if cache is empty
   if(cachedIntel.length === 0){
-    cachedIntel = await sbGet('intelligence_items', 'domain_code=eq.'+d.code+'&order=scraped_at.desc')
+    cachedIntel = await sbGet('intelligence_items', 'domain_code=eq.'+d.code+'&order=scraped_at.desc', 50)
   }
   var items = currentFilter === 'all' ? cachedIntel : cachedIntel.filter(function(item){ return item.intelligence_stream === currentFilter })
   
@@ -469,18 +470,26 @@ function renderIntelligenceItems(items){
   var el = document.getElementById('tabIntelligence')
   if(!el) return
 
-  if(items.length===0){
-    el.innerHTML = '<div class="empty-state"><div class="icon">&#128270;</div><h3>No Intelligence Yet</h3><p>Run the Intelligence Scraper for ' + d.name + ' to populate this domain.</p></div>'
-    return
+  // Set up filter bar once (persistent)
+  var filterBarEl = document.getElementById('intelFilterBar')
+  if(!filterBarEl){
+    var mpCount = cachedIntel.filter(function(i){return i.intelligence_stream==='market_pulse'}).length
+    var diCount = cachedIntel.filter(function(i){return i.intelligence_stream==='domain_intel'}).length
+    var twCount = cachedIntel.filter(function(i){return i.intelligence_stream==='tech_watch'}).length
+    var filterBar = '<div class="filter-bar" id="intelFilterBar">'
+      + '<span style="font-size:11px;color:var(--mid);font-weight:600">Filter:</span>'
+      + '<button class="filter-btn active" data-filter="all" onclick="setFilter(this.dataset.filter)">All (' + cachedIntel.length + ')</button>'
+      + '<button class="filter-btn mp" data-filter="market_pulse" onclick="setFilter(this.dataset.filter)">Market Pulse (' + mpCount + ')</button>'
+      + '<button class="filter-btn di" data-filter="domain_intel" onclick="setFilter(this.dataset.filter)">Domain Intel (' + diCount + ')</button>'
+      + '<button class="filter-btn tw" data-filter="tech_watch" onclick="setFilter(this.dataset.filter)">Tech Watch (' + twCount + ')</button>'
+      + '</div><div id="intelItems"></div>'
+    el.innerHTML = filterBar
   }
 
-  var filterBar = '<div class="filter-bar">'
-    + '<span style="font-size:11px;color:var(--mid);font-weight:600">Filter:</span>'
-    + '<button class="filter-btn ' + (currentFilter==='all'?'active':'') + '" data-filter="all" onclick="setFilter(this.dataset.filter)">All (' + items.length + ')</button>'
-    + '<button class="filter-btn mp ' + (currentFilter==='market_pulse'?'active':'') + '" data-filter="market_pulse" onclick="setFilter(this.dataset.filter)">Market Pulse</button>'
-    + '<button class="filter-btn di ' + (currentFilter==='domain_intel'?'active':'') + '" data-filter="domain_intel" onclick="setFilter(this.dataset.filter)">Domain Intel</button>'
-    + '<button class="filter-btn tw ' + (currentFilter==='tech_watch'?'active':'') + '" data-filter="tech_watch" onclick="setFilter(this.dataset.filter)">Tech Watch</button>'
-    + '</div>'
+  if(items.length===0){
+    document.getElementById('intelItems').innerHTML = '<div class="empty-state"><div class="icon">&#128270;</div><h3>No Intelligence Yet</h3><p>Run the Intelligence Scraper for ' + d.name + ' to populate this domain.</p></div>'
+    return
+  }
 
   var cardsHtml = items.map(function(item){
     var streamClass = item.intelligence_stream==='market_pulse'?'badge-mp':item.intelligence_stream==='domain_intel'?'badge-di':'badge-tw'
@@ -518,7 +527,7 @@ function renderIntelligenceItems(items){
       + '</div>'
   }).join('')
 
-  el.innerHTML = filterBar + '<div class="intel-grid">' + cardsHtml + '</div>'
+  container.innerHTML = '<div class="intel-grid">' + cardsHtml + '</div>'
 }
 
 function setFilter(filter){
