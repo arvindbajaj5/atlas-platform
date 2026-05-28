@@ -788,10 +788,14 @@ function extractItems(raw, code, name, sourceType){
         if(pt.startsWith('[') || pt.startsWith('{')){ text = pt; break }
       }
     }
-    // Find start of array
-    var first = text.indexOf('[')
+    // Strip any chars before first { or [ (Gemini sometimes adds invisible prefix chars)
+    var firstBrace = text.indexOf('{')
+    var firstBracket = text.indexOf('[')
+    var first = -1
+    if(firstBracket >= 0 && (firstBrace < 0 || firstBracket <= firstBrace)) first = firstBracket
+    else if(firstBrace >= 0) first = firstBrace
     if(first >= 0){
-      var arrText = text.slice(first)
+      var arrText = first === text.indexOf('[') ? text.slice(first) : '[' + text.slice(first) + ']'
       // Try full parse first
       try{
         var parsed = JSON.parse(arrText)
@@ -813,7 +817,7 @@ function extractItems(raw, code, name, sourceType){
             }
           }catch(e2){ /* fall through to method 2 */ }
         }
-        if(items.length === 0) log('Method 1 failed: ' + innerE.message.slice(0,60) + ' - trying method 2', 'warn')
+        if(items.length === 0) log('Method 1 retrying via method 2...', 'dim')
       }
     }
   }catch(e1){
