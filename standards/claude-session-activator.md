@@ -200,10 +200,11 @@ To add (v1.2): `intelligence_stream (market_pulse/domain_intel/tech_watch), prob
 | 6 | PEI — query Supabase intel DB before Gemini, match by sector/country/ownership, "From Intelligence DB" section | 🟡 Next iteration |
 | 7 | AI Centre Builder — form empty, investigate and fix | 🔴 Check first next session |
 | 8 | GitHub Actions → write to Supabase | 🔴 After scraper stable |
-| 9 | Engagement Configurator | 🔴 After Second Brain |
-| 10 | GDrive sync | 🔴 Low priority |
-| 11 | RAC Tool exports testing | 🟡 Cosmetic |
-| 12 | `tool-features.md` v1.1 | ⏸ On hold |
+| 9 | Sales Actions (light) — "Create Action" from intelligence item, assign/track/convert to engagement, Supabase sales_actions table, built inside Second Brain v2 | 🔴 Build with Second Brain v2 |
+| 10 | Engagement Configurator | 🔴 After Second Brain |
+| 11 | GDrive sync | 🔴 Low priority |
+| 12 | RAC Tool exports testing | 🟡 Cosmetic |
+| 13 | `tool-features.md` v1.1 | ⏸ On hold |
 
 ---
 
