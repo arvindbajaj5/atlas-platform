@@ -353,15 +353,16 @@ async function sbUpsertItem(item){
         'apikey':sb.key,
         'Authorization':'Bearer '+sb.key,
         'Content-Type':'application/json',
-        'Prefer':'resolution=ignore-duplicates'
+        'Prefer':'return=representation'
       },
       body: JSON.stringify(row)
     })
     if(!resp.ok){
       var errText = await resp.text()
-      log('Supabase write error ' + resp.status + ': ' + errText.slice(0,100), 'error')
+      log('Supabase write error ' + resp.status + ': ' + errText.slice(0,200), 'error')
       return false
     }
+    log('Supabase write OK: ' + row.title.slice(0,40), 'dim')
     return true
   }catch(e){
     log('Supabase write exception: ' + e.message, 'error')
