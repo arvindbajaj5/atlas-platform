@@ -593,14 +593,31 @@ function updateRunBtn(){
 }
 
 function updateStats(){
-  var db = getIntelDB()
   var meta = getMetaDB()
-  var domains = Object.keys(meta).filter(function(k){return !k.startsWith('news_') && meta[k].last_scraped}).length
-  var total = Object.values(db).reduce(function(sum,arr){return sum + arr.length},0)
+  var domains = Object.keys(meta).filter(function(k){return meta[k].last_scraped}).length
+  // Total items from metadata (more reliable than counting localStorage)
+  var total = Object.values(meta).reduce(function(sum,m){return sum + (m.total_items||0)},0)
   document.getElementById('statDomains').textContent = domains
   document.getElementById('statItems').textContent = total
   document.getElementById('statTokens').textContent = sessionTokens.toLocaleString()
   document.getElementById('statCost').textContent = '$' + sessionCost.toFixed(4)
+}
+
+async function updateStatsFromSupabase(){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/intelligence_items?select=id&limit=1', {
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key,'Prefer':'count=exact'}
+    })
+    if(resp.ok){
+      var count = resp.headers.get('content-range')
+      if(count){
+        var total = count.split('/')[1]
+        document.getElementById('statItems').textContent = total || '?'
+      }
+    }
+  }catch(e){}
 }
 
 // \u2500\u2500 Logging \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -1208,7 +1225,7 @@ window.addEventListener('DOMContentLoaded', function(){
   init()
   // Load metadata from Supabase on startup
   var cfg0 = getConfig()
-  if(cfg0.sbUrl && cfg0.sbKey) loadFromSupabase()
+  if(cfg0.sbUrl && cfg0.sbKey){ loadFromSupabase(); updateStatsFromSupabase() }
   // Show any existing results
   var db = getIntelDB()
   if(Object.keys(db).length > 0) renderResults()
