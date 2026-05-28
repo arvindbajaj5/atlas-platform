@@ -157,8 +157,8 @@ input:focus,select:focus{border-color:var(--blue);}
       <div>
         <label class="lbl">Items per domain</label>
         <select id="itemCount" style="width:120px">
-          <option value="5" selected>5 items</option>
-          <option value="10">10 items</option>
+          <option value="5">5 items</option>
+          <option value="10" selected>10 items</option>
           <option value="15">15 items</option>
           <option value="20">20 items</option>
         </select>
@@ -610,7 +610,8 @@ function extractItems(raw, code, name, sourceType){
 
   // Method 1: direct JSON parse with partial recovery
   try{
-    var text = raw.trim()
+    // Strip BOM, zero-width spaces, and other invisible chars before JSON
+    var text = raw.replace(/^[\s\uFEFF\u200B\u200C\u200D\u00A0]+/, '').trim()
     var fence = String.fromCharCode(96,96,96)
     if(text.indexOf(fence) >= 0){
       var parts = text.split(fence)
@@ -720,7 +721,7 @@ function extractItems(raw, code, name, sourceType){
 
 async function scrapeDomain(domain){
   var cfg3 = getConfig()
-  var n = cfg3.itemCount || 5
+  var n = parseInt(cfg3.itemCount) || 5
   var items = []
   var usedTitles = []
 
@@ -767,7 +768,7 @@ async function scrapeDomain(domain){
 
 async function scrapeNews(topic){
   var cfg4 = getConfig()
-  var n2 = cfg4.itemCount || 5
+  var n2 = parseInt(cfg4.itemCount) || 5
   var items = []
   var usedTitlesN = []
 
