@@ -153,6 +153,17 @@ input:focus,select:focus{border-color:var(--blue);}
       </div>
       <button class="btn btn-outline btn-sm" onclick="saveConfig()">Save Config</button>
     </div>
+    <div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <label class="lbl">Supabase Project URL</label>
+        <input type="text" id="supabaseUrl" placeholder="https://xxxx.supabase.co">
+      </div>
+      <div style="flex:2;min-width:200px">
+        <label class="lbl">Supabase Anon Key</label>
+        <input type="password" id="supabaseKey" placeholder="eyJ...">
+        <div class="field-hint">From Supabase Project Settings &rarr; API &rarr; Publishable key</div>
+      </div>
+    </div>
     <div style="display:flex;gap:20px;margin-top:14px;flex-wrap:wrap;align-items:flex-end">
       <div>
         <label class="lbl">Items per domain</label>
@@ -288,14 +299,136 @@ function getConfig(){
 }
 function setConfig(c){ localStorage.setItem('atlas_intel_config',JSON.stringify(c)) }
 
+// ── Supabase ──────────────────────────────────────────────────────────────────
+function getSupabase(){
+  var cfg = getConfig()
+  return {url: cfg.sbUrl||'', key: cfg.sbKey||''}
+}
+
+async function testSupabase(){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/intelligence_items?limit=1', {
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
+    })
+    if(resp.ok){
+      log('Supabase connected successfully.', 'success')
+    } else {
+      log('Supabase connection failed: ' + resp.status, 'error')
+    }
+  }catch(e){
+    log('Supabase error: ' + e.message, 'error')
+  }
+}
+
+async function sbUpsertItem(item){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return false
+  var resp = await fetch(sb.url+'/rest/v1/intelligence_items', {
+    method:'POST',
+    headers:{
+      'apikey':sb.key,
+      'Authorization':'Bearer '+sb.key,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=ignore-duplicates'
+    },
+    body: JSON.stringify(item)
+  })
+  return resp.ok
+}
+
+async function sbUpsertMeta(domainCode, totalItems, addedLastRun){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return
+  await fetch(sb.url+'/rest/v1/scraping_metadata', {
+    method:'POST',
+    headers:{
+      'apikey':sb.key,
+      'Authorization':'Bearer '+sb.key,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({
+      domain_code: domainCode,
+      last_scraped: new Date().toISOString(),
+      total_items: totalItems,
+      added_last_run: addedLastRun
+    })
+  })
+}
+
+async function sbFetchItems(domainCode){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return []
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/intelligence_items?domain_code=eq.'+domainCode+'&order=scraped_at.desc', {
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
+    })
+    if(resp.ok) return await resp.json()
+  }catch(e){ log('Supabase fetch error: '+e.message,'warn') }
+  return []
+}
+
+async function sbFetchMeta(){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return {}
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/scraping_metadata', {
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
+    })
+    if(resp.ok){
+      var rows = await resp.json()
+      var meta = {}
+      rows.forEach(function(r){ meta[r.domain_code] = r })
+      return meta
+    }
+  }catch(e){}
+  return {}
+}
+
+async function sbUpsertUC(uc){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return
+  await fetch(sb.url+'/rest/v1/uc_queue', {
+    method:'POST',
+    headers:{
+      'apikey':sb.key,
+      'Authorization':'Bearer '+sb.key,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=ignore-duplicates'
+    },
+    body: JSON.stringify(uc)
+  })
+}
+
+async function loadFromSupabase(){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return
+  log('Loading intelligence from Supabase...', 'info')
+  var meta = await sbFetchMeta()
+  // Merge Supabase metadata with localStorage metadata
+  var localMeta = getMetaDB()
+  Object.assign(localMeta, meta)
+  setMetaDB(localMeta)
+  renderDomainGrid()
+  renderNewsGrid()
+  updateStats()
+  log('Supabase metadata loaded.', 'success')
+}
+
+
 function saveConfig(){
   var key = document.getElementById('apiKey').value.trim()
   var model = document.getElementById('modelSelect').value
   var itemCount = parseInt(document.getElementById('itemCount').value) || 10
   var useGrounding = document.getElementById('useGrounding').checked
+  var sbUrl = document.getElementById('supabaseUrl').value.trim()
+  var sbKey = document.getElementById('supabaseKey').value.trim()
   if(!key){ alert('Please enter your Gemini API key.'); return }
-  setConfig({key:key, model:model, itemCount:itemCount, useGrounding:useGrounding})
-  log('Config saved. Model: ' + model + ' | Items: ' + itemCount + ' | Grounding: ' + useGrounding, 'success')
+  setConfig({key:key, model:model, itemCount:itemCount, useGrounding:useGrounding, sbUrl:sbUrl, sbKey:sbKey})
+  log('Config saved. Model: ' + model + ' | Items: ' + itemCount + ' | Supabase: ' + (sbUrl?'connected':'not set'), 'success')
+  if(sbUrl && sbKey) testSupabase()
   updateRunBtn()
 }
 
@@ -306,6 +439,8 @@ function init(){
   if(cfg.model) document.getElementById('modelSelect').value = cfg.model
   if(cfg.itemCount) document.getElementById('itemCount').value = cfg.itemCount
   if(cfg.useGrounding) document.getElementById('useGrounding').checked = cfg.useGrounding
+  if(cfg.sbUrl) document.getElementById('supabaseUrl').value = cfg.sbUrl
+  if(cfg.sbKey) document.getElementById('supabaseKey').value = cfg.sbKey
   renderDomainGrid()
   renderNewsGrid()
   updateStats()
@@ -802,6 +937,7 @@ async function scrapeNews(topic){
         var item2 = extracted2[0]
         if(item2.title) usedTitlesN.push(item2.title)
         items.push(item2)
+        if(item2.id) sbUpsertItem(item2)
       }
     }catch(err2){
       log('News item ' + (j+1) + ' failed for ' + topic.code + ': ' + err2.message, 'warn')
@@ -882,6 +1018,7 @@ async function runScraper(){
       setIntelDB(db)
       meta['news_' + topic.code] = {last_scraped: new Date().toISOString(), total_items: nresult.merged.length, added_last_run: nresult.added}
       setMetaDB(meta)
+      sbUpsertMeta('news_' + topic.code, nresult.merged.length, nresult.added)
       totalAdded += nresult.added
       setDomainStatus(topic.code, 'done', true)
       log('Done: NEWS/' + topic.code + ' &mdash; ' + nresult.added + ' new items (' + nresult.merged.length + ' total)', 'success')
@@ -981,6 +1118,9 @@ function clearIntelligence(){
 
 window.addEventListener('DOMContentLoaded', function(){
   init()
+  // Load metadata from Supabase on startup
+  var cfg0 = getConfig()
+  if(cfg0.sbUrl && cfg0.sbKey) loadFromSupabase()
   // Show any existing results
   var db = getIntelDB()
   if(Object.keys(db).length > 0) renderResults()
