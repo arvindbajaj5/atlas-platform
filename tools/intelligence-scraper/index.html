@@ -325,17 +325,48 @@ async function testSupabase(){
 async function sbUpsertItem(item){
   var sb = getSupabase()
   if(!sb.url||!sb.key) return false
-  var resp = await fetch(sb.url+'/rest/v1/intelligence_items', {
-    method:'POST',
-    headers:{
-      'apikey':sb.key,
-      'Authorization':'Bearer '+sb.key,
-      'Content-Type':'application/json',
-      'Prefer':'resolution=ignore-duplicates'
-    },
-    body: JSON.stringify(item)
-  })
-  return resp.ok
+  // Normalise to match Supabase schema exactly
+  var row = {
+    id: item.id,
+    domain_code: item.domain_code || item.topic_code || '',
+    source_type: item.source_type || 'domain',
+    title: (item.title||'').slice(0,500),
+    summary: (item.summary||'').slice(0,1000),
+    type: item.type||'',
+    intelligence_value: item.intelligence_value || item.urgency || 'medium',
+    organisations: Array.isArray(item.organisations) ? item.organisations : [],
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    opportunity: (item.opportunity || item.opportunity_signals || '').slice(0,500),
+    competitor_signals: (item.competitor_signals||'').slice(0,500),
+    uc_suggest: (item.uc_suggest||'').slice(0,200),
+    confidence: item.confidence||'medium',
+    scraped_at: item.scraped_at || new Date().toISOString(),
+    scraped_by: getConfig().scraperName || 'ATLAS',
+    topic_code: item.topic_code||null,
+    topic_name: item.topic_name||null,
+    domain_name: item.domain_name||null
+  }
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/intelligence_items', {
+      method:'POST',
+      headers:{
+        'apikey':sb.key,
+        'Authorization':'Bearer '+sb.key,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=ignore-duplicates'
+      },
+      body: JSON.stringify(row)
+    })
+    if(!resp.ok){
+      var errText = await resp.text()
+      log('Supabase write error ' + resp.status + ': ' + errText.slice(0,100), 'error')
+      return false
+    }
+    return true
+  }catch(e){
+    log('Supabase write exception: ' + e.message, 'error')
+    return false
+  }
 }
 
 async function sbUpsertMeta(domainCode, totalItems, addedLastRun){
