@@ -1,6 +1,6 @@
 # claude-session-activator.md
 # ATLAS Claude Session Activator
-# Version: 1.6 | Last Updated: 2026-05-28
+# Version: 1.7 | Last Updated: 2026-05-28
 
 ---
 
@@ -9,7 +9,7 @@
 Upload this file at the start of any ATLAS working session. Claude reads it fully before proceeding.
 
 **On loading, Claude confirms:**
-> *"ATLAS Session Activator v1.6 loaded. [State any other files uploaded. Ready to proceed.]"*
+> *"ATLAS Session Activator v1.7 loaded. [State any other files uploaded. Ready to proceed.]"*
 
 ---
 
@@ -19,7 +19,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 - **Stack:** GitHub Pages (hosting) + Supabase (central database) + Google Drive (file storage)
 - **Repo:** arvindbajaj5/atlas-platform
 - **Live URL:** https://arvindbajaj5.github.io/atlas-platform/
-- **Gemini API:** Gemini 3.5 Flash — key stored in browser localStorage
+- **Gemini API:** Gemini 3.1 Flash-Lite — key stored in browser localStorage
 - **Supabase:** Central intelligence database — URL and anon key stored in browser localStorage
 
 ---
@@ -41,11 +41,11 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | Tool | Version | Status | Path |
 |---|---|---|---|
 | Portal | v2.0 | ✅ Live | `index.html` |
-| Second Brain | v1.0 | ✅ Live | `tools/second-brain/` |
+| Second Brain | v1.0 | 🔴 Needs redesign | `tools/second-brain/` |
 | Customer Intelligence (PEI) | v0.1 | ✅ Live | `tools/pei-tool/` |
 | Intelligence Scraper | v1.1 | ✅ Live | `tools/intelligence-scraper/` |
 | Engagement Management | v1.0 | ✅ Live | `tools/engagement-management/` |
-| AI Centre Builder | v1.1 | ✅ Live | `tools/ai-centre-builder/` |
+| AI Centre Builder | v1.1 | ⚠️ Form empty — check | `tools/ai-centre-builder/` |
 | Portfolio Portal | — | ✅ Live | `tools/portfolio-portal/` |
 | Vision Document Factory | — | ✅ Live | `tools/vision-document/` |
 | Domain Configurator | v3.0 | ✅ Live | `tools/domain-configurator/` |
@@ -69,7 +69,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | `project-definition-schema.md` | v1.0 | ✅ Live |
 | `blacklist-whitelist.md` | v1.0 | ✅ Live |
 | `tool-features.md` | v1.0 | ⏸ Needs v1.1 |
-| `claude-session-activator.md` | v1.6 | ✅ This file |
+| `claude-session-activator.md` | v1.7 | ✅ This file |
 
 ---
 
@@ -95,8 +95,9 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 6. **No inline onclick with dynamic JS args** — use data attributes
 7. **No HTML entities in JS** — use Unicode escapes or actual chars
 8. **No non-ASCII chars in JS** — escape all emoji with \u{XXXXX}
-9. **No `responseMimeType: 'application/json'`** — causes Gemini Flash output token cap (~40 tokens). Never use this.
-10. Always run Node.js syntax check before delivering
+9. **NEVER use `responseMimeType: 'application/json'`** — hard caps Gemini output to ~40 tokens
+10. **Always disable thinking** — add `thinkingConfig: {thinkingBudget: 0}` to Gemini generationConfig
+11. Always run Node.js syntax check before delivering
 
 ---
 
@@ -106,9 +107,8 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 - **Single-file HTML** — no external dependencies except approved CDNs
 - **No backticks in JS** — string concatenation only
 - **Claude API:** `claude-sonnet-4-20250514`, max_tokens 1500
-- **Gemini 3.5 Flash (no grounding):** Intelligence Scraper default
-- **Gemini 3.5 Flash (with grounding):** PEI Tool, Intelligence Scraper optional toggle
-- **CRITICAL:** Never use `responseMimeType: 'application/json'` in Gemini API calls — hard caps output to ~40 tokens
+- **Gemini model:** `gemini-3.1-flash-lite` — fast, cheap, no thinking tokens, clean JSON
+- **NEVER:** `responseMimeType: 'application/json'` or missing `thinkingBudget: 0`
 - **Qwen 3.5 4B via Ollama:** MacBook local processing ✅ working
 
 ---
@@ -118,74 +118,79 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 **7-domain system — two-stage pipeline:**
 
 ```
-Stage 1 — SCRAPING (browser on-demand OR GitHub Actions scheduled)
-  Gemini 3.5 Flash → extracts items → writes to Supabase intelligence_items
+Stage 1 — SCRAPING (Intelligence Scraper browser tool)
+  gemini-3.1-flash-lite → extracts items → writes to Supabase intelligence_items
 
 Stage 2 — PROCESSING (MacBook, Ollama + Qwen 3.5 4B) — NOT YET BUILT
   Reads raw data → structures, tags, cross-refs → writes to Supabase
 ```
 
 **Supabase schema (live):**
-- `intelligence_items` — all scraped intelligence
-- `scraping_metadata` — last run per domain
-- `uc_queue` — UC recommendations pending review
+- `intelligence_items` — all scraped intelligence (domain_code, title, summary, type, intelligence_value, organisations, tags, opportunity, competitor_signals, uc_suggest, confidence, scraped_at)
+- `scraping_metadata` — last run per domain/topic
+- `uc_queue` — UC recommendations (uc_name, cluster, rationale, status: pending/accepted/rejected)
 
-**Intelligence Scraper v1.1 features:**
-- 10 domains + 5 news topics
-- Configurable item count (5/10/15/20), default 10
-- Grounding toggle (off by default)
-- Writes to Supabase in real-time as items are extracted
-- Incremental — deduplicates on title
-- Token tracking + cost display
-- Export JSON
+**Intelligence Scraper v1.1 — working configuration:**
+- Model: `gemini-3.1-flash-lite` (default)
+- `thinkingBudget: 0` in generationConfig
+- No `responseMimeType`
+- 1 item per API call, N calls per domain (configurable 5/10/15/20)
+- Writes to Supabase in real-time
+- Incremental deduplication on title
 - Multi-method JSON extraction (Methods 1, 2, 2.5, 3)
-- **Known issue:** Some items still truncate — Method 2.5 truncation recovery handles most cases
+- Token tracking + cost display
 
-**Storage architecture (locked):**
-- GitHub Actions (automated) → Supabase
-- Browser scraper (on-demand) → Supabase
-- MacBook processing → Supabase
-- All ATLAS tools read from Supabase
+**Second Brain — redesign needed:**
+- Current v1.0 uses localStorage — needs full redesign
+- New role: **intelligence consumption tool** (reads from Supabase)
+- Structure:
+  - Foundation: static human-curated markdown per domain (stays)
+  - Domain Intelligence: reads from Supabase `intelligence_items` filtered by domain_code
+  - UC Queue: reads from Supabase `uc_queue` table
+- Intelligence Scraper = collection tool, Second Brain = reading/analysis tool
 
-**Phase 2:** ChromaDB + RAG when 200+ items. Phase 3: LightRAG knowledge graph on own server.
+**Storage architecture:**
+- Intelligence Scraper (browser) → Supabase
+- GitHub Actions (when built) → Supabase
+- MacBook processing (when built) → Supabase
+- Second Brain + all tools → read from Supabase
 
-**MacBook setup:**
-- Ollama ✅ installed
-- Qwen 3.5 4B ✅ pulled and working
+**Phase 2:** ChromaDB + RAG at 200+ items. Phase 3: LightRAG on own server.
 
 ---
 
-## Gemini API — Critical Notes
+## Gemini API — Critical Rules
 
-- **API key:** Generated from Google Cloud Console (My First Project, billing enabled) via AI Studio
-- **Free tier limits:** 15 RPM, 1500 RPD — sufficient for on-demand scraping
-- **NEVER use `responseMimeType: 'application/json'`** — hard caps output tokens to ~40, breaks all responses
-- **Grounding:** Available but uses more quota — toggle in scraper config
+- **Model:** `gemini-3.1-flash-lite` for scraping (fast, cheap, no thinking)
+- **Always add:** `thinkingConfig: {thinkingBudget: 0}` to generationConfig
+- **Never add:** `responseMimeType: 'application/json'`
+- **Free tier:** 15 RPM, 1500 RPD — sufficient for on-demand scraping
+- **Key:** From Google Cloud Console (My First Project, billing enabled) via AI Studio
 
 ---
 
 ## Supabase
 
-- **Project:** atlas-platform
-- **Region:** South Asia (Mumbai)
-- **Auth:** None for now (shared anon key access) — add proper auth when going live
-- **Credentials:** Stored in browser localStorage (Supabase URL + anon key)
-- **Tables:** intelligence_items, scraping_metadata, uc_queue
+- **Project:** atlas-platform — South Asia (Mumbai)
+- **Auth:** None for now (shared anon key) — add when going live
+- **Credentials:** Stored in browser localStorage per tool
 
 ---
 
 ## Current Pending Items
 
-| # | Item | Status |
+| # | Item | Priority |
 |---|---|---|
-| 1 | Verify Intelligence Scraper working after cache clears | 🟡 Cache issue — wait 10 min |
-| 2 | MacBook processing script (Ollama + Qwen) | 🔴 Not built |
-| 3 | GitHub Actions → write to Supabase | 🔴 Not updated |
-| 4 | Engagement Configurator | 🔴 Next major build |
-| 5 | Second Brain — update to read from Supabase | 🔴 Not updated |
-| 6 | GDrive sync | 🔴 Low priority |
-| 7 | RAC Tool exports testing | 🟡 Cosmetic — later |
-| 8 | `tool-features.md` v1.1 | ⏸ On hold |
+| 1 | Intelligence Scraper — restore item count below log | 🟡 Next iteration |
+| 2 | Customer Intelligence (PEI) — save API key in config | 🟡 Next iteration |
+| 3 | AI Centre Builder — form empty, investigate and fix | 🔴 Check first |
+| 4 | Second Brain v2 — redesign to read from Supabase | 🔴 Next major build |
+| 5 | MacBook processing script (Ollama + Qwen) | 🔴 After scraper stable |
+| 6 | GitHub Actions → write to Supabase | 🔴 After scraper stable |
+| 7 | Engagement Configurator | 🔴 After Second Brain |
+| 8 | GDrive sync | 🔴 Low priority |
+| 9 | RAC Tool exports testing | 🟡 Cosmetic |
+| 10 | `tool-features.md` v1.1 | ⏸ On hold |
 
 ---
 
@@ -205,14 +210,13 @@ Stage 2 — PROCESSING (MacBook, Ollama + Qwen 3.5 4B) — NOT YET BUILT
 
 ---
 
-## Google Drive Structure
+## Google Drive
 
 ```
 📁 AI Portal (root) — ID: 1L6Ta_fqSlUpzE0iNr0Be9ooRjfhPRsRd
 ```
-
 Portal Drive file ID: `1F_qo4b6_jfhL-Skx7YFU5GtQH8Jry8Wt`
 
 ---
 
-*End of ATLAS Session Activator v1.6*
+*End of ATLAS Session Activator v1.7*
