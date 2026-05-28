@@ -19,7 +19,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 - **Stack:** GitHub Pages (hosting) + Supabase (central database) + Google Drive (file storage)
 - **Repo:** arvindbajaj5/atlas-platform
 - **Live URL:** https://arvindbajaj5.github.io/atlas-platform/
-- **Gemini API:** Gemini 3.1 Flash-Lite — key stored in browser localStorage
+- **Gemini API:** `gemini-3.1-flash-lite` — key stored in browser localStorage
 - **Supabase:** Central intelligence database — URL and anon key stored in browser localStorage
 
 ---
@@ -41,7 +41,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | Tool | Version | Status | Path |
 |---|---|---|---|
 | Portal | v2.0 | ✅ Live | `index.html` |
-| Second Brain | v1.0 | 🔴 Needs redesign | `tools/second-brain/` |
+| Second Brain | v1.0 | 🔴 Needs full redesign | `tools/second-brain/` |
 | Customer Intelligence (PEI) | v0.1 | ✅ Live | `tools/pei-tool/` |
 | Intelligence Scraper | v1.1 | ✅ Live | `tools/intelligence-scraper/` |
 | Engagement Management | v1.0 | ✅ Live | `tools/engagement-management/` |
@@ -77,8 +77,6 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 
 **Never reference in customer-facing content:** Krutrim, Chinese models (DeepSeek, Qwen etc.), MeitY, NIC, IndiaAI Mission, CDAC
 
-**Chinese models OK for:** local offline MacBook processing via Ollama only.
-
 **Policy whitelist:** Make in India · Viksit Bharat · Digital India · Atmanirbhar Bharat · PM-DevINE · BharatNet · Smart Cities · DPDP Act 2023
 
 **Approved tech stack:** DLC 265kW (4× GB200, 8× MI355, 4× MI450, Vera Rubin NVL72) · Air-cooled (8× Rubin) · CPU DLC (AMD/Intel) · Networking (IB, BXI, NVLink, Infinity Fabric) · OEM AI Platform · OEM HPC Middleware · COMPASS · Modular Datacenter · SMP (up to 32 sockets, 48TB RAM) · HPC Cluster · Quantum Simulator
@@ -93,10 +91,10 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 4. Always output a downloadable file
 5. **No nested backticks in template literals** — string concatenation only
 6. **No inline onclick with dynamic JS args** — use data attributes
-7. **No HTML entities in JS** — use Unicode escapes or actual chars
-8. **No non-ASCII chars in JS** — escape all emoji with \u{XXXXX}
+7. **No HTML entities in JS** — use Unicode escapes
+8. **No non-ASCII chars in JS** — escape all emoji
 9. **NEVER use `responseMimeType: 'application/json'`** — hard caps Gemini output to ~40 tokens
-10. **Always disable thinking** — add `thinkingConfig: {thinkingBudget: 0}` to Gemini generationConfig
+10. **Always disable thinking** — add `thinkingConfig: {thinkingBudget: 0}` to generationConfig
 11. Always run Node.js syntax check before delivering
 
 ---
@@ -106,54 +104,67 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 - **On-premises first** — never suggest cloud unless explicitly required
 - **Single-file HTML** — no external dependencies except approved CDNs
 - **No backticks in JS** — string concatenation only
-- **Claude API:** `claude-sonnet-4-20250514`, max_tokens 1500
 - **Gemini model:** `gemini-3.1-flash-lite` — fast, cheap, no thinking tokens, clean JSON
+- **One model everywhere** — no MacBook, no Qwen, no Ollama
 - **NEVER:** `responseMimeType: 'application/json'` or missing `thinkingBudget: 0`
-- **Qwen 3.5 4B via Ollama:** MacBook local processing ✅ working
 
 ---
 
-## Intelligence Engine Architecture
+## MacBook / Ollama / Qwen — DROPPED
 
-**7-domain system — two-stage pipeline:**
+MacBook processing, Ollama, and Qwen have been dropped from the architecture entirely. Reasons:
+- Intelligence data is not confidential (publicly available domain data)
+- Gemini 3.1 Flash-Lite cost is negligible (~$0.001 per call)
+- Browser-based processing works for the whole team
+- No local dependencies simplifies the stack
+
+All processing — scraping AND enrichment — uses `gemini-3.1-flash-lite` in the browser.
+
+---
+
+## Intelligence Engine Architecture (FINAL)
+
+**7-domain system — two-phase browser pipeline:**
 
 ```
-Stage 1 — SCRAPING (Intelligence Scraper browser tool)
-  gemini-3.1-flash-lite → extracts items → writes to Supabase intelligence_items
+Phase 1 — SCRAPE (Intelligence Scraper, browser)
+  gemini-3.1-flash-lite
+  Three prompt types per domain:
+    1. Market Pulse — India/APAC, tenders, contracts, vendor wins
+    2. Domain Intelligence — global, use cases, architectures, patterns
+    3. Technology Watch — global, emerging capabilities, infrastructure
+  → writes raw items to Supabase intelligence_items
 
-Stage 2 — PROCESSING (MacBook, Ollama + Qwen 3.5 4B) — NOT YET BUILT
-  Reads raw data → structures, tags, cross-refs → writes to Supabase
+Phase 2 — ENRICH (Intelligence Scraper, browser, after Phase 1)
+  gemini-3.1-flash-lite
+  Takes each raw item, expands with:
+    - problem_statement
+    - technical_context
+    - infrastructure_signals
+    - uc_extracted (name, cluster, hardware_needed, confidence)
+  → updates item in Supabase
+
+GitHub Actions (scheduled, when built)
+  Same two phases, automated on cadence
+  → writes to same Supabase tables
 ```
 
-**Supabase schema (live):**
-- `intelligence_items` — all scraped intelligence (domain_code, title, summary, type, intelligence_value, organisations, tags, opportunity, competitor_signals, uc_suggest, confidence, scraped_at)
-- `scraping_metadata` — last run per domain/topic
-- `uc_queue` — UC recommendations (uc_name, cluster, rationale, status: pending/accepted/rejected)
+**Supabase schema (current + planned fields):**
 
-**Intelligence Scraper v1.1 — working configuration:**
-- Model: `gemini-3.1-flash-lite` (default)
-- `thinkingBudget: 0` in generationConfig
-- No `responseMimeType`
-- 1 item per API call, N calls per domain (configurable 5/10/15/20)
-- Writes to Supabase in real-time
-- Incremental deduplication on title
-- Multi-method JSON extraction (Methods 1, 2, 2.5, 3)
-- Token tracking + cost display
+Current: `id, domain_code, source_type, title, summary, type, intelligence_value, organisations, tags, opportunity, competitor_signals, uc_suggest, confidence, scraped_at, scraped_by, topic_code, topic_name, domain_name`
 
-**Second Brain — redesign needed:**
-- Current v1.0 uses localStorage — needs full redesign
-- New role: **intelligence consumption tool** (reads from Supabase)
-- Structure:
-  - Foundation: static human-curated markdown per domain (stays)
-  - Domain Intelligence: reads from Supabase `intelligence_items` filtered by domain_code
-  - UC Queue: reads from Supabase `uc_queue` table
-- Intelligence Scraper = collection tool, Second Brain = reading/analysis tool
+To add (v1.2): `intelligence_stream (market_pulse/domain_intel/tech_watch), problem_statement, technical_context, infrastructure_signals (jsonb), uc_extracted (jsonb), enriched_at, depth_score`
 
-**Storage architecture:**
-- Intelligence Scraper (browser) → Supabase
-- GitHub Actions (when built) → Supabase
-- MacBook processing (when built) → Supabase
-- Second Brain + all tools → read from Supabase
+**Second Brain v2 — reads from Supabase:**
+- Foundation: static human-curated markdown per domain (stays)
+- Domain Intelligence: reads `intelligence_items` filtered by domain_code + intelligence_stream
+- UC Queue: reads `uc_queue` table
+- Search and filter across all domains
+- Export domain brief
+- Feeds engagement configurator
+
+**Intelligence Scraper = collection tool**
+**Second Brain = reading/analysis/synthesis tool**
 
 **Phase 2:** ChromaDB + RAG at 200+ items. Phase 3: LightRAG on own server.
 
@@ -161,10 +172,10 @@ Stage 2 — PROCESSING (MacBook, Ollama + Qwen 3.5 4B) — NOT YET BUILT
 
 ## Gemini API — Critical Rules
 
-- **Model:** `gemini-3.1-flash-lite` for scraping (fast, cheap, no thinking)
+- **Model:** `gemini-3.1-flash-lite` everywhere
 - **Always add:** `thinkingConfig: {thinkingBudget: 0}` to generationConfig
 - **Never add:** `responseMimeType: 'application/json'`
-- **Free tier:** 15 RPM, 1500 RPD — sufficient for on-demand scraping
+- **Free tier:** 15 RPM, 1500 RPD
 - **Key:** From Google Cloud Console (My First Project, billing enabled) via AI Studio
 
 ---
@@ -181,17 +192,18 @@ Stage 2 — PROCESSING (MacBook, Ollama + Qwen 3.5 4B) — NOT YET BUILT
 
 | # | Item | Priority |
 |---|---|---|
-| 1 | Intelligence Scraper — restore item count below log | 🟡 Next iteration |
-| 2 | Customer Intelligence (PEI) — save API key in config | 🟡 Next iteration |
-| 2b | Customer Intelligence (PEI) — query Supabase intel DB before Gemini call, match by sector/country/ownership, incorporate as context + show "From Intelligence DB" section in output | 🟡 Next iteration |
-| 3 | AI Centre Builder — form empty, investigate and fix | 🔴 Check first |
-| 4 | Second Brain v2 — redesign to read from Supabase | 🔴 Next major build |
-| 5 | MacBook processing script (Ollama + Qwen) | 🔴 After scraper stable |
-| 6 | GitHub Actions → write to Supabase | 🔴 After scraper stable |
-| 7 | Engagement Configurator | 🔴 After Second Brain |
-| 8 | GDrive sync | 🔴 Low priority |
-| 9 | RAC Tool exports testing | 🟡 Cosmetic |
-| 10 | `tool-features.md` v1.1 | ⏸ On hold |
+| 1 | Intelligence Scraper v1.2 — three prompt types, enrichment phase, richer schema, intelligence_stream field | 🔴 Next build |
+| 2 | Supabase schema update — add new fields for v1.2 | 🔴 With scraper v1.2 |
+| 3 | Second Brain v2 — reads Supabase, three streams, UC queue | 🔴 After scraper v1.2 |
+| 4 | Scraper — restore item count below log | 🟡 With v1.2 |
+| 5 | PEI — save API key in config | 🟡 Next iteration |
+| 6 | PEI — query Supabase intel DB before Gemini, match by sector/country/ownership, "From Intelligence DB" section | 🟡 Next iteration |
+| 7 | AI Centre Builder — form empty, investigate and fix | 🔴 Check first next session |
+| 8 | GitHub Actions → write to Supabase | 🔴 After scraper stable |
+| 9 | Engagement Configurator | 🔴 After Second Brain |
+| 10 | GDrive sync | 🔴 Low priority |
+| 11 | RAC Tool exports testing | 🟡 Cosmetic |
+| 12 | `tool-features.md` v1.1 | ⏸ On hold |
 
 ---
 
