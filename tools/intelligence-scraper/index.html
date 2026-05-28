@@ -854,6 +854,44 @@ function extractItems(raw, code, name, sourceType){
     }
   }
 
+  // Method 2.5: truncation recovery - try to complete truncated JSON
+  if(items.length === 0){
+    try{
+      var rawT = raw.trim()
+      // Find the start of a JSON object
+      var objStart = rawT.indexOf('{')
+      if(objStart >= 0){
+        var partial = rawT.slice(objStart)
+        // Count open/close braces to find how many } are missing
+        var openB = 0, closeB = 0
+        for(var ci=0; ci<partial.length; ci++){
+          if(partial[ci]==='{') openB++
+          else if(partial[ci]==='}') closeB++
+        }
+        var missing = openB - closeB
+        // Add missing closing braces and a closing quote if string is open
+        var completed = partial
+        // Check if we're inside a string (odd number of unescaped quotes at end)
+        var trailingContent = partial.slice(-50)
+        var quoteCount = (trailingContent.match(/(?<!\\)"/g)||[]).length
+        if(quoteCount % 2 !== 0) completed += '"'  // close open string
+        // Close any open arrays
+        var openArr = (completed.match(/\[/g)||[]).length
+        var closeArr = (completed.match(/\]/g)||[]).length
+        for(var ai=0; ai<openArr-closeArr; ai++) completed += ']'
+        // Add missing closing braces
+        for(var bi=0; bi<missing; bi++) completed += '}'
+        try{
+          var recovered = JSON.parse(completed)
+          if(recovered.title){
+            log('Recovered truncated item: ' + recovered.title.slice(0,40), 'dim')
+            items = [recovered]
+          }
+        }catch(eR){ /* could not recover */ }
+      }
+    }catch(e25){ /* silent */ }
+  }
+
   // Method 3: parse markdown bullet format (* key: value)
   if(items.length === 0){
     try{
