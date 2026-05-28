@@ -927,7 +927,9 @@ async function scrapeDomain(domain){
         var item = extracted[0]
         if(item.title) usedTitles.push(item.title)
         items.push(item)
-        if(item.id) sbUpsertItem(item)
+        log('Writing to Supabase: ' + (item.title||'').slice(0,40), 'dim')
+        var writeOk = await sbUpsertItem(item)
+        log('Supabase domain write result: ' + writeOk, 'dim')
         if(item.uc_suggest) sbUpsertUC({id:'uc-'+item.id,uc_name:item.uc_suggest,cluster:'',rationale:'From '+domain.name+' scrape',source_intel_id:item.id,source_title:item.title,domain_code:domain.code,status:'pending'})
       }
     }catch(err){
