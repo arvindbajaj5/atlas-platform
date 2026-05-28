@@ -188,23 +188,34 @@ To add (v1.2): `intelligence_stream (market_pulse/domain_intel/tech_watch), prob
 
 ---
 
+## Build Sequence (confirmed — left to right on lifecycle)
+
+```
+STAGE 1 — Intelligence Scraper v1.2 + Supabase updates
+STAGE 2 — Second Brain v2 (reads Supabase + Sales Actions light)
+STAGE 3 — Customer Intelligence PEI enhancements
+STAGE 4 — AI Centre Builder fix
+STAGE 5 — Engagement Configurator
+STAGE 6 — GitHub Actions automation
+```
+
+Each stage feeds the next — build and test in sequence.
+
 ## Current Pending Items
 
-| # | Item | Priority |
-|---|---|---|
-| 1 | Intelligence Scraper v1.2 — three prompt types, enrichment phase, richer schema, intelligence_stream field | 🔴 Next build |
-| 2 | Supabase schema update — add new fields for v1.2 | 🔴 With scraper v1.2 |
-| 3 | Second Brain v2 — reads Supabase, three streams, UC queue | 🔴 After scraper v1.2 |
-| 4 | Scraper — restore item count below log | 🟡 With v1.2 |
-| 5 | PEI — save API key in config | 🟡 Next iteration |
-| 6 | PEI — query Supabase intel DB before Gemini, match by sector/country/ownership, "From Intelligence DB" section | 🟡 Next iteration |
-| 7 | AI Centre Builder — form empty, investigate and fix | 🔴 Check first next session |
-| 8 | GitHub Actions → write to Supabase | 🔴 After scraper stable |
-| 9 | Sales Actions (light) — "Create Action" from intelligence item, assign/track/convert to engagement, Supabase sales_actions table, built inside Second Brain v2 | 🔴 Build with Second Brain v2 |
-| 10 | Engagement Configurator | 🔴 After Second Brain |
-| 11 | GDrive sync | 🔴 Low priority |
-| 12 | RAC Tool exports testing | 🟡 Cosmetic |
-| 13 | `tool-features.md` v1.1 | ⏸ On hold |
+| # | Item | Stage | Priority |
+|---|---|---|---|
+| 1 | Intelligence Scraper v1.2 — three prompt types (Market Pulse/Domain Intel/Tech Watch), enrichment Phase 2, richer schema, intelligence_stream field, item count below log restored | 1 | 🔴 Next build |
+| 2 | Supabase schema update — add: intelligence_stream, problem_statement, technical_context, infrastructure_signals, uc_extracted, enriched_at, depth_score, sales_actions table | 1 | 🔴 With scraper v1.2 |
+| 3 | Second Brain v2 — reads Supabase, three stream views, UC queue, Sales Actions light (Create Action → assign → convert to Engagement) | 2 | 🔴 After stage 1 |
+| 4 | PEI — save API key in config | 3 | 🟡 After stage 2 |
+| 5 | PEI — query Supabase before Gemini, match by sector/country/ownership, "From Intelligence DB" section | 3 | 🟡 After stage 2 |
+| 6 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 After stage 3 |
+| 7 | Engagement Configurator — receives converted Sales Actions, full lifecycle | 5 | 🔴 After stage 3 |
+| 8 | GitHub Actions → Supabase (automated scraping) | 6 | 🔴 After scraper stable |
+| 9 | GDrive sync | — | 🔴 Low priority |
+| 10 | RAC Tool exports testing | — | 🟡 Cosmetic |
+| 11 | `tool-features.md` v1.1 | — | ⏸ On hold |
 
 ---
 
