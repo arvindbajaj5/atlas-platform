@@ -927,6 +927,8 @@ async function scrapeDomain(domain){
         var item = extracted[0]
         if(item.title) usedTitles.push(item.title)
         items.push(item)
+        if(item.id) sbUpsertItem(item)
+        if(item.uc_suggest) sbUpsertUC({id:'uc-'+item.id,uc_name:item.uc_suggest,cluster:'',rationale:'From '+domain.name+' scrape',source_intel_id:item.id,source_title:item.title,domain_code:domain.code,status:'pending'})
       }
     }catch(err){
       log('Item ' + (i+1) + ' failed for ' + domain.code + ': ' + err.message, 'warn')
