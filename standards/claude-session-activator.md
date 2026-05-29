@@ -215,6 +215,18 @@ Single localStorage key `atlas_global_cfg` shared across all tools. Set once in 
 
 **Migration:** On save, portal Settings auto-populates legacy keys (`atlas_api_key`, `atlas_gemini_key`) and tool-specific configs (`atlas_sb2_cfg`, `atlas_pei_cfg`, `atlas_scraper_cfg`).
 
+**Model tiers by task (defaults):**
+
+| Task | Default model | Rationale |
+|---|---|---|
+| Scraping | `gemini-3.1-flash-lite` | High volume, quality not critical |
+| Intel Enrichment | `gemini-3.1-flash-lite` | High volume |
+| UC Auto-Enrichment | `gemini-3.5-flash` | Needs reasoning |
+| PEI Brief | `claude-haiku-4-5-20251001` | Better long-form synthesis, $1/$5 per MTok |
+| Document Generation | `claude-haiku-4-5-20251001` | Quality matters, upgrade to Sonnet for flagship |
+| Indic / Regional | `sarvam-m` | Domain fit |
+| Air-Gapped | `llama3.3` | Zero data egress |
+
 **7 AI Providers supported:**
 | Provider | Region | Model IDs |
 |---|---|---|
