@@ -12,7 +12,7 @@ const SUPABASE_KEY   = process.env.SUPABASE_KEY
 const ITEMS_PER_DOMAIN = parseInt(process.env.ITEMS_PER_DOMAIN || '5')
 const RUN_ENRICHMENT   = process.env.RUN_ENRICHMENT !== 'false'
 const DOMAINS_OVERRIDE = process.env.DOMAINS_OVERRIDE || ''
-const MODEL = 'gemini-3.1-flash-lite'
+const MODEL = process.env.SCRAPE_MODEL || 'gemini-3.1-flash-lite'  // Set via GitHub secret SCRAPE_MODEL or defaults to lite
 const DELAY_MS = 2000  // delay between API calls
 
 if (!GEMINI_API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
