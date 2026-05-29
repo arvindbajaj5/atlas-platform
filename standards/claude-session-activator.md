@@ -239,11 +239,13 @@ STAGE 6 — GitHub Actions automation                    ✅ COMPLETE
 | # | Item | Stage | Priority |
 |---|---|---|---|
 | 1 | Intelligence Scraper — results panel below log not populating after run | 1 | 🟡 Next iteration |
+| 1b | Intelligence Scraper — duplicates still appearing in Market Pulse despite dedup — tighten title matching or add URL/date dedup | 1 | 🟡 Next iteration |
 | 2 | PEI — save API key in config | 3 | 🔴 Next build |
 | 3 | PEI — query Supabase before Gemini, match by sector/country/ownership, "From Intelligence DB" section | 3 | 🔴 Next build |
 | 4 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 After PEI |
 | 5 | Engagement Configurator — receives converted Sales Actions, full lifecycle docket | 5 | 🔴 Major build |
 | 6 | UC Library — manual add + bulk import (39 GeoAI UCs + civil aviation UCs) | 2 | 🔴 With Second Brain v2.2 |
+| 6b | UC Library — rich structured form per UC: problem, benefit, how it works, process steps, key actors, data requirements, technical requirements, model type, hardware profile, maturity, reference deployments, regulatory, estimated effort | 2 | 🔴 v2.2 |
 | 7 | Second Brain — UC Library tab (rich form, manual add, bulk import) | 2 | 🔴 v2.2 |
 | 8 | Network Graph View — D3.js force-directed graph in Second Brain | 2 | 🟡 Stretch goal |
 | 9 | GDrive sync | — | 🔴 Low priority |
