@@ -440,43 +440,169 @@ function showTodo(){
 }
 
 function showSettings(){
-  document.getElementById('main').innerHTML=
-    '<div class="ph-title" style="margin-bottom:4px">&#9881; Settings</div>'
-    +'<div class="ph-sub">Business Head access only</div>'
-    +'<div class="card" style="max-width:520px"><div class="card-title">Company Logo</div>'
-    +'<div class="card-sub">Displayed in the portal masthead. PNG, JPG, or SVG. Max 200KB.</div>'
-    +'<div id="logo-preview-wrap" style="margin-bottom:12px;display:none">'
-    +'<img id="logo-preview" style="height:40px;border:1px solid #e0e0e8;border-radius:4px;padding:4px;background:var(--navy)"></div>'
-    +'<label class="btn btn-secondary btn-sm" style="cursor:pointer;width:auto;display:inline-flex">&#11014; Upload Logo'
-    +'<input type="file" accept="image/*" style="display:none" onchange="handleLogoUpload(event)"></label>'
-    +'<button class="btn btn-sm" style="margin-left:8px;color:#DC2626;border:1px solid #DC2626;background:transparent" onclick="removeLogo()">Remove</button>'
-    +'</div>'
-    +'<div class="card" style="max-width:520px"><div class="card-title">AI Configuration</div>'
-    +'<div class="card-sub">Anthropic API key for Document Factory and Vision Document generation</div>'
-    +'<label>Anthropic API Key</label><input type="password" id="apiKey" placeholder="sk-ant-...">'
-    +'<button class="btn btn-secondary btn-sm" onclick="saveKey()">Save Key</button>'
-    +'</div>'
-    +'<div class="card" style="max-width:520px"><div class="card-title">Platform Information</div>'
-    +'<table><tr><td style="color:var(--mid);width:140px">Portal URL</td>'
-    +'<td><a href="'+BASE+'" target="_blank" style="color:var(--blue);font-size:12px">'+BASE+'</a></td></tr>'
-    +'<tr><td style="color:var(--mid)">Tools Deployed</td><td>'+Object.keys(TOOLS).length+'</td></tr>'
+  var gcfg=(function(){try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}}})()
+  var dModel=localStorage.getItem('atlas_default_model')||'gemini-3.1-flash-lite'
+  var PROV=[
+    {id:'gemini',   name:'Google Gemini',        flag:'\uD83C\uDDFA\uD83C\uDDF8',tag:'US',     hint:'aistudio.google.com',                       ph:'AIza...'},
+    {id:'openai',   name:'OpenAI',               flag:'\uD83C\uDDFA\uD83C\uDDF8',tag:'US',     hint:'platform.openai.com',                       ph:'sk-...'},
+    {id:'anthropic',name:'Anthropic Claude',     flag:'\uD83C\uDDFA\uD83C\uDDF8',tag:'US',     hint:'console.anthropic.com',                     ph:'sk-ant-...'},
+    {id:'mistral',  name:'Mistral AI',           flag:'\uD83C\uDDEB\uD83C\uDDF7',tag:'EU',     hint:'console.mistral.ai (GDPR, EU hosted)',       ph:'Mistral API key...'},
+    {id:'qwen',     name:'Qwen (Alibaba Cloud)', flag:'\uD83C\uDDE8\uD83C\uDDF3',tag:'CN/Intl',hint:'Alibaba Cloud Model Studio (dashscope-intl)',ph:'Alibaba Cloud key...'},
+    {id:'sarvam',   name:'Sarvam AI',            flag:'\uD83C\uDDEE\uD83C\uDDF3',tag:'India',  hint:'dashboard.sarvam.ai (Indic languages)',      ph:'Sarvam subscription key...'},
+    {id:'ollama',   name:'Ollama (Local)',        flag:'\uD83D\uDCBB',            tag:'On-Prem',hint:'Local server, zero data egress',             ph:'http://localhost:11434/v1/chat/completions'},
+  ]
+  var MODELS={
+    gemini:   [{id:'gemini-3.1-flash-lite',label:'3.1 Flash-Lite (default)'},{id:'gemini-3.5-flash',label:'3.5 Flash'}],
+    openai:   [{id:'gpt-4o',label:'GPT-4o'},{id:'gpt-4o-mini',label:'GPT-4o Mini'}],
+    anthropic:[{id:'claude-sonnet-4-6',label:'Sonnet 4.6'},{id:'claude-haiku-4-5-20251001',label:'Haiku 4.5'}],
+    mistral:  [{id:'mistral-large-latest',label:'Mistral Large 3'},{id:'mistral-small-latest',label:'Mistral Small 4'}],
+    qwen:     [{id:'qwen3.5-plus',label:'Qwen 3.5 Plus'},{id:'qwen3.5-flash',label:'Qwen 3.5 Flash'}],
+    sarvam:   [{id:'sarvam-m',label:'Sarvam-M 24B (multilingual)'}],
+    ollama:   [{id:'llama3.3',label:'Llama 3.3 70B'},{id:'mistral-nemo',label:'Mistral Nemo 12B'}],
+  }
+  var provHtml=PROV.map(function(p){
+    var key=p.id==='ollama'?(gcfg['endpoint_ollama']||''):(gcfg['key_'+p.id]||'')
+    var hasKey=key.length>0
+    var modelRows=(MODELS[p.id]||[]).map(function(m){
+      var isDef=m.id===dModel
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--light)">'
+        +'<span style="flex:1;font-size:11px;font-family:Roboto Mono,monospace">'+m.id+'</span>'
+        +'<span style="font-size:10px;color:var(--mid)">'+m.label+'</span>'
+        +'<button style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid '+(isDef?'var(--teal)':'var(--mid)')+';background:'+(isDef?'var(--teal)':'transparent')+';color:'+(isDef?'#fff':'var(--mid)')+';cursor:pointer;font-family:inherit" data-mid="'+m.id+'" onclick="setDefModel(this.dataset.mid)">'+(isDef?'\u2713 Default':'Set Default')+'</button>'
+        +'</div>'
+    }).join('')
+    return '<div style="border:1px solid '+(hasKey?'var(--teal)':'#e0e0e8')+';border-radius:8px;padding:14px;margin-bottom:10px;background:'+(hasKey?'rgba(0,178,144,0.03)':'var(--white)')+'">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+      +'<span style="width:8px;height:8px;border-radius:50%;background:'+(hasKey?'var(--teal)':'var(--mid)')+';flex-shrink:0;display:inline-block"></span>'
+      +'<span style="font-size:13px;font-weight:700;color:var(--navy)">'+p.flag+' '+p.name+'</span>'
+      +'<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;background:rgba(0,40,112,0.08);color:var(--navy)">'+p.tag+'</span>'
+      +'</div>'
+      +'<label style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;display:block">'+(p.id==='ollama'?'Endpoint URL':'API Key')+'</label>'
+      +'<input type="password" id="pkey-'+p.id+'" value="'+key.replace(/"/g,'&quot;')+'" placeholder="'+p.ph+'" style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:6px;font-size:12px;margin-bottom:4px;font-family:Roboto Mono,monospace">'
+      +'<div style="font-size:10px;color:var(--mid);margin-bottom:8px">'+p.hint+'</div>'
+      +'<div>'+modelRows+'</div>'
+      +'</div>'
+  }).join('')
+
+  document.getElementById('main').innerHTML='<div class="ph-title" style="margin-bottom:4px">\u2699\uFE0F Settings</div>'
+    +'<div class="ph-sub">Business Head access only \u00B7 All keys stored in this browser only</div>'
+    +'<div class="card" style="max-width:680px"><div class="card-title">Company Logo</div>'
+    +'<div class="card-sub">Displayed in the portal masthead. PNG, JPG, or SVG. Recommended height: 32px.</div>'
+    +'<div id="logo-preview-wrap" style="margin-bottom:12px;display:none"><img id="logo-preview" style="height:40px;border:1px solid #e0e0e8;border-radius:4px;padding:4px;background:var(--navy)"></div>'
+    +'<label class="btn btn-secondary btn-sm" style="cursor:pointer;width:auto;display:inline-flex">\u2B06 Upload Logo<input type="file" accept="image/*" style="display:none" onchange="handleLogoUpload(event)"></label>'
+    +'<button class="btn btn-sm" style="margin-left:8px;color:#DC2626;border:1px solid #DC2626;background:transparent" onclick="removeLogo()">Remove</button></div>'
+    +'<div class="card" style="max-width:680px"><div class="card-title">\uD83D\uDCCA Supabase \u2014 Intelligence Database</div>'
+    +'<div class="card-sub">Used by Second Brain, PEI, and all tools that read or write intelligence data.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">'
+    +'<div><label style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;display:block">Project URL</label><input type="text" id="cfg-sb-url" placeholder="https://xxxx.supabase.co" style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:6px;font-size:12px"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;display:block">Anon Key</label><input type="password" id="cfg-sb-key" placeholder="eyJ..." style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:6px;font-size:12px"></div>'
+    +'</div><div style="display:flex;gap:10px;align-items:center">'
+    +'<button class="btn btn-secondary btn-sm" onclick="saveGlobalSettings()">Save</button>'
+    +'<button class="btn btn-sm" style="background:var(--light);color:var(--navy);border:1px solid #d0d0d8" id="sbTestBtn" onclick="testSbFromSettings()">Test Connection</button>'
+    +'<span id="sbTestResult" style="font-size:11px"></span></div></div>'
+    +'<div class="card" style="max-width:680px"><div class="card-title">\uD83E\uDD16 AI Model Registry</div>'
+    +'<div class="card-sub">Configure API keys. Click Set Default to choose which model ATLAS tools use by default.</div>'
+    +provHtml
+    +'<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">'
+    +'<button class="btn btn-secondary" onclick="saveGlobalSettings()">Save All Keys</button>'
+    +'<button class="btn btn-sm" style="background:var(--light);color:var(--navy);border:1px solid #d0d0d8" onclick="exportGlobalSettings()">\u2B07 Export</button>'
+    +'<button class="btn btn-sm" style="background:var(--light);color:var(--navy);border:1px solid #d0d0d8" onclick="importGlobalSettings()">\u2B06 Import</button>'
+    +'<span id="saveSettingsMsg" style="font-size:11px;color:var(--teal);display:none">\u2713 Saved \u2014 all tools will use these settings</span>'
+    +'</div></div>'
+    +'<div class="card" style="max-width:680px"><div class="card-title">Platform Information</div>'
+    +'<div class="card-sub">ATLAS v1.0 \u00B7 GitHub Pages deployment</div><table>'
+    +'<tr><td style="color:var(--mid);width:140px">Portal URL</td><td><a href="'+BASE+'" target="_blank" style="color:var(--blue);font-size:12px">'+BASE+'</a></td></tr>'
+    +'<tr><td style="color:var(--mid)">Tools Deployed</td><td>'+Object.values(TOOLS).filter(function(t){return t.url}).length+' of '+Object.keys(TOOLS).length+'</td></tr>'
     +'<tr><td style="color:var(--mid)">Build Date</td><td>May 2026</td></tr>'
-    +'<tr><td style="color:var(--mid)">Stack</td><td>GitHub Pages + localStorage + Claude API</td></tr></table>'
-    +'</div>'
-    +'<div class="card" style="max-width:520px"><div class="card-title">Data Export</div>'
+    +'<tr><td style="color:var(--mid)">Stack</td><td>GitHub Pages + Supabase + Multi-provider AI</td></tr>'
+    +'</table></div>'
+    +'<div class="card" style="max-width:680px"><div class="card-title">Data Export</div>'
     +'<div class="card-sub">Export all ATLAS data for backup</div>'
-    +'<button class="btn btn-secondary btn-sm" onclick="exportData()">Export All Data (JSON)</button>'
-    +'</div>'
-  var k=localStorage.getItem('atlas_api_key')
-  if(k)document.getElementById('apiKey').value=k
+    +'<button class="btn btn-secondary btn-sm" onclick="exportData()">Export All Data (JSON)</button></div>'
+
+  var gcfg2=(function(){try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}}})()
+  if(gcfg2.sbUrl) document.getElementById('cfg-sb-url').value=gcfg2.sbUrl
+  if(gcfg2.sbKey) document.getElementById('cfg-sb-key').value=gcfg2.sbKey
   var logo=localStorage.getItem('atlas_logo')
   var prev=document.getElementById('logo-preview')
   var wrap=document.getElementById('logo-preview-wrap')
   if(logo&&prev&&wrap){prev.src=logo;wrap.style.display='block'}
 }
 
+function setDefModel(modelId){
+  localStorage.setItem('atlas_default_model',modelId)
+  showSettings()
+}
+
+function saveGlobalSettings(){
+  var gcfg=(function(){try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}}})()
+  var sbUrl=document.getElementById('cfg-sb-url').value.trim()
+  var sbKey=document.getElementById('cfg-sb-key').value.trim()
+  if(sbUrl) gcfg.sbUrl=sbUrl
+  if(sbKey) gcfg.sbKey=sbKey
+  var PIDS=['gemini','openai','anthropic','mistral','qwen','sarvam','ollama']
+  PIDS.forEach(function(pid){
+    var el=document.getElementById('pkey-'+pid)
+    if(el&&el.value.trim()){
+      if(pid==='ollama') gcfg['endpoint_ollama']=el.value.trim()
+      else gcfg['key_'+pid]=el.value.trim()
+    }
+  })
+  localStorage.setItem('atlas_global_cfg',JSON.stringify(gcfg))
+  if(gcfg['key_gemini']) localStorage.setItem('atlas_gemini_key',gcfg['key_gemini'])
+  if(gcfg['key_anthropic']) localStorage.setItem('atlas_api_key',gcfg['key_anthropic'])
+  if(sbUrl&&sbKey){
+    ['atlas_sb2_cfg','atlas_pei_cfg','atlas_scraper_cfg'].forEach(function(k){
+      try{var tc=JSON.parse(localStorage.getItem(k)||'{}');tc.url=sbUrl;tc.key=sbKey;if(gcfg['key_gemini'])tc.geminiKey=gcfg['key_gemini'];localStorage.setItem(k,JSON.stringify(tc))}catch(e){}
+    })
+  }
+  var msg=document.getElementById('saveSettingsMsg')
+  if(msg){msg.style.display='inline';setTimeout(function(){msg.style.display='none'},3000)}
+}
+
+async function testSbFromSettings(){
+  var url=document.getElementById('cfg-sb-url').value.trim()
+  var key=document.getElementById('cfg-sb-key').value.trim()
+  var res=document.getElementById('sbTestResult')
+  if(!url||!key){res.textContent='Enter URL and key first';res.style.color='var(--orange)';return}
+  document.getElementById('sbTestBtn').disabled=true
+  res.textContent='Testing...'
+  try{
+    var r=await fetch(url+'/rest/v1/intelligence_items?limit=1&select=id',{headers:{'apikey':key,'Authorization':'Bearer '+key}})
+    res.innerHTML=r.ok?'<span style="color:var(--teal)">\u2705 Connected</span>':'<span style="color:var(--orange)">\u274C Error '+r.status+'</span>'
+  }catch(e){
+    res.innerHTML='<span style="color:var(--orange)">\u274C '+e.message.slice(0,40)+'</span>'
+  }
+  document.getElementById('sbTestBtn').disabled=false
+}
+
+function exportGlobalSettings(){
+  var data={atlas_global_cfg:JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}'),atlas_default_model:localStorage.getItem('atlas_default_model')||''}
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+  var url=URL.createObjectURL(blob)
+  var a=document.createElement('a');a.href=url;a.download='atlas-settings-'+new Date().toISOString().slice(0,10)+'.json';a.click()
+  URL.revokeObjectURL(url)
+}
+
+function importGlobalSettings(){
+  var input=document.createElement('input');input.type='file';input.accept='.json'
+  input.onchange=function(e){
+    var reader=new FileReader()
+    reader.onload=function(ev){
+      try{
+        var obj=JSON.parse(ev.target.result)
+        if(obj.atlas_global_cfg) localStorage.setItem('atlas_global_cfg',JSON.stringify(obj.atlas_global_cfg))
+        if(obj.atlas_default_model) localStorage.setItem('atlas_default_model',obj.atlas_default_model)
+        alert('Settings imported.');showSettings()
+      }catch(err){alert('Invalid file: '+err.message)}
+    }
+    reader.readAsText(e.target.files[0])
+  }
+  input.click()
+}
+
 function saveKey(){
-  var k=document.getElementById('apiKey').value.trim()
+  const k=document.getElementById('apiKey')?document.getElementById('apiKey').value.trim():''
   if(k){localStorage.setItem('atlas_api_key',k);alert('API key saved.')}
 }
 
