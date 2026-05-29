@@ -791,10 +791,13 @@ async function aiEnrichUC(){
   
   // Get config for Gemini key
   var cfg = getCfg()
+  // Also check dedicated gemini key storage
+  if(!cfg.geminiKey) cfg.geminiKey = localStorage.getItem('atlas_gemini_key')||''
   if(!cfg.geminiKey){
-    var k = prompt('Enter your Gemini API key (stored in config):')
-    if(!k) return
+    var k = prompt('Enter your Gemini API key (will be saved):')
+    if(!k){ alert('Gemini API key is required for auto-enrichment.'); return }
     cfg.geminiKey = k
+    localStorage.setItem('atlas_gemini_key', k)
     setCfg(cfg)
   }
   
@@ -807,7 +810,9 @@ async function aiEnrichUC(){
   btn.disabled = true
   btn.textContent = 'Enriching...'
   status.style.display = 'block'
+  status.style.color = 'var(--mid)'
   status.textContent = 'Calling Gemini...'
+  console.log('aiEnrichUC: calling with key', cfg.geminiKey ? 'present' : 'MISSING', 'ucName:', ucName)
   
   var prompt = 'You are a senior AI solutions expert. Generate a complete structured use case definition for the following AI use case.'
     + ' UC NAME: ' + ucName + '.'
@@ -865,9 +870,12 @@ async function aiEnrichUC(){
     status.style.color = 'var(--teal)'
     btn.textContent = '\u21BA Re-Enrich with Gemini'
   }catch(e){
-    status.textContent = '\u274C Error: ' + e.message.slice(0,80)
+    var errMsg = e.message || String(e)
+    status.textContent = '\u274C ' + errMsg.slice(0,120)
     status.style.color = 'var(--orange)'
     btn.textContent = '\u21BA Retry Auto-Enrich'
+    console.error('aiEnrichUC error:', e)
+    alert('Enrichment error: ' + errMsg.slice(0,200))
   }
   btn.disabled = false
 }
