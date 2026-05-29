@@ -158,6 +158,10 @@ textarea{resize:vertical;min-height:70px;}
       <label class="lbl" style="margin-top:0">Supabase Anon Key</label>
       <input type="password" id="sbKey" placeholder="eyJ...">
     </div>
+    <div class="config-field">
+      <label class="lbl" style="margin-top:0">Gemini API Key</label>
+      <input type="password" id="geminiKey" placeholder="AIza...">
+    </div>
     <div>
       <button class="btn btn-primary btn-sm" onclick="saveConfig()">Save &amp; Connect</button>
     </div>
@@ -217,7 +221,11 @@ textarea{resize:vertical;min-height:70px;}
     <div class="modal-title">&#128161; Enrich Use Case</div>
     <input type="hidden" id="enrichUCId">
     <input type="hidden" id="enrichQueueId">
-    <div style="background:var(--light);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--mid)" id="enrichSourceInfo"></div>
+    <div style="background:var(--light);border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--mid)" id="enrichSourceInfo"></div>
+    <div style="margin-bottom:14px">
+      <button class="btn btn-primary" id="aiEnrichBtn" onclick="aiEnrichUC()" style="width:100%">&#129504; Auto-Enrich with Gemini</button>
+      <div id="aiEnrichStatus" style="font-size:11px;color:var(--mid);margin-top:6px;text-align:center;display:none"></div>
+    </div>
     <label class="lbl">UC Name *</label>
     <input type="text" id="enrichName" placeholder="Specific, actionable use case name">
     <label class="lbl">Cluster / Category</label>
@@ -338,8 +346,9 @@ function getTeam(){ try{ return JSON.parse(localStorage.getItem('atlas_sb2_team'
 function saveConfig(){
   var url = document.getElementById('sbUrl').value.trim()
   var key = document.getElementById('sbKey').value.trim()
-  if(!url||!key){ alert('Enter both URL and key.'); return }
-  setCfg({url:url, key:key})
+  if(!url||!key){ alert('Enter both Supabase URL and key.'); return }
+  var gemKey = document.getElementById('geminiKey').value.trim()
+  setCfg({url:url, key:key, geminiKey:gemKey})
   document.getElementById('configCard').style.display = 'none'
   init()
 }
@@ -350,6 +359,7 @@ function toggleConfig(){
   var cfg = getCfg()
   if(cfg.url) document.getElementById('sbUrl').value = cfg.url
   if(cfg.key) document.getElementById('sbKey').value = cfg.key
+  if(cfg.geminiKey) document.getElementById('geminiKey').value = cfg.geminiKey
 }
 
 // \u2500\u2500 Supabase helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -773,6 +783,93 @@ function openEnrichModal(queueId, ucName, rationale, sourceTitle, sourceIntelId,
   // If we have a source intel item, try to pre-fill from its enrichment
   if(sourceIntelId) prefillFromIntel(sourceIntelId)
   document.getElementById('enrichModal').classList.add('open')
+}
+
+async function aiEnrichUC(){
+  var ucName = document.getElementById('enrichName').value.trim()
+  if(!ucName){ alert('Enter a UC Name first so Gemini knows what to enrich.'); return }
+  
+  // Get config for Gemini key
+  var cfg = getCfg()
+  if(!cfg.geminiKey){
+    var k = prompt('Enter your Gemini API key (stored in config):')
+    if(!k) return
+    cfg.geminiKey = k
+    setCfg(cfg)
+  }
+  
+  // Gather context from form
+  var domainCode = document.getElementById('enrichDomains').value.trim() || (currentEntry ? currentEntry.name : '')
+  var sourceInfo = document.getElementById('enrichSourceInfo').textContent || ''
+  
+  var btn = document.getElementById('aiEnrichBtn')
+  var status = document.getElementById('aiEnrichStatus')
+  btn.disabled = true
+  btn.textContent = 'Enriching...'
+  status.style.display = 'block'
+  status.textContent = 'Calling Gemini...'
+  
+  var prompt = 'You are a senior AI solutions expert. Generate a complete structured use case definition for the following AI use case.'
+    + ' UC NAME: ' + ucName + '.'
+    + ' DOMAIN: ' + domainCode + '.'
+    + ' CONTEXT: ' + sourceInfo.slice(0,300) + '.'
+    + ' Respond with a SINGLE JSON object using ONLY these exact fields:'
+    + ' problem_statement (2-3 sentences: what problem this solves and why it matters),'
+    + ' benefit (quantified benefit: cost saving, efficiency gain, risk reduction),'
+    + ' description (3-4 sentences: how the AI works, what approach is used),'
+    + ' process_steps (array of 5-7 strings: step-by-step implementation process),'
+    + ' key_actors (array of 4-6 strings: organisations/roles who use, benefit, approve),'
+    + ' data_requirements (what data is needed, format, volume, frequency, sources),'
+    + ' technical_requirements (compute needs, connectivity, latency, deployment constraints),'
+    + ' model_type (e.g. Computer Vision, NLP, Time Series, Multimodal, Reinforcement Learning),'
+    + ' hardware_profile (e.g. Edge GPU node, Central GPU cluster, Air-gapped, DLC rack),'
+    + ' regulatory (compliance, data sovereignty, clearance requirements if any),'
+    + ' reference_deployments (array of 2-4 strings: where similar systems exist globally),'
+    + ' estimated_effort (implementation complexity: e.g. 3-6 months, High complexity).'
+    + ' Start with { end with }. No markdown. No backticks.'
+  
+  try{
+    var model = 'gemini-3.1-flash-lite'
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+cfg.geminiKey
+    var body = {
+      contents:[{role:'user',parts:[{text:prompt}]}],
+      generationConfig:{temperature:0.2, maxOutputTokens:2048, thinkingConfig:{thinkingBudget:0}}
+    }
+    var resp = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+    if(!resp.ok) throw new Error('Gemini error: ' + resp.status)
+    var data = await resp.json()
+    var raw = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // Parse JSON
+    var first = raw.indexOf('{')
+    if(first >= 0) raw = raw.slice(first)
+    var last = raw.lastIndexOf('}')
+    if(last >= 0) raw = raw.slice(0, last+1)
+    var enriched = JSON.parse(raw)
+    
+    // Populate form fields
+    if(enriched.problem_statement) document.getElementById('enrichProblem').value = enriched.problem_statement
+    if(enriched.benefit) document.getElementById('enrichBenefit').value = enriched.benefit
+    if(enriched.description) document.getElementById('enrichDescription').value = enriched.description
+    if(Array.isArray(enriched.process_steps)) document.getElementById('enrichSteps').value = enriched.process_steps.join('\n')
+    if(Array.isArray(enriched.key_actors)) document.getElementById('enrichActors').value = enriched.key_actors.join(', ')
+    if(enriched.data_requirements) document.getElementById('enrichData').value = enriched.data_requirements
+    if(enriched.technical_requirements) document.getElementById('enrichTech').value = enriched.technical_requirements
+    if(enriched.model_type) document.getElementById('enrichModelType').value = enriched.model_type
+    if(enriched.hardware_profile) document.getElementById('enrichHardware').value = enriched.hardware_profile
+    if(enriched.regulatory) document.getElementById('enrichRegulatory').value = enriched.regulatory
+    if(Array.isArray(enriched.reference_deployments)) document.getElementById('enrichRefs').value = enriched.reference_deployments.join(', ')
+    if(enriched.estimated_effort) document.getElementById('enrichEffort').value = enriched.estimated_effort
+    
+    status.textContent = '\u2705 Enriched by Gemini \u2014 review and edit before saving'
+    status.style.color = 'var(--teal)'
+    btn.textContent = '\u21BA Re-Enrich with Gemini'
+  }catch(e){
+    status.textContent = '\u274C Error: ' + e.message.slice(0,80)
+    status.style.color = 'var(--orange)'
+    btn.textContent = '\u21BA Retry Auto-Enrich'
+  }
+  btn.disabled = false
 }
 
 async function prefillFromIntel(intelId){
