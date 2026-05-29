@@ -1,6 +1,6 @@
 # claude-session-activator.md
 # ATLAS Claude Session Activator
-# Version: 1.9 | Last Updated: 2026-05-29
+# Version: 2.0 | Last Updated: 2026-05-29
 
 ---
 
@@ -41,8 +41,8 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | Tool | Version | Status | Path |
 |---|---|---|---|
 | Portal | v2.0 | ✅ Live | `index.html` |
-| Second Brain | v2.2 | ✅ Live | `tools/second-brain/` |
-| Customer Intelligence (PEI) | v0.2 | ✅ Live | `tools/pei-tool/` |
+| Second Brain | v2.2 | ✅ Live (91KB) | `tools/second-brain/` |
+| Customer Intelligence (PEI) | v0.2 | ✅ Live (79KB) | `tools/pei-tool/` |
 | Intelligence Scraper | v1.3 | ✅ Live | `tools/intelligence-scraper/` |
 | Engagement Management | v1.0 | ✅ Live | `tools/engagement-management/` |
 | AI Centre Builder | v1.1 | ⚠️ Form empty — pending fix | `tools/ai-centre-builder/` |
@@ -70,7 +70,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | `blacklist-whitelist.md` | v1.0 | ✅ Live |
 | `domain-taxonomy.md` | v1.1 | ✅ Live |
 | `tool-features.md` | v1.0 | ⏸ Needs v1.1 |
-| `claude-session-activator.md` | v1.9 | ✅ This file |
+| `claude-session-activator.md` | v2.0 | ✅ This file |
 
 ---
 
@@ -205,6 +205,18 @@ New fields on `intelligence_items`: `intelligence_stream`, `problem_statement`, 
 
 ---
 
+## ATLAS Model Registry (shared utility — embedded in all tools)
+
+Single source of truth for AI provider configuration. Embedded in Portal, Second Brain, PEI, and all future tools. Key functions:
+
+- `atlasGetConfiguredProviders()` — returns only providers with keys set in Settings
+- `atlasBuildModelSelect(selectedModel)` — builds `<select>` HTML showing only configured providers and their models
+- `atlasGetKeyForModel(modelId)` — returns the correct API key for any model
+- `atlasCallModel(modelId, prompt, systemPrompt, maxTokens)` — universal call, routes to correct provider API
+- `atlasGetTaskModel(taskId)` — reads task-specific model from `atlas_global_cfg.model_tiers`
+
+**Design principle:** Tool dropdowns show ONLY models whose provider key is configured in Settings. No key = no models shown from that provider.
+
 ## Global Settings (atlas_global_cfg)
 
 Single localStorage key `atlas_global_cfg` shared across all tools. Set once in portal Settings panel (Business Head only). Contains:
@@ -274,8 +286,8 @@ STAGE 6 — GitHub Actions automation                    ✅ COMPLETE
 | # | Item | Stage | Priority |
 |---|---|---|---|
 | 1 | Intelligence Scraper — results panel below log not populating after run | 1 | 🟡 Deferred |
-| 1b | Intelligence Scraper — duplicates in Market Pulse — Supabase dedup added (18m window), further tightening if needed | 1 | 🟡 Monitor |
-| 2 | PEI v0.2 — ✅ DONE: config saved, Supabase query before Gemini, "From Intelligence DB" section, multi-model selector | 3 | ✅ Complete |
+| 1b | Intelligence Scraper — Market Pulse duplicates — monitoring | 1 | 🟡 Monitor |
+| 2 | PEI v0.2 — ✅ DONE | 3 | ✅ Complete |
 | 4 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 Next |
 | 5 | Engagement Configurator — receives converted Sales Actions, full lifecycle docket | 5 | 🔴 Major build |
 | 6 | UC Library — manual add + bulk import (39 GeoAI UCs + civil aviation UCs) | 2 | 🔴 With Second Brain v2.2 |
