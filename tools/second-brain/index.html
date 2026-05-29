@@ -681,6 +681,11 @@ function renderUCItems(){
       var matBadge = item.maturity ? '<span class="badge" style="background:rgba(0,178,144,0.1);color:var(--teal)">'+item.maturity+'</span>' : ''
       var hwBadge = item.hardware_profile ? '<span class="badge badge-di">'+esc(item.hardware_profile.slice(0,30))+'</span>' : ''
       var expanded = ''
+      // Always show source domain + AI model + processing if available (imported UCs)
+      if(item.source_domain) expanded += '<div class="intel-field"><div class="intel-field-label">Source Domain</div><div class="intel-field-val">'+esc(item.source_domain)+'</div></div>'
+      if(item.ai_model) expanded += '<div class="intel-field"><div class="intel-field-label">AI Model</div><div class="intel-field-val">'+esc(item.ai_model)+'</div></div>'
+      if(item.processing_type) expanded += '<div class="intel-field"><div class="intel-field-label">Processing Type</div><div class="intel-field-val">'+esc(item.processing_type)+'</div></div>'
+      if(item.hardware_profile) expanded += '<div class="intel-field"><div class="intel-field-label">Hardware Profile</div><div class="intel-field-val">'+esc(item.hardware_profile)+'</div></div>'
       if(item.problem_statement) expanded += '<div class="intel-field"><div class="intel-field-label">Problem</div><div class="intel-field-val">'+esc(item.problem_statement)+'</div></div>'
       if(item.benefit) expanded += '<div class="intel-field"><div class="intel-field-label">Benefit</div><div class="intel-field-val">'+esc(item.benefit)+'</div></div>'
       if(item.description) expanded += '<div class="intel-field"><div class="intel-field-label">How It Works</div><div class="intel-field-val">'+esc(item.description)+'</div></div>'
@@ -694,6 +699,7 @@ function renderUCItems(){
       if(item.regulatory) expanded += '<div class="intel-field"><div class="intel-field-label">Regulatory</div><div class="intel-field-val">'+esc(item.regulatory)+'</div></div>'
       var refs = Array.isArray(item.reference_deployments) ? item.reference_deployments : []
       if(refs.length) expanded += '<div class="intel-field"><div class="intel-field-label">Reference Deployments</div><div class="intel-field-val">'+refs.map(esc).join(', ')+'</div></div>'
+      if(item.estimated_effort) expanded += '<div class="intel-field"><div class="intel-field-label">Estimated Effort</div><div class="intel-field-val">'+esc(item.estimated_effort)+'</div></div>'
       return '<div class="uc-card">'
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px">'
         +'<div><div class="uc-name">'+esc(item.uc_name||'')+'</div>'
@@ -701,9 +707,10 @@ function renderUCItems(){
         +'<span class="uc-status accepted">library</span>'
         +'</div>'
         +(item.problem_statement?'<div style="font-size:12px;color:#555;line-height:1.5;margin-bottom:8px">'+esc(item.problem_statement.slice(0,120))+'</div>':'')
-        +(expanded?'<div class="intel-expanded" id="ucexp-'+item.id+'">'+expanded+'</div>':'')
-        +'<div style="display:flex;gap:6px;margin-top:8px">'
-        +(expanded?'<button class="btn btn-outline btn-xs" data-eid="ucexp-'+item.id+'" onclick="toggleExpLib(this.dataset.eid)">&#9660; Details</button>':'')
+        +'<div class="intel-expanded" id="ucexp-'+item.id+'">'+(expanded||'<em style="font-size:11px;color:var(--mid)">Basic entry &#8212; click Enrich to add full details.</em>')+'</div>'
+        +'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'
+        +'<button class="btn btn-outline btn-xs" data-eid="ucexp-'+item.id+'" onclick="toggleExpLib(this.dataset.eid)">&#9660; Details</button>'
+        +'<button class="btn btn-primary btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'').replace(/"/g,'&quot;')+'" data-domain="'+(Array.isArray(item.domain_codes)&&item.domain_codes.length?item.domain_codes[0]:'')+'" onclick="openEnrichLibUC(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9999; Enrich</button>'
         +'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'').replace(/"/g,'&quot;')+'" data-domain="'+(currentEntry.code||'')+'" onclick="openActionModal(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9889; Use in Engagement</button>'
         +'</div></div>'
     }).join('')
@@ -781,6 +788,38 @@ async function prefillFromIntel(intelId){
     document.getElementById('enrichHardware').value = infra.join(', ')
 }
 
+async function openEnrichLibUC(libId, ucName, domainCode){
+  // Fetch full item from uc_library
+  var items = await sbFetch('uc_library','id=eq.'+libId,1)
+  if(!items.length){ alert('Could not load UC.'); return }
+  var item = items[0]
+  
+  document.getElementById('enrichUCId').value = libId
+  document.getElementById('enrichQueueId').value = ''
+  document.getElementById('enrichName').value = item.uc_name||''
+  document.getElementById('enrichCluster').value = item.cluster||''
+  var codes = Array.isArray(item.domain_codes) ? item.domain_codes : []
+  document.getElementById('enrichDomains').value = codes.join(', ')
+  document.getElementById('enrichMaturity').value = item.maturity||'emerging'
+  document.getElementById('enrichProblem').value = item.problem_statement||''
+  document.getElementById('enrichBenefit').value = item.benefit||''
+  document.getElementById('enrichDescription').value = item.description||''
+  var steps = Array.isArray(item.process_steps) ? item.process_steps : []
+  document.getElementById('enrichSteps').value = steps.join('\n')
+  var actors = Array.isArray(item.key_actors) ? item.key_actors : []
+  document.getElementById('enrichActors').value = actors.join(', ')
+  document.getElementById('enrichData').value = item.data_requirements||''
+  document.getElementById('enrichTech').value = item.technical_requirements||''
+  document.getElementById('enrichModelType').value = item.model_type||item.ai_model||''
+  document.getElementById('enrichHardware').value = item.hardware_profile||''
+  document.getElementById('enrichRegulatory').value = item.regulatory||''
+  var refs = Array.isArray(item.reference_deployments) ? item.reference_deployments : []
+  document.getElementById('enrichRefs').value = refs.join(', ')
+  document.getElementById('enrichEffort').value = item.estimated_effort||''
+  document.getElementById('enrichSourceInfo').innerHTML = '<strong>Editing library UC:</strong> '+esc(item.uc_name||'')+(item.source_domain?' | Source: '+esc(item.source_domain):'')
+  document.getElementById('enrichModal').classList.add('open')
+}
+
 async function saveEnrichedUC(){
   var name = document.getElementById('enrichName').value.trim()
   if(!name){ alert('UC Name is required.'); return }
@@ -825,14 +864,20 @@ async function saveEnrichedUC(){
     source_intel_id: null
   }
   
-  var ok = await sbInsert('uc_library', ucRow)
+  var libId = document.getElementById('enrichUCId').value
+  var ok = false
+  if(libId){
+    // Update existing library item
+    ok = await sbPatch('uc_library','id=eq.'+libId, ucRow)
+  } else {
+    // Insert new library item
+    ok = await sbInsert('uc_library', ucRow)
+    if(ok && queueId) await sbPatch('uc_queue','id=eq.'+queueId,{status:'accepted'})
+  }
   if(ok){
-    // If from queue, mark as accepted
-    if(queueId) await sbPatch('uc_queue','id=eq.'+queueId,{status:'accepted'})
     closeModal('enrichModal')
     cachedUC = []
     await loadUC()
-    log('UC saved to library: '+name, 'success')
   } else {
     alert('Failed to save. Check Supabase connection.')
   }
