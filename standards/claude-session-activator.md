@@ -156,6 +156,8 @@ GEO-SPA = civilian geospatial (NRSC, Survey of India, Pixxel). Defence geospatia
 
 ## Intelligence Engine Architecture (FINAL)
 
+⚠️ **CRITICAL NOTE:** Current scraper generates SYNTHETIC intelligence from Gemini training data. Items are NOT sourced from real web content. Must be rebuilt with real web search before any sales use. See pending item 1c.
+
 **Two-phase pipeline — browser (on-demand) + GitHub Actions (scheduled):**
 
 ```
@@ -327,6 +329,7 @@ engagements (id ENG-YYYY-SECTOR-NNNN, customer_id, division_id, name,
 | # | Item | Stage | Priority |
 |---|---|---|---|
 | 1 | Intelligence Scraper — results panel below log not populating after run | 1 | 🟡 Deferred |
+| 1c | Intelligence Scraper — CRITICAL: all items are synthetic (Gemini training data), NOT real web intelligence. Must rebuild with real web search. Constraint: zero cost. Options to deliberate: Gemini Search Grounding (free, built-in), RSS feeds (free), Gemini with web search tool. Source URLs must be stored and displayed in Second Brain. Multi-geography support needed (dropdown in settings). | 1 | 🔴 Deliberate next session |
 | 1b | Intelligence Scraper — Market Pulse duplicates — monitoring | 1 | 🟡 Monitor |
 | 2 | PEI v0.2 — ✅ DONE | 3 | ✅ Complete |
 | 4 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 Pending |
