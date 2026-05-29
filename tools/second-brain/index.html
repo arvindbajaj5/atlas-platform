@@ -736,8 +736,8 @@ function renderUCItems(){
         +'</div>'
         +'<div class="uc-rationale">'+esc(item.rationale||'')+'</div>'
         +(item.source_title?'<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Source: '+esc(item.source_title.slice(0,60))+'</div>':'')
-        +'<div style="display:flex;gap:6px">'
-        +(item.status==='pending'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" data-status="accepted" onclick="updateUC(this.dataset.id,this.dataset.status)">&#10003; Accept</button>':'')
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+        +(item.status==='pending'?'<button class="btn btn-primary btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'').replace(/"/g,'&quot;')+'" data-rationale="'+(item.rationale||'').replace(/"/g,'&quot;').slice(0,80)+'" data-source="'+(item.source_title||'').replace(/"/g,'&quot;').slice(0,60)+'" data-intel="'+(item.source_intel_id||'')+'" data-domain="'+(item.domain_code||'')+'" onclick="openEnrichModal(this.dataset.id,this.dataset.name,this.dataset.rationale,this.dataset.source,this.dataset.intel,this.dataset.domain)">&#9999; Enrich &rarr; Library</button>':'')
         +(item.status==='pending'?'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" data-status="rejected" onclick="updateUC(this.dataset.id,this.dataset.status)">&#10007; Reject</button>':'')
         +(item.status==='accepted'?'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'').replace(/"/g,'&quot;')+'" data-domain="'+(currentEntry.code||'')+'" onclick="openActionModal(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9889; Action</button>':'')
         +'</div></div>'
