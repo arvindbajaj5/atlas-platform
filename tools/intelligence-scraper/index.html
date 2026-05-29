@@ -237,14 +237,7 @@ input:focus,select:focus{border-color:var(--blue);}
       </div>
     </div>
 
-    <!-- TOKEN METER -->
-    <div id="tokenMeter" style="display:none;margin-top:14px">
-      <div class="token-row">
-        <span class="token-label">Session tokens used</span>
-        <span class="token-val" id="meterTokens">0</span>
-        <span class="token-cost" id="meterCost">~$0.000</span>
-      </div>
-    </div>
+
   </div>
 
   <!-- LIVE LOG -->
@@ -805,9 +798,7 @@ async function callGemini(prompt, label){
 
   document.getElementById('statTokens').textContent = sessionTokens.toLocaleString()
   document.getElementById('statCost').textContent = '$' + sessionCost.toFixed(4)
-  document.getElementById('meterTokens').textContent = sessionTokens.toLocaleString()
-  document.getElementById('meterCost').textContent = '~$' + sessionCost.toFixed(4)
-  document.getElementById('tokenMeter').style.display = 'block'
+  // token meter removed from HTML, stats row handles display
 
   log(label + ' &mdash; tokens: in=' + inTokens + ' out=' + outTokens + ' cost=~$' + ((inTokens*0.0000003)+(outTokens*0.0000025)).toFixed(5), 'dim')
 
@@ -1339,7 +1330,9 @@ async function runScraper(){
 
   // Phase 2: Enrich all newly scraped items
   await runEnrichmentPhase(allNewItems)
-  log('Scraping complete. ' + totalAdded + ' new items added. Total tokens: ' + sessionTokens.toLocaleString() + ' (~$' + sessionCost.toFixed(4) + ')', 'success')
+  log('', 'dim')
+  log('\u2500\u2500 RUN SUMMARY \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500', 'dim')
+  log('Items added: ' + totalAdded + ' | Session tokens: ' + sessionTokens.toLocaleString() + ' | Est. cost: ~$' + sessionCost.toFixed(4), 'success')
   running = false
   document.getElementById('runBtn').disabled = false
   document.getElementById('runBtn').textContent = '\u25B6 Run Scraper'
