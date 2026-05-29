@@ -450,7 +450,7 @@ async function sbUpsertItem(item){
   else if(item.focus) tgs = item.focus.split(',').slice(0,3).map(function(x){return x.trim()})
   var row = {
     id: item.id,
-    domain_code: item.domain_code || item.topic_code || '',
+    domain_code: item.domain_code || item.topic_code || 'UNKNOWN',
     source_type: item.source_type || 'domain',
     title: (t||'Untitled').slice(0,500),
     summary: (s||'').slice(0,1000),
@@ -466,7 +466,8 @@ async function sbUpsertItem(item){
     scraped_by: getConfig().scraperName || 'ATLAS',
     topic_code: item.topic_code||null,
     topic_name: item.topic_name||null,
-    domain_name: item.domain_name||null
+    domain_name: item.domain_name||null,
+    intelligence_stream: item.intelligence_stream || null
   }
   try{
     var resp = await fetch(sb.url+'/rest/v1/intelligence_items', {
@@ -475,13 +476,13 @@ async function sbUpsertItem(item){
         'apikey':sb.key,
         'Authorization':'Bearer '+sb.key,
         'Content-Type':'application/json',
-        'Prefer':'return=representation'
+        'Prefer':'resolution=ignore-duplicates,return=minimal'
       },
       body: JSON.stringify(row)
     })
     if(!resp.ok){
       var errText = await resp.text()
-      log('Supabase write error ' + resp.status + ': ' + errText.slice(0,200), 'error')
+      log('SB error ' + resp.status + ' [' + row.domain_code + '] ' + errText.slice(0,150), 'error')
       return false
     }
     log('Supabase write OK: ' + row.title.slice(0,40), 'dim')
@@ -1048,9 +1049,9 @@ function extractItems(raw, code, name, sourceType){
 
   // Normalise and stamp items
   items.forEach(function(item, i){
-    item.id = (sourceType==='news'?'news':'intel') + '-' + code + '-' + Date.now() + '-' + i
+    item.id = (sourceType==='news'?'news':'intel') + '-' + code.replace(/-/g,'') + '-' + Date.now() + '-' + i + '-' + Math.floor(Math.random()*9999)
     if(sourceType === 'domain'){ item.domain_code = code; item.domain_name = name }
-    else { item.topic_code = code; item.topic_name = name }
+    else { item.topic_code = code; item.topic_name = name; item.domain_code = code }
     item.scraped_at = now
     item.source_type = sourceType
     // Normalise field names
@@ -1153,6 +1154,7 @@ async function scrapeNews(topic){
       if(extracted2.length > 0){
         var item2 = extracted2[0]
         if(item2.title) usedTitlesN.push(item2.title)
+        if(!item2.intelligence_stream) item2.intelligence_stream = 'market_pulse'
         items.push(item2)
         if(item2.id) sbUpsertItem(item2)
       }
