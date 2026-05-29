@@ -1499,8 +1499,30 @@ async function saveAction(){
     cachedActions = []
     await loadActions()
     if(currentTab!=='actions') switchTab('actions')
+    // Offer Add to Docket
+    var title = document.getElementById('actTitle').value.trim()
+    var desc = document.getElementById('actDesc').value.trim()
+    var intelTitle = document.getElementById('actIntelTitle').value||''
+    var domain = document.getElementById('actDomain').value||''
+    offerAddToDocket({
+      type:'action',
+      title: title,
+      notes: desc || (intelTitle?'From intel: '+intelTitle:''),
+      content:{domain_code:domain, source_intel_title:intelTitle},
+      source_id: document.getElementById('actIntelId').value||null
+    })
   } else {
     alert('Failed to save. Check Supabase connection.')
+  }
+}
+
+function offerAddToDocket(item){
+  // Simple confirm dialog \u2014 opens docket tool in new tab pre-loaded if confirmed
+  if(confirm('Action saved. Add "'+item.title+'" to an Engagement Docket?')){
+    // Store pending item for docket tool to pick up
+    try{ localStorage.setItem('atlas_pending_docket_item', JSON.stringify(item)) }catch(e){}
+    // Open docket tool \u2014 it will auto-trigger the modal
+    window.open('../engagement-docket/index.html?addItem=1','_blank')
   }
 }
 
