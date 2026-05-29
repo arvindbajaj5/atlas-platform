@@ -1108,7 +1108,12 @@ async function scrapeDomain(domain){
       if(extracted.length > 0){
         var item = extracted[0]
         item.intelligence_stream = st.stream
+        if(sbTitles.has((item.title||'').toLowerCase().trim())){
+          log('Duplicate skipped: '+(item.title||'').slice(0,40), 'dim')
+          continue
+        }
         if(item.title) usedTitles.push(item.title)
+        if(item.title) sbTitles.add((item.title).toLowerCase().trim())
         items.push(item)
         if(item.id) sbUpsertItem(item)
         if(item.uc_suggest) sbUpsertUC({id:'uc-'+item.id, uc_name:item.uc_suggest, cluster:'', rationale:'From '+domain.name+' scrape ('+st.label+')', source_intel_id:item.id, source_title:item.title, domain_code:domain.code, status:'pending'})
@@ -1125,6 +1130,8 @@ async function scrapeNews(topic){
   var n2 = parseInt(cfg4.itemCount) || 5
   var items = []
   var usedTitlesN = []
+  var sbTitlesN = await getSupabaseTitles(topic.code)
+  log('Dedup: '+sbTitlesN.size+' existing news titles for '+topic.code, 'dim')
 
   var newsAngles = [
     'contract awards and vendor wins',
@@ -1155,6 +1162,12 @@ async function scrapeNews(topic){
         var item2 = extracted2[0]
         if(item2.title) usedTitlesN.push(item2.title)
         if(!item2.intelligence_stream) item2.intelligence_stream = 'market_pulse'
+        // Supabase dedup check
+        if(sbTitlesN.has((item2.title||'').toLowerCase().trim())){
+          log('News duplicate skipped: '+(item2.title||'').slice(0,40), 'dim')
+          continue
+        }
+        if(item2.title) sbTitlesN.add(item2.title.toLowerCase().trim())
         items.push(item2)
         if(item2.id) sbUpsertItem(item2)
       }
@@ -1166,6 +1179,24 @@ async function scrapeNews(topic){
   return items
 }
 
+
+async function getSupabaseTitles(domainCode){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return new Set()
+  var cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - 18)
+  var cutoffStr = cutoff.toISOString()
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/intelligence_items?domain_code=eq.'+domainCode+'&scraped_at=gte.'+cutoffStr+'&select=title&limit=500', {
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
+    })
+    if(resp.ok){
+      var rows = await resp.json()
+      return new Set(rows.map(function(r){ return (r.title||'').toLowerCase().trim() }))
+    }
+  }catch(e){ console.error('getSupabaseTitles:', e) }
+  return new Set()
+}
 
 function mergeItems(existing, newItems){
   var existingTitles = {}
@@ -1293,7 +1324,7 @@ async function runScraper(){
       meta[domain.code] = {last_scraped: new Date().toISOString(), total_items: result.merged.length, added_last_run: result.added}
       setMetaDB(meta)
       totalAdded += result.added
-      allNewItems = allNewItems.concat(result.merged.slice(-result.added))
+      allNewItems = allNewItems.concat(items)  // items from this scrape session
       setDomainStatus(domain.code, 'done', false)
       log('Done: ' + domain.code + ' &mdash; ' + result.added + ' new items added (' + result.merged.length + ' total)', 'success')
     }catch(err){
@@ -1320,7 +1351,7 @@ async function runScraper(){
       setMetaDB(meta)
       sbUpsertMeta('news_' + topic.code, nresult.merged.length, nresult.added)
       totalAdded += nresult.added
-      allNewItems = allNewItems.concat(nresult.merged.slice(-nresult.added))
+      allNewItems = allNewItems.concat(nitems)
       setDomainStatus(topic.code, 'done', true)
       log('Done: NEWS/' + topic.code + ' &mdash; ' + nresult.added + ' new items (' + nresult.merged.length + ' total)', 'success')
     }catch(err){
