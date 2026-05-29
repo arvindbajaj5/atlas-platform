@@ -360,6 +360,11 @@ function getCfg(){ try{ return JSON.parse(localStorage.getItem('atlas_sb2_cfg')|
 
 // Read from global ATLAS settings, fall back to local config
 function getGlobal(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } }
+function getTaskModel(taskId){
+  var g = getGlobal()
+  var DEFAULTS={scraping:'gemini-3.1-flash-lite',enrichment:'gemini-3.1-flash-lite',uc_enrich:'gemini-3.5-flash',pei:'claude-haiku-4-5-20251001',documents:'claude-haiku-4-5-20251001',specialist:'sarvam-m',airgap:'llama3.3'}
+  return (g.model_tiers&&g.model_tiers[taskId]) || localStorage.getItem('atlas_default_model') || DEFAULTS[taskId] || 'gemini-3.1-flash-lite'
+}
 function getSupabase(){
   var local = getCfg(), global = getGlobal()
   return { url: local.url||global.sbUrl||'', key: local.key||global.sbKey||'' }
@@ -935,7 +940,7 @@ async function aiEnrichUC(){
     + ' Start with { end with }. No markdown. No backticks.'
   
   try{
-    var model = 'gemini-3.1-flash-lite'
+    var model = getTaskModel('uc_enrich')
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+cfg.geminiKey
     var body = {
       contents:[{role:'user',parts:[{text:prompt}]}],
@@ -1281,7 +1286,7 @@ async function enrichIntelItem(itemId){
   var prompt = 'Enrich this intelligence item for an AI/HPC OEM. TITLE: '+(item.title||'').slice(0,100)+' SUMMARY: '+(item.summary||'').slice(0,200)+' DOMAIN: '+(item.domain_name||'')+'. Respond JSON only: problem_statement, technical_context, infrastructure_signals (array 3-5), opportunity, competitor_signals, uc_suggest, depth_score (1-10).'
   document.getElementById('im-fields').innerHTML = '<div style="font-size:12px;color:var(--mid)">Enriching with AI...</div>'
   try{
-    var model = getDefaultModel()
+    var model = getTaskModel('enrichment')
     var text = await callModel(prompt, model)
     var first = text.indexOf('{'), last = text.lastIndexOf('}')
     if(first < 0) throw new Error('No JSON in response')
