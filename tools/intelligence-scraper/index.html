@@ -1342,10 +1342,54 @@ async function runScraper(){
   updateStats()
   renderDomainGrid()
   renderNewsGrid()
-  renderResults()
+  renderRunResults(allNewItems)
 }
 
 // \u2500\u2500 Results \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function renderRunResults(allItems){
+  if(!allItems || allItems.length === 0){
+    renderResults()
+    return
+  }
+  // Group by domain_code or topic_code
+  var groups = {}
+  allItems.forEach(function(item){
+    var key = item.domain_code || item.topic_code || 'unknown'
+    if(!groups[key]) groups[key] = []
+    groups[key].push(item)
+  })
+  var keys = Object.keys(groups)
+  document.getElementById('resultsSection').style.display = 'block'
+  document.getElementById('resultsCount').textContent = allItems.length + ' new items added across ' + keys.length + ' domain(s)'
+  document.getElementById('resultsDom').innerHTML = keys.map(function(key){
+    var items = groups[key]
+    var label = key
+    var domainObj = (typeof DOMAINS !== 'undefined' ? DOMAINS : []).find(function(d){return d.code===key})
+    var newsObj = (typeof NEWS_TOPICS !== 'undefined' ? NEWS_TOPICS : []).find(function(t){return t.code===key})
+    if(domainObj) label = domainObj.icon + ' ' + domainObj.name
+    else if(newsObj) label = newsObj.icon + ' ' + newsObj.name
+    return '<div class="result-domain">'
+      + '<div class="result-domain-hdr" onclick="toggleResultSection(this)">'
+      + '<div class="result-domain-title">' + label + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<span class="result-domain-count">' + items.length + ' new</span>'
+      + '<span style="color:var(--mid);font-size:12px">&#9660;</span>'
+      + '</div></div>'
+      + '<div class="result-items">'
+      + items.map(function(item){
+          var streamBadge = item.intelligence_stream ? '<span class="tag tag-type">' + item.intelligence_stream.replace(/_/g,' ') + '</span>' : ''
+          var ucTag = item.uc_suggest ? '<span class="tag tag-uc">UC: ' + item.uc_suggest.slice(0,30) + '</span>' : ''
+          var valTag = item.intelligence_value === 'high' ? '<span class="tag tag-high">High</span>' : ''
+          return '<div class="result-item">'
+            + '<div class="result-item-title">' + (item.title||'') + '</div>'
+            + '<div class="result-item-summary">' + (item.summary||'').slice(0,120) + '</div>'
+            + '<div class="result-item-tags">' + streamBadge + valTag + ucTag + '</div>'
+            + '</div>'
+        }).join('')
+      + '</div></div>'
+  }).join('')
+}
+
 function renderResults(){
   var db = getIntelDB()
   var meta = getMetaDB()
