@@ -6,7 +6,7 @@
 <title>ATLAS &mdash; Second Brain</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--shadow:0 2px 8px rgba(0,0,0,0.08);}
+:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--shadow:0 2px 8px rgba(0,0,0,0.08);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;display:flex;flex-direction:column;}
 .hdr{background:var(--navy);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
@@ -23,153 +23,153 @@ body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);m
 .btn-outline:hover{background:var(--navy);color:var(--white);}
 .btn-teal{background:var(--teal);color:var(--white);}
 .btn-teal:hover{background:#009a7c;}
-.btn-amber{background:var(--amber);color:var(--dark);}
 .btn-sm{padding:5px 10px;font-size:11px;}
 .btn-xs{padding:3px 8px;font-size:10px;}
 .btn-danger{background:transparent;color:#DC2626;border:1px solid #DC2626;}
 .btn-danger:hover{background:#DC2626;color:var(--white);}
 .shell{display:flex;flex:1;overflow:hidden;}
-.sidebar{width:220px;background:var(--navy);overflow-y:auto;flex-shrink:0;padding:12px 0;}
-.sb-section{font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;padding:12px 16px 5px;}
-.sb-item{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;font-size:12px;color:rgba(255,255,255,0.7);cursor:pointer;transition:all 0.15s;border-left:3px solid transparent;}
+/* Sidebar */
+.sidebar{width:230px;background:var(--navy);overflow-y:auto;flex-shrink:0;padding:8px 0;}
+.sb-section{font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;padding:14px 16px 4px;}
+.sb-item{display:flex;align-items:center;justify-content:space-between;padding:7px 16px;font-size:12px;color:rgba(255,255,255,0.65);cursor:pointer;transition:all 0.15s;border-left:3px solid transparent;}
 .sb-item:hover,.sb-item.active{color:var(--white);background:rgba(255,255,255,0.08);border-left-color:var(--orange);}
-.sb-item-label{display:flex;align-items:center;gap:7px;}
-.sb-count{font-size:10px;font-weight:700;background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:8px;color:rgba(255,255,255,0.5);}
-.sb-count.has-data{background:rgba(0,178,144,0.2);color:var(--teal);}
-.main{flex:1;overflow-y:auto;padding:0;}
-.domain-hdr{padding:20px 24px 0;border-bottom:1px solid #e0e0e8;background:var(--white);}
+.sb-item-label{display:flex;align-items:center;gap:7px;flex:1;}
+.sb-count{font-size:10px;font-weight:700;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:8px;color:rgba(255,255,255,0.4);flex-shrink:0;}
+.sb-count.live{background:rgba(0,178,144,0.2);color:var(--teal);}
+/* DEF umbrella */
+.sb-cluster{padding:5px 16px 2px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;cursor:pointer;}
+.sb-cluster:hover{color:rgba(255,255,255,0.6);}
+.sb-sub{padding-left:12px;}
+.sb-sub .sb-item{font-size:11px;padding:5px 16px 5px 28px;color:rgba(255,255,255,0.5);}
+.sb-sub .sb-item:hover,.sb-sub .sb-item.active{color:var(--white);}
+/* Main */
+.main{flex:1;overflow-y:auto;}
+.domain-hdr{padding:20px 24px 0;border-bottom:1px solid #e0e0e8;background:var(--white);position:sticky;top:0;z-index:10;}
 .domain-title{font-size:20px;font-weight:700;color:var(--navy);margin-bottom:2px;}
-.domain-meta{font-size:12px;color:var(--mid);margin-bottom:14px;}
-.tabs{display:flex;gap:0;border-bottom:2px solid #e0e0e8;}
-.tab{padding:10px 20px;font-size:13px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
+.domain-sub{font-size:12px;color:var(--mid);margin-bottom:14px;}
+.tabs{display:flex;gap:0;}
+.tab{padding:10px 20px;font-size:13px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;}
 .tab:hover{color:var(--navy);}
 .tab.active{color:var(--navy);border-bottom-color:var(--orange);}
 .tab-content{padding:20px 24px;display:none;}
 .tab-content.active{display:block;}
-.filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
-.filter-btn{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #d0d0d8;background:var(--white);color:var(--mid);cursor:pointer;transition:all 0.15s;}
+/* Filter bar */
+.filter-bar{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.filter-btn{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #d0d0d8;background:var(--white);color:var(--mid);cursor:pointer;transition:all 0.15s;}
 .filter-btn:hover{border-color:var(--navy);color:var(--navy);}
 .filter-btn.active{background:var(--navy);color:var(--white);border-color:var(--navy);}
-.filter-btn.mp{background:rgba(255,85,57,0.1);color:var(--orange);border-color:rgba(255,85,57,0.3);}
-.filter-btn.mp.active{background:var(--orange);color:var(--white);border-color:var(--orange);}
-.filter-btn.di{background:rgba(0,40,112,0.08);color:var(--navy);border-color:rgba(0,40,112,0.2);}
-.filter-btn.di.active{background:var(--navy);color:var(--white);}
-.filter-btn.tw{background:rgba(0,178,144,0.08);color:var(--teal);border-color:rgba(0,178,144,0.3);}
-.filter-btn.tw.active{background:var(--teal);color:var(--white);border-color:var(--teal);}
+.filter-btn.mp.active{background:var(--orange);border-color:var(--orange);}
+.filter-btn.di.active{background:var(--navy);border-color:var(--navy);}
+.filter-btn.tw.active{background:var(--teal);border-color:var(--teal);}
+/* Intel cards */
 .intel-grid{display:flex;flex-direction:column;gap:10px;}
 .intel-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);}
 .intel-card:hover{border-color:#c0c0cc;}
 .intel-card-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
 .intel-title{font-size:13px;font-weight:700;color:var(--dark);line-height:1.4;flex:1;}
 .intel-badges{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
-.badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:0.3px;}
-.badge-mp{background:rgba(255,85,57,0.12);color:var(--orange);}
-.badge-di{background:rgba(0,40,112,0.1);color:var(--navy);}
-.badge-tw{background:rgba(0,178,144,0.12);color:var(--teal);}
-.badge-high{background:rgba(255,85,57,0.12);color:var(--orange);}
-.badge-medium{background:rgba(255,182,0,0.12);color:#9a7000;}
-.badge-low{background:rgba(180,180,190,0.2);color:var(--mid);}
-.badge-depth{background:rgba(28,56,245,0.1);color:var(--blue);}
-.intel-summary{font-size:12px;color:#555;line-height:1.6;margin-bottom:8px;}
+.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;text-transform:uppercase;letter-spacing:0.3px;display:inline-block;}
+.badge-mp{background:rgba(255,85,57,0.1);color:var(--orange);}
+.badge-di{background:rgba(0,40,112,0.08);color:var(--navy);}
+.badge-tw{background:rgba(0,178,144,0.1);color:var(--teal);}
+.badge-high{background:rgba(255,85,57,0.1);color:var(--orange);}
+.badge-medium{background:rgba(255,182,0,0.1);color:#9a7000;}
+.badge-low{background:rgba(180,180,190,0.15);color:var(--mid);}
+.badge-depth{background:rgba(28,56,245,0.08);color:var(--blue);}
+.intel-summary{font-size:12px;color:#555;line-height:1.6;margin-bottom:6px;}
 .intel-expanded{display:none;border-top:1px solid #f0f0f5;margin-top:8px;padding-top:8px;}
 .intel-expanded.open{display:block;}
-.intel-field{margin-bottom:6px;}
+.intel-field{margin-bottom:8px;}
 .intel-field-label{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:2px;}
 .intel-field-val{font-size:12px;color:var(--dark);line-height:1.5;}
-.intel-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;}
-.tag{font-size:10px;padding:2px 6px;border-radius:5px;background:var(--light);color:var(--mid);}
+.intel-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
+.tag{font-size:10px;padding:2px 6px;border-radius:4px;background:var(--light);color:var(--mid);}
 .tag-opp{background:rgba(0,178,144,0.08);color:var(--teal);}
 .tag-comp{background:rgba(255,85,57,0.08);color:var(--orange);}
-.intel-actions{display:flex;gap:6px;margin-top:10px;}
-.uc-grid{display:flex;flex-direction:column;gap:10px;}
-.uc-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);}
-.uc-card-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
-.uc-name{font-size:13px;font-weight:700;color:var(--dark);}
+.intel-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+/* UC cards */
+.uc-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px;}
+.uc-name{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:2px;}
 .uc-cluster{font-size:11px;color:var(--mid);margin-bottom:6px;}
-.uc-rationale{font-size:12px;color:#555;line-height:1.5;margin-bottom:10px;}
-.uc-status{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;}
+.uc-rationale{font-size:12px;color:#555;line-height:1.5;margin-bottom:8px;}
+.uc-status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;}
 .uc-status.pending{background:rgba(255,182,0,0.15);color:#9a7000;}
 .uc-status.accepted{background:rgba(0,178,144,0.15);color:var(--teal);}
 .uc-status.rejected{background:rgba(180,180,190,0.2);color:var(--mid);}
-.action-grid{display:flex;flex-direction:column;gap:10px;}
-.action-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);}
-.action-card.status-new{border-left:4px solid var(--blue);}
-.action-card.status-in_progress{border-left:4px solid var(--amber);}
-.action-card.status-converted{border-left:4px solid var(--teal);}
-.action-card.status-closed{border-left:4px solid var(--mid);opacity:0.7;}
-.action-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
-.action-title{font-size:13px;font-weight:700;color:var(--dark);}
-.action-meta{font-size:11px;color:var(--mid);margin-bottom:8px;}
-.action-desc{font-size:12px;color:#555;line-height:1.5;margin-bottom:10px;}
-.action-status{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;}
+/* Action cards */
+.action-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px;border-left:4px solid var(--mid);}
+.action-card.new{border-left-color:var(--blue);}
+.action-card.in_progress{border-left-color:var(--amber);}
+.action-card.converted{border-left-color:var(--teal);}
+.action-card.closed{opacity:0.6;}
+.action-title{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:2px;}
+.action-meta{font-size:11px;color:var(--mid);margin-bottom:6px;}
+.action-status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;}
 .action-status.new{background:rgba(28,56,245,0.1);color:var(--blue);}
 .action-status.in_progress{background:rgba(255,182,0,0.15);color:#9a7000;}
 .action-status.converted{background:rgba(0,178,144,0.15);color:var(--teal);}
 .action-status.closed{background:rgba(180,180,190,0.2);color:var(--mid);}
+/* Empty state */
 .empty-state{text-align:center;padding:60px 24px;color:var(--mid);}
-.empty-state .icon{font-size:40px;margin-bottom:12px;}
-.empty-state h3{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:6px;}
-.empty-state p{font-size:13px;line-height:1.6;}
+.empty-state .icon{font-size:36px;margin-bottom:12px;}
+.empty-state h3{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:6px;}
+.empty-state p{font-size:12px;line-height:1.6;}
+/* Modals */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--white);border-radius:12px;padding:24px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
-.modal-title{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:16px;}
-label.lbl{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px;}
-input,select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:6px;font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;margin-bottom:12px;}
+.modal{background:var(--white);border-radius:12px;padding:24px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:16px;}
+label.lbl{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px;margin-top:10px;}
+input,select,textarea{width:100%;padding:8px 12px;border:1px solid #d0d0d8;border-radius:6px;font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;}
 input:focus,select:focus,textarea:focus{border-color:var(--blue);}
-textarea{resize:vertical;min-height:80px;}
-.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;}
-.config-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:16px;margin:16px 24px;box-shadow:var(--shadow);}
-.config-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;}
+textarea{resize:vertical;min-height:70px;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+/* Config card */
+.config-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:16px 24px;margin:0;border-bottom:1px solid #e0e0e8;}
+.config-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;}
+.config-field{flex:1;min-width:160px;}
+/* Loading */
 .loading{display:flex;align-items:center;gap:8px;color:var(--mid);font-size:13px;padding:40px 24px;}
-.spin{width:16px;height:16px;border:2px solid #e0e0e8;border-top-color:var(--orange);border-radius:50%;animation:spin 0.8s linear infinite;}
+.spin{width:16px;height:16px;border:2px solid #e0e0e8;border-top-color:var(--orange);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;}
 @keyframes spin{to{transform:rotate(360deg)}}
-.search-bar{padding:16px 24px 0;}
-.search-input{width:100%;padding:9px 14px;border:1px solid #d0d0d8;border-radius:20px;font-size:13px;font-family:inherit;outline:none;background:var(--white);}
-.search-input:focus{border-color:var(--blue);}
+/* Welcome */
+.welcome{padding:40px 24px;max-width:600px;}
+.welcome h2{font-size:22px;font-weight:700;color:var(--navy);margin-bottom:8px;}
+.welcome p{font-size:13px;color:#555;line-height:1.7;margin-bottom:16px;}
 </style>
 </head>
 <body>
-
 <div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S &mdash; Second Brain</div>
   <div class="hdr-right">
-    <span class="hdr-badge">v2.0</span>
-    <button class="btn btn-ghost btn-sm" onclick="showConfig()">&#9881; Config</button>
+    <span class="hdr-badge">v2.1</span>
+    <button class="btn btn-ghost btn-sm" onclick="toggleConfig()">&#9881; Config</button>
     <button class="btn btn-ghost btn-sm" onclick="window.history.back()">&#8592; Portal</button>
   </div>
 </div>
 
-<div class="shell">
-  <div class="sidebar" id="sidebar">
-    <div class="sb-section">Intelligence Engine</div>
-    <div id="domainList"></div>
-    <div class="sb-section" style="margin-top:8px">Market News</div>
-    <div id="newsList"></div>
-  </div>
-  <div class="main" id="main">
-    <div class="config-card" id="configCard">
-      <div class="config-title">&#9881; Supabase Configuration</div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap">
-        <div style="flex:1;min-width:180px">
-          <label class="lbl">Supabase Project URL</label>
-          <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" style="margin-bottom:0">
-        </div>
-        <div style="flex:2;min-width:200px">
-          <label class="lbl">Supabase Anon Key</label>
-          <input type="password" id="sbKey" placeholder="eyJ..." style="margin-bottom:0">
-        </div>
-        <div style="display:flex;align-items:flex-end;padding-bottom:1px">
-          <button class="btn btn-primary btn-sm" onclick="saveConfig()">Save &amp; Connect</button>
-        </div>
-      </div>
+<div id="configCard" class="config-card" style="display:none">
+  <div class="config-row">
+    <div class="config-field">
+      <label class="lbl" style="margin-top:0">Supabase URL</label>
+      <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co">
     </div>
-    <div id="mainContent">
-      <div class="empty-state">
-        <div class="icon">&#129504;</div>
-        <h3>Second Brain v2.0</h3>
-        <p>Configure your Supabase connection above, then select a domain from the sidebar to explore intelligence.</p>
-      </div>
+    <div class="config-field" style="flex:2">
+      <label class="lbl" style="margin-top:0">Supabase Anon Key</label>
+      <input type="password" id="sbKey" placeholder="eyJ...">
+    </div>
+    <div>
+      <button class="btn btn-primary btn-sm" onclick="saveConfig()">Save &amp; Connect</button>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <div class="sidebar" id="sidebar"></div>
+  <div class="main" id="main">
+    <div class="welcome" id="welcome">
+      <h2>&#129504; Second Brain v2.1</h2>
+      <p>Configure your Supabase connection to explore intelligence across 17 domains and 5 market news topics. Select a domain from the sidebar to begin.</p>
     </div>
   </div>
 </div>
@@ -178,22 +178,22 @@ textarea{resize:vertical;min-height:80px;}
 <div class="modal-overlay" id="actionModal">
   <div class="modal">
     <div class="modal-title">&#9889; Create Sales Action</div>
-    <input type="hidden" id="actionIntelId">
-    <input type="hidden" id="actionIntelTitle">
-    <input type="hidden" id="actionDomainCode">
+    <input type="hidden" id="actIntelId">
+    <input type="hidden" id="actIntelTitle">
+    <input type="hidden" id="actDomain">
     <label class="lbl">Action Title *</label>
-    <input type="text" id="actionTitle" placeholder="e.g. Follow up with DRDO CAIR on edge AI RFP">
+    <input type="text" id="actTitle" placeholder="e.g. Follow up on DRDO edge AI RFP">
     <label class="lbl">Description</label>
-    <textarea id="actionDesc" placeholder="What needs to be done..."></textarea>
+    <textarea id="actDesc" placeholder="What needs to be done..."></textarea>
     <label class="lbl">Suggested Approach</label>
-    <input type="text" id="actionApproach" placeholder="e.g. Schedule demo, send white paper...">
+    <input type="text" id="actApproach" placeholder="e.g. Schedule demo, send white paper">
     <label class="lbl">Assign To</label>
-    <input type="text" id="actionAssignee" placeholder="Salesperson name" list="teamList">
-    <datalist id="teamList" id="teamList"></datalist>
-    <div style="display:flex;gap:12px">
+    <input type="text" id="actAssignee" placeholder="Salesperson name" list="teamDL">
+    <datalist id="teamDL"></datalist>
+    <div style="display:flex;gap:12px;margin-top:4px">
       <div style="flex:1">
         <label class="lbl">Priority</label>
-        <select id="actionPriority">
+        <select id="actPriority">
           <option value="high">High</option>
           <option value="medium" selected>Medium</option>
           <option value="low">Low</option>
@@ -201,7 +201,7 @@ textarea{resize:vertical;min-height:80px;}
       </div>
       <div style="flex:1">
         <label class="lbl">Due Date</label>
-        <input type="date" id="actionDue">
+        <input type="date" id="actDue">
       </div>
     </div>
     <div class="modal-actions">
@@ -215,225 +215,229 @@ textarea{resize:vertical;min-height:80px;}
 <div class="modal-overlay" id="engModal">
   <div class="modal">
     <div class="modal-title">&#128640; Convert to Engagement</div>
-    <input type="hidden" id="engActionId">
+    <input type="hidden" id="engActId">
     <label class="lbl">Engagement ID</label>
     <input type="text" id="engId" placeholder="ENG-2026-DEF-001">
     <label class="lbl">Notes</label>
     <textarea id="engNotes" placeholder="Context for the engagement team..."></textarea>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal('engModal')">Cancel</button>
-      <button class="btn btn-teal btn-sm" onclick="convertToEngagement()">Convert</button>
+      <button class="btn btn-teal btn-sm" onclick="convertToEng()">Convert</button>
     </div>
   </div>
 </div>
 
 <script charset="utf-8">
-// \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// \u2500\u2500 Domain taxonomy \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 var DOMAINS = [
-  {code:'DEF', name:'Defence & Armed Forces',        icon:'&#128737;'},
-  {code:'GEO', name:'Geospatial & Earth Observation',icon:'&#128752;'},
-  {code:'GOV', name:'Governance & e-Governance',     icon:'&#127963;'},
-  {code:'HLT', name:'Health & Life Sciences',        icon:'&#127973;'},
-  {code:'ENR', name:'Energy & Utilities',            icon:'&#9889;'},
-  {code:'TEL', name:'Telecom & Networks',            icon:'&#128225;'},
-  {code:'FIN', name:'BFSI & Financial Services',     icon:'&#127981;'},
-  {code:'MFG', name:'Manufacturing & Industry',      icon:'&#9881;'},
-  {code:'TER', name:'Territory / State CoE',         icon:'&#127960;'},
-  {code:'HLS', name:'Homeland Security',             icon:'&#128274;'},
+  {code:'GOV-GOV', name:'Government & Governance',        icon:'&#127963;', cluster:'standalone'},
+  {code:'DEF-MIL', name:'Armed Forces',                   icon:'&#128737;', cluster:'DEF'},
+  {code:'DEF-SPC', name:'Space & Satellite',              icon:'&#128752;', cluster:'DEF'},
+  {code:'DEF-HLS', name:'Homeland Security',              icon:'&#128274;', cluster:'DEF'},
+  {code:'DEF-INT', name:'Intelligence & Signals',         icon:'&#128065;', cluster:'DEF'},
+  {code:'GEO-SPA', name:'Geospatial & Earth Observation', icon:'&#127758;', cluster:'standalone'},
+  {code:'INF-CIV', name:'Critical Infrastructure',        icon:'&#9992;',   cluster:'standalone'},
+  {code:'RES-NAT', name:'Natural Resources',              icon:'&#127795;', cluster:'standalone'},
+  {code:'TEL-NET', name:'Telecom & Networks',             icon:'&#128225;', cluster:'standalone'},
+  {code:'TEC-GEN', name:'Technology',                     icon:'&#128187;', cluster:'standalone'},
+  {code:'MED-BRD', name:'Media & Broadcast',              icon:'&#127916;', cluster:'standalone'},
+  {code:'FIN-BFS', name:'Banking & Financial Services',   icon:'&#127981;', cluster:'standalone'},
+  {code:'MFG-IND', name:'Manufacturing & Industry',       icon:'&#9881;',   cluster:'standalone'},
+  {code:'ENR-UTL', name:'Energy & Utilities',             icon:'&#9889;',   cluster:'standalone'},
+  {code:'REG-AIP', name:'Regional AI Programmes',         icon:'&#127960;', cluster:'standalone'},
+  {code:'LAB-AIR', name:'AI Labs & Research',             icon:'&#128300;', cluster:'standalone'},
+  {code:'HLT-LIF', name:'Healthcare & Life Sciences',     icon:'&#127973;', cluster:'standalone'},
 ]
 
 var NEWS_TOPICS = [
-  {code:'news_AI_HPC',   name:'AI & HPC in India',           icon:'&#128204;'},
-  {code:'news_COMP',     name:'Competitor & Vendor Activity', icon:'&#127942;'},
-  {code:'news_TENDERS',  name:'Government AI Tenders',        icon:'&#128196;'},
-  {code:'news_DEF_TECH', name:'Defence Technology News',      icon:'&#128737;'},
-  {code:'news_SOV_AI',   name:'Sovereign AI & Policy',        icon:'&#127963;'},
+  {code:'MKT-HPC', name:'AI & HPC in India',           icon:'&#128204;'},
+  {code:'MKT-COM', name:'Competitor & Vendor Activity', icon:'&#127942;'},
+  {code:'MKT-TND', name:'Government AI Tenders',        icon:'&#128196;'},
+  {code:'MKT-DEF', name:'Defence Technology News',      icon:'&#128737;'},
+  {code:'MKT-SOV', name:'Sovereign AI & Policy',        icon:'&#127963;'},
 ]
 
-var ALL_ENTRIES = DOMAINS.concat(NEWS_TOPICS.map(function(t){
-  return {code: t.code, name: t.name, icon: t.icon, isNews: true}
-}))
-
-var currentDomain = null
-var currentTab = 'intelligence'
+// \u2500\u2500 State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var currentEntry = null
+var currentTab = 'intel'
 var currentFilter = 'all'
-var itemCounts = {}
 var cachedIntel = []
 var cachedUC = []
 var cachedActions = []
+var counts = {}
 
-// \u2500\u2500 Storage \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function getSBConfig(){
-  try{ return JSON.parse(localStorage.getItem('atlas_sb2_config')||'{}') }catch{return {}}
-}
-function setSBConfig(c){ localStorage.setItem('atlas_sb2_config',JSON.stringify(c)) }
-function getTeam(){
-  try{ return JSON.parse(localStorage.getItem('atlas_sb2_team')||'[]') }catch{return []} 
+// \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function getCfg(){ try{ return JSON.parse(localStorage.getItem('atlas_sb2_cfg')||'{}') }catch(e){ return {} } }
+function setCfg(c){ localStorage.setItem('atlas_sb2_cfg', JSON.stringify(c)) }
+function getTeam(){ try{ return JSON.parse(localStorage.getItem('atlas_sb2_team')||'[]') }catch(e){ return [] } }
+
+function saveConfig(){
+  var url = document.getElementById('sbUrl').value.trim()
+  var key = document.getElementById('sbKey').value.trim()
+  if(!url||!key){ alert('Enter both URL and key.'); return }
+  setCfg({url:url, key:key})
+  document.getElementById('configCard').style.display = 'none'
+  init()
 }
 
-// \u2500\u2500 Supabase helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function sbGet(table, params, limit){
-  var cfg = getSBConfig()
+function toggleConfig(){
+  var el = document.getElementById('configCard')
+  el.style.display = el.style.display === 'none' ? 'block' : 'none'
+  var cfg = getCfg()
+  if(cfg.url) document.getElementById('sbUrl').value = cfg.url
+  if(cfg.key) document.getElementById('sbKey').value = cfg.key
+}
+
+// \u2500\u2500 Supabase helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function sbFetch(table, params, limit){
+  var cfg = getCfg()
   if(!cfg.url||!cfg.key) return []
-  limit = limit || 100
-  var url = cfg.url + '/rest/v1/' + table + '?' + params + '&limit=' + limit
+  var url = cfg.url+'/rest/v1/'+table+'?'+params+'&limit='+(limit||100)
   try{
-    var resp = await fetch(url, {
-      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key}
-    })
-    if(resp.ok) return await resp.json()
-  }catch(e){ console.error('SB error:', e) }
+    var r = await fetch(url, {headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key}})
+    if(r.ok) return await r.json()
+  }catch(e){ console.error(e) }
   return []
 }
 
-async function sbPost(table, data){
-  var cfg = getSBConfig()
-  if(!cfg.url||!cfg.key) return false
-  try{
-    var resp = await fetch(cfg.url+'/rest/v1/'+table, {
-      method:'POST',
-      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates'},
-      body: JSON.stringify(data)
-    })
-    return resp.ok
-  }catch(e){ return false }
-}
-
-async function sbPatch(table, filter, data){
-  var cfg = getSBConfig()
-  if(!cfg.url||!cfg.key) return false
-  try{
-    var resp = await fetch(cfg.url+'/rest/v1/'+table+'?'+filter, {
-      method:'PATCH',
-      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify(data)
-    })
-    return resp.ok
-  }catch(e){ return false }
-}
-
-async function getCount(table, filter){
-  var cfg = getSBConfig()
+async function sbCount(table, filter){
+  var cfg = getCfg()
   if(!cfg.url||!cfg.key) return 0
   try{
-    var resp = await fetch(cfg.url+'/rest/v1/'+table+'?'+filter+'&limit=1', {
+    var r = await fetch(cfg.url+'/rest/v1/'+table+'?'+filter+'&limit=1', {
       headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Prefer':'count=exact'}
     })
-    if(resp.ok){
-      var cr = resp.headers.get('content-range')
+    if(r.ok){
+      var cr = r.headers.get('content-range')
       if(cr) return parseInt(cr.split('/')[1])||0
     }
   }catch(e){}
   return 0
 }
 
-// \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function saveConfig(){
-  var url = document.getElementById('sbUrl').value.trim()
-  var key = document.getElementById('sbKey').value.trim()
-  if(!url||!key){ alert('Please enter both Supabase URL and key.'); return }
-  setSBConfig({url:url, key:key})
-  document.getElementById('configCard').style.display='none'
-  loadSidebar()
+async function sbPatch(table, filter, data){
+  var cfg = getCfg()
+  if(!cfg.url||!cfg.key) return false
+  try{
+    var r = await fetch(cfg.url+'/rest/v1/'+table+'?'+filter, {
+      method:'PATCH',
+      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(data)
+    })
+    return r.ok
+  }catch(e){ return false }
 }
 
-function showConfig(){
-  var card = document.getElementById('configCard')
-  card.style.display = card.style.display==='none'?'block':'none'
-  var cfg = getSBConfig()
-  if(cfg.url) document.getElementById('sbUrl').value=cfg.url
-  if(cfg.key) document.getElementById('sbKey').value=cfg.key
+async function sbInsert(table, data){
+  var cfg = getCfg()
+  if(!cfg.url||!cfg.key) return false
+  try{
+    var r = await fetch(cfg.url+'/rest/v1/'+table, {
+      method:'POST',
+      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=minimal'},
+      body:JSON.stringify(data)
+    })
+    return r.ok
+  }catch(e){ return false }
 }
 
-// \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function loadSidebar(){
-  var cfg = getSBConfig()
+// \u2500\u2500 Init & Sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function init(){
+  var cfg = getCfg()
   if(!cfg.url||!cfg.key) return
-
-  // Load item counts for all domains
-  for(var i=0;i<DOMAINS.length;i++){
-    var c = await getCount('intelligence_items', 'domain_code=eq.'+DOMAINS[i].code)
-    itemCounts[DOMAINS[i].code] = c
-  }
-  for(var j=0;j<NEWS_TOPICS.length;j++){
-    var c2 = await getCount('intelligence_items', 'domain_code=eq.'+NEWS_TOPICS[j].code)
-    itemCounts[NEWS_TOPICS[j].code] = c2
+  document.getElementById('welcome').innerHTML = '<div class="loading"><div class="spin"></div> Loading domain counts...</div>'
+  // Load counts for all domains + news
+  var allCodes = DOMAINS.map(function(d){return d.code}).concat(NEWS_TOPICS.map(function(t){return t.code}))
+  for(var i=0; i<allCodes.length; i++){
+    counts[allCodes[i]] = await sbCount('intelligence_items','domain_code=eq.'+allCodes[i])
   }
   renderSidebar()
+  document.getElementById('welcome').innerHTML = '<div class="welcome"><h2>&#129504; Second Brain v2.1</h2><p>Select a domain from the sidebar to explore intelligence, use cases, and sales actions.</p></div>'
 }
 
 function renderSidebar(){
-  var domHtml = DOMAINS.map(function(d){
-    var count = itemCounts[d.code]||0
-    var hasData = count > 0
-    var isActive = currentDomain && currentDomain.code === d.code
-    return '<div class="sb-item ' + (isActive?'active':'') + '" data-code="' + d.code + '" onclick="selectDomain(this.dataset.code)">'
-      + '<div class="sb-item-label">' + d.icon + ' ' + d.name + '</div>'
-      + '<span class="sb-count ' + (hasData?'has-data':'') + '">' + count + '</span>'
-      + '</div>'
-  }).join('')
+  var html = ''
 
-  var newsHtml = NEWS_TOPICS.map(function(t){
-    var count = itemCounts[t.code]||0
-    var hasData = count > 0
-    var isActive = currentDomain && currentDomain.code === t.code
-    return '<div class="sb-item ' + (isActive?'active':'') + '" data-code="' + t.code + '" onclick="selectDomain(this.dataset.code)">'
-      + '<div class="sb-item-label">' + t.icon + ' ' + t.name + '</div>'
-      + '<span class="sb-count ' + (hasData?'has-data':'') + '">' + count + '</span>'
-      + '</div>'
-  }).join('')
+  // GOV-GOV standalone
+  html += '<div class="sb-section">Intelligence Domains</div>'
+  html += sidebarItem(DOMAINS[0])
 
-  document.getElementById('domainList').innerHTML = domHtml
-  document.getElementById('newsList').innerHTML = newsHtml
+  // DEF umbrella
+  html += '<div class="sb-cluster" onclick="toggleDef()">&#128737; Defence <span style="font-size:9px;opacity:0.5;margin-left:4px" id="defArrow">&#9660;</span></div>'
+  html += '<div id="defSubs" class="sb-sub">'
+  DOMAINS.filter(function(d){return d.cluster==='DEF'}).forEach(function(d){ html += sidebarItem(d) })
+  html += '</div>'
+
+  // Rest of standalone domains
+  DOMAINS.filter(function(d){return d.cluster==='standalone' && d.code!=='GOV-GOV'}).forEach(function(d){
+    html += sidebarItem(d)
+  })
+
+  // News topics
+  html += '<div class="sb-section" style="margin-top:8px">Market News</div>'
+  NEWS_TOPICS.forEach(function(t){ html += sidebarItem(t, true) })
+
+  document.getElementById('sidebar').innerHTML = html
 }
 
-async function selectDomain(code){
-  var entry = ALL_ENTRIES.find(function(e){return e.code===code})
+function sidebarItem(entry, isNews){
+  var c = counts[entry.code]||0
+  var isActive = currentEntry && currentEntry.code === entry.code
+  return '<div class="sb-item'+(isActive?' active':'')+'" data-code="'+entry.code+'" onclick="selectEntry(this.dataset.code)">'
+    +'<div class="sb-item-label">'+entry.icon+' '+entry.name+'</div>'
+    +'<span class="sb-count'+(c>0?' live':'')+'">'+c+'</span>'
+    +'</div>'
+}
+
+var defOpen = true
+function toggleDef(){
+  defOpen = !defOpen
+  var subs = document.getElementById('defSubs')
+  var arrow = document.getElementById('defArrow')
+  if(subs) subs.style.display = defOpen ? 'block' : 'none'
+  if(arrow) arrow.innerHTML = defOpen ? '&#9660;' : '&#9654;'
+}
+
+async function selectEntry(code){
+  var entry = DOMAINS.find(function(d){return d.code===code}) || NEWS_TOPICS.find(function(t){return t.code===code})
   if(!entry) return
-  currentDomain = entry
-  currentTab = 'intelligence'
+  currentEntry = entry
+  currentTab = 'intel'
   currentFilter = 'all'
-  // Clear cache when switching domains
-  cachedIntel = []
-  cachedUC = []
-  cachedActions = []
+  cachedIntel = []; cachedUC = []; cachedActions = []
   document.querySelectorAll('.sb-item').forEach(function(el){el.classList.remove('active')})
   document.querySelectorAll('.sb-item[data-code="'+code+'"]').forEach(function(el){el.classList.add('active')})
   await renderDomainView()
 }
 
-// \u2500\u2500 Domain View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// \u2500\u2500 Domain View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function renderDomainView(){
-  var d = currentDomain
-  if(!d) return
+  var e = currentEntry
+  var intelCount = counts[e.code]||0
+  var ucCount = await sbCount('uc_queue','domain_code=eq.'+e.code+'&status=eq.pending')
+  var actionCount = await sbCount('sales_actions','domain_code=eq.'+e.code+'&status=neq.closed')
 
-  // Get counts for tabs
-  var intelCount = await getCount('intelligence_items','domain_code=eq.'+d.code)
-  var ucCount = await getCount('uc_queue','domain_code=eq.'+d.code+'&status=eq.pending')
-  var actionCount = await getCount('sales_actions','domain_code=eq.'+d.code+'&status=neq.closed')
-
-  document.getElementById('mainContent').innerHTML =
+  document.getElementById('main').innerHTML =
     '<div class="domain-hdr">'
-    + '<div class="domain-title">' + d.icon + ' ' + d.name + '</div>'
-    + '<div class="domain-meta" id="domainMeta">' + intelCount + ' intelligence items</div>'
-    + '<div class="tabs">'
-    + '<div class="tab ' + (currentTab==='intelligence'?'active':'') + '" data-tab="intelligence" onclick="switchTab(this.dataset.tab)">Intelligence <span style="font-size:10px;opacity:0.7">(' + intelCount + ')</span></div>'
-    + '<div class="tab ' + (currentTab==='usecases'?'active':'') + '" data-tab="usecases" onclick="switchTab(this.dataset.tab)">Use Cases <span style="font-size:10px;opacity:0.7">(' + ucCount + ')</span></div>'
-    + '<div class="tab ' + (currentTab==='actions'?'active':'') + '" data-tab="actions" onclick="switchTab(this.dataset.tab)">Sales Actions <span style="font-size:10px;opacity:0.7">(' + actionCount + ')</span></div>'
-    + '</div></div>'
-    + '<div id="tabIntelligence" class="tab-content ' + (currentTab==='intelligence'?'active':'') + '">'
-    + '<div class="loading"><div class="spin"></div> Loading intelligence...</div>'
-    + '</div>'
-    + '<div id="tabUsecases" class="tab-content ' + (currentTab==='usecases'?'active':'') + '">'
-    + '<div class="loading"><div class="spin"></div> Loading use cases...</div>'
-    + '</div>'
-    + '<div id="tabActions" class="tab-content ' + (currentTab==='actions'?'active':'') + '">'
-    + '<div class="loading"><div class="spin"></div> Loading actions...</div>'
-    + '</div>'
+    +'<div class="domain-title">'+e.icon+' '+e.name+'</div>'
+    +'<div class="domain-sub" id="domSub">'+intelCount+' intelligence items</div>'
+    +'<div class="tabs">'
+    +'<div class="tab'+(currentTab==='intel'?' active':'')+'" data-tab="intel" onclick="switchTab(this.dataset.tab)">Intelligence <span style="font-size:10px;opacity:0.6">('+intelCount+')</span></div>'
+    +'<div class="tab'+(currentTab==='uc'?' active':'')+'" data-tab="uc" onclick="switchTab(this.dataset.tab)">Use Cases <span style="font-size:10px;opacity:0.6">('+ucCount+')</span></div>'
+    +'<div class="tab'+(currentTab==='actions'?' active':'')+'" data-tab="actions" onclick="switchTab(this.dataset.tab)">Sales Actions <span style="font-size:10px;opacity:0.6">('+actionCount+')</span></div>'
+    +'</div></div>'
+    +'<div id="tabIntel" class="tab-content'+(currentTab==='intel'?' active':'')+'">'
+    +'<div class="loading"><div class="spin"></div> Loading intelligence...</div>'
+    +'</div>'
+    +'<div id="tabUc" class="tab-content'+(currentTab==='uc'?' active':'')+'">'
+    +'<div class="loading"><div class="spin"></div> Loading use cases...</div>'
+    +'</div>'
+    +'<div id="tabActions" class="tab-content'+(currentTab==='actions'?' active':'')+'">'
+    +'<div class="loading"><div class="spin"></div> Loading actions...</div>'
+    +'</div>'
 
-  // Load the active tab
-  if(currentTab==='intelligence') await loadIntelligence()
-  else if(currentTab==='usecases') await loadUseCases()
+  if(currentTab==='intel') await loadIntel()
+  else if(currentTab==='uc') await loadUC()
   else await loadActions()
 }
 
@@ -442,288 +446,263 @@ function switchTab(tab){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')})
   document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active')})
   var tabEl = document.querySelector('.tab[data-tab="'+tab+'"]')
-  var contentEl = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1))
+  var contentEl = document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1))
   if(tabEl) tabEl.classList.add('active')
   if(contentEl) contentEl.classList.add('active')
-  // Only load if content shows loading spinner or is empty
   var needsLoad = !contentEl || contentEl.innerHTML.indexOf('Loading') >= 0 || contentEl.innerHTML.trim() === ''
   if(needsLoad){
-    if(tab==='intelligence') loadIntelligence()
-    else if(tab==='usecases') loadUseCases()
+    if(tab==='intel') loadIntel()
+    else if(tab==='uc') loadUC()
     else loadActions()
   }
 }
 
-// \u2500\u2500 Intelligence Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function loadIntelligence(){
-  var d = currentDomain
-  // Fetch from Supabase if cache is empty
-  if(cachedIntel.length === 0){
-    cachedIntel = await sbGet('intelligence_items', 'domain_code=eq.'+d.code+'&order=scraped_at.desc', 50)
-  }
-  var items = currentFilter === 'all' ? cachedIntel : cachedIntel.filter(function(item){ return item.intelligence_stream === currentFilter })
-  
-  renderIntelligenceItems(items)
+// \u2500\u2500 Intelligence Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function loadIntel(){
+  var e = currentEntry
+  var el = document.getElementById('tabIntel')
+  if(!el) return
+  if(cachedIntel.length === 0)
+    cachedIntel = await sbFetch('intelligence_items','domain_code=eq.'+e.code+'&order=scraped_at.desc',50)
+  renderIntelTab()
 }
 
-function renderIntelligenceItems(items){
-  var el = document.getElementById('tabIntelligence')
+function renderIntelTab(){
+  var el = document.getElementById('tabIntel')
   if(!el) return
+  var all = cachedIntel
+  var items = currentFilter==='all' ? all : all.filter(function(i){return i.intelligence_stream===currentFilter})
+  var mp = all.filter(function(i){return i.intelligence_stream==='market_pulse'}).length
+  var di = all.filter(function(i){return i.intelligence_stream==='domain_intel'}).length
+  var tw = all.filter(function(i){return i.intelligence_stream==='tech_watch'}).length
 
-  // Set up filter bar once (persistent)
-  var filterBarEl = document.getElementById('intelFilterBar')
-  if(!filterBarEl){
-    var mpCount = cachedIntel.filter(function(i){return i.intelligence_stream==='market_pulse'}).length
-    var diCount = cachedIntel.filter(function(i){return i.intelligence_stream==='domain_intel'}).length
-    var twCount = cachedIntel.filter(function(i){return i.intelligence_stream==='tech_watch'}).length
-    var filterBar = '<div class="filter-bar" id="intelFilterBar">'
-      + '<span style="font-size:11px;color:var(--mid);font-weight:600">Filter:</span>'
-      + '<button class="filter-btn active" data-filter="all" onclick="setFilter(this.dataset.filter)">All (' + cachedIntel.length + ')</button>'
-      + '<button class="filter-btn mp" data-filter="market_pulse" onclick="setFilter(this.dataset.filter)">Market Pulse (' + mpCount + ')</button>'
-      + '<button class="filter-btn di" data-filter="domain_intel" onclick="setFilter(this.dataset.filter)">Domain Intel (' + diCount + ')</button>'
-      + '<button class="filter-btn tw" data-filter="tech_watch" onclick="setFilter(this.dataset.filter)">Tech Watch (' + twCount + ')</button>'
-      + '</div><div id="intelItems"></div>'
-    el.innerHTML = filterBar
-  }
+  el.innerHTML = '<div class="filter-bar" id="intelFilterBar">'
+    +'<span style="font-size:11px;color:var(--mid);font-weight:600">Filter:</span>'
+    +'<button class="filter-btn'+(currentFilter==='all'?' active':'')+'" data-filter="all" onclick="setFilter(this.dataset.filter)">All ('+all.length+')</button>'
+    +'<button class="filter-btn mp'+(currentFilter==='market_pulse'?' active':'')+'" data-filter="market_pulse" onclick="setFilter(this.dataset.filter)">Market Pulse ('+mp+')</button>'
+    +'<button class="filter-btn di'+(currentFilter==='domain_intel'?' active':'')+'" data-filter="domain_intel" onclick="setFilter(this.dataset.filter)">Domain Intel ('+di+')</button>'
+    +'<button class="filter-btn tw'+(currentFilter==='tech_watch'?' active':'')+'" data-filter="tech_watch" onclick="setFilter(this.dataset.filter)">Tech Watch ('+tw+')</button>'
+    +'</div><div id="intelItems"></div>'
 
-  if(items.length===0){
-    document.getElementById('intelItems').innerHTML = '<div class="empty-state"><div class="icon">&#128270;</div><h3>No Intelligence Yet</h3><p>Run the Intelligence Scraper for ' + d.name + ' to populate this domain.</p></div>'
+  renderIntelItems(items)
+}
+
+function setFilter(f){
+  currentFilter = f
+  document.querySelectorAll('#intelFilterBar .filter-btn').forEach(function(b){
+    b.classList.toggle('active', b.dataset.filter===f)
+  })
+  var items = f==='all' ? cachedIntel : cachedIntel.filter(function(i){return i.intelligence_stream===f})
+  renderIntelItems(items)
+}
+
+function renderIntelItems(items){
+  var c = document.getElementById('intelItems')
+  if(!c) return
+  if(!items.length){
+    c.innerHTML = '<div class="empty-state"><div class="icon">&#128270;</div><h3>No items</h3><p>No intelligence items for this filter.</p></div>'
     return
   }
-
-  var cardsHtml = items.map(function(item){
-    var streamClass = item.intelligence_stream==='market_pulse'?'badge-mp':item.intelligence_stream==='domain_intel'?'badge-di':'badge-tw'
-    var streamLabel = item.intelligence_stream ? item.intelligence_stream.replace('_',' ') : ''
-    var valClass = 'badge-' + (item.intelligence_value||'medium')
-    var depthBadge = item.depth_score ? '<span class="badge badge-depth">depth ' + item.depth_score + '</span>' : ''
-    var streamBadge = streamLabel ? '<span class="badge ' + streamClass + '">' + streamLabel + '</span>' : ''
-    var valBadge = '<span class="badge ' + valClass + '">' + (item.intelligence_value||'medium') + '</span>'
-
-    var expandedHtml = ''
-    if(item.problem_statement) expandedHtml += '<div class="intel-field"><div class="intel-field-label">Problem Statement</div><div class="intel-field-val">' + item.problem_statement + '</div></div>'
-    if(item.technical_context) expandedHtml += '<div class="intel-field"><div class="intel-field-label">Technical Context</div><div class="intel-field-val">' + item.technical_context + '</div></div>'
-    if(item.opportunity) expandedHtml += '<div class="intel-field"><div class="intel-field-label">Opportunity Signal</div><div class="intel-field-val"><span class="tag tag-opp">' + item.opportunity + '</span></div></div>'
-    if(item.competitor_signals) expandedHtml += '<div class="intel-field"><div class="intel-field-label">Competitor Signals</div><div class="intel-field-val"><span class="tag tag-comp">' + item.competitor_signals + '</span></div></div>'
-    var infra = Array.isArray(item.infrastructure_signals) ? item.infrastructure_signals : []
-    if(infra.length > 0) expandedHtml += '<div class="intel-field"><div class="intel-field-label">Infrastructure Signals</div><div class="intel-tags">' + infra.map(function(s){return '<span class="tag">'+s+'</span>'}).join('') + '</div></div>'
-    var uc = item.uc_extracted || {}
-    if(uc.uc_name) expandedHtml += '<div class="intel-field"><div class="intel-field-label">UC Signal</div><div class="intel-field-val" style="color:var(--teal);font-weight:600">' + uc.uc_name + (uc.uc_hardware?' &mdash; '+uc.uc_hardware:'') + '</div></div>'
-
-    var tags = Array.isArray(item.tags) ? item.tags : []
-    var tagsHtml = tags.slice(0,5).map(function(t){return '<span class="tag">'+t+'</span>'}).join('')
-
+  c.innerHTML = '<div class="intel-grid">'+items.map(function(item){
+    var sc = item.intelligence_stream==='market_pulse'?'badge-mp':item.intelligence_stream==='domain_intel'?'badge-di':'badge-tw'
+    var sl = item.intelligence_stream ? item.intelligence_stream.replace(/_/g,' ') : ''
+    var vc = 'badge-'+(item.intelligence_value||'medium')
+    var exp = ''
+    if(item.problem_statement) exp+='<div class="intel-field"><div class="intel-field-label">Problem Statement</div><div class="intel-field-val">'+esc(item.problem_statement)+'</div></div>'
+    if(item.technical_context) exp+='<div class="intel-field"><div class="intel-field-label">Technical Context</div><div class="intel-field-val">'+esc(item.technical_context)+'</div></div>'
+    if(item.opportunity) exp+='<div class="intel-field"><div class="intel-field-label">Opportunity</div><div class="intel-field-val"><span class="tag tag-opp">'+esc(item.opportunity)+'</span></div></div>'
+    if(item.competitor_signals) exp+='<div class="intel-field"><div class="intel-field-label">Competitor Signals</div><div class="intel-field-val"><span class="tag tag-comp">'+esc(item.competitor_signals)+'</span></div></div>'
+    var infra = Array.isArray(item.infrastructure_signals)?item.infrastructure_signals:[]
+    if(infra.length) exp+='<div class="intel-field"><div class="intel-field-label">Infrastructure</div><div class="intel-tags">'+infra.map(function(s){return '<span class="tag">'+esc(s)+'</span>'}).join('')+'</div></div>'
+    var uc = item.uc_extracted||{}
+    if(uc.uc_name) exp+='<div class="intel-field"><div class="intel-field-label">UC Signal</div><div class="intel-field-val" style="color:var(--teal);font-weight:600">'+esc(uc.uc_name)+'</div></div>'
+    var tags = Array.isArray(item.tags)?item.tags:[]
+    var th = tags.slice(0,4).map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join('')
     return '<div class="intel-card">'
-      + '<div class="intel-card-hdr">'
-      + '<div class="intel-title">' + (item.title||'') + '</div>'
-      + '<div class="intel-badges">' + streamBadge + valBadge + depthBadge + '</div>'
-      + '</div>'
-      + '<div class="intel-summary">' + (item.summary||'') + '</div>'
-      + (tagsHtml ? '<div class="intel-tags">' + tagsHtml + '</div>' : '')
-      + (expandedHtml ? '<div class="intel-expanded" id="exp-' + item.id + '">' + expandedHtml + '</div>' : '')
-      + '<div class="intel-actions">'
-      + (expandedHtml ? '<button class="btn btn-outline btn-xs" data-eid="'+item.id+'" onclick="toggleExpand(this.dataset.eid)" id="expbtn-'+item.id+'">&#9660; More</button>' : '')
-      + '<button class="btn btn-teal btn-xs" data-id="' + item.id + '" data-title="' + (item.title||'').replace(/"/g,'') + '" data-domain="' + (item.domain_code||'') + '" onclick="openActionModal(this.dataset.id, this.dataset.title, this.dataset.domain)">&#9889; Create Action</button>'
-      + '</div>'
-      + '</div>'
-  }).join('')
-
-  container.innerHTML = '<div class="intel-grid">' + cardsHtml + '</div>'
+      +'<div class="intel-card-hdr"><div class="intel-title">'+esc(item.title||'')+'</div>'
+      +'<div class="intel-badges">'+(sl?'<span class="badge '+sc+'">'+sl+'</span> ':'')+'<span class="badge '+vc+'">'+(item.intelligence_value||'medium')+'</span>'+(item.depth_score?'<span class="badge badge-depth"> d'+item.depth_score+'</span>':'')+'</div></div>'
+      +'<div class="intel-summary">'+esc(item.summary||'')+'</div>'
+      +(th?'<div class="intel-tags">'+th+'</div>':'')
+      +(exp?'<div class="intel-expanded" id="exp-'+item.id+'">'+exp+'</div>':'')
+      +'<div class="intel-actions">'
+      +(exp?'<button class="btn btn-outline btn-xs" data-eid="'+item.id+'" onclick="toggleExp(this.dataset.eid)" id="expbtn-'+item.id+'">&#9660; More</button>':'')
+      +'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" data-title="'+(item.title||'').replace(/"/g,'&quot;')+'" data-domain="'+(item.domain_code||'')+'" onclick="openActionModal(this.dataset.id,this.dataset.title,this.dataset.domain)">&#9889; Action</button>'
+      +'</div></div>'
+  }).join('')+'</div>'
 }
 
-function setFilter(filter){
-  currentFilter = filter
-  renderIntelligenceFromCache()
-}
-
-function renderIntelligenceFromCache(){
-  var el = document.getElementById('tabIntelligence')
-  if(!el){ loadIntelligence(); return }
-  var items = currentFilter === 'all' ? cachedIntel : cachedIntel.filter(function(item){ return item.intelligence_stream === currentFilter })
-  renderIntelligenceItems(items)
-}
-
-function toggleExpand(id){
-  var exp = document.getElementById('exp-'+id)
+function toggleExp(id){
+  var el = document.getElementById('exp-'+id)
   var btn = document.getElementById('expbtn-'+id)
-  if(!exp) return
-  exp.classList.toggle('open')
-  if(exp.classList.contains('open')){
-    btn.textContent = '\u25B2 Less'
-  } else {
-    btn.innerHTML = '&#9660; More'
-  }
+  if(!el) return
+  el.classList.toggle('open')
+  btn.innerHTML = el.classList.contains('open') ? '&#9650; Less' : '&#9660; More'
 }
 
-// \u2500\u2500 Use Cases Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function loadUseCases(){
-  var d = currentDomain
-  if(cachedUC.length === 0) cachedUC = await sbGet('uc_queue', 'domain_code=eq.'+d.code+'&order=suggested_at.desc')
-  var items = cachedUC
-  var el = document.getElementById('tabUsecases')
+// \u2500\u2500 Use Cases Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function loadUC(){
+  var e = currentEntry
+  var el = document.getElementById('tabUc')
   if(!el) return
+  if(cachedUC.length === 0)
+    cachedUC = await sbFetch('uc_queue','domain_code=eq.'+e.code+'&order=suggested_at.desc')
+  renderUCItems()
+}
 
-  if(items.length===0){
-    el.innerHTML = '<div class="empty-state"><div class="icon">&#128161;</div><h3>No Use Cases Yet</h3><p>Use cases are suggested automatically when intelligence items are scraped and enriched.</p></div>'
+function renderUCItems(){
+  var el = document.getElementById('tabUc')
+  if(!el) return
+  var items = cachedUC
+  if(!items.length){
+    el.innerHTML = '<div class="empty-state"><div class="icon">&#128161;</div><h3>No Use Cases Yet</h3><p>Use cases are suggested automatically when intelligence items are scraped and enriched for this domain.</p></div>'
     return
   }
-
-  var html = '<div class="uc-grid">' + items.map(function(item){
+  el.innerHTML = items.map(function(item){
     return '<div class="uc-card">'
-      + '<div class="uc-card-hdr">'
-      + '<div><div class="uc-name">' + (item.uc_name||'') + '</div>'
-      + '<div class="uc-cluster">' + (item.cluster||'Uncategorised') + '</div></div>'
-      + '<span class="uc-status ' + (item.status||'pending') + '">' + (item.status||'pending') + '</span>'
-      + '</div>'
-      + '<div class="uc-rationale">' + (item.rationale||'') + '</div>'
-      + (item.source_title ? '<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Source: ' + item.source_title.slice(0,60) + '</div>' : '')
-      + '<div style="display:flex;gap:6px">'
-      + (item.status==='pending' ? '<button class="btn btn-teal btn-xs" data-id="' + item.id + '" data-status="accepted" onclick="updateUCStatus(this.dataset.id,this.dataset.status)">&#10003; Accept</button>' : '')
-      + (item.status==='pending' ? '<button class="btn btn-danger btn-xs" data-id="' + item.id + '" data-status="rejected" onclick="updateUCStatus(this.dataset.id,this.dataset.status)">&#10007; Reject</button>' : '')
-      + (item.status==='accepted' ? '<button class="btn btn-outline btn-xs" data-id="' + item.id + '" data-name="' + (item.uc_name||'').replace(/"/g,'') + '" data-domain="' + d.code + '" onclick="openActionModal(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9889; Create Action</button>' : '')
-      + '</div>'
-      + '</div>'
-  }).join('') + '</div>'
-
-  el.innerHTML = html
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px">'
+      +'<div><div class="uc-name">'+esc(item.uc_name||'')+'</div>'
+      +'<div class="uc-cluster">'+esc(item.cluster||'Uncategorised')+'</div></div>'
+      +'<span class="uc-status '+(item.status||'pending')+'">'+( item.status||'pending')+'</span>'
+      +'</div>'
+      +'<div class="uc-rationale">'+esc(item.rationale||'')+'</div>'
+      +(item.source_title?'<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Source: '+esc(item.source_title.slice(0,60))+'</div>':'')
+      +'<div style="display:flex;gap:6px">'
+      +(item.status==='pending'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" data-status="accepted" onclick="updateUC(this.dataset.id,this.dataset.status)">&#10003; Accept</button>':'')
+      +(item.status==='pending'?'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" data-status="rejected" onclick="updateUC(this.dataset.id,this.dataset.status)">&#10007; Reject</button>':'')
+      +(item.status==='accepted'?'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'')+'" data-domain="'+(currentEntry.code||'')+'" onclick="openActionModal(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9889; Action</button>':'')
+      +'</div></div>'
+  }).join('')
 }
 
-async function updateUCStatus(id, status){
-  await sbPatch('uc_queue', 'id=eq.'+id, {status:status})
-  cachedUC = []
-  loadUseCases()
+async function updateUC(id, status){
+  await sbPatch('uc_queue','id=eq.'+id,{status:status})
+  cachedUC = []; loadUC()
 }
 
-// \u2500\u2500 Sales Actions Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// \u2500\u2500 Sales Actions Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function loadActions(){
-  var d = currentDomain
-  if(cachedActions.length === 0) cachedActions = await sbGet('sales_actions', 'domain_code=eq.'+d.code+'&order=created_at.desc')
-  var items = cachedActions
+  var e = currentEntry
   var el = document.getElementById('tabActions')
   if(!el) return
+  if(cachedActions.length === 0)
+    cachedActions = await sbFetch('sales_actions','domain_code=eq.'+e.code+'&order=created_at.desc')
+  renderActionItems()
+}
 
-  var newActionBtn = '<div style="display:flex;justify-content:flex-end;margin-bottom:14px">'
-    + '<button class="btn btn-primary btn-sm" data-domain="'+d.code+'" onclick="newAction(this.dataset.domain)">+ New Action</button>'
-    + '</div>'
-
-  if(items.length===0){
-    el.innerHTML = newActionBtn + '<div class="empty-state"><div class="icon">&#9889;</div><h3>No Sales Actions Yet</h3><p>Create actions from intelligence items or use cases, or click New Action above.</p></div>'
+function renderActionItems(){
+  var el = document.getElementById('tabActions')
+  if(!el) return
+  var items = cachedActions
+  var newBtn = '<div style="display:flex;justify-content:flex-end;margin-bottom:14px">'
+    +'<button class="btn btn-primary btn-sm" data-domain="'+(currentEntry.code||'')+'" onclick="newAction(this.dataset.domain)">+ New Action</button>'
+    +'</div>'
+  if(!items.length){
+    el.innerHTML = newBtn+'<div class="empty-state"><div class="icon">&#9889;</div><h3>No Actions Yet</h3><p>Create actions from intelligence items or use cases, or click New Action above.</p></div>'
     return
   }
-
-  var html = newActionBtn + '<div class="action-grid">' + items.map(function(item){
-    var statusClass = (item.status||'new').replace('_','-')
-    var assignedStr = item.assigned_to ? 'Assigned to: <strong>' + item.assigned_to + '</strong>' : 'Unassigned'
-    var dueStr = item.due_date ? ' &middot; Due: ' + item.due_date : ''
-    return '<div class="action-card status-' + statusClass + '">'
-      + '<div class="action-hdr">'
-      + '<div><div class="action-title">' + (item.action_title||'') + '</div>'
-      + '<div class="action-meta">' + assignedStr + dueStr + '</div></div>'
-      + '<span class="action-status ' + (item.status||'new') + '">' + (item.status||'new').replace('_',' ') + '</span>'
-      + '</div>'
-      + (item.action_description ? '<div class="action-desc">' + item.action_description + '</div>' : '')
-      + (item.source_title ? '<div style="font-size:11px;color:var(--mid);margin-bottom:8px">From: ' + item.source_title.slice(0,60) + '</div>' : '')
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      + (item.status==='new' ? '<button class="btn btn-outline btn-xs" data-id="'+item.id+'" data-status="in_progress" onclick="updateActionStatus(this.dataset.id,this.dataset.status)">Start</button>' : '')
-      + (item.status==='in_progress' ? '<button class="btn btn-teal btn-xs" data-id="'+item.id+'" data-aid="'+item.id+'" onclick="openEngModal(this.dataset.aid)">&#128640; Convert to Engagement</button>' : '')
-      + (item.status!=='closed'&&item.status!=='converted' ? '<button class="btn btn-danger btn-xs" data-id="'+item.id+'" data-status="closed" onclick="updateActionStatus(this.dataset.id,this.dataset.status)">Close</button>' : '')
-      + '</div>'
-      + '</div>'
-  }).join('') + '</div>'
-
-  el.innerHTML = html
+  el.innerHTML = newBtn + items.map(function(item){
+    var st = item.status||'new'
+    var assigned = item.assigned_to ? 'Assigned to: <strong>'+esc(item.assigned_to)+'</strong>' : 'Unassigned'
+    var due = item.due_date ? ' &middot; Due: '+item.due_date : ''
+    return '<div class="action-card '+st+'">'
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px">'
+      +'<div><div class="action-title">'+esc(item.action_title||'')+'</div>'
+      +'<div class="action-meta">'+assigned+due+'</div></div>'
+      +'<span class="action-status '+st+'">'+st.replace('_',' ')+'</span>'
+      +'</div>'
+      +(item.action_description?'<div style="font-size:12px;color:#555;margin-bottom:8px;line-height:1.5">'+esc(item.action_description)+'</div>':'')
+      +(item.source_title?'<div style="font-size:11px;color:var(--mid);margin-bottom:8px">From: '+esc(item.source_title.slice(0,60))+'</div>':'')
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +(st==='new'?'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" data-status="in_progress" onclick="updateAction(this.dataset.id,this.dataset.status)">Start</button>':'')
+      +(st==='in_progress'?'<button class="btn btn-teal btn-xs" data-aid="'+item.id+'" onclick="openEngModal(this.dataset.aid)">&#128640; Convert to Engagement</button>':'')
+      +(st!=='closed'&&st!=='converted'?'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" data-status="closed" onclick="updateAction(this.dataset.id,this.dataset.status)">Close</button>':'')
+      +'</div></div>'
+  }).join('')
 }
 
-async function updateActionStatus(id, status){
-  await sbPatch('sales_actions', 'id=eq.'+id, {status:status})
-  cachedActions = []
-  loadActions()
+async function updateAction(id, status){
+  await sbPatch('sales_actions','id=eq.'+id,{status:status})
+  cachedActions = []; loadActions()
 }
 
-// \u2500\u2500 Modals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function newAction(domainCode){ openActionModal('','',domainCode) }
+// \u2500\u2500 Modals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function newAction(dc){ openActionModal('','',dc) }
 
 function openActionModal(intelId, intelTitle, domainCode){
-  document.getElementById('actionIntelId').value = intelId||''
-  document.getElementById('actionIntelTitle').value = intelTitle||''
-  document.getElementById('actionDomainCode').value = domainCode||''
-  document.getElementById('actionTitle').value = ''
-  document.getElementById('actionDesc').value = ''
-  document.getElementById('actionApproach').value = ''
-  document.getElementById('actionAssignee').value = ''
-  document.getElementById('actionPriority').value = 'medium'
-  document.getElementById('actionDue').value = ''
-  // Populate team datalist
+  document.getElementById('actIntelId').value = intelId||''
+  document.getElementById('actIntelTitle').value = intelTitle||''
+  document.getElementById('actDomain').value = domainCode||''
+  document.getElementById('actTitle').value = ''
+  document.getElementById('actDesc').value = ''
+  document.getElementById('actApproach').value = ''
+  document.getElementById('actAssignee').value = ''
+  document.getElementById('actPriority').value = 'medium'
+  document.getElementById('actDue').value = ''
   var team = getTeam()
-  var dl = document.getElementById('teamList')
-  dl.innerHTML = team.map(function(m){return '<option value="'+m+'">'}).join('')
+  document.getElementById('teamDL').innerHTML = team.map(function(m){return '<option value="'+m+'">'}).join('')
   document.getElementById('actionModal').classList.add('open')
 }
 
 async function saveAction(){
-  var title = document.getElementById('actionTitle').value.trim()
-  if(!title){ alert('Please enter an action title.'); return }
-  var action = {
-    id: 'act-' + Date.now(),
-    source_intel_id: document.getElementById('actionIntelId').value||null,
-    source_title: document.getElementById('actionIntelTitle').value||null,
-    domain_code: document.getElementById('actionDomainCode').value||null,
+  var title = document.getElementById('actTitle').value.trim()
+  if(!title){ alert('Enter an action title.'); return }
+  var ok = await sbInsert('sales_actions',{
+    id: 'act-'+Date.now()+'-'+Math.floor(Math.random()*9999),
+    source_intel_id: document.getElementById('actIntelId').value||null,
+    source_title: document.getElementById('actIntelTitle').value||null,
+    domain_code: document.getElementById('actDomain').value||null,
     action_title: title,
-    action_description: document.getElementById('actionDesc').value.trim()||null,
-    suggested_approach: document.getElementById('actionApproach').value.trim()||null,
-    assigned_to: document.getElementById('actionAssignee').value.trim()||null,
-    priority: document.getElementById('actionPriority').value,
+    action_description: document.getElementById('actDesc').value.trim()||null,
+    suggested_approach: document.getElementById('actApproach').value.trim()||null,
+    assigned_to: document.getElementById('actAssignee').value.trim()||null,
+    priority: document.getElementById('actPriority').value,
     status: 'new',
     created_at: new Date().toISOString(),
-    created_by: 'ATLAS',
-    due_date: document.getElementById('actionDue').value||null
-  }
-  var ok = await sbPost('sales_actions', action)
+    created_by: 'ATLAS'
+  })
   if(ok){
     closeModal('actionModal')
     cachedActions = []
     await loadActions()
     if(currentTab!=='actions') switchTab('actions')
   } else {
-    alert('Failed to save action. Check Supabase connection.')
+    alert('Failed to save. Check Supabase connection.')
   }
 }
 
 function openEngModal(actionId){
-  document.getElementById('engActionId').value = actionId
+  document.getElementById('engActId').value = actionId
   document.getElementById('engId').value = ''
   document.getElementById('engNotes').value = ''
   document.getElementById('engModal').classList.add('open')
 }
 
-async function convertToEngagement(){
-  var actionId = document.getElementById('engActionId').value
+async function convertToEng(){
+  var id = document.getElementById('engActId').value
   var engId = document.getElementById('engId').value.trim()
-  var notes = document.getElementById('engNotes').value.trim()
-  if(!engId){ alert('Please enter an Engagement ID.'); return }
-  await sbPatch('sales_actions', 'id=eq.'+actionId, {
-    status: 'converted',
+  if(!engId){ alert('Enter an Engagement ID.'); return }
+  await sbPatch('sales_actions','id=eq.'+id,{
+    status:'converted',
     converted_to_eng_id: engId,
     converted_at: new Date().toISOString(),
-    notes: notes
+    notes: document.getElementById('engNotes').value.trim()
   })
   closeModal('engModal')
-  cachedActions = []
-  loadActions()
+  cachedActions = []; loadActions()
 }
 
-function closeModal(id){
-  document.getElementById(id).classList.remove('open')
+function closeModal(id){ document.getElementById(id).classList.remove('open') }
+
+// \u2500\u2500 Utils \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function esc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }
 
-// \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// \u2500\u2500 Boot \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 window.addEventListener('DOMContentLoaded', function(){
-  var cfg = getSBConfig()
+  var cfg = getCfg()
   if(cfg.url && cfg.key){
-    document.getElementById('configCard').style.display = 'none'
-    loadSidebar()
-  } else {
-    document.getElementById('sbUrl').value = cfg.url||''
-    document.getElementById('sbKey').value = cfg.key||''
+    init()
   }
 })
 </script>
