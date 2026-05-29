@@ -167,8 +167,12 @@ async function sbPatch(table, filter, data) {
 }
 
 async function getExistingTitles(domainCode) {
+  // Only dedup against last 18 months — older intel is stale, allow re-scraping
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - 18)
+  const cutoffStr = cutoff.toISOString()
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/intelligence_items?domain_code=eq.${domainCode}&select=title&limit=200`,
+    `${SUPABASE_URL}/rest/v1/intelligence_items?domain_code=eq.${domainCode}&scraped_at=gte.${cutoffStr}&select=title&limit=500`,
     { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
   )
   if (!r.ok) return new Set()
