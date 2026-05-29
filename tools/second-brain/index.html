@@ -282,7 +282,24 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
-<!-- Convert to Engagement Modal -->
+<!-- Intel Detail Modal -->
+<div class="modal-overlay" id="intelModal">
+  <div class="modal" style="max-width:640px;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+      <div class="modal-title" style="margin-bottom:0" id="im-title">Intelligence Item</div>
+      <button class="btn btn-outline btn-xs" onclick="closeModal('intelModal')">&#10005;</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="im-badges"></div>
+    <div style="font-size:12px;line-height:1.7;color:var(--dark);margin-bottom:14px" id="im-summary"></div>
+    <div id="im-fields"></div>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" id="im-action-btn" onclick="createActionFromIntel()">&#9889; Create Sales Action</button>
+      <button class="btn btn-outline btn-sm" onclick="closeModal('intelModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Convert to Engagement Modal --><!-- Convert to Engagement Modal -->
 <div class="modal-overlay" id="engModal">
   <div class="modal">
     <div class="modal-title">&#128640; Convert to Engagement</div>
@@ -340,6 +357,90 @@ var counts = {}
 
 // \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function getCfg(){ try{ return JSON.parse(localStorage.getItem('atlas_sb2_cfg')||'{}') }catch(e){ return {} } }
+
+// Read from global ATLAS settings, fall back to local config
+function getGlobal(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } }
+function getSupabase(){
+  var local = getCfg(), global = getGlobal()
+  return { url: local.url||global.sbUrl||'', key: local.key||global.sbKey||'' }
+}
+function getDefaultModel(){
+  return localStorage.getItem('atlas_default_model') || 'gemini-3.1-flash-lite'
+}
+function getModelKey(providerId){
+  var global = getGlobal()
+  var local = getCfg()
+  if(providerId === 'gemini') return local.geminiKey || global['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
+  return global['key_'+providerId] || ''
+}
+
+// Universal model call \u2014 handles Gemini, OpenAI-compatible, Anthropic, Sarvam
+async function callModel(prompt, modelId, systemPrompt){
+  modelId = modelId || getDefaultModel()
+  var PROVIDERS = {
+    gemini: {test: function(m){ return m.indexOf('gemini') >= 0 }},
+    openai: {test: function(m){ return m.indexOf('gpt') >= 0 }},
+    anthropic: {test: function(m){ return m.indexOf('claude') >= 0 }},
+    mistral: {test: function(m){ return m.indexOf('mistral') >= 0 || m.indexOf('magistral') >= 0 }},
+    qwen: {test: function(m){ return m.indexOf('qwen') >= 0 }},
+    sarvam: {test: function(m){ return m.indexOf('sarvam') >= 0 }},
+    ollama: {test: function(m){ return m.indexOf('llama') >= 0 || m.indexOf('gemma') >= 0 || m.indexOf('nemo') >= 0 }},
+  }
+  var provider = 'gemini'
+  for(var pid in PROVIDERS){ if(PROVIDERS[pid].test(modelId)){ provider = pid; break } }
+
+  var global = getGlobal()
+  var localCfg = getCfg()
+
+  if(provider === 'gemini'){
+    var key = localCfg.geminiKey || global['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
+    if(!key) throw new Error('Gemini API key not configured. Open ATLAS Settings.')
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+modelId+':generateContent?key='+key
+    var body = {
+      contents:[{role:'user',parts:[{text:prompt}]}],
+      generationConfig:{temperature:0.1, maxOutputTokens:1024, thinkingConfig:{thinkingBudget:0}}
+    }
+    if(systemPrompt) body.system_instruction = {parts:[{text:systemPrompt}]}
+    var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    if(!r.ok) throw new Error('Gemini error '+r.status)
+    var d = await r.json()
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  }
+
+  // OpenAI-compatible (Mistral, Qwen, Sarvam, Ollama, OpenAI)
+  var endpoints = {
+    openai: 'https://api.openai.com/v1/chat/completions',
+    mistral: 'https://api.mistral.ai/v1/chat/completions',
+    qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
+    sarvam: 'https://api.sarvam.ai/v1/chat/completions',
+    ollama: (global['endpoint_ollama'] || 'http://localhost:11434/v1/chat/completions'),
+    anthropic: 'https://api.anthropic.com/v1/messages',
+  }
+
+  var endpoint = endpoints[provider]
+  var apiKey = global['key_'+provider] || ''
+  var messages = []
+  if(systemPrompt) messages.push({role:'system',content:systemPrompt})
+  messages.push({role:'user',content:prompt})
+
+  if(provider === 'anthropic'){
+    if(!apiKey) throw new Error('Anthropic API key not configured. Open ATLAS Settings.')
+    var body = {model:modelId, max_tokens:1024, messages:messages}
+    var r = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)})
+    if(!r.ok) throw new Error('Anthropic error '+r.status)
+    var d = await r.json()
+    return d.content?.[0]?.text || ''
+  }
+
+  var headers = {'Content-Type':'application/json'}
+  if(provider === 'sarvam') headers['api-subscription-key'] = apiKey
+  else if(provider !== 'ollama' && apiKey) headers['Authorization'] = 'Bearer '+apiKey
+  var body = {model:modelId, messages:messages, max_tokens:1024, temperature:0.1}
+  var r = await fetch(endpoint,{method:'POST',headers:headers,body:JSON.stringify(body)})
+  if(!r.ok) throw new Error(provider+' error '+r.status)
+  var d = await r.json()
+  return d.choices?.[0]?.message?.content || ''
+}
 function setCfg(c){ localStorage.setItem('atlas_sb2_cfg', JSON.stringify(c)) }
 function getTeam(){ try{ return JSON.parse(localStorage.getItem('atlas_sb2_team')||'[]') }catch(e){ return [] } }
 
@@ -364,7 +465,7 @@ function toggleConfig(){
 
 // \u2500\u2500 Supabase helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function sbFetch(table, params, limit){
-  var cfg = getCfg()
+  var cfg = getSupabase()
   if(!cfg.url||!cfg.key){ console.warn('SB fetch: no config'); return [] }
   var url = cfg.url+'/rest/v1/'+table+'?'+params+'&limit='+(limit||100)
   console.log('SB fetch:', url.slice(0,80))
@@ -625,7 +726,7 @@ function renderIntelItems(items){
     if(uc.uc_name) exp+='<div class="intel-field"><div class="intel-field-label">UC Signal</div><div class="intel-field-val" style="color:var(--teal);font-weight:600">'+esc(uc.uc_name)+'</div></div>'
     var tags = Array.isArray(item.tags)?item.tags:[]
     var th = tags.slice(0,4).map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join('')
-    return '<div class="intel-card">'
+    return '<div class="intel-card" style="cursor:pointer" data-id="'+item.id+'" onclick="openIntelDetail(this.dataset.id)">'
       +'<div class="intel-card-hdr"><div class="intel-title">'+esc(item.title||'')+'</div>'
       +'<div class="intel-badges">'+(sl?'<span class="badge '+sc+'">'+sl+'</span> ':'')+'<span class="badge '+vc+'">'+(item.intelligence_value||'medium')+'</span>'+(item.depth_score?'<span class="badge badge-depth"> d'+item.depth_score+'</span>':'')+'</div></div>'
       +'<div class="intel-summary">'+esc(item.summary||'')+'</div>'
@@ -1123,6 +1224,88 @@ window.addEventListener('DOMContentLoaded', function(){
     init()
   }
 })
-</script>
+
+var CURRENT_INTEL_ITEM = null
+
+async function openIntelDetail(itemId){
+  var items = await sbFetch('intelligence_items','id=eq.'+itemId,1)
+  if(!items.length){ return }
+  var item = items[0]
+  CURRENT_INTEL_ITEM = item
+
+  document.getElementById('im-title').textContent = item.title || 'Intelligence Item'
+
+  var streamLabel = (item.intelligence_stream||'').replace(/_/g,' ')
+  var streamClass = item.intelligence_stream==='market_pulse'?'badge-mp':item.intelligence_stream==='domain_intel'?'badge-di':'badge-tw'
+  var badges = streamLabel?('<span class="badge '+streamClass+'">'+esc(streamLabel)+'</span>'):''
+  if(item.domain_name) badges += ' <span class="badge" style="background:var(--light);color:var(--mid)">'+esc(item.domain_name)+'</span>'
+  if(item.depth_score) badges += ' <span class="badge" style="background:rgba(28,56,245,0.08);color:var(--blue)">depth '+item.depth_score+'</span>'
+  if(item.scraped_at) badges += ' <span class="badge" style="background:var(--light);color:var(--mid)">'+new Date(item.scraped_at).toLocaleDateString('en-IN')+'</span>'
+  document.getElementById('im-badges').innerHTML = badges
+  document.getElementById('im-summary').textContent = item.summary || ''
+
+  function field(label, val){
+    if(!val) return ''
+    return '<div class="intel-field"><div class="intel-field-label">'+label+'</div><div class="intel-field-val">'+esc(String(val))+'</div></div>'
+  }
+  var fields = ''
+  if(item.problem_statement) fields += field('Problem Statement', item.problem_statement)
+  if(item.technical_context) fields += field('Technical Context', item.technical_context)
+  var infra = Array.isArray(item.infrastructure_signals) ? item.infrastructure_signals : []
+  if(infra.length) fields += field('Infrastructure Signals', infra.join(' | '))
+  if(item.opportunity) fields += field('Opportunity Signal', item.opportunity)
+  if(item.competitor_signals) fields += field('Competitor Signals', item.competitor_signals)
+  if(item.uc_suggest) fields += field('UC Suggestion', item.uc_suggest)
+  var orgs = Array.isArray(item.organisations) ? item.organisations : []
+  if(orgs.length) fields += field('Organisations', orgs.join(', '))
+  if(!item.problem_statement && !item.technical_context){
+    var eid = 'enrich-'+itemId
+    fields += '<div style="margin-top:10px"><button class="btn btn-outline btn-sm" data-eid="'+itemId+'" onclick="enrichIntelItem(this.dataset.eid)">&#9999; Auto-Enrich</button></div>'
+  }
+  document.getElementById('im-fields').innerHTML = fields || '<div style="font-size:12px;color:var(--mid)">No enrichment data yet \u2014 click Auto-Enrich.</div>'
+
+  var btn = document.getElementById('im-action-btn')
+  btn.dataset.id = itemId
+  btn.dataset.title = item.title || ''
+  btn.dataset.domain = item.domain_code || ''
+  document.getElementById('intelModal').classList.add('open')
+}
+
+async function enrichIntelItem(itemId){
+  var cfg = getCfg()
+  var global = getGlobal()
+  var gemKey = cfg.geminiKey || global['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
+  if(!gemKey){ alert('Configure Gemini API key in ATLAS Settings.'); return }
+  var item = CURRENT_INTEL_ITEM
+  if(!item) return
+  var prompt = 'Enrich this intelligence item for an AI/HPC OEM. TITLE: '+(item.title||'').slice(0,100)+' SUMMARY: '+(item.summary||'').slice(0,200)+' DOMAIN: '+(item.domain_name||'')+'. Respond JSON only: problem_statement, technical_context, infrastructure_signals (array 3-5), opportunity, competitor_signals, uc_suggest, depth_score (1-10).'
+  document.getElementById('im-fields').innerHTML = '<div style="font-size:12px;color:var(--mid)">Enriching with AI...</div>'
+  try{
+    var model = getDefaultModel()
+    var text = await callModel(prompt, model)
+    var first = text.indexOf('{'), last = text.lastIndexOf('}')
+    if(first < 0) throw new Error('No JSON in response')
+    var enriched = JSON.parse(text.slice(first, last+1))
+    await sbPatch('intelligence_items', 'id=eq.'+itemId, {
+      problem_statement: enriched.problem_statement||null,
+      technical_context: enriched.technical_context||null,
+      infrastructure_signals: Array.isArray(enriched.infrastructure_signals)?enriched.infrastructure_signals:[],
+      opportunity: enriched.opportunity||null,
+      competitor_signals: enriched.competitor_signals||null,
+      uc_suggest: enriched.uc_suggest||null,
+      depth_score: parseInt(enriched.depth_score)||5,
+      enriched_at: new Date().toISOString()
+    })
+    await openIntelDetail(itemId)
+  }catch(e){
+    document.getElementById('im-fields').innerHTML = '<div style="color:var(--orange)">Error: '+esc(e.message)+'</div>'
+  }
+}
+
+function createActionFromIntel(){
+  var btn = document.getElementById('im-action-btn')
+  closeModal('intelModal')
+  openActionModal(btn.dataset.id, btn.dataset.title, btn.dataset.domain)
+}</script>
 </body>
 </html>
