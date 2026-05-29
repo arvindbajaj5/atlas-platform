@@ -125,7 +125,7 @@ input:focus,select:focus{border-color:var(--blue);}
   <div class="hdr-brand">ATL<span>A</span>S</div>
   <div style="font-size:13px;color:rgba(255,255,255,0.65)">Intelligence Scraper</div>
   <div class="hdr-right">
-    <span class="hdr-badge">v1.2</span>
+    <span class="hdr-badge">v1.3</span>
     <button class="btn btn-ghost btn-sm" onclick="window.history.back()">&#8592; Portal</button>
   </div>
 </div>
@@ -267,17 +267,122 @@ input:focus,select:focus{border-color:var(--blue);}
 <script charset="utf-8">
 // \u2500\u2500 Data \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 var DOMAINS = [
-  {code:'DEF', name:'Defence & Armed Forces',        icon:'\u{1F6E1}', focus:'Indian defence AI, military technology, DRDO, DPSUs, defence procurement, border surveillance'},
-  {code:'GEO', name:'Geospatial & Earth Observation',icon:'\u{1F6F0}', focus:'satellite imagery AI, ISRO, remote sensing, GIS platforms, geospatial analytics India'},
-  {code:'GOV', name:'Governance & e-Governance',     icon:'\u{1F3DB}', focus:'Indian government AI adoption, digital India, e-governance, citizen services AI, smart cities'},
-  {code:'HLT', name:'Health & Life Sciences',        icon:'\u{1F3E5}', focus:'healthcare AI India, diagnostic AI, hospital technology, pharma AI, medical imaging'},
-  {code:'ENR', name:'Energy & Utilities',            icon:'\u26A1',   focus:'energy sector AI India, smart grid, renewable energy technology, oil and gas AI'},
-  {code:'TEL', name:'Telecom & Networks',            icon:'\u{1F4E1}', focus:'telecom AI India, 5G AI, network optimisation, subscriber analytics'},
-  {code:'FIN', name:'BFSI & Financial Services',     icon:'\u{1F3ED}', focus:'banking AI India, fintech AI, fraud detection, insurance AI, payments'},
-  {code:'MFG', name:'Manufacturing & Industry',      icon:'\u2699',   focus:'manufacturing AI India, Industry 4.0, predictive maintenance, MSME AI'},
-  {code:'TER', name:'Territory / State CoE',         icon:'\u{1F3D8}', focus:'state government AI centres India, sovereign AI platforms, AI CoE programmes'},
-  {code:'HLS', name:'Homeland Security',             icon:'\u{1F512}', focus:'border security AI India, surveillance technology, paramilitary AI, critical infrastructure'},
+  // Government
+  {code:'GOV-GOV', name:'Government & Governance',           icon:'&#127963;', cluster:'GOV',
+   focus:'Indian central and state government AI adoption, e-governance, digital India, citizen services, smart cities'},
+  // Defence umbrella (4 sub-domains)
+  {code:'DEF-MIL', name:'Defence \u2014 Armed Forces',            icon:'&#128737;', cluster:'DEF',
+   focus:'Indian Army, Navy, Air Force, DPSUs, DRDO combat systems, autonomous weapons, military AI'},
+  {code:'DEF-SPC', name:'Defence \u2014 Space & Satellite',       icon:'&#128752;', cluster:'DEF',
+   focus:'ISRO, IN-SPACe, Defence Space Agency, military satellite building, launch vehicles, space situational awareness'},
+  {code:'DEF-HLS', name:'Defence \u2014 Homeland Security',       icon:'&#128274;', cluster:'DEF',
+   focus:'BSF, CRPF, paramilitary forces, border security, surveillance networks, critical infrastructure protection'},
+  {code:'DEF-INT', name:'Defence \u2014 Intelligence & Signals',  icon:'&#128065;', cluster:'DEF',
+   focus:'SIGINT, IMINT, cryptanalysis, intelligence agencies, cyber intelligence, signal processing AI'},
+  // Geospatial
+  {code:'GEO-SPA', name:'Geospatial & Earth Observation',    icon:'&#127758;', cluster:'GEO',
+   focus:'NRSC, Survey of India, Pixxel, MapMyIndia, civilian EO platforms, GIS, Bhuvan, commercial satellite data'},
+  // Infrastructure
+  {code:'INF-CIV', name:'Critical Infrastructure',           icon:'&#9992;',   cluster:'INF',
+   focus:'Ports, airports, railways, civil aviation, DGCA, AAI, Indian Railways, metro systems, road infrastructure AI'},
+  // Natural Resources
+  {code:'RES-NAT', name:'Natural Resources',                 icon:'&#127795;', cluster:'RES',
+   focus:'Oil and gas, mines, water resources, ONGC, Coal India, forestry, MOEF, geological survey AI'},
+  // Telecom
+  {code:'TEL-NET', name:'Telecom & Networks',                icon:'&#128225;', cluster:'TEL',
+   focus:'Reliance Jio, Airtel, BSNL, C-DOT, DoT, 5G AI, network optimisation, telecom AI India'},
+  // Technology
+  {code:'TEC-GEN', name:'Technology',                        icon:'&#128187;', cluster:'TEC',
+   focus:'IT services, cloud providers, tech companies, AI platforms, SaaS, TCS, Infosys, Wipro AI'},
+  // Media
+  {code:'MED-BRD', name:'Media & Broadcast',                 icon:'&#127916;', cluster:'MED',
+   focus:'OTT platforms, news media, broadcast, content AI, Prasar Bharati, NDTV, Zee, Sony AI'},
+  // Finance
+  {code:'FIN-BFS', name:'Banking & Financial Services',      icon:'&#127981;', cluster:'FIN',
+   focus:'PSBs, private banks, RBI, SEBI, insurance, fintech, payments, fraud detection, credit AI India'},
+  // Manufacturing
+  {code:'MFG-IND', name:'Manufacturing & Industry',          icon:'&#9881;',   cluster:'MFG',
+   focus:'Industry 4.0, MSME, automotive, aerospace, SAMARTH Udyog Bharat, predictive maintenance India'},
+  // Energy
+  {code:'ENR-UTL', name:'Energy & Utilities',                icon:'&#9889;',   cluster:'ENR',
+   focus:'Power grids, renewables, NTPC, PGCIL, smart grid, solar energy AI, oil refining automation India'},
+  // Regional
+  {code:'REG-AIP', name:'Regional AI Programmes',            icon:'&#127960;', cluster:'REG',
+   focus:'State CoEs, IndiaAI Mission, AI Cities, Maharashtra AI Mission, Tamil Nadu AI, regional compute hubs'},
+  // Labs
+  {code:'LAB-AIR', name:'AI Labs & Research',                icon:'&#128300;', cluster:'LAB',
+   focus:'IITs, DRDO labs, IISER, private AI research, AI startups India, research publications, benchmarks'},
+  // Healthcare
+  {code:'HLT-LIF', name:'Healthcare & Life Sciences',        icon:'&#127973;', cluster:'HLT',
+   focus:'AIIMS, diagnostic AI, pharma, hospital technology, genomics, medical imaging, health data AI India'},
 ]
+
+
+var NEWS_TOPICS = [
+  {code:'MKT-HPC', name:'AI & HPC in India',           icon:'&#128204;',
+   focus:'AI and HPC market developments, investments, deployments, vendor activity India 2026'},
+  {code:'MKT-COM', name:'Competitor & Vendor Activity', icon:'&#127942;',
+   focus:'NVIDIA, AMD, Intel, HPE, Dell, Atos, Lenovo wins and announcements India HPC AI 2026'},
+  {code:'MKT-TND', name:'Government AI Tenders',        icon:'&#128196;',
+   focus:'India government AI RFPs, GeM tenders, procurement signals, budget allocations 2026'},
+  {code:'MKT-DEF', name:'Defence Technology News',      icon:'&#128737;',
+   focus:'India military AI, DRDO, DPSUs, defence tech, autonomous systems, MoD programmes 2026'},
+  {code:'MKT-SOV', name:'Sovereign AI & Policy',        icon:'&#127963;',
+   focus:'Data localisation, on-premise mandates, DPDP Act, sovereign AI policy India 2026'},
+]
+
+// \u2500\u2500 Data \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var DOMAINS = [
+  // Government
+  {code:'GOV-GOV', name:'Government & Governance',           icon:'&#127963;', cluster:'GOV',
+   focus:'Indian central and state government AI adoption, e-governance, digital India, citizen services, smart cities'},
+  // Defence umbrella (4 sub-domains)
+  {code:'DEF-MIL', name:'Defence \u2014 Armed Forces',            icon:'&#128737;', cluster:'DEF',
+   focus:'Indian Army, Navy, Air Force, DPSUs, DRDO combat systems, autonomous weapons, military AI'},
+  {code:'DEF-SPC', name:'Defence \u2014 Space & Satellite',       icon:'&#128752;', cluster:'DEF',
+   focus:'ISRO, IN-SPACe, Defence Space Agency, military satellite building, launch vehicles, space situational awareness'},
+  {code:'DEF-HLS', name:'Defence \u2014 Homeland Security',       icon:'&#128274;', cluster:'DEF',
+   focus:'BSF, CRPF, paramilitary forces, border security, surveillance networks, critical infrastructure protection'},
+  {code:'DEF-INT', name:'Defence \u2014 Intelligence & Signals',  icon:'&#128065;', cluster:'DEF',
+   focus:'SIGINT, IMINT, cryptanalysis, intelligence agencies, cyber intelligence, signal processing AI'},
+  // Geospatial
+  {code:'GEO-SPA', name:'Geospatial & Earth Observation',    icon:'&#127758;', cluster:'GEO',
+   focus:'NRSC, Survey of India, Pixxel, MapMyIndia, civilian EO platforms, GIS, Bhuvan, commercial satellite data'},
+  // Infrastructure
+  {code:'INF-CIV', name:'Critical Infrastructure',           icon:'&#9992;',   cluster:'INF',
+   focus:'Ports, airports, railways, civil aviation, DGCA, AAI, Indian Railways, metro systems, road infrastructure AI'},
+  // Natural Resources
+  {code:'RES-NAT', name:'Natural Resources',                 icon:'&#127795;', cluster:'RES',
+   focus:'Oil and gas, mines, water resources, ONGC, Coal India, forestry, MOEF, geological survey AI'},
+  // Telecom
+  {code:'TEL-NET', name:'Telecom & Networks',                icon:'&#128225;', cluster:'TEL',
+   focus:'Reliance Jio, Airtel, BSNL, C-DOT, DoT, 5G AI, network optimisation, telecom AI India'},
+  // Technology
+  {code:'TEC-GEN', name:'Technology',                        icon:'&#128187;', cluster:'TEC',
+   focus:'IT services, cloud providers, tech companies, AI platforms, SaaS, TCS, Infosys, Wipro AI'},
+  // Media
+  {code:'MED-BRD', name:'Media & Broadcast',                 icon:'&#127916;', cluster:'MED',
+   focus:'OTT platforms, news media, broadcast, content AI, Prasar Bharati, NDTV, Zee, Sony AI'},
+  // Finance
+  {code:'FIN-BFS', name:'Banking & Financial Services',      icon:'&#127981;', cluster:'FIN',
+   focus:'PSBs, private banks, RBI, SEBI, insurance, fintech, payments, fraud detection, credit AI India'},
+  // Manufacturing
+  {code:'MFG-IND', name:'Manufacturing & Industry',          icon:'&#9881;',   cluster:'MFG',
+   focus:'Industry 4.0, MSME, automotive, aerospace, SAMARTH Udyog Bharat, predictive maintenance India'},
+  // Energy
+  {code:'ENR-UTL', name:'Energy & Utilities',                icon:'&#9889;',   cluster:'ENR',
+   focus:'Power grids, renewables, NTPC, PGCIL, smart grid, solar energy AI, oil refining automation India'},
+  // Regional
+  {code:'REG-AIP', name:'Regional AI Programmes',            icon:'&#127960;', cluster:'REG',
+   focus:'State CoEs, IndiaAI Mission, AI Cities, Maharashtra AI Mission, Tamil Nadu AI, regional compute hubs'},
+  // Labs
+  {code:'LAB-AIR', name:'AI Labs & Research',                icon:'&#128300;', cluster:'LAB',
+   focus:'IITs, DRDO labs, IISER, private AI research, AI startups India, research publications, benchmarks'},
+  // Healthcare
+  {code:'HLT-LIF', name:'Healthcare & Life Sciences',        icon:'&#127973;', cluster:'HLT',
+   focus:'AIIMS, diagnostic AI, pharma, hospital technology, genomics, medical imaging, health data AI India'},
+]
+
 
 var NEWS_TOPICS = [
   {code:'AI_HPC',   name:'AI & HPC in India',          icon:'\u{1F4CC}', focus:'AI HPC supercomputer India government enterprise market developments 2026'},
@@ -307,7 +412,7 @@ function getConfig(){
 }
 function setConfig(c){ localStorage.setItem('atlas_intel_config',JSON.stringify(c)) }
 
-// ── Supabase ──────────────────────────────────────────────────────────────────
+// \u2500\u2500 Supabase \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function getSupabase(){
   var cfg = getConfig()
   return {url: cfg.sbUrl||'', key: cfg.sbKey||''}
@@ -977,14 +1082,14 @@ async function scrapeDomain(domain){
     {
       stream: 'market_pulse',
       label: 'Market Pulse',
-      angle: 'Indian and APAC market developments — tenders, contracts, vendor wins, government procurement, budget allocations',
+      angle: 'Indian and APAC market developments \u2014 tenders, contracts, vendor wins, government procurement, budget allocations',
       focus: 'India and Asia-Pacific only. Recent and specific. Name actual organisations, tender numbers, contract values where known.'
     },
     {
       stream: 'domain_intel',
       label: 'Domain Intelligence',
       angle: 'global use cases, AI architectures, deployment patterns, proven solutions, and emerging applications',
-      focus: 'Global — US, Europe, Middle East, and India. What specific problems are being solved. What AI approaches are working. What infrastructure is needed.'
+      focus: 'Global \u2014 US, Europe, Middle East, and India. What specific problems are being solved. What AI approaches are working. What infrastructure is needed.'
     },
     {
       stream: 'tech_watch',
@@ -1048,7 +1153,7 @@ async function scrapeNews(topic){
     var prompt2 = 'You are a market intelligence analyst for an AI and HPC hardware OEM.'
       + ' Generate ONE market intelligence item about ' + angle + ' related to the following topic.'
       + ' TOPIC: ' + topic.name + '. FOCUS: ' + topic.focus + '.'
-      + ' Be specific — name real organisations and deals. Keep the summary under 80 words. All string values must be short.' + avoidStrN
+      + ' Be specific \u2014 name real organisations and deals. Keep the summary under 80 words. All string values must be short.' + avoidStrN
       + ' Respond with a single JSON object only. No array brackets. No explanation. No markdown. No backticks. Use ONLY these exact field names: title, summary, type, intelligence_value, organisations, tags, opportunity, competitor_signals, uc_suggest, confidence. Start with { end with }.'
 
     try{
@@ -1081,7 +1186,7 @@ function mergeItems(existing, newItems){
 
 // \u2500\u2500 Main run \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-// ── Phase 2: Enrichment ───────────────────────────────────────────────────────
+// \u2500\u2500 Phase 2: Enrichment \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function enrichItem(item){
   var prompt = 'You are a senior intelligence analyst. Enrich the following intelligence item with deeper analysis.'
     + ' INPUT: title="' + (item.title||'').slice(0,80) + '" summary="' + (item.summary||'').slice(0,200) + '" domain=' + (item.domain_code||item.topic_code||'') + ' stream=' + (item.intelligence_stream||'') + '.'
@@ -1149,7 +1254,7 @@ async function runEnrichmentPhase(allItems){
   if(!cfg.useEnrich) return
   if(!allItems || allItems.length === 0) return
   log('', 'dim')
-  log('Phase 2 — Enriching ' + allItems.length + ' items...', 'info')
+  log('Phase 2 \u2014 Enriching ' + allItems.length + ' items...', 'info')
   for(var i=0; i<allItems.length; i++){
     if(allItems[i].id){
       await enrichItem(allItems[i])
