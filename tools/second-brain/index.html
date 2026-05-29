@@ -142,7 +142,7 @@ textarea{resize:vertical;min-height:70px;}
 <div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S &mdash; Second Brain</div>
   <div class="hdr-right">
-    <span class="hdr-badge">v2.1</span>
+    <span class="hdr-badge">v2.2</span>
     <button class="btn btn-ghost btn-sm" onclick="toggleConfig()">&#9881; Config</button>
     <button class="btn btn-ghost btn-sm" onclick="window.history.back()">&#8592; Portal</button>
   </div>
@@ -207,6 +207,69 @@ textarea{resize:vertical;min-height:70px;}
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal('actionModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveAction()">Create Action</button>
+    </div>
+  </div>
+</div>
+
+<!-- Enrich UC Modal -->
+<div class="modal-overlay" id="enrichModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-title">&#128161; Enrich Use Case</div>
+    <input type="hidden" id="enrichUCId">
+    <input type="hidden" id="enrichQueueId">
+    <div style="background:var(--light);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--mid)" id="enrichSourceInfo"></div>
+    <label class="lbl">UC Name *</label>
+    <input type="text" id="enrichName" placeholder="Specific, actionable use case name">
+    <label class="lbl">Cluster / Category</label>
+    <input type="text" id="enrichCluster" placeholder="e.g. Border Surveillance, Crop Analytics">
+    <div style="display:flex;gap:12px">
+      <div style="flex:1">
+        <label class="lbl">Domain Codes</label>
+        <input type="text" id="enrichDomains" placeholder="e.g. DEF-MIL, GEO-SPA">
+      </div>
+      <div style="flex:1">
+        <label class="lbl">Maturity</label>
+        <select id="enrichMaturity">
+          <option value="theoretical">Theoretical</option>
+          <option value="emerging" selected>Emerging</option>
+          <option value="piloted">Piloted</option>
+          <option value="proven">Proven</option>
+        </select>
+      </div>
+    </div>
+    <label class="lbl">Problem Statement</label>
+    <textarea id="enrichProblem" placeholder="What specific problem does this solve?"></textarea>
+    <label class="lbl">Benefit</label>
+    <input type="text" id="enrichBenefit" placeholder="Quantified benefit if known (cost saving, efficiency gain...)">
+    <label class="lbl">How It Works</label>
+    <textarea id="enrichDescription" placeholder="Plain language description of the AI approach"></textarea>
+    <label class="lbl">Process Steps (one per line)</label>
+    <textarea id="enrichSteps" placeholder="1. Ingest satellite imagery&#10;2. Run change detection model&#10;3. Flag anomalies for review"></textarea>
+    <label class="lbl">Key Actors</label>
+    <input type="text" id="enrichActors" placeholder="e.g. DRDO, Indian Army, ISRO (comma separated)">
+    <label class="lbl">Data Requirements</label>
+    <textarea id="enrichData" placeholder="What data is needed, format, volume, frequency"></textarea>
+    <label class="lbl">Technical Requirements</label>
+    <textarea id="enrichTech" placeholder="Compute, connectivity, latency, air-gap requirements"></textarea>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1">
+        <label class="lbl">Model Type</label>
+        <input type="text" id="enrichModelType" placeholder="e.g. Vision, NLP, Multimodal">
+      </div>
+      <div style="flex:1">
+        <label class="lbl">Hardware Profile</label>
+        <input type="text" id="enrichHardware" placeholder="e.g. Edge GPU, Air-gapped cluster">
+      </div>
+    </div>
+    <label class="lbl">Regulatory / Compliance Notes</label>
+    <input type="text" id="enrichRegulatory" placeholder="e.g. MoD clearance, DPDP Act, data sovereignty">
+    <label class="lbl">Reference Deployments</label>
+    <input type="text" id="enrichRefs" placeholder="Where has this been done? (comma separated)">
+    <label class="lbl">Estimated Effort</label>
+    <input type="text" id="enrichEffort" placeholder="e.g. 3-6 months, Medium complexity">
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('enrichModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEnrichedUC()">Save to UC Library</button>
     </div>
   </div>
 </div>
@@ -601,11 +664,17 @@ function renderUCItems(){
   var items = cachedUC
   var libraryItems = items.filter(function(i){return i._source==='library'})
   var queueItems = items.filter(function(i){return i._source==='queue'})
+  // Add UC + manual button header
+  var headerHtml = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy)">Use Cases &mdash; '+currentEntry.name+'</div>'
+    +'<button class="btn btn-primary btn-sm" onclick="openManualUC()">+ Add UC Manually</button>'
+    +'</div>'
+
   if(!items.length){
-    el.innerHTML = '<div class="empty-state"><div class="icon">&#128161;</div><h3>No Use Cases Yet</h3><p>Use cases are suggested automatically during enrichment, or can be added manually to the UC Library.</p></div>'
+    el.innerHTML = headerHtml + '<div class="empty-state"><div class="icon">&#128161;</div><h3>No Use Cases Yet</h3><p>Use cases are suggested automatically during enrichment, or can be added manually using the button above.</p></div>'
     return
   }
-  var html = ''
+  var html = headerHtml
   if(libraryItems.length){
     html += '<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">&#128218; UC Library ('+libraryItems.length+')</div>'
     html += libraryItems.map(function(item){
@@ -667,7 +736,110 @@ function toggleExpLib(id){
   var isOpen = el.classList.contains('open')
   // Find the button that triggered this
   var btn = document.querySelector('[data-eid="'+id+'"]')
-  if(btn) btn.innerHTML = isOpen ? '▲ Hide' : '▼ Details'
+  if(btn) btn.innerHTML = isOpen ? '\u25B2 Hide' : '\u25BC Details'
+}
+
+function openEnrichModal(queueId, ucName, rationale, sourceTitle, sourceIntelId, domainCode){
+  document.getElementById('enrichUCId').value = ''
+  document.getElementById('enrichQueueId').value = queueId||''
+  document.getElementById('enrichName').value = ucName||''
+  document.getElementById('enrichCluster').value = ''
+  document.getElementById('enrichDomains').value = domainCode||''
+  document.getElementById('enrichMaturity').value = 'emerging'
+  document.getElementById('enrichProblem').value = ''
+  document.getElementById('enrichBenefit').value = ''
+  document.getElementById('enrichDescription').value = ''
+  document.getElementById('enrichSteps').value = ''
+  document.getElementById('enrichActors').value = ''
+  document.getElementById('enrichData').value = ''
+  document.getElementById('enrichTech').value = ''
+  document.getElementById('enrichModelType').value = ''
+  document.getElementById('enrichHardware').value = ''
+  document.getElementById('enrichRegulatory').value = ''
+  document.getElementById('enrichRefs').value = ''
+  document.getElementById('enrichEffort').value = ''
+  // Show source context
+  var info = ''
+  if(sourceTitle) info += '<strong>Source:</strong> ' + esc(sourceTitle.slice(0,80))
+  if(rationale) info += '<br><strong>Rationale:</strong> ' + esc(rationale.slice(0,120))
+  document.getElementById('enrichSourceInfo').innerHTML = info || 'Manual entry'
+  // If we have a source intel item, try to pre-fill from its enrichment
+  if(sourceIntelId) prefillFromIntel(sourceIntelId)
+  document.getElementById('enrichModal').classList.add('open')
+}
+
+async function prefillFromIntel(intelId){
+  var items = await sbFetch('intelligence_items','id=eq.'+intelId,1)
+  if(!items.length) return
+  var item = items[0]
+  if(item.problem_statement && !document.getElementById('enrichProblem').value)
+    document.getElementById('enrichProblem').value = item.problem_statement
+  if(item.technical_context && !document.getElementById('enrichTech').value)
+    document.getElementById('enrichTech').value = item.technical_context
+  var infra = Array.isArray(item.infrastructure_signals) ? item.infrastructure_signals : []
+  if(infra.length && !document.getElementById('enrichHardware').value)
+    document.getElementById('enrichHardware').value = infra.join(', ')
+}
+
+async function saveEnrichedUC(){
+  var name = document.getElementById('enrichName').value.trim()
+  if(!name){ alert('UC Name is required.'); return }
+  
+  var domainsRaw = document.getElementById('enrichDomains').value.trim()
+  var domainCodes = domainsRaw ? domainsRaw.split(',').map(function(s){return s.trim()}).filter(Boolean) : []
+  
+  var stepsRaw = document.getElementById('enrichSteps').value.trim()
+  var steps = stepsRaw ? stepsRaw.split('\n').map(function(s){return s.replace(/^\d+\.\s*/,'').trim()}).filter(Boolean) : []
+  
+  var actorsRaw = document.getElementById('enrichActors').value.trim()
+  var actors = actorsRaw ? actorsRaw.split(',').map(function(s){return s.trim()}).filter(Boolean) : []
+  
+  var refsRaw = document.getElementById('enrichRefs').value.trim()
+  var refs = refsRaw ? refsRaw.split(',').map(function(s){return s.trim()}).filter(Boolean) : []
+  
+  var queueId = document.getElementById('enrichQueueId').value
+  var ucId = 'uclib-' + Date.now() + '-' + Math.floor(Math.random()*9999)
+  
+  var ucRow = {
+    id: ucId,
+    uc_name: name,
+    cluster: document.getElementById('enrichCluster').value.trim()||null,
+    domain_codes: domainCodes,
+    source: queueId ? 'enriched_from_queue' : 'manual',
+    status: 'active',
+    problem_statement: document.getElementById('enrichProblem').value.trim()||null,
+    benefit: document.getElementById('enrichBenefit').value.trim()||null,
+    description: document.getElementById('enrichDescription').value.trim()||null,
+    process_steps: steps,
+    key_actors: actors,
+    data_requirements: document.getElementById('enrichData').value.trim()||null,
+    technical_requirements: document.getElementById('enrichTech').value.trim()||null,
+    model_type: document.getElementById('enrichModelType').value.trim()||null,
+    hardware_profile: document.getElementById('enrichHardware').value.trim()||null,
+    regulatory: document.getElementById('enrichRegulatory').value.trim()||null,
+    reference_deployments: refs,
+    estimated_effort: document.getElementById('enrichEffort').value.trim()||null,
+    maturity: document.getElementById('enrichMaturity').value,
+    created_by: 'ATLAS',
+    created_at: new Date().toISOString(),
+    source_intel_id: null
+  }
+  
+  var ok = await sbInsert('uc_library', ucRow)
+  if(ok){
+    // If from queue, mark as accepted
+    if(queueId) await sbPatch('uc_queue','id=eq.'+queueId,{status:'accepted'})
+    closeModal('enrichModal')
+    cachedUC = []
+    await loadUC()
+    log('UC saved to library: '+name, 'success')
+  } else {
+    alert('Failed to save. Check Supabase connection.')
+  }
+}
+
+async function openManualUC(){
+  openEnrichModal('','','','','', currentEntry ? currentEntry.code : '')
 }
 
 async function updateUC(id, status){
