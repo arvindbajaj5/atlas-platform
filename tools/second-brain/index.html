@@ -581,7 +581,12 @@ async function loadUC(){
   if(cachedUC.length === 0){
     // Fetch from both uc_queue (auto-suggested) and uc_library (curated)
     var queueItems = await sbFetch('uc_queue','domain_code=eq.'+e.code+'&order=suggested_at.desc')
-    var libraryItems = await sbFetch('uc_library','domain_codes=cs.["'+e.code+'"]&order=created_at.desc',100)
+    // Fetch all library items and filter client-side (avoids complex jsonb query)
+    var allLibraryItems = await sbFetch('uc_library','order=created_at.desc',200)
+    var libraryItems = allLibraryItems.filter(function(i){
+      var codes = Array.isArray(i.domain_codes) ? i.domain_codes : []
+      return codes.indexOf(e.code) >= 0 || codes.length === 0
+    })
     // Tag source type for rendering
     queueItems.forEach(function(i){ i._source = 'queue' })
     libraryItems.forEach(function(i){ i._source = 'library' })
@@ -659,8 +664,10 @@ function toggleExpLib(id){
   var el = document.getElementById(id)
   if(!el) return
   el.classList.toggle('open')
-  var btn = el.previousElementSibling
-  if(btn && btn.dataset.eid) btn.innerHTML = el.classList.contains('open') ? '&#9650; Hide' : '&#9660; Details'
+  var isOpen = el.classList.contains('open')
+  // Find the button that triggered this
+  var btn = document.querySelector('[data-eid="'+id+'"]')
+  if(btn) btn.innerHTML = isOpen ? '▲ Hide' : '▼ Details'
 }
 
 async function updateUC(id, status){
