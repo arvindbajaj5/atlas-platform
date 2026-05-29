@@ -1,6 +1,6 @@
 # claude-session-activator.md
 # ATLAS Claude Session Activator
-# Version: 1.8 | Last Updated: 2026-05-29
+# Version: 1.9 | Last Updated: 2026-05-29
 
 ---
 
@@ -41,8 +41,8 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | Tool | Version | Status | Path |
 |---|---|---|---|
 | Portal | v2.0 | ✅ Live | `index.html` |
-| Second Brain | v2.1 | ✅ Live | `tools/second-brain/` |
-| Customer Intelligence (PEI) | v0.1 | ✅ Live | `tools/pei-tool/` |
+| Second Brain | v2.2 | ✅ Live | `tools/second-brain/` |
+| Customer Intelligence (PEI) | v0.2 | ✅ Live | `tools/pei-tool/` |
 | Intelligence Scraper | v1.3 | ✅ Live | `tools/intelligence-scraper/` |
 | Engagement Management | v1.0 | ✅ Live | `tools/engagement-management/` |
 | AI Centre Builder | v1.1 | ⚠️ Form empty — pending fix | `tools/ai-centre-builder/` |
@@ -70,7 +70,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | `blacklist-whitelist.md` | v1.0 | ✅ Live |
 | `domain-taxonomy.md` | v1.1 | ✅ Live |
 | `tool-features.md` | v1.0 | ⏸ Needs v1.1 |
-| `claude-session-activator.md` | v1.8 | ✅ This file |
+| `claude-session-activator.md` | v1.9 | ✅ This file |
 
 ---
 
@@ -189,19 +189,42 @@ New fields on `intelligence_items`: `intelligence_stream`, `problem_statement`, 
 
 ---
 
-## Second Brain v2.1
+## Second Brain v2.2
 
 - 17 domains + 5 MKT news topics in sidebar
 - DEF umbrella — collapsible, shows 4 sub-domains
-- Counts loaded from Supabase on startup
-- Three tabs per domain: Intelligence / Use Cases / Sales Actions
-- Intelligence tab: filter by stream (All / Market Pulse / Domain Intel / Tech Watch) — client-side, instant
-- UC tab: shows uc_queue items, Accept/Reject/Create Action
-- Sales Actions tab: create, assign, track, convert to engagement
-- Supabase config saved in localStorage key `atlas_sb2_cfg`
+- Intelligence tab: filter by stream + 18-month recency filter (clock toggle for All time)
+- **Intel item detail** — click any card to open full detail panel (all enrichment fields, Auto-Enrich button)
+- **UC tab** — two sections: UC Library (curated, expandable detail, Enrich button) + Suggested from Intelligence (queue items, Enrich → Library button)
+- **UC enrichment flow** — Enrich button → form opens → Auto-Enrich with Gemini fills all 12 fields → Save to UC Library
+- **+ Add UC Manually** button for domain-knowledge UCs
+- UC Library fetches from `uc_library` table, queue from `uc_queue` — client-side filtered by domain
+- Supabase config read from `atlas_global_cfg` (global) or `atlas_sb2_cfg` (local fallback)
+- Gemini key read from global settings
 - **Backfill note:** Run this SQL on existing items missing stream: `UPDATE intelligence_items SET intelligence_stream = 'market_pulse' WHERE intelligence_stream IS NULL`
 
 ---
+
+## Global Settings (atlas_global_cfg)
+
+Single localStorage key `atlas_global_cfg` shared across all tools. Set once in portal Settings panel (Business Head only). Contains:
+- `sbUrl`, `sbKey` — Supabase credentials
+- `key_gemini`, `key_openai`, `key_anthropic`, `key_mistral`, `key_qwen`, `key_sarvam` — AI provider keys
+- `endpoint_ollama` — local Ollama endpoint URL
+- `atlas_default_model` — default model ID used across all tools
+
+**Migration:** On save, portal Settings auto-populates legacy keys (`atlas_api_key`, `atlas_gemini_key`) and tool-specific configs (`atlas_sb2_cfg`, `atlas_pei_cfg`, `atlas_scraper_cfg`).
+
+**7 AI Providers supported:**
+| Provider | Region | Model IDs |
+|---|---|---|
+| Google Gemini | US | `gemini-3.1-flash-lite`, `gemini-3.5-flash` |
+| OpenAI | US | `gpt-4o`, `gpt-4o-mini` |
+| Anthropic | US | `claude-sonnet-4-6`, `claude-haiku-4-5-20251001` |
+| Mistral AI | 🇫🇷 EU (GDPR) | `mistral-large-latest`, `mistral-small-latest` |
+| Qwen (Alibaba) | 🇨🇳 CN/Intl | `qwen3.5-plus`, `qwen3.5-flash` |
+| Sarvam AI | 🇮🇳 India | `sarvam-m` (10 Indic languages) |
+| Ollama | Local/On-prem | any local model, zero data egress |
 
 ## Gemini API — Critical Rules
 
@@ -225,8 +248,8 @@ New fields on `intelligence_items`: `intelligence_stream`, `problem_statement`, 
 
 ```
 STAGE 1 — Intelligence Scraper v1.3 + Supabase schema  ✅ COMPLETE
-STAGE 2 — Second Brain v2.1                            ✅ COMPLETE
-STAGE 3 — Customer Intelligence (PEI) enhancements     🔴 Next
+STAGE 2 — Second Brain v2.2                            ✅ COMPLETE
+STAGE 3 — Customer Intelligence (PEI) v0.2             ✅ COMPLETE
 STAGE 4 — AI Centre Builder fix                        🔴 After stage 3
 STAGE 5 — Engagement Configurator                      🔴 After stage 4
 STAGE 6 — GitHub Actions automation                    ✅ COMPLETE
@@ -238,11 +261,10 @@ STAGE 6 — GitHub Actions automation                    ✅ COMPLETE
 
 | # | Item | Stage | Priority |
 |---|---|---|---|
-| 1 | Intelligence Scraper — results panel below log not populating after run | 1 | 🟡 Next iteration |
-| 1b | Intelligence Scraper — duplicates still appearing in Market Pulse despite dedup — tighten title matching or add URL/date dedup | 1 | 🟡 Next iteration |
-| 2 | PEI — save API key in config | 3 | 🔴 Next build |
-| 3 | PEI — query Supabase before Gemini, match by sector/country/ownership, "From Intelligence DB" section | 3 | 🔴 Next build |
-| 4 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 After PEI |
+| 1 | Intelligence Scraper — results panel below log not populating after run | 1 | 🟡 Deferred |
+| 1b | Intelligence Scraper — duplicates in Market Pulse — Supabase dedup added (18m window), further tightening if needed | 1 | 🟡 Monitor |
+| 2 | PEI v0.2 — ✅ DONE: config saved, Supabase query before Gemini, "From Intelligence DB" section, multi-model selector | 3 | ✅ Complete |
+| 4 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 Next |
 | 5 | Engagement Configurator — receives converted Sales Actions, full lifecycle docket | 5 | 🔴 Major build |
 | 6 | UC Library — manual add + bulk import (39 GeoAI UCs + civil aviation UCs) | 2 | 🔴 With Second Brain v2.2 |
 | 6b | UC Library — rich structured form per UC: problem, benefit, how it works, process steps, key actors, data requirements, technical requirements, model type, hardware profile, maturity, reference deployments, regulatory, estimated effort | 2 | 🔴 v2.2 |
