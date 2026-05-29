@@ -1,43 +1,47 @@
-name: ATLAS Intelligence Scraper
+name: Intelligence Scraper
 
 on:
   schedule:
-    - cron: '0 6 * * 1'
+    # Run daily at 2:00 AM IST (20:30 UTC previous day)
+    - cron: '30 20 * * *'
   workflow_dispatch:
+    inputs:
+      domains:
+        description: 'Comma-separated domain codes to scrape (leave empty for all)'
+        required: false
+        default: ''
+      items_per_domain:
+        description: 'Items per domain (default: 5)'
+        required: false
+        default: '5'
+      run_enrichment:
+        description: 'Run enrichment phase (true/false)'
+        required: false
+        default: 'true'
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: write
+    timeout-minutes: 120
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
+          node-version: '20'
 
       - name: Install dependencies
-        run: pip install requests
+        run: npm install node-fetch@3
 
-      - name: Run Domain Intelligence Scraper
+      - name: Run Intelligence Scraper
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python scripts/scrape/domain_intelligence_scraper.py
-
-      - name: Run Market News Scraper
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python scripts/scrape/market_news_scraper.py
-
-      - name: Commit scraped data
-        run: |
-          git config --local user.email "atlas-bot@github.com"
-          git config --local user.name "ATLAS Intelligence Bot"
-          git add data/raw/
-          git diff --staged --quiet || git commit -m "Intelligence scrape $(date -u '+%Y-%m-%d %H:%M UTC')"
-          git push
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          DOMAINS_OVERRIDE: ${{ github.event.inputs.domains }}
+          ITEMS_PER_DOMAIN: ${{ github.event.inputs.items_per_domain || '5' }}
+          RUN_ENRICHMENT: ${{ github.event.inputs.run_enrichment || 'true' }}
+        run: node scripts/scrape-intelligence.js
