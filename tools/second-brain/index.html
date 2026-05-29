@@ -291,18 +291,26 @@ function toggleConfig(){
 // \u2500\u2500 Supabase helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function sbFetch(table, params, limit){
   var cfg = getCfg()
-  if(!cfg.url||!cfg.key) return []
+  if(!cfg.url||!cfg.key){ console.warn('SB fetch: no config'); return [] }
   var url = cfg.url+'/rest/v1/'+table+'?'+params+'&limit='+(limit||100)
+  console.log('SB fetch:', url.slice(0,80))
   try{
     var r = await fetch(url, {headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key}})
-    if(r.ok) return await r.json()
-  }catch(e){ console.error(e) }
-  return []
+    if(r.ok){
+      var data = await r.json()
+      console.log('SB fetch ok:', data.length, 'rows from', table)
+      return data
+    } else {
+      var t = await r.text()
+      console.error('SB fetch error '+r.status+': '+t.slice(0,200))
+      return []
+    }
+  }catch(e){ console.error('SB fetch exception:',e); return [] }
 }
 
 async function sbCount(table, filter){
   var cfg = getCfg()
-  if(!cfg.url||!cfg.key) return 0
+  if(!cfg.url||!cfg.key){ console.warn('SB: no config'); return 0 }
   try{
     var r = await fetch(cfg.url+'/rest/v1/'+table+'?'+filter+'&limit=1', {
       headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Prefer':'count=exact'}
@@ -310,9 +318,13 @@ async function sbCount(table, filter){
     if(r.ok){
       var cr = r.headers.get('content-range')
       if(cr) return parseInt(cr.split('/')[1])||0
+      return 0
+    } else {
+      var t = await r.text()
+      console.error('SB count error '+r.status+': '+t.slice(0,200))
+      return 0
     }
-  }catch(e){}
-  return 0
+  }catch(e){ console.error('SB count exception:',e); return 0 }
 }
 
 async function sbPatch(table, filter, data){
@@ -344,15 +356,21 @@ async function sbInsert(table, data){
 // \u2500\u2500 Init & Sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function init(){
   var cfg = getCfg()
-  if(!cfg.url||!cfg.key) return
+  if(!cfg.url||!cfg.key){
+    document.getElementById('welcome').innerHTML = '<div class="welcome"><h2>&#9888; Config Required</h2><p>Click the Config button above and enter your Supabase URL and anon key, then click Save &amp; Connect.</p></div>'
+    return
+  }
+  console.log('SB init with url:', cfg.url.slice(0,40))
   document.getElementById('welcome').innerHTML = '<div class="loading"><div class="spin"></div> Loading domain counts...</div>'
   // Load counts for all domains + news
   var allCodes = DOMAINS.map(function(d){return d.code}).concat(NEWS_TOPICS.map(function(t){return t.code}))
   for(var i=0; i<allCodes.length; i++){
     counts[allCodes[i]] = await sbCount('intelligence_items','domain_code=eq.'+allCodes[i])
   }
+  var totalItems = Object.values(counts).reduce(function(s,c){return s+c},0)
+  console.log('SB init complete. Total counts:', counts)
   renderSidebar()
-  document.getElementById('welcome').innerHTML = '<div class="welcome"><h2>&#129504; Second Brain v2.1</h2><p>Select a domain from the sidebar to explore intelligence, use cases, and sales actions.</p></div>'
+  document.getElementById('welcome').innerHTML = '<div class="welcome"><h2>&#129504; Second Brain v2.1</h2><p>'+totalItems+' intelligence items across all domains. Select a domain from the sidebar to explore.</p>'+(totalItems===0?'<p style="color:var(--orange);margin-top:8px">&#9888; No items found. Check your Supabase connection or run the Intelligence Scraper first.</p>':'')+'</div>'
 }
 
 function renderSidebar(){
