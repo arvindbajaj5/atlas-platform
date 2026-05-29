@@ -147,6 +147,262 @@ tr:hover td{background:rgba(0,0,0,0.02);}
 </div>
 
 <script>
+// \u2500\u2500 ATLAS Model Registry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Central utility \u2014 reads atlas_global_cfg, returns only configured providers
+// All tools use this \u2014 never hardcode models or keys
+
+var ATLAS_MODEL_REGISTRY = [
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    flag: '\uD83C\uDDFA\uD83C\uDDF8',
+    cfgKey: 'key_gemini',
+    legacyKey: 'atlas_gemini_key',
+    authStyle: 'gemini',
+    models: [
+      {id:'gemini-3.1-flash-lite', label:'Gemini 3.1 Flash-Lite', tier:'lite',  cost:'$0.075/$0.30'},
+      {id:'gemini-3.5-flash',      label:'Gemini 3.5 Flash',      tier:'std',   cost:'$0.15/$0.60'},
+    ]
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic Claude',
+    flag: '\uD83C\uDDFA\uD83C\uDDF8',
+    cfgKey: 'key_anthropic',
+    legacyKey: 'atlas_api_key',
+    authStyle: 'anthropic',
+    models: [
+      {id:'claude-haiku-4-5-20251001', label:'Claude Haiku 4.5',  tier:'std',  cost:'$1/$5'},
+      {id:'claude-sonnet-4-6',         label:'Claude Sonnet 4.6', tier:'heavy', cost:'$3/$15'},
+    ]
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral AI',
+    flag: '\uD83C\uDDEB\uD83C\uDDF7',
+    cfgKey: 'key_mistral',
+    legacyKey: null,
+    authStyle: 'bearer',
+    endpoint: 'https://api.mistral.ai/v1/chat/completions',
+    models: [
+      {id:'mistral-small-latest',  label:'Mistral Small 4',  tier:'std',   cost:'~$0.10/$0.30'},
+      {id:'mistral-large-latest',  label:'Mistral Large 3',  tier:'heavy', cost:'~$2/$6'},
+    ]
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    flag: '\uD83C\uDDFA\uD83C\uDDF8',
+    cfgKey: 'key_openai',
+    legacyKey: null,
+    authStyle: 'bearer',
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    models: [
+      {id:'gpt-4o-mini', label:'GPT-4o Mini', tier:'std',   cost:'$0.15/$0.60'},
+      {id:'gpt-4o',      label:'GPT-4o',      tier:'heavy', cost:'$2.50/$10'},
+    ]
+  },
+  {
+    id: 'qwen',
+    name: 'Qwen (Alibaba)',
+    flag: '\uD83C\uDDE8\uD83C\uDDF3',
+    cfgKey: 'key_qwen',
+    legacyKey: null,
+    authStyle: 'bearer',
+    endpoint: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
+    models: [
+      {id:'qwen3.5-flash', label:'Qwen 3.5 Flash', tier:'lite', cost:'~$0.05/$0.10'},
+      {id:'qwen3.5-plus',  label:'Qwen 3.5 Plus',  tier:'std',  cost:'~$0.50/$1.50'},
+    ]
+  },
+  {
+    id: 'sarvam',
+    name: 'Sarvam AI',
+    flag: '\uD83C\uDDEE\uD83C\uDDF3',
+    cfgKey: 'key_sarvam',
+    legacyKey: null,
+    authStyle: 'sarvam',
+    endpoint: 'https://api.sarvam.ai/v1/chat/completions',
+    models: [
+      {id:'sarvam-m', label:'Sarvam-M 24B (Indic)', tier:'specialist', cost:'varies'},
+    ]
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama (Local)',
+    flag: '\uD83D\uDCBB',
+    cfgKey: 'endpoint_ollama',
+    legacyKey: null,
+    authStyle: 'none',
+    alwaysAvailable: true,
+    models: [
+      {id:'llama3.3',     label:'Llama 3.3 70B',   tier:'airgap', cost:'free'},
+      {id:'mistral-nemo', label:'Mistral Nemo 12B', tier:'airgap', cost:'free'},
+      {id:'gemma3',       label:'Gemma 3',          tier:'airgap', cost:'free'},
+    ]
+  },
+]
+
+function atlasGetGlobal(){
+  try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} }
+}
+
+// Returns only providers that have a key configured
+function atlasGetConfiguredProviders(){
+  var g = atlasGetGlobal()
+  return ATLAS_MODEL_REGISTRY.filter(function(p){
+    if(p.alwaysAvailable) return true
+    var key = g[p.cfgKey] || (p.legacyKey ? localStorage.getItem(p.legacyKey) : '') || ''
+    return key.length > 0
+  })
+}
+
+// Returns flat list of {modelId, modelLabel, providerId, providerName, flag, cost} for configured providers
+function atlasGetAvailableModels(){
+  var providers = atlasGetConfiguredProviders()
+  var models = []
+  providers.forEach(function(p){
+    p.models.forEach(function(m){
+      models.push({
+        modelId: m.id,
+        modelLabel: m.label,
+        cost: m.cost,
+        tier: m.tier,
+        providerId: p.id,
+        providerName: p.name,
+        flag: p.flag,
+      })
+    })
+  })
+  return models
+}
+
+// Build a <select> innerHTML grouped by provider \u2014 only configured providers shown
+// selectedModel: current model ID to pre-select
+function atlasBuildModelSelect(selectedModel){
+  var providers = atlasGetConfiguredProviders()
+  if(!providers.length) return '<option value="">No providers configured in Settings</option>'
+  var html = ''
+  providers.forEach(function(p){
+    html += '<optgroup label="'+p.flag+' '+p.name+'">'
+    p.models.forEach(function(m){
+      var sel = m.id === selectedModel ? ' selected' : ''
+      html += '<option value="'+m.id+'"'+sel+'>'+m.label+' ('+m.cost+')</option>'
+    })
+    html += '</optgroup>'
+  })
+  return html
+}
+
+// Get the API key for a given model ID
+function atlasGetKeyForModel(modelId){
+  var g = atlasGetGlobal()
+  var provider = null
+  ATLAS_MODEL_REGISTRY.forEach(function(p){
+    p.models.forEach(function(m){ if(m.id === modelId) provider = p })
+  })
+  if(!provider) return ''
+  return g[provider.cfgKey] || (provider.legacyKey ? localStorage.getItem(provider.legacyKey) : '') || ''
+}
+
+// Universal model call \u2014 routes to correct provider API
+async function atlasCallModel(modelId, prompt, systemPrompt, maxTokens){
+  maxTokens = maxTokens || 4096
+  var g = atlasGetGlobal()
+  var provider = null
+  ATLAS_MODEL_REGISTRY.forEach(function(p){
+    p.models.forEach(function(m){ if(m.id === modelId) provider = p })
+  })
+  if(!provider) throw new Error('Unknown model: '+modelId)
+
+  var key = atlasGetKeyForModel(modelId)
+  if(!key && !provider.alwaysAvailable) throw new Error(provider.name+' API key not configured in ATLAS Settings.')
+
+  // Gemini
+  if(provider.authStyle === 'gemini'){
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+modelId+':generateContent?key='+key
+    var body = {
+      contents:[{parts:[{text:prompt}]}],
+      generationConfig:{temperature:0.2, maxOutputTokens:maxTokens, thinkingConfig:{thinkingBudget:0}}
+    }
+    if(systemPrompt) body.system_instruction = {parts:[{text:systemPrompt}]}
+    var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    if(!r.ok){var e=await r.json();throw new Error(e.error?.message||'Gemini error '+r.status)}
+    var d = await r.json()
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  }
+
+  // Anthropic
+  if(provider.authStyle === 'anthropic'){
+    var msgs = [{role:'user',content:prompt}]
+    var body = {model:modelId, max_tokens:maxTokens, messages:msgs}
+    if(systemPrompt) body.system = systemPrompt
+    var r = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify(body)
+    })
+    if(!r.ok){var e=await r.json();throw new Error(e.error?.message||'Claude error '+r.status)}
+    var d = await r.json()
+    return d.content?.[0]?.text || ''
+  }
+
+  // Sarvam
+  if(provider.authStyle === 'sarvam'){
+    var msgs = systemPrompt ? [{role:'system',content:systemPrompt},{role:'user',content:prompt}] : [{role:'user',content:prompt}]
+    var r = await fetch(provider.endpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','api-subscription-key':key},
+      body:JSON.stringify({model:modelId,messages:msgs,max_tokens:maxTokens,temperature:0.2})
+    })
+    if(!r.ok) throw new Error('Sarvam error '+r.status)
+    var d = await r.json()
+    return d.choices?.[0]?.message?.content || ''
+  }
+
+  // Ollama (local)
+  if(provider.authStyle === 'none'){
+    var endpoint = g['endpoint_ollama'] || 'http://localhost:11434/v1/chat/completions'
+    var msgs = systemPrompt ? [{role:'system',content:systemPrompt},{role:'user',content:prompt}] : [{role:'user',content:prompt}]
+    var r = await fetch(endpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:modelId,messages:msgs,max_tokens:maxTokens,temperature:0.2})
+    })
+    if(!r.ok) throw new Error('Ollama error '+r.status)
+    var d = await r.json()
+    return d.choices?.[0]?.message?.content || ''
+  }
+
+  // OpenAI-compatible (Mistral, OpenAI, Qwen)
+  var msgs = systemPrompt ? [{role:'system',content:systemPrompt},{role:'user',content:prompt}] : [{role:'user',content:prompt}]
+  var r = await fetch(provider.endpoint,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({model:modelId,messages:msgs,max_tokens:maxTokens,temperature:0.2})
+  })
+  if(!r.ok){var e=await r.json();throw new Error(e.error?.message||provider.name+' error '+r.status)}
+  var d = await r.json()
+  return d.choices?.[0]?.message?.content || ''
+}
+
+// Read task model from global settings
+function atlasGetTaskModel(taskId){
+  var g = atlasGetGlobal()
+  var DEFAULTS = {
+    scraping:    'gemini-3.1-flash-lite',
+    enrichment:  'gemini-3.1-flash-lite',
+    uc_enrich:   'gemini-3.5-flash',
+    pei:         'claude-haiku-4-5-20251001',
+    documents:   'claude-haiku-4-5-20251001',
+    specialist:  'sarvam-m',
+    airgap:      'llama3.3',
+  }
+  return (g.model_tiers && g.model_tiers[taskId]) || localStorage.getItem('atlas_default_model') || DEFAULTS[taskId] || 'gemini-3.1-flash-lite'
+}
+// \u2500\u2500 End ATLAS Model Registry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+
 var BASE='https://arvindbajaj5.github.io/atlas-platform'
 
 var ROLES={
@@ -442,32 +698,15 @@ function showTodo(){
 function showSettings(){
   var gcfg=(function(){try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}}})()
   var dModel=localStorage.getItem('atlas_default_model')||'gemini-3.1-flash-lite'
-  var PROV=[
-    {id:'gemini',   name:'Google Gemini',        flag:'\uD83C\uDDFA\uD83C\uDDF8',tag:'US',     hint:'aistudio.google.com',                       ph:'AIza...'},
-    {id:'openai',   name:'OpenAI',               flag:'\uD83C\uDDFA\uD83C\uDDF8',tag:'US',     hint:'platform.openai.com',                       ph:'sk-...'},
-    {id:'anthropic',name:'Anthropic Claude',     flag:'\uD83C\uDDFA\uD83C\uDDF8',tag:'US',     hint:'console.anthropic.com',                     ph:'sk-ant-...'},
-    {id:'mistral',  name:'Mistral AI',           flag:'\uD83C\uDDEB\uD83C\uDDF7',tag:'EU',     hint:'console.mistral.ai (GDPR, EU hosted)',       ph:'Mistral API key...'},
-    {id:'qwen',     name:'Qwen (Alibaba Cloud)', flag:'\uD83C\uDDE8\uD83C\uDDF3',tag:'CN/Intl',hint:'Alibaba Cloud Model Studio (dashscope-intl)',ph:'Alibaba Cloud key...'},
-    {id:'sarvam',   name:'Sarvam AI',            flag:'\uD83C\uDDEE\uD83C\uDDF3',tag:'India',  hint:'dashboard.sarvam.ai (Indic languages)',      ph:'Sarvam subscription key...'},
-    {id:'ollama',   name:'Ollama (Local)',        flag:'\uD83D\uDCBB',            tag:'On-Prem',hint:'Local server, zero data egress',             ph:'http://localhost:11434/v1/chat/completions'},
-  ]
-  var MODELS={
-    gemini:   [{id:'gemini-3.1-flash-lite',label:'3.1 Flash-Lite (default)'},{id:'gemini-3.5-flash',label:'3.5 Flash'}],
-    openai:   [{id:'gpt-4o',label:'GPT-4o'},{id:'gpt-4o-mini',label:'GPT-4o Mini'}],
-    anthropic:[{id:'claude-sonnet-4-6',label:'Sonnet 4.6'},{id:'claude-haiku-4-5-20251001',label:'Haiku 4.5'}],
-    mistral:  [{id:'mistral-large-latest',label:'Mistral Large 3'},{id:'mistral-small-latest',label:'Mistral Small 4'}],
-    qwen:     [{id:'qwen3.5-plus',label:'Qwen 3.5 Plus'},{id:'qwen3.5-flash',label:'Qwen 3.5 Flash'}],
-    sarvam:   [{id:'sarvam-m',label:'Sarvam-M 24B (multilingual)'}],
-    ollama:   [{id:'llama3.3',label:'Llama 3.3 70B'},{id:'mistral-nemo',label:'Mistral Nemo 12B'}],
-  }
-  var provHtml=PROV.map(function(p){
-    var key=p.id==='ollama'?(gcfg['endpoint_ollama']||''):(gcfg['key_'+p.id]||'')
-    var hasKey=key.length>0
-    var modelRows=(MODELS[p.id]||[]).map(function(m){
-      var isDef=m.id===dModel
+  // Build provider cards dynamically from registry
+  var provHtml = ATLAS_MODEL_REGISTRY.map(function(p){
+    var key = p.alwaysAvailable ? (atlasGetGlobal()['endpoint_ollama']||'') : (atlasGetGlobal()[p.cfgKey]||(p.legacyKey?localStorage.getItem(p.legacyKey):'')||'')
+    var hasKey = p.alwaysAvailable || key.length > 0
+    var modelRows = p.models.map(function(m){
+      var isDef = m.id === dModel
       return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--light)">'
         +'<span style="flex:1;font-size:11px;font-family:Roboto Mono,monospace">'+m.id+'</span>'
-        +'<span style="font-size:10px;color:var(--mid)">'+m.label+'</span>'
+        +'<span style="font-size:10px;color:var(--mid)">'+m.label+' \u00B7 '+m.cost+'</span>'
         +'<button style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid '+(isDef?'var(--teal)':'var(--mid)')+';background:'+(isDef?'var(--teal)':'transparent')+';color:'+(isDef?'#fff':'var(--mid)')+';cursor:pointer;font-family:inherit" data-mid="'+m.id+'" onclick="setDefModel(this.dataset.mid)">'+(isDef?'\u2713 Default':'Set Default')+'</button>'
         +'</div>'
     }).join('')
@@ -475,11 +714,9 @@ function showSettings(){
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
       +'<span style="width:8px;height:8px;border-radius:50%;background:'+(hasKey?'var(--teal)':'var(--mid)')+';flex-shrink:0;display:inline-block"></span>'
       +'<span style="font-size:13px;font-weight:700;color:var(--navy)">'+p.flag+' '+p.name+'</span>'
-      +'<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;background:rgba(0,40,112,0.08);color:var(--navy)">'+p.tag+'</span>'
       +'</div>'
       +'<label style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;display:block">'+(p.id==='ollama'?'Endpoint URL':'API Key')+'</label>'
-      +'<input type="password" id="pkey-'+p.id+'" value="'+key.replace(/"/g,'&quot;')+'" placeholder="'+p.ph+'" style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:6px;font-size:12px;margin-bottom:4px;font-family:Roboto Mono,monospace">'
-      +'<div style="font-size:10px;color:var(--mid);margin-bottom:8px">'+p.hint+'</div>'
+      +'<input type="password" id="pkey-'+p.id+'" value="'+key.replace(/"/g,'&quot;')+'" placeholder="'+p.models[0].id+'..." style="width:100%;padding:8px 10px;border:1px solid #d0d0d8;border-radius:6px;font-size:12px;margin-bottom:4px;font-family:Roboto Mono,monospace">'
       +'<div>'+modelRows+'</div>'
       +'</div>'
   }).join('')
@@ -535,21 +772,13 @@ function setDefModel(modelId){
   showSettings()
 }
 
-// Read model for a specific task \u2014 used by all tools
-// taskId: 'scraping' | 'enrichment' | 'uc_enrich' | 'pei' | 'documents' | 'specialist' | 'airgap'
-function getTaskModel(taskId){
-  var gcfg=(function(){try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}}})()
-  var DEFAULTS={scraping:'gemini-3.1-flash-lite',enrichment:'gemini-3.1-flash-lite',uc_enrich:'gemini-3.5-flash',pei:'claude-haiku-4-5-20251001',documents:'claude-haiku-4-5-20251001',specialist:'sarvam-m',airgap:'llama3.3'}
-  return (gcfg.model_tiers&&gcfg.model_tiers[taskId]) || gcfg.default_model || localStorage.getItem('atlas_default_model') || DEFAULTS[taskId] || 'gemini-3.1-flash-lite'
-}
-
 function saveGlobalSettings(){
   var gcfg=(function(){try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}}})()
   var sbUrl=document.getElementById('cfg-sb-url').value.trim()
   var sbKey=document.getElementById('cfg-sb-key').value.trim()
   if(sbUrl) gcfg.sbUrl=sbUrl
   if(sbKey) gcfg.sbKey=sbKey
-  var PIDS=['gemini','openai','anthropic','mistral','qwen','sarvam','ollama']
+  var PIDS = ATLAS_MODEL_REGISTRY.map(function(p){ return p.id })
   PIDS.forEach(function(pid){
     var el=document.getElementById('pkey-'+pid)
     if(el&&el.value.trim()){
