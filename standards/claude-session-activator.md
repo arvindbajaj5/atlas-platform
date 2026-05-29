@@ -1,6 +1,6 @@
 # claude-session-activator.md
 # ATLAS Claude Session Activator
-# Version: 2.0 | Last Updated: 2026-05-29
+# Version: 2.1 | Last Updated: 2026-05-29
 
 ---
 
@@ -44,7 +44,8 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | Second Brain | v2.2 | ✅ Live (91KB) | `tools/second-brain/` |
 | Customer Intelligence (PEI) | v0.2 | ✅ Live (79KB) | `tools/pei-tool/` |
 | Intelligence Scraper | v1.3 | ✅ Live | `tools/intelligence-scraper/` |
-| Engagement Management | v1.0 | ✅ Live | `tools/engagement-management/` |
+| Engagement Management | v1.0 | ⚠️ To be replaced by Engagement Docket | `tools/engagement-management/`
+| Engagement Docket | v1.0 | 🔴 Built, pending SQL + upload | `tools/engagement-docket/` |
 | AI Centre Builder | v1.1 | ⚠️ Form empty — pending fix | `tools/ai-centre-builder/` |
 | Portfolio Portal | — | ✅ Live | `tools/portfolio-portal/` |
 | Vision Document Factory | — | ✅ Live | `tools/vision-document/` |
@@ -70,7 +71,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | `blacklist-whitelist.md` | v1.0 | ✅ Live |
 | `domain-taxonomy.md` | v1.1 | ✅ Live |
 | `tool-features.md` | v1.0 | ⏸ Needs v1.1 |
-| `claude-session-activator.md` | v2.0 | ✅ This file |
+| `claude-session-activator.md` | v2.1 | ✅ This file |
 
 ---
 
@@ -281,6 +282,46 @@ STAGE 6 — GitHub Actions automation                    ✅ COMPLETE
 
 ---
 
+## Engagement Docket — Design Decisions (carry forward)
+
+**Architecture:** Full replacement of Engagement Management. Three-layer model:
+```
+customers → engagements → engagement_dockets → docket_items
+```
+
+**Two docket types:**
+- Customer Engagement Docket — full lifecycle, exportable Word
+- Salesperson Action Docket — one per person, auto-created, actions only
+
+**New Supabase tables needed (not yet created):**
+```
+customers (id, name, short_name, country, ownership, sector, org_type,
+           state, parent_org, ai_maturity, notes, contacts jsonb, divisions jsonb)
+
+engagements (id ENG-YYYY-SECTOR-NNNN, customer_id, division_id, name,
+             archetype, type, phase, status, domain, currency, value, notes, owner)
+```
+`engagement_dockets` and `docket_items` tables already created ✅
+
+**Engagement phases:** strategy | presales | proposal | delivery | live
+**Archetypes:** territory_coe | govt_sectorial | enterprise | defence
+**Docket item types:** action | intel | pei | uc | rfp | pitch | solution | bom | proposal | pricing | exec_doc
+
+**"Add to Docket" trigger flow:**
+- Sales Action in SB → confirm → opens docket tool with pending item in localStorage
+- PEI generate → same flow (to be wired)
+- UC acceptance → same flow (to be wired)
+- Auto-create salesperson docket on first action
+
+**Migration:** Old EM data (localStorage) → import JSON → write to Supabase customers + engagements
+
+**Engagement Docket v1.0 (basic)** already built at `tools/engagement-docket/` — needs:
+- SQL for customers + engagements tables
+- Customer profile UI (contacts, divisions, AI maturity)
+- Engagement creation with phase + archetype + ENG-ID
+- Full docket detail view wired to engagement
+- Word export via docx skill
+
 ## Current Pending Items
 
 | # | Item | Stage | Priority |
@@ -288,7 +329,13 @@ STAGE 6 — GitHub Actions automation                    ✅ COMPLETE
 | 1 | Intelligence Scraper — results panel below log not populating after run | 1 | 🟡 Deferred |
 | 1b | Intelligence Scraper — Market Pulse duplicates — monitoring | 1 | 🟡 Monitor |
 | 2 | PEI v0.2 — ✅ DONE | 3 | ✅ Complete |
-| 4 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 Next |
+| 4 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 Pending |
+| 5 | Engagement Docket — customers + engagements Supabase tables | 5 | 🔴 Next session |
+| 6 | Engagement Docket — Customer UI (contacts, divisions, AI maturity) | 5 | 🔴 Next session |
+| 7 | Engagement Docket — Engagement creation with phase/archetype/ENG-ID | 5 | 🔴 Next session |
+| 8 | Engagement Docket — Word export via docx skill | 5 | 🔴 Next session |
+| 9 | Wire PEI → Add to Docket trigger | 5 | 🔴 Next session |
+| 10 | Wire UC acceptance → Add to Docket trigger | 5 | 🔴 Next session |
 | 5 | Engagement Configurator — receives converted Sales Actions, full lifecycle docket | 5 | 🔴 Major build |
 | 6 | UC Library — manual add + bulk import (39 GeoAI UCs + civil aviation UCs) | 2 | 🔴 With Second Brain v2.2 |
 | 6b | UC Library — rich structured form per UC: problem, benefit, how it works, process steps, key actors, data requirements, technical requirements, model type, hardware profile, maturity, reference deployments, regulatory, estimated effort | 2 | 🔴 v2.2 |
