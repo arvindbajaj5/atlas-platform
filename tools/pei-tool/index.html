@@ -359,13 +359,18 @@ function loadConfig(){
   try{ return JSON.parse(localStorage.getItem('atlas_pei_cfg')||'{}') }catch(e){ return {} }
 }
 function getGlobal(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } }
+function getTaskModel(taskId){
+  var g=getGlobal()
+  var DEFAULTS={scraping:'gemini-3.1-flash-lite',enrichment:'gemini-3.1-flash-lite',uc_enrich:'gemini-3.5-flash',pei:'claude-haiku-4-5-20251001',documents:'claude-haiku-4-5-20251001',specialist:'sarvam-m',airgap:'llama3.3'}
+  return (g.model_tiers&&g.model_tiers[taskId])||localStorage.getItem('atlas_default_model')||DEFAULTS[taskId]||'gemini-3.1-flash-lite'
+}
 function getEffectiveCfg(){
   var local = loadConfig(), global = getGlobal()
   return {
     key: local.key || global['key_gemini'] || localStorage.getItem('atlas_gemini_key') || '',
     sbUrl: local.sbUrl || global.sbUrl || '',
     sbKey: local.sbKey || global.sbKey || '',
-    model: local.model || localStorage.getItem('atlas_default_model') || 'gemini-3.1-flash-lite'
+    model: local.model || getTaskModel('pei')
   }
 }
 function saveConfig(){
