@@ -358,6 +358,16 @@ var PEI_DATA = null
 function loadConfig(){
   try{ return JSON.parse(localStorage.getItem('atlas_pei_cfg')||'{}') }catch(e){ return {} }
 }
+function getGlobal(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } }
+function getEffectiveCfg(){
+  var local = loadConfig(), global = getGlobal()
+  return {
+    key: local.key || global['key_gemini'] || localStorage.getItem('atlas_gemini_key') || '',
+    sbUrl: local.sbUrl || global.sbUrl || '',
+    sbKey: local.sbKey || global.sbKey || '',
+    model: local.model || localStorage.getItem('atlas_default_model') || 'gemini-3.1-flash-lite'
+  }
+}
 function saveConfig(){
   var key = document.getElementById('apiKey').value.trim()
   var sbUrl = document.getElementById('sbUrl').value.trim()
@@ -371,7 +381,7 @@ function saveConfig(){
 }
 
 window.addEventListener('DOMContentLoaded', function(){
-  var cfg = loadConfig()
+  var cfg = getEffectiveCfg()
   if(cfg.key) document.getElementById('apiKey').value = cfg.key
   if(cfg.sbUrl) document.getElementById('sbUrl').value = cfg.sbUrl
   if(cfg.sbKey) document.getElementById('sbKey').value = cfg.sbKey
@@ -380,7 +390,7 @@ window.addEventListener('DOMContentLoaded', function(){
 
 // \u2500\u2500 Supabase intelligence query \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function queryIntelligenceDB(sector, country, ownership){
-  var cfg = loadConfig()
+  var cfg = getEffectiveCfg()
   if(!cfg.sbUrl||!cfg.sbKey) return []
 
   // Map sector to domain codes
@@ -431,7 +441,7 @@ async function queryIntelligenceDB(sector, country, ownership){
 
 // \u2500\u2500 Main generate function \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function generatePEI(){
-  var cfg = loadConfig()
+  var cfg = getEffectiveCfg()
   var apiKey = cfg.key || document.getElementById('apiKey').value.trim()
   var orgName = document.getElementById('orgName').value.trim()
   var country = document.getElementById('orgCountry').value
