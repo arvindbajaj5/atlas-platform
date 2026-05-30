@@ -1109,7 +1109,7 @@ async function scrapeDomain(domain){
         + ' CRITICAL: Use web search NOW. ONLY real events from 2025 or 2026. Older events = {"relevant":false}.'
         + ' TOPIC GATE: Only AI/ML/HPC/supercomputing/data centres/govt digital transformation/defence AI. Off-topic = {"relevant":false}.'
         + ' JSON only: relevant(true), title(exact real headline), summary(factual 80 words from real article), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(empty string if none), uc_suggest(use case name or empty string), confidence(high|medium|low), source_title(exact publication name e.g. Economic Times), published_year(integer 2025 or 2026).'
-        + ' Start with { end with }. No markdown. No backticks.'
+        + ' IMPORTANT: Respond with pure JSON only. No markdown. No backtick fences. No ```json. Start directly with { end with }.'
       try{
         await sleep(DELAY_MS)
         var result = await callGeminiGrounded(prompt)
@@ -1191,7 +1191,7 @@ async function scrapeNews(topic){
         + ' If the search returns no results from 2025-2026, respond with just: {"relevant":false}'
         + ' RELEVANCE: Only report news about AI, HPC, supercomputing, government technology procurement, defence AI, digital transformation. If off-topic respond with just: {"relevant":false}'
         + ' Respond with JSON only: relevant(true), title(exact real headline with year), summary(factual 80 words citing real source), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(1 sentence or empty string), uc_suggest(specific use case or empty string), confidence(high|medium|low), source_title(exact publication name), published_year(2025 or 2026).'
-        + ' Start with { end with }. No markdown. No backticks.'
+        + ' IMPORTANT: Respond with pure JSON only. No markdown. No backtick fences. No ```json. Start directly with { end with }.'
       try{
         await sleep(DELAY_MS)
         var result = await callGeminiGrounded(prompt)
@@ -1297,7 +1297,7 @@ async function enrichItem(item){
     + ' uc_cluster (which UC cluster this belongs to, else empty string),'
     + ' uc_hardware (what hardware is needed for this UC, else empty string),'
     + ' depth_score (integer 1-10, how actionable and specific this intelligence is).'
-    + ' Start with { end with }. No markdown. No backticks.'
+    + ' IMPORTANT: Respond with pure JSON only. No markdown. No backtick fences. No ```json. Start directly with { end with }.'
 
   try{
     var raw = await callGemini(prompt, 'ENRICH ' + (item.domain_code||item.topic_code||''))
@@ -1624,7 +1624,9 @@ async function callGeminiGrounded(prompt){
   if(!r.ok) throw new Error('Gemini grounded error '+r.status)
   var data = await r.json()
   var candidate = data.candidates?.[0]
-  var text = candidate?.content?.parts?.[0]?.text || ''
+  // Extract text from all parts (gemini-3.5-flash may split thinking and response)
+  var parts = (candidate?.content?.parts) || []
+  var text = parts.map(function(p){ return p.text||'' }).join('')
   var chunks = candidate?.groundingMetadata?.groundingChunks || []
   var sources = chunks.filter(function(c){return c.web&&c.web.uri}).map(function(c){return {url:c.web.uri,title:c.web.title||''}})
   return {text:text, sources:sources}
