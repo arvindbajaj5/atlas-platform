@@ -470,13 +470,13 @@ async function sbUpsertItem(item){
     intelligence_stream: item.intelligence_stream || 'market_pulse',
     title: (t||'Untitled').slice(0,500),
     summary: (s||'').slice(0,1000),
-    type: item.type || item.category || item.event_type || '',
-    intelligence_value: item.intelligence_value || item.urgency || item.priority || 'medium',
+    type: item.type || item.category || '',
+    intelligence_value: item.intelligence_value || 'medium',
     organisations: orgs,
     tags: tgs,
-    opportunity: (item.opportunity || item.opportunity_signals || item.relevance || '').slice(0,500),
-    competitor_signals: (item.competitor_signals || item.incumbents || item.competitors || '').slice(0,500),
-    uc_suggest: (item.uc_suggest || item.use_case || '').slice(0,200),
+    opportunity: (item.opportunity||'').slice(0,500),
+    competitor_signals: (item.competitor_signals||'').slice(0,500),
+    uc_suggest: (item.uc_suggest||'').slice(0,200),
     confidence: item.confidence || 'medium',
     scraped_at: new Date().toISOString(),
     scraped_by: 'browser-scraper-v2',
@@ -484,6 +484,10 @@ async function sbUpsertItem(item){
     topic_name: item.topic_name||null,
     source_url: item.source_url||null,
     source_name: item.source_name||null,
+    source_language: item.source_language||'en',
+    model_used: item.model_used||'gemini-3.1-flash-lite',
+    scrape_method: item.scrape_method||item.source_type||'search_grounded',
+    published_date: item.published_date||null,
     geography: item.geography||'India',
     is_real: true
   }
@@ -1118,9 +1122,12 @@ async function scrapeDomain(domain){
         if(!item||item.relevant===false) continue
         if(!item.title) continue
         var titleKey = item.title.toLowerCase().trim()
+        // Fuzzy dedup: also check normalized title (no punctuation, short words)
+        var titleNorm = titleKey.replace(/[^a-z0-9 ]/g,'').replace(/\b(the|a|an|in|of|for|to|on|at|by|is|are|was|were|has|have|will|with|from|and|or|that|this|it|its|be|been|as|we|our|their|also|new|india|indian)\b/g,'').replace(/\s+/g,' ').trim().slice(0,60)
         var srcUrl = (result.sources&&result.sources[0]) ? result.sources[0].url : null
         var urlKey = srcUrl ? srcUrl.toLowerCase() : ''
-        if(sbTitles.has(titleKey)){ log('dup title: '+item.title.slice(0,40),'dim'); continue }
+        if(sbTitles.has(titleKey)){ log('dup: '+item.title.slice(0,40),'dim'); continue }
+        if(sbTitles.has(titleNorm) && titleNorm.length > 20){ log('dup (fuzzy): '+item.title.slice(0,40),'dim'); continue }
         if(urlKey&&sbUrls.has(urlKey)){ log('dup url','dim'); continue }
         item.id = 'gs-'+domain.code.replace(/-/g,'')+'-'+geo.replace(/[^a-zA-Z]/g,'')+'-'+Date.now()+'-'+Math.floor(Math.random()*9999)
         item.intelligence_stream = item.intelligence_stream||'market_pulse'
@@ -1129,9 +1136,13 @@ async function scrapeDomain(domain){
         item.geography = geo
         item.is_real = true
         item.source_type = 'search_grounded'
+        item.scrape_method = 'search_grounded'
+        item.model_used = 'gemini-3.1-flash-lite'
+        item.source_language = 'en'
         item.domain_code = domain.code
         item.domain_name = domain.name
         sbTitles.add(titleKey)
+        sbTitles.add(titleNorm)
         if(urlKey) sbUrls.add(urlKey)
         items.push(item)
         await sbUpsertItem(item)
@@ -1190,6 +1201,9 @@ async function scrapeNews(topic){
         item.geography = geo
         item.is_real = true
         item.source_type = 'search_grounded'
+        item.scrape_method = 'search_grounded'
+        item.model_used = 'gemini-3.1-flash-lite'
+        item.source_language = 'en'
         item.domain_code = topic.code
         item.topic_code = topic.code
         item.domain_name = topic.name
@@ -1219,7 +1233,14 @@ async function getSupabaseTitles(domainCode){
     })
     if(resp.ok){
       var rows = await resp.json()
-      return new Set(rows.map(function(r){ return (r.title||'').toLowerCase().trim() }))
+      var tset = new Set()
+      rows.forEach(function(r){
+        var t = (r.title||'').toLowerCase().trim()
+        tset.add(t)
+        var tn = t.replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim().slice(0,60)
+        if(tn.length>15) tset.add(tn)
+      })
+      return tset
     }
   }catch(e){ console.error('getSupabaseTitles:', e) }
   return new Set()
