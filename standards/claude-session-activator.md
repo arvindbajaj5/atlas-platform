@@ -1,6 +1,6 @@
 # claude-session-activator.md
 # ATLAS Claude Session Activator
-# Version: 2.2 | Last Updated: 2026-05-29
+# Version: 2.3 | Last Updated: 2026-05-29
 
 ---
 
@@ -43,7 +43,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | Portal | v2.0 | ✅ Live | `index.html` |
 | Second Brain | v2.2 | ✅ Live (91KB) | `tools/second-brain/` |
 | Customer Intelligence (PEI) | v0.2 | ✅ Live (79KB) | `tools/pei-tool/` |
-| Intelligence Scraper | v2.0 | ✅ Live (79KB) | `tools/intelligence-scraper/` |
+| Intelligence Scraper | v2.0 | ✅ Live (83KB) | `tools/intelligence-scraper/` |
 | Engagement Management | v1.0 | ⚠️ To be replaced by Engagement Docket | `tools/engagement-management/`
 | Engagement Docket | v1.0 | 🔴 Built, pending SQL + upload | `tools/engagement-docket/` |
 | AI Centre Builder | v1.1 | ⚠️ Form empty — pending fix | `tools/ai-centre-builder/` |
@@ -71,7 +71,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | `blacklist-whitelist.md` | v1.0 | ✅ Live |
 | `domain-taxonomy.md` | v1.1 | ✅ Live |
 | `tool-features.md` | v1.0 | ⏸ Needs v1.1 |
-| `claude-session-activator.md` | v2.2 | ✅ This file |
+| `claude-session-activator.md` | v2.3 | ✅ This file |
 
 ---
 
@@ -293,7 +293,9 @@ Single localStorage key `atlas_global_cfg` shared across all tools. Set once in 
 
 ## Gemini API — Critical Rules
 
-- **Model:** `gemini-3.1-flash-lite` everywhere
+- **Scraping model:** `gemini-3.5-flash` for search grounding (hardcoded in callGeminiGrounded — thinkingBudget MUST be absent for grounding to fire)
+- **Extraction model:** `gemini-3.1-flash-lite` for RSS signal extraction (cheap, thinkingBudget:0 ok here)
+- **Model:** `gemini-3.1-flash-lite` everywhere else
 - **Always add:** `thinkingConfig: {thinkingBudget: 0}` to generationConfig
 - **Never add:** `responseMimeType: 'application/json'`
 - **Free tier:** 15 RPM, 1500 RPD
@@ -368,7 +370,10 @@ engagements (id ENG-YYYY-SECTOR-NNNN, customer_id, division_id, name,
 |---|---|---|---|
 | 1 | Intelligence Scraper — results panel below log not populating after run | 1 | 🟡 Deferred |
 | 1c | Intelligence Scraper v2.0 — ✅ DONE: Gemini Search Grounding + RSS feeds, source_url stored, multi-geography dropdown, reads keys from global settings | 1 | ✅ Complete |
-| 1d | Intelligence Scraper v2.0 — bugs fixed: sleep() missing, init() crashing on removed DOM refs (supabaseUrl/supabaseKey/useGrounding), domains start all-selected. Uploaded, pending test. | 1 | 🟡 Testing |
+| 1d | Intelligence Scraper v2.0 — bugs fixed: sleep() missing, init() crashing on removed DOM refs, domains start all-selected | 1 | ✅ Fixed |
+| 1e | Intelligence Scraper v2.0 — uses gemini-3.5-flash for grounding (hardcoded, bypasses registry), thinkingBudget removed from grounded call, date gate rejects pre-2025 items, Roman numeral dedup, full traceability fields (model_used, source_language, scrape_method, published_year) | 1 | ✅ Live |
+| 1f | Intelligence Scraper v2.0 — first run with all fixes returned 0 items. Cause unknown — needs log review next session. May be date gate too aggressive or grounding still not firing. | 1 | 🔴 Investigate next session |
+| 1g | GitHub Actions scraper v2.1 — built with 14 RSS feeds (3 Indic via Sarvam), gemini-3.5-flash grounding, full traceability. Pending upload to scripts/ | 1 | 🔴 Upload pending |
 | 1b | Intelligence Scraper — Market Pulse duplicates — monitoring | 1 | 🟡 Monitor |
 | 2 | PEI v0.2 — ✅ DONE | 3 | ✅ Complete |
 | 4 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 Pending |
