@@ -1122,7 +1122,7 @@ async function scrapeDomain(domain){
         var urlKey = srcUrl ? srcUrl.toLowerCase() : ''
         if(sbTitles.has(titleKey)){ log('dup title: '+item.title.slice(0,40),'dim'); continue }
         if(urlKey&&sbUrls.has(urlKey)){ log('dup url','dim'); continue }
-        item.id = 'gs-'+domain.code.replace(/-/g,'')+'-'+geo.replace(/\s/g,'')+'-'+Date.now()+'-'+Math.floor(Math.random()*9999)
+        item.id = 'gs-'+domain.code.replace(/-/g,'')+'-'+geo.replace(/[^a-zA-Z]/g,'')+'-'+Date.now()+'-'+Math.floor(Math.random()*9999)
         item.intelligence_stream = item.intelligence_stream||'market_pulse'
         item.source_url = srcUrl || null
         item.source_name = srcUrl ? ((result.sources[0] && result.sources[0].title)||item.source_title||'Web Search') : (item.source_title||'Web Search')
@@ -1134,7 +1134,7 @@ async function scrapeDomain(domain){
         sbTitles.add(titleKey)
         if(urlKey) sbUrls.add(urlKey)
         items.push(item)
-        sbUpsertItem(item)
+        await sbUpsertItem(item)
         log('['+domain.code+']['+geo+'] '+item.title.slice(0,55),'success')
       }catch(err2){
         log('['+domain.code+']['+geo+'] error: '+err2.message.slice(0,60),'error')
@@ -1145,59 +1145,67 @@ async function scrapeDomain(domain){
 }
 
 async function scrapeNews(topic){
-  var cfg4 = getConfig()
-  var n2 = parseInt(cfg4.itemCount) || 5
+  var cfg = getConfig()
+  var n = Math.min(parseInt(cfg.itemCount)||5, 5)
+  var geoEl = document.getElementById('cfgGeo')
+  var geos = []
+  if(geoEl){ for(var oi=0;oi<geoEl.options.length;oi++){ if(geoEl.options[oi].selected) geos.push(geoEl.options[oi].value) } }
+  if(!geos.length) geos = ['India']
   var items = []
-  var usedTitlesN = []
   var sbTitlesN = await getSupabaseTitles(topic.code)
+  var sbUrlsN = await getSupabaseUrls(topic.code)
   log('Dedup: '+sbTitlesN.size+' existing news titles for '+topic.code, 'dim')
 
-  var newsAngles = [
-    'contract awards and vendor wins',
-    'government tenders and RFPs',
-    'policy and regulatory developments',
-    'technology partnerships and MoUs',
-    'market investments and funding',
-    'product launches and announcements',
-    'competitive moves and market shifts',
-    'procurement patterns and budget signals',
-    'international deals with India angle',
-    'startup and ecosystem developments'
-  ]
-
-  for(var j=0; j<n2; j++){
-    var angle = newsAngles[j % newsAngles.length]
-    var avoidStrN = usedTitlesN.length > 0 ? ' Do NOT repeat: ' + usedTitlesN.slice(-3).join('; ') + '.' : ''
-    var prompt2 = 'You are a market intelligence analyst for an AI and HPC hardware OEM.'
-      + ' Generate ONE market intelligence item about ' + angle + ' related to the following topic.'
-      + ' TOPIC: ' + topic.name + '. FOCUS: ' + topic.focus + '.'
-      + ' Be specific \u2014 name real organisations and deals. Keep the summary under 80 words. All string values must be short.' + avoidStrN
-      + ' Respond with a single JSON object only. No array brackets. No explanation. No markdown. No backticks. Use ONLY these exact field names: title, summary, type, intelligence_value, organisations, tags, opportunity, competitor_signals, uc_suggest, confidence. Start with { end with }.'
-
-    try{
-      var raw2 = await callGemini(prompt2, 'NEWS/' + topic.code + ' [' + (j+1) + '/' + n2 + ']')
-      var extracted2 = extractItems(raw2, topic.code, topic.name, 'news')
-      if(extracted2.length > 0){
-        var item2 = extracted2[0]
-        if(item2.title) usedTitlesN.push(item2.title)
-        if(!item2.intelligence_stream) item2.intelligence_stream = 'market_pulse'
-        // Supabase dedup check
-        if(sbTitlesN.has((item2.title||'').toLowerCase().trim())){
-          log('News duplicate skipped: '+(item2.title||'').slice(0,40), 'dim')
-          continue
-        }
-        if(item2.title) sbTitlesN.add(item2.title.toLowerCase().trim())
-        items.push(item2)
-        if(item2.id) sbUpsertItem(item2)
+  for(var gi=0; gi<geos.length; gi++){
+    var geo = geos[gi]
+    for(var i=0; i<Math.min(n,3); i++){
+      var prompt = 'You are an intelligence analyst for an AI and HPC hardware OEM.'
+        + ' Search the web and report ONE real recent news item about '+topic.name+' in '+geo+'.'
+        + ' Focus: '+topic.focus+'.'
+        + ' Report a REAL event from 2025 or 2026 only. Do not invent or use training data.'
+        + ' IMPORTANT: Only report news directly related to AI, machine learning, HPC, data centres, government technology, defence technology, or digital transformation. If NOT about these topics, respond with just: {"relevant":false}'
+        + ' Otherwise respond with JSON only: relevant(true), title(real headline), summary(factual 80 words), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(1 sentence or empty string), uc_suggest(specific use case or empty string), confidence(high|medium|low), source_title(real publication name).'
+        + ' Start with { end with }. No markdown. No backticks.'
+      try{
+        await sleep(DELAY_MS)
+        var result = await callGeminiGrounded(prompt)
+        if(!result) continue
+        var raw = result.text
+        var first = raw.indexOf('{')
+        var last = raw.lastIndexOf('}')
+        if(first<0||last<0) continue
+        var item
+        try{ item = JSON.parse(raw.slice(first,last+1)) }catch(pe){ continue }
+        if(!item||item.relevant===false) continue
+        if(!item.title) continue
+        var titleKey = item.title.toLowerCase().trim()
+        var srcUrl = (result.sources&&result.sources[0]) ? result.sources[0].url : null
+        var urlKey = srcUrl ? srcUrl.toLowerCase() : ''
+        if(sbTitlesN.has(titleKey)){ log('dup: '+item.title.slice(0,40),'dim'); continue }
+        if(urlKey&&sbUrlsN.has(urlKey)){ log('dup url','dim'); continue }
+        item.id = 'gs-'+topic.code.replace(/-/g,'')+'-'+geo.replace(/[^a-zA-Z]/g,'')+'-'+Date.now()+'-'+Math.floor(Math.random()*9999)
+        item.intelligence_stream = item.intelligence_stream||'market_pulse'
+        item.source_url = srcUrl
+        item.source_name = srcUrl ? ((result.sources[0]&&result.sources[0].title)||item.source_title||'Web Search') : (item.source_title||'Web Search')
+        item.geography = geo
+        item.is_real = true
+        item.source_type = 'search_grounded'
+        item.domain_code = topic.code
+        item.topic_code = topic.code
+        item.domain_name = topic.name
+        item.topic_name = topic.name
+        sbTitlesN.add(titleKey)
+        if(urlKey) sbUrlsN.add(urlKey)
+        items.push(item)
+        await sbUpsertItem(item)
+        log('['+topic.code+']['+geo+'] '+item.title.slice(0,55),'success')
+      }catch(err2){
+        log('['+topic.code+']['+geo+'] error: '+err2.message.slice(0,60),'error')
       }
-    }catch(err2){
-      log('News item ' + (j+1) + ' failed for ' + topic.code + ': ' + err2.message, 'warn')
     }
-    if(j < n2-1) await new Promise(function(r){setTimeout(r,1500)})
   }
   return items
 }
-
 
 async function getSupabaseTitles(domainCode){
   var sb = getSupabase()
