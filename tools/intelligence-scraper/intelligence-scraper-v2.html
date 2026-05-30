@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS &mdash; Intelligence Scraper</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--indigo:#3C00B4;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--r-sm:6px;--r-lg:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:100;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-primary:disabled{opacity:0.4;cursor:not-allowed;}
+.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
+.btn-ghost:hover{background:rgba(255,255,255,0.25);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-teal:hover{background:#009a7c;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-xs{padding:3px 8px;font-size:10px;}
+.container{max-width:1100px;margin:0 auto;padding:24px;}
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:14px;line-height:1.6;}
+label.lbl{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;}
+input[type=password],input[type=text],select{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
+input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
+input:focus,select:focus{border-color:var(--blue);}
+.field-hint{font-size:10px;color:var(--mid);margin-top:4px;}
+.alert{padding:10px 14px;border-radius:var(--r);font-size:11px;margin-bottom:12px;line-height:1.6;}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.3);color:#9a7000;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-error{background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);color:#DC2626;}
+.alert-success{background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.2);color:var(--teal);}
+
+/* DOMAIN GRID */
+.domain-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:16px;}
+.domain-card{border:2px solid #e0e0e8;border-radius:var(--r-lg);padding:14px 16px;cursor:pointer;transition:all 0.15s;background:var(--white);position:relative;}
+.domain-card.selected{border-color:var(--navy);background:rgba(0,40,112,0.03);}
+.domain-card.selected .domain-check{background:var(--navy);border-color:var(--navy);}
+.domain-card.selected .domain-check::after{display:block;}
+.domain-card.running{border-color:var(--blue);background:rgba(28,56,245,0.03);}
+.domain-card.done{border-color:var(--teal);background:rgba(0,178,144,0.03);}
+.domain-card.error{border-color:var(--orange);background:rgba(255,85,57,0.03);}
+.domain-card-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.domain-icon{font-size:20px;}
+.domain-check{width:18px;height:18px;border:2px solid #d0d0d8;border-radius:4px;flex-shrink:0;margin-left:auto;position:relative;transition:all 0.15s;}
+.domain-check::after{content:'';display:none;position:absolute;top:2px;left:5px;width:5px;height:9px;border:2px solid var(--white);border-top:none;border-left:none;transform:rotate(45deg);}
+.domain-name{font-size:12px;font-weight:700;color:var(--dark);}
+.domain-code{font-size:10px;font-family:'Roboto Mono',monospace;color:var(--mid);}
+.domain-meta{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--mid);margin-top:6px;}
+.domain-status{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;}
+.status-never{background:var(--light);color:var(--mid);}
+.status-fresh{background:rgba(0,178,144,0.1);color:var(--teal);}
+.status-stale{background:rgba(255,182,0,0.1);color:#9a7000;}
+.status-running{background:rgba(28,56,245,0.1);color:var(--blue);}
+.status-done{background:rgba(0,178,144,0.1);color:var(--teal);}
+.status-error{background:rgba(255,85,57,0.1);color:var(--orange);}
+.domain-progress{height:3px;background:var(--light);border-radius:2px;margin-top:8px;overflow:hidden;display:none;}
+.domain-progress.show{display:block;}
+.domain-progress-bar{height:100%;background:var(--blue);border-radius:2px;width:0%;transition:width 0.5s;}
+.domain-progress-bar.pulse{animation:pulse 1.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat-box{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:14px 16px;box-shadow:var(--shadow);}
+.stat-val{font-size:24px;font-weight:900;color:var(--navy);}
+.stat-val.teal{color:var(--teal);}
+.stat-val.orange{color:var(--orange);}
+.stat-val.blue{color:var(--blue);}
+.stat-lbl{font-size:10px;color:var(--mid);margin-top:3px;}
+
+/* TOKEN METER */
+.token-row{display:flex;gap:10px;align-items:center;padding:10px 14px;background:rgba(28,56,245,0.04);border:1px solid rgba(28,56,245,0.15);border-radius:var(--r);margin-bottom:12px;font-size:11px;}
+.token-label{color:var(--mid);flex:1;}
+.token-val{font-family:'Roboto Mono',monospace;font-weight:700;color:var(--navy);}
+.token-cost{font-family:'Roboto Mono',monospace;color:var(--teal);font-size:10px;}
+
+/* LOG */
+.log-wrap{background:#0a0a0f;border-radius:var(--r-lg);padding:16px;max-height:320px;overflow-y:auto;font-family:'Roboto Mono',monospace;font-size:11px;line-height:1.7;}
+.log-line{padding:1px 0;}
+.log-info{color:#7fb3ff;}
+.log-success{color:#56d49b;}
+.log-warn{color:#ffd166;}
+.log-error{color:#ff7e72;}
+.log-data{color:#c8c8d0;}
+.log-dim{color:#555;}
+
+/* RESULTS */
+.result-section{margin-top:16px;}
+.result-domain{border:1px solid #e0e0e8;border-radius:var(--r-lg);margin-bottom:10px;overflow:hidden;}
+.result-domain-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--light);cursor:pointer;}
+.result-domain-hdr:hover{background:#e8e8f0;}
+.result-domain-title{font-size:12px;font-weight:700;color:var(--navy);}
+.result-domain-count{font-size:11px;font-weight:700;color:var(--teal);background:rgba(0,178,144,0.1);padding:2px 8px;border-radius:8px;}
+.result-items{display:none;padding:12px 14px;}
+.result-items.open{display:block;}
+.result-item{border:1px solid #e0e0e8;border-radius:var(--r);padding:10px 12px;margin-bottom:6px;background:var(--white);}
+.result-item-title{font-size:12px;font-weight:600;color:var(--dark);margin-bottom:3px;}
+.result-item-summary{font-size:11px;color:var(--mid);line-height:1.6;margin-bottom:5px;}
+.result-item-tags{display:flex;gap:4px;flex-wrap:wrap;}
+.tag{font-size:9px;font-weight:600;padding:1px 6px;border-radius:5px;background:var(--light);color:var(--mid);}
+.tag-type{background:rgba(0,40,112,0.07);color:var(--navy);}
+.tag-high{background:rgba(255,85,57,0.1);color:var(--orange);}
+.tag-uc{background:rgba(0,178,144,0.1);color:var(--teal);}
+
+/* SECTION DIVIDER */
+.section-hdr{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--light);display:flex;align-items:center;justify-content:space-between;}
+
+@media(max-width:700px){.stats-row{grid-template-columns:1fr 1fr;}.domain-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.65)">Intelligence Scraper</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">v2.0</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">&#8592; Portal</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- API KEY -->
+  <div class="card">
+    <div class="card-title">&#9889; Configuration</div>
+    <div class="card-sub">API keys and Supabase credentials are read from ATLAS Global Settings. No need to enter them here.</div>
+    <div id="settingsStatus" style="padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px;background:var(--light)">Checking settings...</div>
+    <a href="../../index.html" class="btn btn-outline btn-sm" style="margin-bottom:4px">&#9881; Open ATLAS Settings</a>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:14px">
+      <div class="config-field" style="flex:2">
+        <label class="lbl">Geographies (Ctrl+click multi)</label>
+        <select id="cfgGeo" multiple style="height:80px;width:100%">
+          <option value="India" selected>India</option>
+          <option value="UAE">UAE</option>
+          <option value="Saudi Arabia">Saudi Arabia</option>
+          <option value="Qatar">Qatar</option>
+          <option value="Singapore">Singapore</option>
+          <option value="Malaysia">Malaysia</option>
+          <option value="Australia">Australia</option>
+          <option value="United Kingdom">United Kingdom</option>
+          <option value="France">France</option>
+          <option value="Germany">Germany</option>
+          <option value="United States">United States</option>
+        </select>
+      </div>
+      <div class="config-field">
+        <label class="lbl">Sources</label>
+        <select id="cfgSources" style="width:100%">
+          <option value="both">RSS + Search Grounding</option>
+          <option value="rss">RSS Feeds only</option>
+          <option value="search">Search Grounding only</option>
+        </select>
+      </div>
+    </div>
+  </div><!-- end config card -->
+
+  <!-- STATS -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-box"><div class="stat-val" id="statDomains">0</div><div class="stat-lbl">Domains scraped</div></div>
+    <div class="stat-box"><div class="stat-val teal" id="statItems">0</div><div class="stat-lbl">Total intel items</div></div>
+    <div class="stat-box"><div class="stat-val blue" id="statTokens">0</div><div class="stat-lbl">Tokens used (session)</div></div>
+    <div class="stat-box"><div class="stat-val orange" id="statCost">$0.000</div><div class="stat-lbl">Est. cost (session)</div></div>
+  </div>
+
+  <!-- DOMAIN SELECTION -->
+  <div class="section-hdr">
+    <span>&#128270; Intelligence Domains</span>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-outline btn-xs" onclick="selectAll()">Select All</button>
+      <button class="btn btn-outline btn-xs" onclick="selectNone()">Clear</button>
+    </div>
+  </div>
+
+  <div class="domain-grid" id="domainGrid"></div>
+
+  <!-- NEWS TOPICS -->
+  <div class="section-hdr" style="margin-top:20px">
+    <span>&#128240; Market News Topics</span>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-outline btn-xs" onclick="selectAllNews()">Select All</button>
+      <button class="btn btn-outline btn-xs" onclick="selectNoneNews()">Clear</button>
+    </div>
+  </div>
+
+  <div class="domain-grid" id="newsGrid"></div>
+
+  <!-- RUN CONTROLS -->
+  <div class="card" style="margin-top:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="card-title" style="margin-bottom:2px">Run Scraper</div>
+        <div id="selectedCount" style="font-size:11px;color:var(--mid)">0 domains/topics selected</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="exportIntelligence()" id="exportBtn" disabled>&#11015; Export JSON</button>
+        <button class="btn btn-outline btn-sm" onclick="clearIntelligence()" id="clearBtn">&#128465; Clear Database</button>
+        <button class="btn btn-primary" id="runBtn" onclick="runScraper()" disabled>&#9654; Run Scraper</button>
+      </div>
+    </div>
+
+
+  </div>
+
+  <!-- LIVE LOG -->
+  <div id="logSection" style="display:none">
+    <div class="section-hdr"><span>&#128196; Live Log</span><button class="btn btn-xs btn-outline" onclick="clearLog()">Clear</button></div>
+    <div class="log-wrap" id="logWrap"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="resultsSection" style="display:none">
+    <div class="section-hdr">
+      <span>&#9989; Intelligence Items</span>
+      <span id="resultsCount" style="font-size:11px;color:var(--mid)"></span>
+    </div>
+    <div id="resultsDom"></div>
+  </div>
+
+</div>
+
+<script charset="utf-8">
+// \u2500\u2500 Data \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var DOMAINS = [
+  // Government
+  {code:'GOV-GOV', name:'Government & Governance',           icon:'&#127963;', cluster:'GOV',
+   focus:'Indian central and state government AI adoption, e-governance, digital India, citizen services, smart cities'},
+  // Defence umbrella (4 sub-domains)
+  {code:'DEF-MIL', name:'Defence \u2014 Armed Forces',            icon:'&#128737;', cluster:'DEF',
+   focus:'Indian Army, Navy, Air Force, DPSUs, DRDO combat systems, autonomous weapons, military AI'},
+  {code:'DEF-SPC', name:'Defence \u2014 Space & Satellite',       icon:'&#128752;', cluster:'DEF',
+   focus:'ISRO, IN-SPACe, Defence Space Agency, military satellite building, launch vehicles, space situational awareness'},
+  {code:'DEF-HLS', name:'Defence \u2014 Homeland Security',       icon:'&#128274;', cluster:'DEF',
+   focus:'BSF, CRPF, paramilitary forces, border security, surveillance networks, critical infrastructure protection'},
+  {code:'DEF-INT', name:'Defence \u2014 Intelligence & Signals',  icon:'&#128065;', cluster:'DEF',
+   focus:'SIGINT, IMINT, cryptanalysis, intelligence agencies, cyber intelligence, signal processing AI'},
+  // Geospatial
+  {code:'GEO-SPA', name:'Geospatial & Earth Observation',    icon:'&#127758;', cluster:'GEO',
+   focus:'NRSC, Survey of India, Pixxel, MapMyIndia, civilian EO platforms, GIS, Bhuvan, commercial satellite data'},
+  // Infrastructure
+  {code:'INF-CIV', name:'Critical Infrastructure',           icon:'&#9992;',   cluster:'INF',
+   focus:'Ports, airports, railways, civil aviation, DGCA, AAI, Indian Railways, metro systems, road infrastructure AI'},
+  // Natural Resources
+  {code:'RES-NAT', name:'Natural Resources',                 icon:'&#127795;', cluster:'RES',
+   focus:'Oil and gas, mines, water resources, ONGC, Coal India, forestry, MOEF, geological survey AI'},
+  // Telecom
+  {code:'TEL-NET', name:'Telecom & Networks',                icon:'&#128225;', cluster:'TEL',
+   focus:'Reliance Jio, Airtel, BSNL, C-DOT, DoT, 5G AI, network optimisation, telecom AI India'},
+  // Technology
+  {code:'TEC-GEN', name:'Technology',                        icon:'&#128187;', cluster:'TEC',
+   focus:'IT services, cloud providers, tech companies, AI platforms, SaaS, TCS, Infosys, Wipro AI'},
+  // Media
+  {code:'MED-BRD', name:'Media & Broadcast',                 icon:'&#127916;', cluster:'MED',
+   focus:'OTT platforms, news media, broadcast, content AI, Prasar Bharati, NDTV, Zee, Sony AI'},
+  // Finance
+  {code:'FIN-BFS', name:'Banking & Financial Services',      icon:'&#127981;', cluster:'FIN',
+   focus:'PSBs, private banks, RBI, SEBI, insurance, fintech, payments, fraud detection, credit AI India'},
+  // Manufacturing
+  {code:'MFG-IND', name:'Manufacturing & Industry',          icon:'&#9881;',   cluster:'MFG',
+   focus:'Industry 4.0, MSME, automotive, aerospace, SAMARTH Udyog Bharat, predictive maintenance India'},
+  // Energy
+  {code:'ENR-UTL', name:'Energy & Utilities',                icon:'&#9889;',   cluster:'ENR',
+   focus:'Power grids, renewables, NTPC, PGCIL, smart grid, solar energy AI, oil refining automation India'},
+  // Regional
+  {code:'REG-AIP', name:'Regional AI Programmes',            icon:'&#127960;', cluster:'REG',
+   focus:'State CoEs, IndiaAI Mission, AI Cities, Maharashtra AI Mission, Tamil Nadu AI, regional compute hubs'},
+  // Labs
+  {code:'LAB-AIR', name:'AI Labs & Research',                icon:'&#128300;', cluster:'LAB',
+   focus:'IITs, DRDO labs, IISER, private AI research, AI startups India, research publications, benchmarks'},
+  // Healthcare
+  {code:'HLT-LIF', name:'Healthcare & Life Sciences',        icon:'&#127973;', cluster:'HLT',
+   focus:'AIIMS, diagnostic AI, pharma, hospital technology, genomics, medical imaging, health data AI India'},
+]
+
+
+var NEWS_TOPICS = [
+  {code:'MKT-HPC', name:'AI & HPC in India',           icon:'&#128204;',
+   focus:'AI and HPC market developments, investments, deployments, vendor activity India 2026'},
+  {code:'MKT-COM', name:'Competitor & Vendor Activity', icon:'&#127942;',
+   focus:'NVIDIA, AMD, Intel, HPE, Dell, Atos, Lenovo wins and announcements India HPC AI 2026'},
+  {code:'MKT-TND', name:'Government AI Tenders',        icon:'&#128196;',
+   focus:'India government AI RFPs, GeM tenders, procurement signals, budget allocations 2026'},
+  {code:'MKT-DEF', name:'Defence Technology News',      icon:'&#128737;',
+   focus:'India military AI, DRDO, DPSUs, defence tech, autonomous systems, MoD programmes 2026'},
+  {code:'MKT-SOV', name:'Sovereign AI & Policy',        icon:'&#127963;',
+   focus:'Data localisation, on-premise mandates, DPDP Act, sovereign AI policy India 2026'},
+]
+
+// \u2500\u2500 Data \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var DOMAINS = [
+  // Government
+  {code:'GOV-GOV', name:'Government & Governance',           icon:'&#127963;', cluster:'GOV',
+   focus:'Indian central and state government AI adoption, e-governance, digital India, citizen services, smart cities'},
+  // Defence umbrella (4 sub-domains)
+  {code:'DEF-MIL', name:'Defence \u2014 Armed Forces',            icon:'&#128737;', cluster:'DEF',
+   focus:'Indian Army, Navy, Air Force, DPSUs, DRDO combat systems, autonomous weapons, military AI'},
+  {code:'DEF-SPC', name:'Defence \u2014 Space & Satellite',       icon:'&#128752;', cluster:'DEF',
+   focus:'ISRO, IN-SPACe, Defence Space Agency, military satellite building, launch vehicles, space situational awareness'},
+  {code:'DEF-HLS', name:'Defence \u2014 Homeland Security',       icon:'&#128274;', cluster:'DEF',
+   focus:'BSF, CRPF, paramilitary forces, border security, surveillance networks, critical infrastructure protection'},
+  {code:'DEF-INT', name:'Defence \u2014 Intelligence & Signals',  icon:'&#128065;', cluster:'DEF',
+   focus:'SIGINT, IMINT, cryptanalysis, intelligence agencies, cyber intelligence, signal processing AI'},
+  // Geospatial
+  {code:'GEO-SPA', name:'Geospatial & Earth Observation',    icon:'&#127758;', cluster:'GEO',
+   focus:'NRSC, Survey of India, Pixxel, MapMyIndia, civilian EO platforms, GIS, Bhuvan, commercial satellite data'},
+  // Infrastructure
+  {code:'INF-CIV', name:'Critical Infrastructure',           icon:'&#9992;',   cluster:'INF',
+   focus:'Ports, airports, railways, civil aviation, DGCA, AAI, Indian Railways, metro systems, road infrastructure AI'},
+  // Natural Resources
+  {code:'RES-NAT', name:'Natural Resources',                 icon:'&#127795;', cluster:'RES',
+   focus:'Oil and gas, mines, water resources, ONGC, Coal India, forestry, MOEF, geological survey AI'},
+  // Telecom
+  {code:'TEL-NET', name:'Telecom & Networks',                icon:'&#128225;', cluster:'TEL',
+   focus:'Reliance Jio, Airtel, BSNL, C-DOT, DoT, 5G AI, network optimisation, telecom AI India'},
+  // Technology
+  {code:'TEC-GEN', name:'Technology',                        icon:'&#128187;', cluster:'TEC',
+   focus:'IT services, cloud providers, tech companies, AI platforms, SaaS, TCS, Infosys, Wipro AI'},
+  // Media
+  {code:'MED-BRD', name:'Media & Broadcast',                 icon:'&#127916;', cluster:'MED',
+   focus:'OTT platforms, news media, broadcast, content AI, Prasar Bharati, NDTV, Zee, Sony AI'},
+  // Finance
+  {code:'FIN-BFS', name:'Banking & Financial Services',      icon:'&#127981;', cluster:'FIN',
+   focus:'PSBs, private banks, RBI, SEBI, insurance, fintech, payments, fraud detection, credit AI India'},
+  // Manufacturing
+  {code:'MFG-IND', name:'Manufacturing & Industry',          icon:'&#9881;',   cluster:'MFG',
+   focus:'Industry 4.0, MSME, automotive, aerospace, SAMARTH Udyog Bharat, predictive maintenance India'},
+  // Energy
+  {code:'ENR-UTL', name:'Energy & Utilities',                icon:'&#9889;',   cluster:'ENR',
+   focus:'Power grids, renewables, NTPC, PGCIL, smart grid, solar energy AI, oil refining automation India'},
+  // Regional
+  {code:'REG-AIP', name:'Regional AI Programmes',            icon:'&#127960;', cluster:'REG',
+   focus:'State CoEs, IndiaAI Mission, AI Cities, Maharashtra AI Mission, Tamil Nadu AI, regional compute hubs'},
+  // Labs
+  {code:'LAB-AIR', name:'AI Labs & Research',                icon:'&#128300;', cluster:'LAB',
+   focus:'IITs, DRDO labs, IISER, private AI research, AI startups India, research publications, benchmarks'},
+  // Healthcare
+  {code:'HLT-LIF', name:'Healthcare & Life Sciences',        icon:'&#127973;', cluster:'HLT',
+   focus:'AIIMS, diagnostic AI, pharma, hospital technology, genomics, medical imaging, health data AI India'},
+]
+
+
+var NEWS_TOPICS = [
+  {code:'AI_HPC',   name:'AI & HPC in India',          icon:'\u{1F4CC}', focus:'AI HPC supercomputer India government enterprise market developments 2026'},
+  {code:'COMP',     name:'Competitor & Vendor Activity',icon:'\u{1F3C6}', focus:'NVIDIA AMD Intel HPE Dell Atos AI HPC India wins contracts announcements 2026'},
+  {code:'TENDERS',  name:'Government AI Tenders',       icon:'\u{1F4C4}', focus:'India government AI tender RFP procurement supercomputer technology 2026'},
+  {code:'DEF_TECH', name:'Defence Technology News',     icon:'\u{1F6E1}', focus:'India defence AI military technology DRDO armed forces digital transformation 2026'},
+  {code:'SOV_AI',   name:'Sovereign AI & Policy',       icon:'\u{1F3DB}', focus:'sovereign AI data localisation India on-premise government cloud policy regulation 2026'},
+]
+
+var selectedDomains = new Set()
+var selectedNews = new Set()
+var sessionTokens = 0
+var sessionCost = 0
+var running = false
+
+// \u2500\u2500 Storage \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function getIntelDB(){
+  try{ return JSON.parse(localStorage.getItem('atlas_intel_db')||'{}') }catch{return {}}
+}
+function setIntelDB(db){ localStorage.setItem('atlas_intel_db',JSON.stringify(db)) }
+function getMetaDB(){
+  try{ return JSON.parse(localStorage.getItem('atlas_intel_meta')||'{}') }catch{return {}}
+}
+function setMetaDB(db){ localStorage.setItem('atlas_intel_meta',JSON.stringify(db)) }
+function getConfig(){
+  // Read from global settings first, fall back to local
+  var g = {}
+  try{ g = JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){}
+  var local = {}
+  try{ local = JSON.parse(localStorage.getItem('atlas_intel_config')||'{}') }catch(e){}
+  return {
+    geminiKey: g['key_gemini'] || localStorage.getItem('atlas_gemini_key') || local.geminiKey || '',
+    sbUrl: g.sbUrl || local.sbUrl || '',
+    sbKey: g.sbKey || local.sbKey || '',
+    itemCount: local.itemCount || '5',
+    model: (g.model_tiers && g.model_tiers.scraping) || localStorage.getItem('atlas_default_model') || 'gemini-3.1-flash-lite',
+  }
+}
+function setConfig(c){ localStorage.setItem('atlas_intel_config',JSON.stringify(c)) }
+
+function refreshSettingsStatus(){
+  var cfg = getConfig()
+  var el = document.getElementById('settingsStatus')
+  if(!el) return
+  var ok = []
+  var warn = []
+  if(cfg.geminiKey) ok.push('\u2705 Gemini key configured')
+  else warn.push('\u274C Gemini key missing')
+  if(cfg.sbUrl && cfg.sbKey) ok.push('\u2705 Supabase connected')
+  else warn.push('\u274C Supabase not configured')
+  var model = cfg.model || 'gemini-3.1-flash-lite'
+  ok.push('\uD83E\uDD16 Scraping model: '+model)
+  var all = ok.concat(warn)
+  el.innerHTML = all.join(' &nbsp;&middot;&nbsp; ')
+  el.style.background = warn.length ? 'rgba(255,182,0,0.1)' : 'rgba(0,178,144,0.08)'
+  el.style.color = warn.length ? '#9a7000' : 'var(--teal)'
+}
+
+// \u2500\u2500 Supabase \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function getSupabase(){
+  var cfg = getConfig()
+  return {url: cfg.sbUrl||'', key: cfg.sbKey||''}
+}
+
+async function testSupabase(){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/intelligence_items?limit=1', {
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
+    })
+    if(resp.ok){
+      log('Supabase connected successfully.', 'success')
+    } else {
+      log('Supabase connection failed: ' + resp.status, 'error')
+    }
+  }catch(e){
+    log('Supabase error: ' + e.message, 'error')
+  }
+}
+
+async function sbUpsertItem(item){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return false
+  // Normalise to match Supabase schema exactly
+  // Handle all possible field name variants from the model
+  var t = item.title || item.headline || item.event || item.programme || item.program || item.initiative || ''
+  var s = item.summary || item.description || item.details || item.overview || item.context || ''
+  // If no summary, construct from available fields
+  if(!s && item.organisation) s = (item.organisation||'') + (item.technology?' is working on '+item.technology:'') + (item.status?' ('+item.status+')':'')
+  if(!s && item.organization) s = (item.organization||'') + (item.focus?' focus: '+item.focus:'')
+  var orgs = []
+  if(Array.isArray(item.organisations)) orgs = item.organisations
+  else if(Array.isArray(item.organizations)) orgs = item.organizations
+  else if(item.organisation) orgs = [item.organisation]
+  else if(item.organization) orgs = [item.organization]
+  else if(item.partner) orgs = [item.partner]
+  var tgs = []
+  if(Array.isArray(item.tags)) tgs = item.tags
+  else if(item.technology) tgs = [item.technology]
+  else if(item.focus) tgs = item.focus.split(',').slice(0,3).map(function(x){return x.trim()})
+  var row = {
+    id: item.id,
+    domain_code: item.domain_code || item.topic_code || 'UNKNOWN',
+    source_type: item.source_type || 'domain',
+    title: (t||'Untitled').slice(0,500),
+    summary: (s||'').slice(0,1000),
+    type: item.type || item.category || item.event_type || '',
+    intelligence_value: item.intelligence_value || item.urgency || item.priority || 'medium',
+    organisations: orgs,
+    tags: tgs,
+    opportunity: (item.opportunity || item.opportunity_signals || item.relevance || item.relevance_to_atlas || '').slice(0,500),
+    competitor_signals: (item.competitor_signals || item.incumbents || item.competitors || item.vendor || '').slice(0,500),
+    uc_suggest: (item.uc_suggest || item.use_case || '').slice(0,200),
+    confidence: item.confidence || 'medium',
+    scraped_at: item.scraped_at || new Date().toISOString(),
+    scraped_by: getConfig().scraperName || 'ATLAS',
+    topic_code: item.topic_code||null,
+    topic_name: item.topic_name||null,
+    domain_name: item.domain_name||null,
+    intelligence_stream: item.intelligence_stream || null
+  }
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/intelligence_items', {
+      method:'POST',
+      headers:{
+        'apikey':sb.key,
+        'Authorization':'Bearer '+sb.key,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=ignore-duplicates,return=minimal'
+      },
+      body: JSON.stringify(row)
+    })
+    if(!resp.ok){
+      var errText = await resp.text()
+      log('SB error ' + resp.status + ' [' + row.domain_code + '] ' + errText.slice(0,150), 'error')
+      return false
+    }
+    log('Supabase write OK: ' + row.title.slice(0,40), 'dim')
+    return true
+  }catch(e){
+    log('Supabase write exception: ' + e.message, 'error')
+    return false
+  }
+}
+
+async function sbUpsertMeta(domainCode, totalItems, addedLastRun){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return
+  await fetch(sb.url+'/rest/v1/scraping_metadata', {
+    method:'POST',
+    headers:{
+      'apikey':sb.key,
+      'Authorization':'Bearer '+sb.key,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({
+      domain_code: domainCode,
+      last_scraped: new Date().toISOString(),
+      total_items: totalItems,
+      added_last_run: addedLastRun
+    })
+  })
+}
+
+async function sbFetchItems(domainCode){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return []
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/intelligence_items?domain_code=eq.'+domainCode+'&order=scraped_at.desc', {
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
+    })
+    if(resp.ok) return await resp.json()
+  }catch(e){ log('Supabase fetch error: '+e.message,'warn') }
+  return []
+}
+
+async function sbFetchMeta(){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return {}
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/scraping_metadata', {
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
+    })
+    if(resp.ok){
+      var rows = await resp.json()
+      var meta = {}
+      rows.forEach(function(r){ meta[r.domain_code] = r })
+      return meta
+    }
+  }catch(e){}
+  return {}
+}
+
+async function sbUpsertUC(uc){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return
+  await fetch(sb.url+'/rest/v1/uc_queue', {
+    method:'POST',
+    headers:{
+      'apikey':sb.key,
+      'Authorization':'Bearer '+sb.key,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=ignore-duplicates'
+    },
+    body: JSON.stringify(uc)
+  })
+}
+
+async function loadFromSupabase(){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return
+  log('Loading intelligence from Supabase...', 'info')
+  var meta = await sbFetchMeta()
+  // Merge Supabase metadata with localStorage metadata
+  var localMeta = getMetaDB()
+  Object.assign(localMeta, meta)
+  setMetaDB(localMeta)
+  renderDomainGrid()
+  renderNewsGrid()
+  updateStats()
+  log('Supabase metadata loaded.', 'success')
+}
+
+
+function saveConfig(){
+  var key = getConfig().geminiKey
+  var model = getConfig().model
+  var itemCount = parseInt(document.getElementById('itemCount').value) || 10
+  var useGrounding = document.getElementById('useGrounding').checked
+  var useEnrich = document.getElementById('useEnrich').checked
+  var sbUrl = document.getElementById('supabaseUrl').value.trim()
+  var sbKey = document.getElementById('supabaseKey').value.trim()
+  if(!key){ alert('Please enter your Gemini API key.'); return }
+  setConfig({key:key, model:model, itemCount:itemCount, useGrounding:useGrounding, useEnrich:useEnrich, sbUrl:sbUrl, sbKey:sbKey})
+  log('Config saved. Model: ' + model + ' | Items: ' + itemCount + ' | Enrich: ' + useEnrich + ' | Supabase: ' + (sbUrl?'connected':'not set'), 'success')
+  if(sbUrl && sbKey) testSupabase()
+  updateRunBtn()
+}
+
+// \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function init(){
+  var cfg = getConfig()
+  if(cfg.key) getConfig().geminiKey = cfg.key
+  if(cfg.model) getConfig().model = cfg.model
+  if(cfg.itemCount) document.getElementById('itemCount').value = cfg.itemCount
+  if(cfg.useGrounding) document.getElementById('useGrounding').checked = cfg.useGrounding
+  if(cfg.sbUrl) document.getElementById('supabaseUrl').value = cfg.sbUrl
+  if(cfg.sbKey) document.getElementById('supabaseKey').value = cfg.sbKey
+  if(cfg.useEnrich !== undefined) document.getElementById('useEnrich').checked = cfg.useEnrich
+  renderDomainGrid()
+  renderNewsGrid()
+  updateStats()
+  updateRunBtn()
+}
+
+function renderDomainGrid(){
+  var meta = getMetaDB()
+  var db = getIntelDB()
+  document.getElementById('domainGrid').innerHTML = DOMAINS.map(function(d){
+    var m = meta[d.code] || {}
+    var items = (db[d.code] || []).length
+    var status = getStatus(m.last_scraped)
+    var statusLabel = status === 'never' ? 'Never scraped' : status === 'fresh' ? 'Fresh' : 'Stale'
+    var lastStr = m.last_scraped ? new Date(m.last_scraped).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : 'Never'
+    var sel = selectedDomains.has(d.code)
+    return '<div class="domain-card ' + (sel?'selected':'') + '" id="dc-' + d.code + '" data-code="' + d.code + '" data-type="domain" onclick="toggleDomain(this)">'
+      + '<div class="domain-card-hdr">'
+      + '<span class="domain-icon">' + d.icon + '</span>'
+      + '<div><div class="domain-name">' + d.name + '</div><div class="domain-code">' + d.code + '</div></div>'
+      + '<div class="domain-check" id="chk-' + d.code + '"></div>'
+      + '</div>'
+      + '<div class="domain-meta">'
+      + '<span>Last: ' + lastStr + '</span>'
+      + '<span class="domain-status status-' + status + '">' + statusLabel + '</span>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--mid);margin-top:4px">' + items + ' items in database</div>'
+      + '<div class="domain-progress" id="prog-' + d.code + '"><div class="domain-progress-bar" id="progbar-' + d.code + '"></div></div>'
+      + '</div>'
+  }).join('')
+}
+
+function renderNewsGrid(){
+  var meta = getMetaDB()
+  var db = getIntelDB()
+  document.getElementById('newsGrid').innerHTML = NEWS_TOPICS.map(function(t){
+    var m = meta['news_' + t.code] || {}
+    var items = (db['news_' + t.code] || []).length
+    var status = getStatus(m.last_scraped)
+    var statusLabel = status === 'never' ? 'Never scraped' : status === 'fresh' ? 'Fresh' : 'Stale'
+    var lastStr = m.last_scraped ? new Date(m.last_scraped).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : 'Never'
+    var sel = selectedNews.has(t.code)
+    return '<div class="domain-card ' + (sel?'selected':'') + '" id="dc-news-' + t.code + '" data-code="' + t.code + '" data-type="news" onclick="toggleNews(this)">'
+      + '<div class="domain-card-hdr">'
+      + '<span class="domain-icon">' + t.icon + '</span>'
+      + '<div><div class="domain-name">' + t.name + '</div><div class="domain-code">NEWS &middot; ' + t.code + '</div></div>'
+      + '<div class="domain-check" id="chk-news-' + t.code + '"></div>'
+      + '</div>'
+      + '<div class="domain-meta">'
+      + '<span>Last: ' + lastStr + '</span>'
+      + '<span class="domain-status status-' + status + '">' + statusLabel + '</span>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--mid);margin-top:4px">' + items + ' items in database</div>'
+      + '<div class="domain-progress" id="prog-news-' + t.code + '"><div class="domain-progress-bar" id="progbar-news-' + t.code + '"></div></div>'
+      + '</div>'
+  }).join('')
+}
+
+function getStatus(lastScraped){
+  if(!lastScraped) return 'never'
+  var days = (Date.now() - new Date(lastScraped).getTime()) / (1000*60*60*24)
+  return days < 8 ? 'fresh' : 'stale'
+}
+
+function toggleDomain(el){
+  if(running) return
+  var code = el.dataset.code
+  if(selectedDomains.has(code)) selectedDomains.delete(code)
+  else selectedDomains.add(code)
+  renderDomainGrid()
+  updateSelectedCount()
+  updateRunBtn()
+}
+
+function toggleNews(el){
+  if(running) return
+  var code = el.dataset.code
+  if(selectedNews.has(code)) selectedNews.delete(code)
+  else selectedNews.add(code)
+  renderNewsGrid()
+  updateSelectedCount()
+  updateRunBtn()
+}
+
+function selectAll(){ DOMAINS.forEach(function(d){selectedDomains.add(d.code)}); renderDomainGrid(); updateSelectedCount(); updateRunBtn() }
+function selectNone(){ selectedDomains.clear(); renderDomainGrid(); updateSelectedCount(); updateRunBtn() }
+function selectAllNews(){ NEWS_TOPICS.forEach(function(t){selectedNews.add(t.code)}); renderNewsGrid(); updateSelectedCount(); updateRunBtn() }
+function selectNoneNews(){ selectedNews.clear(); renderNewsGrid(); updateSelectedCount(); updateRunBtn() }
+
+function updateSelectedCount(){
+  var total = selectedDomains.size + selectedNews.size
+  document.getElementById('selectedCount').textContent = total + ' domain' + (total!==1?'s':'') + '/topic' + (total!==1?'s':'') + ' selected'
+}
+
+function updateRunBtn(){
+  var cfg = getConfig()
+  var hasKey = !!(cfg.key || getConfig().geminiKey)
+  var hasSelection = selectedDomains.size > 0 || selectedNews.size > 0
+  document.getElementById('runBtn').disabled = !hasKey || !hasSelection || running
+  document.getElementById('exportBtn').disabled = Object.keys(getIntelDB()).length === 0
+}
+
+function updateStats(){
+  var meta = getMetaDB()
+  var domains = Object.keys(meta).filter(function(k){return meta[k].last_scraped}).length
+  // Total items from metadata (more reliable than counting localStorage)
+  var total = Object.values(meta).reduce(function(sum,m){return sum + (m.total_items||0)},0)
+  document.getElementById('statDomains').textContent = domains
+  document.getElementById('statItems').textContent = total
+  document.getElementById('statTokens').textContent = sessionTokens.toLocaleString()
+  document.getElementById('statCost').textContent = '$' + sessionCost.toFixed(4)
+}
+
+async function updateStatsFromSupabase(){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/intelligence_items?select=id&limit=1', {
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key,'Prefer':'count=exact'}
+    })
+    if(resp.ok){
+      var count = resp.headers.get('content-range')
+      if(count){
+        var total = count.split('/')[1]
+        document.getElementById('statItems').textContent = total || '?'
+      }
+    }
+  }catch(e){}
+}
+
+// \u2500\u2500 Logging \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function log(msg, type){
+  type = type || 'info'
+  var wrap = document.getElementById('logWrap')
+  document.getElementById('logSection').style.display = 'block'
+  var line = document.createElement('div')
+  line.className = 'log-line log-' + type
+  var time = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})
+  line.textContent = '[' + time + '] ' + msg
+  wrap.appendChild(line)
+  wrap.scrollTop = wrap.scrollHeight
+}
+
+function clearLog(){
+  document.getElementById('logWrap').innerHTML = ''
+}
+
+function setDomainStatus(code, status, isNews){
+  var prefix = isNews ? 'dc-news-' : 'dc-'
+  var el = document.getElementById(prefix + code)
+  if(!el) return
+  el.className = 'domain-card ' + status
+  var prog = document.getElementById('prog-' + (isNews?'news-':'') + code)
+  var bar = document.getElementById('progbar-' + (isNews?'news-':'') + code)
+  if(status === 'running'){
+    prog.classList.add('show')
+    bar.style.width = '100%'
+    bar.classList.add('pulse')
+  } else {
+    bar.classList.remove('pulse')
+    bar.style.width = status === 'done' ? '100%' : '0%'
+    if(status !== 'done') prog.classList.remove('show')
+  }
+}
+
+// \u2500\u2500 Gemini API \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function callGemini(prompt, label){
+  var cfg = getConfig()
+  var key = cfg.key || getConfig().geminiKey
+  var model = getConfig().model
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key
+
+  var cfg2 = getConfig()
+  var body = {
+    contents: [{role: 'user', parts: [{text: prompt}]}],
+    generationConfig: {temperature: 0.1, maxOutputTokens: 1024, thinkingConfig: {thinkingBudget: 0}}
+  }
+  if(cfg2.useGrounding && document.getElementById('useGrounding').checked){
+    body.tools = [{google_search: {}}]
+    delete body.generationConfig.responseMimeType
+  }
+
+  var resp = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+  if(!resp.ok){
+    var err = await resp.json()
+    throw new Error((err.error && err.error.message) || 'API error ' + resp.status)
+  }
+  var data = await resp.json()
+
+  // Track tokens
+  var usage = data.usageMetadata || {}
+  var inTokens = usage.promptTokenCount || 0
+  var outTokens = usage.candidatesTokenCount || 0
+  var totalTok = inTokens + outTokens
+  sessionTokens += totalTok
+
+  // Cost estimate: Gemini 3.5 Flash ~$0.30/M input, $2.50/M output (rough)
+  sessionCost += (inTokens * 0.0000003) + (outTokens * 0.0000025)
+
+  document.getElementById('statTokens').textContent = sessionTokens.toLocaleString()
+  document.getElementById('statCost').textContent = '$' + sessionCost.toFixed(4)
+  // token meter removed from HTML, stats row handles display
+
+  log(label + ' &mdash; tokens: in=' + inTokens + ' out=' + outTokens + ' cost=~$' + ((inTokens*0.0000003)+(outTokens*0.0000025)).toFixed(5), 'dim')
+
+  var text = data.candidates[0].content.parts[0].text
+  // Log first 200 and last 200 chars of response for debugging
+  log('RAW start: ' + text.slice(0,150).replace(/\n/g,' '), 'dim')
+  log('RAW end: ' + text.slice(-150).replace(/\n/g,' '), 'dim')
+  return text
+}
+
+function parseJSON(text){
+  text = text.trim()
+  // Strip code fences
+  var fence = String.fromCharCode(96,96,96)
+  if(text.indexOf(fence) >= 0){
+    var parts = text.split(fence)
+    for(var pi=0;pi<parts.length;pi++){
+      var pt = parts[pi].trim()
+      if(pt.startsWith('json')) pt = pt.slice(4).trim()
+      if(pt.startsWith('[') || pt.startsWith('{')){ text = pt; break }
+    }
+  }
+  text = text.trim()
+  // Find outermost array or object
+  var first = -1
+  for(var i=0;i<text.length;i++){if(text[i]==='['||text[i]==='{'){first=i;break}}
+  if(first < 0) throw new Error('No JSON array or object found in response')
+  var opener = text[first]
+  var closer = opener === '[' ? ']' : '}'
+  // Find matching closer by counting depth
+  var depth = 0
+  var last = -1
+  for(var j=first;j<text.length;j++){
+    if(text[j]===opener) depth++
+    else if(text[j]===closer){ depth--; if(depth===0){last=j;break} }
+  }
+  if(last < 0) last = text.lastIndexOf(closer)
+  text = text.slice(first, last+1)
+  // Try parsing, if fails try to truncate at last valid item
+  try{
+    return JSON.parse(text)
+  }catch(e){
+    // Try to recover partial JSON array
+    log('JSON parse failed, attempting recovery...', 'warn')
+    if(opener === '['){
+      // Find last complete object in array
+      var lastComma = text.lastIndexOf('},')
+      if(lastComma > 0){
+        var partial = text.slice(0, lastComma+1) + ']'
+        try{ return JSON.parse(partial) }catch(e2){}
+      }
+      // Try removing last incomplete item
+      var lastBrace = text.lastIndexOf('}')
+      if(lastBrace > 0){
+        var partial2 = text.slice(0, lastBrace+1) + ']'
+        try{ return JSON.parse(partial2) }catch(e3){}
+      }
+    }
+    throw new Error('Could not parse JSON: ' + e.message)
+  }
+}
+
+// \u2500\u2500 Scraping \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+
+function parseMarkdownItems(raw){
+  var items = []
+  // Split on item markers: *Item N:*, **Item N**, Item N:
+  var itemBlocks = raw.split(/\*{0,2}Item\s+\d+[:\*]/i)
+  if(itemBlocks.length < 2){
+    // Try splitting on numbered list pattern
+    itemBlocks = raw.split(/\n\d+\.\s+/)
+  }
+  itemBlocks.forEach(function(block){
+    if(!block.trim()) return
+    var item = {}
+    // Extract fields using regex patterns for * key: "value" or * **key**: value
+    var patterns = {
+      title: /[*-]\s*(?:\*{1,2})?[Tt]itle(?:\*{1,2})?[:\s]+[*"']?([^"'\n*]+)[*"']?/,
+      summary: /[*-]\s*(?:\*{1,2})?[Ss]ummary(?:\*{1,2})?[:\s]+"?([^"\n]+(?:\n(?![*-])[^\n]+)*)"?/,
+      type: /[*-]\s*(?:\*{1,2})?[Tt]ype(?:\*{1,2})?[:\s]+"?([\w_]+)"?/,
+      intelligence_value: /[*-]\s*(?:\*{1,2})?[Ii]ntelligence[_\s][Vv]alue(?:\*{1,2})?[:\s]+"?(high|medium|low)"?/i,
+      opportunity: /[*-]\s*(?:\*{1,2})?[Oo]pportunity(?:\*{1,2})?[:\s]+"?([^"\n]+)"?/,
+      confidence: /[*-]\s*(?:\*{1,2})?[Cc]onfidence(?:\*{1,2})?[:\s]+"?(high|medium|low)"?/i,
+      competitor_signals: /[*-]\s*(?:\*{1,2})?[Cc]ompetitor[_\s][Ss]ignals?(?:\*{1,2})?[:\s]+"?([^"\n]+)"?/,
+      uc_suggest: /[*-]\s*(?:\*{1,2})?[Uu][Cc][_\s][Ss]uggest(?:\*{1,2})?[:\s]+"?([^"\n]+)"?/,
+    }
+    for(var field in patterns){
+      var m = block.match(patterns[field])
+      if(m) item[field] = m[1].trim().replace(/[*"']/g,'').replace(/\s*\(\d+\s+chars\)/,'').trim()
+    }
+    // Extract tags array
+    var tagsMatch = block.match(/[*-]\s*(?:\*{1,2})?[Tt]ags?(?:\*{1,2})?[:\s]+\[?([^\]\n]+)\]?/)
+    if(tagsMatch){
+      item.tags = tagsMatch[1].split(/[,;]+/).map(function(t){ return t.trim().replace(/["\'\[\]]/g,'') }).filter(Boolean).slice(0,5)
+    }
+    // Extract organisations
+    var orgMatch = block.match(/[*-]\s*(?:\*{1,2})?[Oo]rganisations?(?:\*{1,2})?[:\s]+\[?([^\]\n]+)\]?/)
+    if(orgMatch){
+      item.organisations = orgMatch[1].split(/[,;]+/).map(function(o){ return o.trim().replace(/["\'\[\]]/g,'') }).filter(Boolean).slice(0,3)
+    }
+    if(item.title && item.title.length > 3) items.push(item)
+  })
+  return items
+}
+
+function extractItems(raw, code, name, sourceType){
+  var now = new Date().toISOString()
+  var items = []
+
+  // Method 1: direct JSON parse with partial recovery
+  try{
+    // Strip BOM, zero-width spaces, and other invisible chars before JSON
+    var text = raw.replace(/^[\s\uFEFF\u200B\u200C\u200D\u00A0]+/, '').trim()
+    var fence = String.fromCharCode(96,96,96)
+    if(text.indexOf(fence) >= 0){
+      var parts = text.split(fence)
+      for(var pi=0;pi<parts.length;pi++){
+        var pt = parts[pi].trim()
+        if(pt.startsWith('json')) pt = pt.slice(4).trim()
+        if(pt.startsWith('[') || pt.startsWith('{')){ text = pt; break }
+      }
+    }
+    // Strip any chars before first { or [ (Gemini sometimes adds invisible prefix chars)
+    var firstBrace = text.indexOf('{')
+    var firstBracket = text.indexOf('[')
+    var first = -1
+    if(firstBracket >= 0 && (firstBrace < 0 || firstBracket <= firstBrace)) first = firstBracket
+    else if(firstBrace >= 0) first = firstBrace
+    if(first >= 0){
+      var arrText = first === text.indexOf('[') ? text.slice(first) : '[' + text.slice(first) + ']'
+      // Try full parse first
+      try{
+        var parsed = JSON.parse(arrText)
+        if(Array.isArray(parsed) && parsed.length > 0){
+          log('Parsed ' + parsed.length + ' items via method 1', 'dim')
+          items = parsed
+        }
+      }catch(innerE){
+        // Try recovery: find last },  and close the array
+        var lastObjEnd = arrText.lastIndexOf('},')
+        if(lastObjEnd < 0) lastObjEnd = arrText.lastIndexOf('}')
+        if(lastObjEnd > 0){
+          var recovered = arrText.slice(0, lastObjEnd+1) + ']'
+          try{
+            var partial = JSON.parse(recovered)
+            if(Array.isArray(partial) && partial.length > 0){
+              log('Parsed ' + partial.length + ' items via method 1 (partial recovery)', 'dim')
+              items = partial
+            }
+          }catch(e2){ /* fall through to method 2 */ }
+        }
+        if(items.length === 0) log('Method 1 retrying via method 2...', 'dim')
+      }
+    }
+  }catch(e1){
+    log('Method 1 outer failed: ' + e1.message.slice(0,40) + ' - trying method 2', 'warn')
+  }
+
+  // Method 2: extract individual {} blocks
+  if(items.length === 0){
+    try{
+      var depth = 0
+      var start = -1
+      var found = []
+      for(var i=0; i<raw.length; i++){
+        if(raw[i] === '{'){
+          if(depth === 0) start = i
+          depth++
+        } else if(raw[i] === '}'){
+          depth--
+          if(depth === 0 && start >= 0){
+            try{
+              var obj = JSON.parse(raw.slice(start, i+1))
+              if(obj.title) found.push(obj)
+            }catch(e){ /* skip malformed object */ }
+            start = -1
+          }
+        }
+      }
+      if(found.length > 0){
+        log('Extracted ' + found.length + ' items via method 2 (individual objects)', 'dim')
+        items = found
+      }
+    }catch(e2){
+      log('Method 2 failed: ' + e2.message.slice(0,60), 'warn')
+    }
+  }
+
+  // Method 2.5: truncation recovery - try to complete truncated JSON
+  if(items.length === 0){
+    try{
+      var rawT = raw.trim()
+      // Find the start of a JSON object
+      var objStart = rawT.indexOf('{')
+      if(objStart >= 0){
+        var partial = rawT.slice(objStart)
+        // Count open/close braces to find how many } are missing
+        var openB = 0, closeB = 0
+        for(var ci=0; ci<partial.length; ci++){
+          if(partial[ci]==='{') openB++
+          else if(partial[ci]==='}') closeB++
+        }
+        var missing = openB - closeB
+        // Add missing closing braces and a closing quote if string is open
+        var completed = partial
+        // Check if we're inside a string (odd number of unescaped quotes at end)
+        var trailingContent = partial.slice(-50)
+        var quoteCount = (trailingContent.match(/(?<!\\)"/g)||[]).length
+        if(quoteCount % 2 !== 0) completed += '"'  // close open string
+        // Close any open arrays
+        var openArr = (completed.match(/\[/g)||[]).length
+        var closeArr = (completed.match(/\]/g)||[]).length
+        for(var ai=0; ai<openArr-closeArr; ai++) completed += ']'
+        // Add missing closing braces
+        for(var bi=0; bi<missing; bi++) completed += '}'
+        try{
+          var recovered = JSON.parse(completed)
+          if(recovered.title){
+            log('Recovered truncated item: ' + recovered.title.slice(0,40), 'dim')
+            items = [recovered]
+          }
+        }catch(eR){ /* could not recover */ }
+      }
+    }catch(e25){ /* silent */ }
+  }
+
+  // Method 3: parse markdown bullet format (* key: value)
+  if(items.length === 0){
+    try{
+      var mdItems = parseMarkdownItems(raw)
+      if(mdItems.length > 0){
+        log('Extracted ' + mdItems.length + ' items via method 3 (markdown parser)', 'dim')
+        items = mdItems
+      }
+    }catch(e3){
+      log('Method 3 failed: ' + e3.message.slice(0,60), 'warn')
+    }
+  }
+
+  if(items.length === 0){
+    log('Could not extract any items. Raw length: ' + raw.length, 'error')
+    var preview = raw.slice(0,500).replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    log('RAW RESPONSE: ' + preview, 'warn')
+    return []
+  }
+
+  // Normalise and stamp items
+  items.forEach(function(item, i){
+    item.id = (sourceType==='news'?'news':'intel') + '-' + code.replace(/-/g,'') + '-' + Date.now() + '-' + i + '-' + Math.floor(Math.random()*9999)
+    if(sourceType === 'domain'){ item.domain_code = code; item.domain_name = name }
+    else { item.topic_code = code; item.topic_name = name; item.domain_code = code }
+    item.scraped_at = now
+    item.source_type = sourceType
+    // Normalise field names
+    if(!item.summary && item.description) item.summary = item.description
+    if(!item.intelligence_value) item.intelligence_value = item.urgency || 'medium'
+    if(!item.opportunity_signals && item.opportunity) item.opportunity_signals = item.opportunity
+    if(!item.relevance_to_atlas && item.relevance) item.relevance_to_atlas = item.relevance
+  })
+  return items
+}
+
+async function scrapeDomain(domain){
+  var cfg = getConfig()
+  var n = parseInt(cfg.itemCount)||5
+  var geoEl = document.getElementById('cfgGeo')
+  var geos = []
+  if(geoEl){ for(var oi=0;oi<geoEl.options.length;oi++){ if(geoEl.options[oi].selected) geos.push(geoEl.options[oi].value) } }
+  if(!geos.length) geos = ['India']
+  var items = []
+  var sbTitles = await getSupabaseTitles(domain.code)
+  var sbUrls = await getSupabaseUrls(domain.code)
+  log('Dedup: '+sbTitles.size+' titles, '+sbUrls.size+' URLs for '+domain.code, 'dim')
+
+  for(var gi=0; gi<geos.length; gi++){
+    var geo = geos[gi]
+    for(var i=0; i<Math.min(n,3); i++){
+      var prompt = 'You are an intelligence analyst for an AI and HPC hardware OEM.'
+        + ' Search the web and report ONE real recent news item about '+domain.name+' in '+geo+'.'
+        + ' Keywords: '+domain.keywords+'.'
+        + ' Report a REAL event from 2025 or 2026 only. Do not invent or use training data.'
+        + ' If no relevant real news found, respond with just: {"relevant":false}'
+        + ' Otherwise respond with JSON only: relevant(true), title(real headline), summary(factual 80 words from real article), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(1 sentence or empty string), uc_suggest(specific use case name or empty string), confidence(high|medium|low), source_title(real publication name).'
+        + ' Start with { end with }. No markdown. No backticks.'
+      try{
+        await sleep(DELAY_MS)
+        var result = await callGeminiGrounded(prompt)
+        if(!result) continue
+        var raw = result.text
+        var first = raw.indexOf('{')
+        var last = raw.lastIndexOf('}')
+        if(first<0||last<0) continue
+        var item
+        try{ item = JSON.parse(raw.slice(first,last+1)) }catch(pe){ continue }
+        if(!item||item.relevant===false) continue
+        if(!item.title) continue
+        var titleKey = item.title.toLowerCase().trim()
+        var srcUrl = (result.sources&&result.sources[0]) ? result.sources[0].url : null
+        var urlKey = srcUrl ? srcUrl.toLowerCase() : ''
+        if(sbTitles.has(titleKey)){ log('dup title: '+item.title.slice(0,40),'dim'); continue }
+        if(urlKey&&sbUrls.has(urlKey)){ log('dup url','dim'); continue }
+        item.intelligence_stream = item.intelligence_stream||'market_pulse'
+        item.source_url = srcUrl
+        item.source_name = srcUrl ? ((result.sources[0].title)||item.source_title||'Web') : item.source_title||'Web Search'
+        item.geography = geo
+        item.is_real = true
+        item.domain_code = domain.code
+        item.domain_name = domain.name
+        sbTitles.add(titleKey)
+        if(urlKey) sbUrls.add(urlKey)
+        items.push(item)
+        sbUpsertItem(item)
+        log('['+domain.code+']['+geo+'] '+item.title.slice(0,55),'success')
+      }catch(err2){
+        log('['+domain.code+']['+geo+'] error: '+err2.message.slice(0,60),'error')
+      }
+    }
+  }
+  return items
+}
+
+async function scrapeNews(topic){
+  var cfg4 = getConfig()
+  var n2 = parseInt(cfg4.itemCount) || 5
+  var items = []
+  var usedTitlesN = []
+  var sbTitlesN = await getSupabaseTitles(topic.code)
+  log('Dedup: '+sbTitlesN.size+' existing news titles for '+topic.code, 'dim')
+
+  var newsAngles = [
+    'contract awards and vendor wins',
+    'government tenders and RFPs',
+    'policy and regulatory developments',
+    'technology partnerships and MoUs',
+    'market investments and funding',
+    'product launches and announcements',
+    'competitive moves and market shifts',
+    'procurement patterns and budget signals',
+    'international deals with India angle',
+    'startup and ecosystem developments'
+  ]
+
+  for(var j=0; j<n2; j++){
+    var angle = newsAngles[j % newsAngles.length]
+    var avoidStrN = usedTitlesN.length > 0 ? ' Do NOT repeat: ' + usedTitlesN.slice(-3).join('; ') + '.' : ''
+    var prompt2 = 'You are a market intelligence analyst for an AI and HPC hardware OEM.'
+      + ' Generate ONE market intelligence item about ' + angle + ' related to the following topic.'
+      + ' TOPIC: ' + topic.name + '. FOCUS: ' + topic.focus + '.'
+      + ' Be specific \u2014 name real organisations and deals. Keep the summary under 80 words. All string values must be short.' + avoidStrN
+      + ' Respond with a single JSON object only. No array brackets. No explanation. No markdown. No backticks. Use ONLY these exact field names: title, summary, type, intelligence_value, organisations, tags, opportunity, competitor_signals, uc_suggest, confidence. Start with { end with }.'
+
+    try{
+      var raw2 = await callGemini(prompt2, 'NEWS/' + topic.code + ' [' + (j+1) + '/' + n2 + ']')
+      var extracted2 = extractItems(raw2, topic.code, topic.name, 'news')
+      if(extracted2.length > 0){
+        var item2 = extracted2[0]
+        if(item2.title) usedTitlesN.push(item2.title)
+        if(!item2.intelligence_stream) item2.intelligence_stream = 'market_pulse'
+        // Supabase dedup check
+        if(sbTitlesN.has((item2.title||'').toLowerCase().trim())){
+          log('News duplicate skipped: '+(item2.title||'').slice(0,40), 'dim')
+          continue
+        }
+        if(item2.title) sbTitlesN.add(item2.title.toLowerCase().trim())
+        items.push(item2)
+        if(item2.id) sbUpsertItem(item2)
+      }
+    }catch(err2){
+      log('News item ' + (j+1) + ' failed for ' + topic.code + ': ' + err2.message, 'warn')
+    }
+    if(j < n2-1) await new Promise(function(r){setTimeout(r,1500)})
+  }
+  return items
+}
+
+
+async function getSupabaseTitles(domainCode){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return new Set()
+  var cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - 18)
+  var cutoffStr = cutoff.toISOString()
+  try{
+    var resp = await fetch(sb.url+'/rest/v1/intelligence_items?domain_code=eq.'+domainCode+'&scraped_at=gte.'+cutoffStr+'&select=title&limit=500', {
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
+    })
+    if(resp.ok){
+      var rows = await resp.json()
+      return new Set(rows.map(function(r){ return (r.title||'').toLowerCase().trim() }))
+    }
+  }catch(e){ console.error('getSupabaseTitles:', e) }
+  return new Set()
+}
+
+function mergeItems(existing, newItems){
+  var existingTitles = {}
+  existing.forEach(function(item){ if(item.title) existingTitles[item.title.toLowerCase().trim()] = true })
+  var added = newItems.filter(function(item){ 
+    if(!item.title) return false
+    return !existingTitles[item.title.toLowerCase().trim()] 
+  })
+  return {merged: existing.concat(added), added: added.length}
+}
+
+// \u2500\u2500 Main run \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+// \u2500\u2500 Phase 2: Enrichment \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function enrichItem(item){
+  var prompt = 'You are a senior intelligence analyst. Enrich the following intelligence item with deeper analysis.'
+    + ' INPUT: title="' + (item.title||'').slice(0,80) + '" summary="' + (item.summary||'').slice(0,200) + '" domain=' + (item.domain_code||item.topic_code||'') + ' stream=' + (item.intelligence_stream||'') + '.'
+    + ' Analyse this item and respond with a SINGLE JSON object using ONLY these fields:'
+    + ' problem_statement (the specific problem being solved, 1-2 sentences),'
+    + ' technical_context (AI architecture, model types, infrastructure patterns involved),'
+    + ' infrastructure_signals (array of 3-5 strings: compute patterns like edge/central/air-gapped/gpu/cpu),'
+    + ' uc_name (specific use case name if this implies one, else empty string),'
+    + ' uc_cluster (which UC cluster this belongs to, else empty string),'
+    + ' uc_hardware (what hardware is needed for this UC, else empty string),'
+    + ' depth_score (integer 1-10, how actionable and specific this intelligence is).'
+    + ' Start with { end with }. No markdown. No backticks.'
+
+  try{
+    var raw = await callGemini(prompt, 'ENRICH ' + (item.domain_code||item.topic_code||''))
+    var extracted = extractItems(raw, item.domain_code||item.topic_code||'', item.domain_name||item.topic_name||'', 'enrich')
+    if(extracted.length > 0){
+      var enriched = extracted[0]
+      var sb = getSupabase()
+      if(!sb.url||!sb.key) return
+      // Update the item in Supabase with enriched fields
+      await fetch(sb.url + '/rest/v1/intelligence_items?id=eq.' + item.id, {
+        method: 'PATCH',
+        headers: {
+          'apikey': sb.key,
+          'Authorization': 'Bearer ' + sb.key,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          problem_statement: enriched.problem_statement || '',
+          technical_context: enriched.technical_context || '',
+          infrastructure_signals: Array.isArray(enriched.infrastructure_signals) ? enriched.infrastructure_signals : [],
+          uc_extracted: {
+            uc_name: enriched.uc_name || '',
+            uc_cluster: enriched.uc_cluster || '',
+            uc_hardware: enriched.uc_hardware || ''
+          },
+          depth_score: parseInt(enriched.depth_score) || 5,
+          enriched_at: new Date().toISOString()
+        })
+      })
+      // If UC found, add to uc_queue
+      if(enriched.uc_name){
+        sbUpsertUC({
+          id: 'uc-enrich-' + item.id,
+          uc_name: enriched.uc_name,
+          cluster: enriched.uc_cluster||'',
+          rationale: 'Enrichment: ' + enriched.uc_hardware,
+          source_intel_id: item.id,
+          source_title: item.title,
+          domain_code: item.domain_code||item.topic_code||'',
+          status: 'pending'
+        })
+      }
+      log('Enriched: ' + (item.title||'').slice(0,40) + ' (depth=' + (enriched.depth_score||'?') + ')', 'dim')
+    }
+  }catch(e){
+    log('Enrich failed: ' + e.message.slice(0,60), 'warn')
+  }
+}
+
+async function runEnrichmentPhase(allItems){
+  var cfg = getConfig()
+  if(!cfg.useEnrich) return
+  if(!allItems || allItems.length === 0) return
+  log('', 'dim')
+  log('Phase 2 \u2014 Enriching ' + allItems.length + ' items...', 'info')
+  for(var i=0; i<allItems.length; i++){
+    if(allItems[i].id){
+      await enrichItem(allItems[i])
+      if(i < allItems.length-1) await new Promise(function(r){setTimeout(r,1200)})
+    }
+  }
+  log('Enrichment complete.', 'success')
+}
+
+async function runScraper(){
+  if(running) return
+  var cfg = getConfig()
+  var key = cfg.key || getConfig().geminiKey
+  if(!key){ alert('Please enter and save your Gemini API key.'); return }
+  if(selectedDomains.size === 0 && selectedNews.size === 0){ alert('Please select at least one domain or topic.'); return }
+
+  running = true
+  document.getElementById('runBtn').disabled = true
+  document.getElementById('runBtn').textContent = '\u25B6 Running...'
+  clearLog()
+  log('Starting intelligence scraper...', 'info')
+  log('Model: ' + getConfig().model, 'dim')
+  log('Domains: ' + Array.from(selectedDomains).join(', '), 'dim')
+  log('News topics: ' + Array.from(selectedNews).join(', '), 'dim')
+
+  var db = getIntelDB()
+  var meta = getMetaDB()
+  var totalAdded = 0
+  var allNewItems = []
+
+  // Scrape domains
+  var domainList = DOMAINS.filter(function(d){ return selectedDomains.has(d.code) })
+  for(var i=0; i<domainList.length; i++){
+    var domain = domainList[i]
+    setDomainStatus(domain.code, 'running', false)
+    log('Scraping domain: ' + domain.name + '...', 'info')
+    try{
+      var items = await scrapeDomain(domain)
+      var existing = db[domain.code] || []
+      var result = mergeItems(existing, items)
+      db[domain.code] = result.merged
+      setIntelDB(db)
+      meta[domain.code] = {last_scraped: new Date().toISOString(), total_items: result.merged.length, added_last_run: result.added}
+      setMetaDB(meta)
+      totalAdded += result.added
+      allNewItems = allNewItems.concat(items)  // items from this scrape session
+      setDomainStatus(domain.code, 'done', false)
+      log('Done: ' + domain.code + ' &mdash; ' + result.added + ' new items added (' + result.merged.length + ' total)', 'success')
+    }catch(err){
+      setDomainStatus(domain.code, 'error', false)
+      log('ERROR: ' + domain.code + ' &mdash; ' + err.message, 'error')
+    }
+    // Small delay between calls
+    if(i < domainList.length-1) await new Promise(function(r){setTimeout(r,2000)})
+  }
+
+  // Scrape news
+  var newsList = NEWS_TOPICS.filter(function(t){ return selectedNews.has(t.code) })
+  for(var j=0; j<newsList.length; j++){
+    var topic = newsList[j]
+    setDomainStatus(topic.code, 'running', true)
+    log('Scraping news: ' + topic.name + '...', 'info')
+    try{
+      var nitems = await scrapeNews(topic)
+      var nexisting = db['news_' + topic.code] || []
+      var nresult = mergeItems(nexisting, nitems)
+      db['news_' + topic.code] = nresult.merged
+      setIntelDB(db)
+      meta['news_' + topic.code] = {last_scraped: new Date().toISOString(), total_items: nresult.merged.length, added_last_run: nresult.added}
+      setMetaDB(meta)
+      sbUpsertMeta('news_' + topic.code, nresult.merged.length, nresult.added)
+      totalAdded += nresult.added
+      allNewItems = allNewItems.concat(nitems)
+      setDomainStatus(topic.code, 'done', true)
+      log('Done: NEWS/' + topic.code + ' &mdash; ' + nresult.added + ' new items (' + nresult.merged.length + ' total)', 'success')
+    }catch(err){
+      setDomainStatus(topic.code, 'error', true)
+      log('ERROR: NEWS/' + topic.code + ' &mdash; ' + err.message, 'error')
+    }
+    if(j < newsList.length-1) await new Promise(function(r){setTimeout(r,2000)})
+  }
+
+  // Phase 2: Enrich all newly scraped items
+  await runEnrichmentPhase(allNewItems)
+  log('', 'dim')
+  log('\u2500\u2500 RUN SUMMARY \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500', 'dim')
+  log('Items added: ' + totalAdded + ' | Session tokens: ' + sessionTokens.toLocaleString() + ' | Est. cost: ~$' + sessionCost.toFixed(4), 'success')
+  running = false
+  document.getElementById('runBtn').disabled = false
+  document.getElementById('runBtn').textContent = '\u25B6 Run Scraper'
+  document.getElementById('exportBtn').disabled = false
+  updateStats()
+  renderDomainGrid()
+  renderNewsGrid()
+  renderRunResults(allNewItems)
+}
+
+// \u2500\u2500 Results \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function renderRunResults(allItems){
+  if(!allItems || allItems.length === 0){
+    renderResults()
+    return
+  }
+  // Group by domain_code or topic_code
+  var groups = {}
+  allItems.forEach(function(item){
+    var key = item.domain_code || item.topic_code || 'unknown'
+    if(!groups[key]) groups[key] = []
+    groups[key].push(item)
+  })
+  var keys = Object.keys(groups)
+  document.getElementById('resultsSection').style.display = 'block'
+  document.getElementById('resultsCount').textContent = allItems.length + ' new items added across ' + keys.length + ' domain(s)'
+  document.getElementById('resultsDom').innerHTML = keys.map(function(key){
+    var items = groups[key]
+    var label = key
+    var domainObj = (typeof DOMAINS !== 'undefined' ? DOMAINS : []).find(function(d){return d.code===key})
+    var newsObj = (typeof NEWS_TOPICS !== 'undefined' ? NEWS_TOPICS : []).find(function(t){return t.code===key})
+    if(domainObj) label = domainObj.icon + ' ' + domainObj.name
+    else if(newsObj) label = newsObj.icon + ' ' + newsObj.name
+    return '<div class="result-domain">'
+      + '<div class="result-domain-hdr" onclick="toggleResultSection(this)">'
+      + '<div class="result-domain-title">' + label + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<span class="result-domain-count">' + items.length + ' new</span>'
+      + '<span style="color:var(--mid);font-size:12px">&#9660;</span>'
+      + '</div></div>'
+      + '<div class="result-items">'
+      + items.map(function(item){
+          var streamBadge = item.intelligence_stream ? '<span class="tag tag-type">' + item.intelligence_stream.replace(/_/g,' ') + '</span>' : ''
+          var ucTag = item.uc_suggest ? '<span class="tag tag-uc">UC: ' + item.uc_suggest.slice(0,30) + '</span>' : ''
+          var valTag = item.intelligence_value === 'high' ? '<span class="tag tag-high">High</span>' : ''
+          return '<div class="result-item">'
+            + '<div class="result-item-title">' + (item.title||'') + '</div>'
+            + '<div class="result-item-summary">' + (item.summary||'').slice(0,120) + '</div>'
+            + '<div class="result-item-tags">' + streamBadge + valTag + ucTag + '</div>'
+            + '</div>'
+        }).join('')
+      + '</div></div>'
+  }).join('')
+}
+
+function renderResults(){
+  var db = getIntelDB()
+  var meta = getMetaDB()
+  var keys = Object.keys(db).filter(function(k){ return db[k].length > 0 })
+
+  // If no localStorage items, show metadata summary from Supabase
+  if(keys.length === 0){
+    var metaKeys = Object.keys(meta).filter(function(k){ return meta[k].total_items > 0 })
+    if(metaKeys.length > 0){
+      document.getElementById('resultsSection').style.display = 'block'
+      document.getElementById('resultsCount').textContent = 'Items stored in Supabase'
+      document.getElementById('resultsDom').innerHTML = metaKeys.map(function(k){
+        var m = meta[k]
+        var label = k.startsWith('news_') ? k.replace('news_','NEWS: ') : k
+        return '<div class="result-domain">'
+          + '<div class="result-domain-hdr" style="cursor:default">'
+          + '<div class="result-domain-title">' + label + '</div>'
+          + '<div style="display:flex;align-items:center;gap:8px">'
+          + '<span class="result-domain-count">' + m.total_items + ' total</span>'
+          + (m.added_last_run ? '<span style="font-size:10px;color:var(--teal);font-weight:600;margin-left:4px">+' + m.added_last_run + ' new</span>' : '')
+          + '</div></div></div>'
+      }).join('')
+    }
+    return
+  }
+
+  var total = keys.reduce(function(sum,k){return sum + db[k].length}, 0)
+  document.getElementById('resultsSection').style.display = 'block'
+  document.getElementById('resultsCount').textContent = total + ' items across ' + keys.length + ' domains/topics'
+
+  document.getElementById('resultsDom').innerHTML = keys.map(function(key){
+    var items = db[key]
+    var m = meta[key] || {}
+    var label = key.startsWith('news_') ? key.replace('news_','NEWS: ') : key
+    var newBadge = m.added_last_run ? '<span style="font-size:10px;color:var(--teal);font-weight:600;margin-left:4px">+' + m.added_last_run + ' new</span>' : ''
+    return '<div class="result-domain">'
+      + '<div class="result-domain-hdr" onclick="toggleResultSection(this)">'
+      + '<div class="result-domain-title">' + label + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<span class="result-domain-count">' + items.length + ' items</span>'
+      + newBadge
+      + '<span style="color:var(--mid);font-size:12px">&#9660;</span>'
+      + '</div></div>'
+      + '<div class="result-items">'
+      + items.slice(0,10).map(function(item){
+          var streamBadge = item.intelligence_stream ? '<span class="tag tag-type">' + item.intelligence_stream.replace('_',' ') + '</span>' : ''
+          var ucTag = (item.uc_suggest) ? '<span class="tag tag-uc">UC: ' + item.uc_suggest.slice(0,30) + '</span>' : ''
+          var valTag = item.intelligence_value === 'high' ? '<span class="tag tag-high">High value</span>' : ''
+          var typeTag = '<span class="tag tag-type">' + (item.type||'') + '</span>'
+          var tags = (item.tags||[]).slice(0,3).map(function(t){return '<span class="tag">'+t+'</span>'}).join('')
+          return '<div class="result-item">'
+            + '<div class="result-item-title">' + (item.title||'') + '</div>'
+            + '<div class="result-item-summary">' + (item.summary||item.relevance_to_atlas||'') + '</div>'
+            + '<div class="result-item-tags">' + streamBadge + typeTag + valTag + ucTag + tags + '</div>'
+            + '</div>'
+        }).join('')
+      + (items.length > 10 ? '<div style="font-size:11px;color:var(--mid);padding:6px 0">...and ' + (items.length-10) + ' more items</div>' : '')
+      + '</div></div>'
+  }).join('')
+}
+
+
+function toggleResultSection(hdr){
+  var body = hdr.nextElementSibling
+  body.classList.toggle('open')
+}
+
+// \u2500\u2500 Export \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function exportIntelligence(){
+  var db = getIntelDB()
+  var meta = getMetaDB()
+  var export_data = {
+    exported_at: new Date().toISOString(),
+    version: '2.0',
+    tool: 'ATLAS Intelligence Scraper v2.0',
+    metadata: meta,
+    intelligence: db
+  }
+  var blob = new Blob([JSON.stringify(export_data, null, 2)], {type:'application/json'})
+  var url = URL.createObjectURL(blob)
+  var a = document.createElement('a')
+  a.href = url
+  a.download = 'atlas-intelligence-' + new Date().toISOString().slice(0,10) + '.json'
+  a.click()
+  URL.revokeObjectURL(url)
+  log('Intelligence database exported as JSON.', 'success')
+}
+
+function clearIntelligence(){
+  if(!confirm('Clear all intelligence data from this browser? This cannot be undone.')) return
+  localStorage.removeItem('atlas_intel_db')
+  localStorage.removeItem('atlas_intel_meta')
+  sessionTokens = 0
+  sessionCost = 0
+  renderDomainGrid()
+  renderNewsGrid()
+  updateStats()
+  document.getElementById('resultsSection').style.display = 'none'
+  log('Intelligence database cleared.', 'warn')
+}
+
+window.addEventListener('DOMContentLoaded', function(){
+  refreshSettingsStatus()
+  init()
+  // Load metadata from Supabase on startup
+  var cfg0 = getConfig()
+  if(cfg0.sbUrl && cfg0.sbKey){ loadFromSupabase(); updateStatsFromSupabase() }
+  // Show any existing results
+  var db = getIntelDB()
+  if(Object.keys(db).length > 0) renderResults()
+})
+
+async function callGeminiGrounded(prompt){
+  var cfg = getConfig()
+  var g = typeof getGlobal === 'function' ? getGlobal() : {}
+  var key = cfg.geminiKey || g['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
+  if(!key){ log('No Gemini API key configured', 'error'); return null }
+  var model = 'gemini-3.1-flash-lite'
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+key
+  var body = {
+    contents:[{role:'user',parts:[{text:prompt}]}],
+    tools:[{googleSearch:{}}],
+    generationConfig:{temperature:0.1,maxOutputTokens:1024,thinkingConfig:{thinkingBudget:0}}
+  }
+  var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+  if(!r.ok) throw new Error('Gemini grounded error '+r.status)
+  var data = await r.json()
+  var candidate = data.candidates?.[0]
+  var text = candidate?.content?.parts?.[0]?.text || ''
+  var chunks = candidate?.groundingMetadata?.groundingChunks || []
+  var sources = chunks.filter(function(c){return c.web&&c.web.uri}).map(function(c){return {url:c.web.uri,title:c.web.title||''}})
+  return {text:text, sources:sources}
+}
+
+async function getSupabaseUrls(domainCode){
+  var sb = getSupabase()
+  if(!sb.url||!sb.key) return new Set()
+  var cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth()-18)
+  try{
+    var r = await fetch(sb.url+'/rest/v1/intelligence_items?domain_code=eq.'+domainCode+'&scraped_at=gte.'+cutoff.toISOString()+'&source_url=not.is.null&select=source_url&limit=500',{
+      headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
+    })
+    if(r.ok){ var rows = await r.json(); return new Set(rows.map(function(x){return (x.source_url||'').toLowerCase().trim()})) }
+  }catch(e){}
+  return new Set()
+}
+
+
+</script>
+</body>
+</html>
