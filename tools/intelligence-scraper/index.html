@@ -485,9 +485,10 @@ async function sbUpsertItem(item){
     source_url: item.source_url||null,
     source_name: item.source_name||null,
     source_language: item.source_language||'en',
-    model_used: item.model_used||'gemini-3.1-flash-lite',
-    scrape_method: item.scrape_method||item.source_type||'search_grounded',
+    model_used: item.model_used||'gemini-3.5-flash',
+    scrape_method: item.scrape_method||'search_grounded',
     published_date: item.published_date||null,
+    published_year: item.published_year ? parseInt(item.published_year) : null,
     geography: item.geography||'India',
     is_real: true
   }
@@ -1105,9 +1106,9 @@ async function scrapeDomain(domain){
       var prompt = 'You are an intelligence analyst for an AI and HPC hardware OEM.'
         + ' Search the web and report ONE real recent news item about '+domain.name+' in '+geo+'.'
         + ' Focus: '+(domain.focus||domain.keywords||domain.name)+'.'
-        + ' Report a REAL event from 2025 or 2026 only. Do not invent or use training data.'
-        + ' IMPORTANT: Only report news directly related to AI, machine learning, HPC, data centres, cloud computing, government technology, defence technology, or digital transformation. If the news is NOT about these topics, respond with just: {"relevant":false}'
-        + ' Otherwise respond with JSON only: relevant(true), title(real headline), summary(factual 80 words from real article), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(1 sentence or empty string), uc_suggest(specific use case name or empty string), confidence(high|medium|low), source_title(real publication name).'
+        ' CRITICAL: Use web search NOW. ONLY real events from 2025 or 2026. Older events = {"relevant":false}.'
+        + ' TOPIC GATE: Only AI/ML/HPC/supercomputing/data centres/govt digital transformation/defence AI. Off-topic = {"relevant":false}.'
+        + ' JSON only: relevant(true), title(exact real headline), summary(factual 80 words from real article), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(empty string if none), uc_suggest(use case name or empty string), confidence(high|medium|low), source_title(exact publication name e.g. Economic Times), published_year(integer 2025 or 2026).'
         + ' Start with { end with }. No markdown. No backticks.'
       try{
         await sleep(DELAY_MS)
@@ -1121,9 +1122,21 @@ async function scrapeDomain(domain){
         try{ item = JSON.parse(raw.slice(first,last+1)) }catch(pe){ continue }
         if(!item||item.relevant===false) continue
         if(!item.title) continue
+        // Hard date gate \u2014 reject anything not from 2025 or 2026
+        if(item.published_year && item.published_year < 2025){
+          log('Rejected (old '+item.published_year+'): '+item.title.slice(0,40),'dim')
+          continue
+        }
+        // Also check title contains year hint
+        var titleStr = item.title.toLowerCase()
+        if(titleStr.match(/\b(201[0-9]|202[0-4])\b/)){ 
+          log('Rejected (old year in title): '+item.title.slice(0,40),'dim')
+          continue
+        }
         var titleKey = item.title.toLowerCase().trim()
         // Fuzzy dedup: also check normalized title (no punctuation, short words)
-        var titleNorm = titleKey.replace(/[^a-z0-9 ]/g,'').replace(/\b(the|a|an|in|of|for|to|on|at|by|is|are|was|were|has|have|will|with|from|and|or|that|this|it|its|be|been|as|we|our|their|also|new|india|indian)\b/g,'').replace(/\s+/g,' ').trim().slice(0,60)
+        // Normalise Roman numerals II->2, III->3, IV->4 before dedup
+        var titleNorm = titleKey.replace(/\bphase ii\b/g,'phase 2').replace(/\bphase iii\b/g,'phase 3').replace(/\bphase iv\b/g,'phase 4').replace(/[^a-z0-9 ]/g,'').replace(/\b(the|a|an|in|of|for|to|on|at|by|is|are|was|were|has|have|will|with|from|and|or|that|this|it|its|be|been|as|we|our|their|also|new|india|indian)\b/g,'').replace(/\s+/g,' ').trim().slice(0,60)
         var srcUrl = (result.sources&&result.sources[0]) ? result.sources[0].url : null
         var urlKey = srcUrl ? srcUrl.toLowerCase() : ''
         if(sbTitles.has(titleKey)){ log('dup: '+item.title.slice(0,40),'dim'); continue }
@@ -1173,9 +1186,10 @@ async function scrapeNews(topic){
       var prompt = 'You are an intelligence analyst for an AI and HPC hardware OEM.'
         + ' Search the web and report ONE real recent news item about '+topic.name+' in '+geo+'.'
         + ' Focus: '+topic.focus+'.'
-        + ' Report a REAL event from 2025 or 2026 only. Do not invent or use training data.'
-        + ' IMPORTANT: Only report news directly related to AI, machine learning, HPC, data centres, government technology, defence technology, or digital transformation. If NOT about these topics, respond with just: {"relevant":false}'
-        + ' Otherwise respond with JSON only: relevant(true), title(real headline), summary(factual 80 words), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(1 sentence or empty string), uc_suggest(specific use case or empty string), confidence(high|medium|low), source_title(real publication name).'
+        + ' CRITICAL: Search the web RIGHT NOW for recent news. Report ONLY events that occurred in 2025 or 2026. Do NOT use training data or historical knowledge.'
+        + ' If the search returns no results from 2025-2026, respond with just: {"relevant":false}'
+        + ' RELEVANCE: Only report news about AI, HPC, supercomputing, government technology procurement, defence AI, digital transformation. If off-topic respond with just: {"relevant":false}'
+        + ' Respond with JSON only: relevant(true), title(exact real headline with year), summary(factual 80 words citing real source), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(1 sentence or empty string), uc_suggest(specific use case or empty string), confidence(high|medium|low), source_title(exact publication name), published_year(2025 or 2026).'
         + ' Start with { end with }. No markdown. No backticks.'
       try{
         await sleep(DELAY_MS)
@@ -1189,6 +1203,17 @@ async function scrapeNews(topic){
         try{ item = JSON.parse(raw.slice(first,last+1)) }catch(pe){ continue }
         if(!item||item.relevant===false) continue
         if(!item.title) continue
+        // Hard date gate \u2014 reject anything not from 2025 or 2026
+        if(item.published_year && item.published_year < 2025){
+          log('Rejected (old '+item.published_year+'): '+item.title.slice(0,40),'dim')
+          continue
+        }
+        // Also check title contains year hint
+        var titleStr = item.title.toLowerCase()
+        if(titleStr.match(/\b(201[0-9]|202[0-4])\b/)){ 
+          log('Rejected (old year in title): '+item.title.slice(0,40),'dim')
+          continue
+        }
         var titleKey = item.title.toLowerCase().trim()
         var srcUrl = (result.sources&&result.sources[0]) ? result.sources[0].url : null
         var urlKey = srcUrl ? srcUrl.toLowerCase() : ''
@@ -1585,7 +1610,7 @@ async function callGeminiGrounded(prompt){
   var g = typeof getGlobal === 'function' ? getGlobal() : {}
   var key = cfg.geminiKey || g['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
   if(!key){ log('No Gemini API key configured', 'error'); return null }
-  var model = 'gemini-3.1-flash-lite'
+  var model = 'gemini-3.5-flash'  // 3.5-flash uses search grounding more reliably
   var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+key
   var body = {
     contents:[{role:'user',parts:[{text:prompt}]}],
