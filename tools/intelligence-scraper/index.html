@@ -465,23 +465,27 @@ async function sbUpsertItem(item){
   var row = {
     id: item.id,
     domain_code: item.domain_code || item.topic_code || 'UNKNOWN',
-    source_type: item.source_type || 'domain',
+    domain_name: item.domain_name||null,
+    source_type: item.source_type || 'search_grounded',
+    intelligence_stream: item.intelligence_stream || 'market_pulse',
     title: (t||'Untitled').slice(0,500),
     summary: (s||'').slice(0,1000),
     type: item.type || item.category || item.event_type || '',
     intelligence_value: item.intelligence_value || item.urgency || item.priority || 'medium',
     organisations: orgs,
     tags: tgs,
-    opportunity: (item.opportunity || item.opportunity_signals || item.relevance || item.relevance_to_atlas || '').slice(0,500),
-    competitor_signals: (item.competitor_signals || item.incumbents || item.competitors || item.vendor || '').slice(0,500),
+    opportunity: (item.opportunity || item.opportunity_signals || item.relevance || '').slice(0,500),
+    competitor_signals: (item.competitor_signals || item.incumbents || item.competitors || '').slice(0,500),
     uc_suggest: (item.uc_suggest || item.use_case || '').slice(0,200),
     confidence: item.confidence || 'medium',
-    scraped_at: item.scraped_at || new Date().toISOString(),
-    scraped_by: getConfig().scraperName || 'ATLAS',
+    scraped_at: new Date().toISOString(),
+    scraped_by: 'browser-scraper-v2',
     topic_code: item.topic_code||null,
     topic_name: item.topic_name||null,
-    domain_name: item.domain_name||null,
-    intelligence_stream: item.intelligence_stream || null
+    source_url: item.source_url||null,
+    source_name: item.source_name||null,
+    geography: item.geography||'India',
+    is_real: true
   }
   try{
     var resp = await fetch(sb.url+'/rest/v1/intelligence_items', {
@@ -1098,7 +1102,7 @@ async function scrapeDomain(domain){
         + ' Search the web and report ONE real recent news item about '+domain.name+' in '+geo+'.'
         + ' Focus: '+(domain.focus||domain.keywords||domain.name)+'.'
         + ' Report a REAL event from 2025 or 2026 only. Do not invent or use training data.'
-        + ' If no relevant real news found, respond with just: {"relevant":false}'
+        + ' IMPORTANT: Only report news directly related to AI, machine learning, HPC, data centres, cloud computing, government technology, defence technology, or digital transformation. If the news is NOT about these topics, respond with just: {"relevant":false}'
         + ' Otherwise respond with JSON only: relevant(true), title(real headline), summary(factual 80 words from real article), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(1 sentence or empty string), uc_suggest(specific use case name or empty string), confidence(high|medium|low), source_title(real publication name).'
         + ' Start with { end with }. No markdown. No backticks.'
       try{
@@ -1118,6 +1122,7 @@ async function scrapeDomain(domain){
         var urlKey = srcUrl ? srcUrl.toLowerCase() : ''
         if(sbTitles.has(titleKey)){ log('dup title: '+item.title.slice(0,40),'dim'); continue }
         if(urlKey&&sbUrls.has(urlKey)){ log('dup url','dim'); continue }
+        item.id = 'gs-'+domain.code.replace(/-/g,'')+'-'+geo.replace(/\s/g,'')+'-'+Date.now()+'-'+Math.floor(Math.random()*9999)
         item.intelligence_stream = item.intelligence_stream||'market_pulse'
         item.source_url = srcUrl || null
         item.source_name = srcUrl ? ((result.sources[0] && result.sources[0].title)||item.source_title||'Web Search') : (item.source_title||'Web Search')
