@@ -1096,7 +1096,7 @@ async function scrapeDomain(domain){
     for(var i=0; i<Math.min(n,3); i++){
       var prompt = 'You are an intelligence analyst for an AI and HPC hardware OEM.'
         + ' Search the web and report ONE real recent news item about '+domain.name+' in '+geo+'.'
-        + ' Keywords: '+domain.keywords+'.'
+        + ' Focus: '+(domain.focus||domain.keywords||domain.name)+'.'
         + ' Report a REAL event from 2025 or 2026 only. Do not invent or use training data.'
         + ' If no relevant real news found, respond with just: {"relevant":false}'
         + ' Otherwise respond with JSON only: relevant(true), title(real headline), summary(factual 80 words from real article), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(1 sentence or empty string), uc_suggest(specific use case name or empty string), confidence(high|medium|low), source_title(real publication name).'
@@ -1119,10 +1119,11 @@ async function scrapeDomain(domain){
         if(sbTitles.has(titleKey)){ log('dup title: '+item.title.slice(0,40),'dim'); continue }
         if(urlKey&&sbUrls.has(urlKey)){ log('dup url','dim'); continue }
         item.intelligence_stream = item.intelligence_stream||'market_pulse'
-        item.source_url = srcUrl
-        item.source_name = srcUrl ? ((result.sources[0].title)||item.source_title||'Web') : item.source_title||'Web Search'
+        item.source_url = srcUrl || null
+        item.source_name = srcUrl ? ((result.sources[0] && result.sources[0].title)||item.source_title||'Web Search') : (item.source_title||'Web Search')
         item.geography = geo
         item.is_real = true
+        item.source_type = 'search_grounded'
         item.domain_code = domain.code
         item.domain_name = domain.name
         sbTitles.add(titleKey)
