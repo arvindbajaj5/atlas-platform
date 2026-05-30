@@ -1113,14 +1113,17 @@ async function scrapeDomain(domain){
       try{
         await sleep(DELAY_MS)
         var result = await callGeminiGrounded(prompt)
-        if(!result) continue
+        if(!result){ log('No grounding result','error'); continue }
         var raw = result.text
+        log('Grounding raw ('+result.sources.length+' sources): '+raw.slice(0,80),'dim')
         var first = raw.indexOf('{')
         var last = raw.lastIndexOf('}')
         if(first<0||last<0) continue
         var item
-        try{ item = JSON.parse(raw.slice(first,last+1)) }catch(pe){ continue }
-        if(!item||item.relevant===false) continue
+        try{ item = JSON.parse(raw.slice(first,last+1)) }catch(pe){ log('JSON parse failed: '+pe.message.slice(0,40),'error'); continue }
+        if(!item){ log('item is null','error'); continue }
+        if(item.relevant===false){ log('Gemini says not relevant: '+raw.slice(0,60),'dim'); continue }
+        log('Gemini returned: '+JSON.stringify(item).slice(0,80),'dim')
         if(!item.title) continue
         // Hard date gate \u2014 reject anything not from 2025 or 2026
         if(item.published_year && item.published_year < 2025){
@@ -1202,8 +1205,10 @@ async function scrapeNews(topic){
         var last = raw.lastIndexOf('}')
         if(first<0||last<0) continue
         var item
-        try{ item = JSON.parse(raw.slice(first,last+1)) }catch(pe){ continue }
-        if(!item||item.relevant===false) continue
+        try{ item = JSON.parse(raw.slice(first,last+1)) }catch(pe){ log('JSON parse failed: '+pe.message.slice(0,40),'error'); continue }
+        if(!item){ log('item is null','error'); continue }
+        if(item.relevant===false){ log('Gemini says not relevant: '+raw.slice(0,60),'dim'); continue }
+        log('Gemini returned: '+JSON.stringify(item).slice(0,80),'dim')
         if(!item.title) continue
         // Hard date gate \u2014 reject anything not from 2025 or 2026
         if(item.published_year && item.published_year < 2025){
