@@ -1569,7 +1569,7 @@ async function callGeminiGrounded(prompt){
   var body = {
     contents:[{role:'user',parts:[{text:prompt}]}],
     tools:[{googleSearch:{}}],
-    generationConfig:{temperature:0.1,maxOutputTokens:1024,thinkingConfig:{thinkingBudget:0}}
+    generationConfig:{temperature:0.1,maxOutputTokens:2048}
   }
   var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
   if(!r.ok) throw new Error('Gemini grounded error '+r.status)
