@@ -1,6 +1,6 @@
 # claude-session-activator.md
 # ATLAS Claude Session Activator
-# Version: 2.1 | Last Updated: 2026-05-29
+# Version: 2.2 | Last Updated: 2026-05-29
 
 ---
 
@@ -43,7 +43,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | Portal | v2.0 | ✅ Live | `index.html` |
 | Second Brain | v2.2 | ✅ Live (91KB) | `tools/second-brain/` |
 | Customer Intelligence (PEI) | v0.2 | ✅ Live (79KB) | `tools/pei-tool/` |
-| Intelligence Scraper | v1.3 | ✅ Live | `tools/intelligence-scraper/` |
+| Intelligence Scraper | v2.0 | ✅ Live (79KB) | `tools/intelligence-scraper/` |
 | Engagement Management | v1.0 | ⚠️ To be replaced by Engagement Docket | `tools/engagement-management/`
 | Engagement Docket | v1.0 | 🔴 Built, pending SQL + upload | `tools/engagement-docket/` |
 | AI Centre Builder | v1.1 | ⚠️ Form empty — pending fix | `tools/ai-centre-builder/` |
@@ -71,7 +71,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | `blacklist-whitelist.md` | v1.0 | ✅ Live |
 | `domain-taxonomy.md` | v1.1 | ✅ Live |
 | `tool-features.md` | v1.0 | ⏸ Needs v1.1 |
-| `claude-session-activator.md` | v2.1 | ✅ This file |
+| `claude-session-activator.md` | v2.2 | ✅ This file |
 
 ---
 
@@ -154,9 +154,47 @@ GEO-SPA = civilian geospatial (NRSC, Survey of India, Pixxel). Defence geospatia
 
 ---
 
-## Intelligence Engine Architecture (FINAL)
+## Intelligence Engine Architecture — v2.0 (REAL WEB SEARCH)
 
-⚠️ **CRITICAL NOTE:** Current scraper generates SYNTHETIC intelligence from Gemini training data. Items are NOT sourced from real web content. Must be rebuilt with real web search before any sales use. See pending item 1c.
+**Hybrid pipeline — RSS Feeds + Gemini Search Grounding:**
+
+```
+Source 1 — RSS Feeds (GitHub Actions, free, real URLs)
+  15 feeds: PIB, MoD, DRDO, GeM, ET, Hindu BL, Mint, BS, Dainik Bhaskar (hi), Eenadu (te)
+  → Parse XML → filter last 30 days → Sarvam translate (Indic) → Gemini extract signals
+  → Save with source_url, source_name, published_date, is_real=true
+
+Source 2 — Gemini Search Grounding (browser + GitHub Actions, free on paid tier)
+  tools: [{googleSearch:{}}] added to every Gemini call
+  → Gemini searches Google in real-time → grounding citations = real URLs
+  → Save with source_url from grounding metadata, is_real=true
+
+Dedup: title + URL checked against Supabase (18-month window) — zero token cost
+Multi-geography: configurable dropdown (browser) or GEOGRAPHIES env var (Actions)
+```
+
+**New fields on intelligence_items:** source_url, source_name, published_date, geography, is_real, source_type_v2
+**Existing synthetic items:** flagged is_real=false via migration SQL
+
+**Browser scraper v2.0:**
+- Config card reads all keys from atlas_global_cfg — no local key entry
+- Status banner shows key/Supabase/model status from global settings
+- Geography multi-select (Ctrl+click)
+- Sources toggle: RSS + Search Grounding / RSS only / Search Grounding only
+
+**GitHub Actions v2:**
+- Script: scripts/scrape-intelligence-v2.js
+- Workflow: .github/workflows/scrape_intelligence_v2.yml
+- New env vars: GEOGRAPHIES, RUN_RSS, RUN_SEARCH, SARVAM_API_KEY (optional)
+- install: npm install node-fetch@3 xml2js
+
+**Sarvam integration:** Optional — if SARVAM_API_KEY set, Indic RSS feeds (Hindi, Telugu) translated before Gemini extraction. Falls back to raw text if no key.
+
+**Network Graph (deferred):** D3.js force-directed graph connecting intel items by shared orgs/domains/tags. Build after 2-3 weeks of real data accumulates.
+
+## Intelligence Engine Architecture — v1.x (RETIRED — synthetic only)
+
+✅ **v2.0 NOTE:** Scraper now uses real web search only — Gemini Search Grounding + RSS feeds. All items tagged is_real=true with source_url stored.
 
 **Two-phase pipeline — browser (on-demand) + GitHub Actions (scheduled):**
 
@@ -329,7 +367,8 @@ engagements (id ENG-YYYY-SECTOR-NNNN, customer_id, division_id, name,
 | # | Item | Stage | Priority |
 |---|---|---|---|
 | 1 | Intelligence Scraper — results panel below log not populating after run | 1 | 🟡 Deferred |
-| 1c | Intelligence Scraper — CRITICAL: all items are synthetic (Gemini training data), NOT real web intelligence. Must rebuild with real web search. Constraint: zero cost. Options to deliberate: Gemini Search Grounding (free, built-in), RSS feeds (free), Gemini with web search tool. Source URLs must be stored and displayed in Second Brain. Multi-geography support needed (dropdown in settings). | 1 | 🔴 Deliberate next session |
+| 1c | Intelligence Scraper v2.0 — ✅ DONE: Gemini Search Grounding + RSS feeds, source_url stored, multi-geography dropdown, reads keys from global settings | 1 | ✅ Complete |
+| 1d | Intelligence Scraper v2.0 — bugs fixed: sleep() missing, init() crashing on removed DOM refs (supabaseUrl/supabaseKey/useGrounding), domains start all-selected. Uploaded, pending test. | 1 | 🟡 Testing |
 | 1b | Intelligence Scraper — Market Pulse duplicates — monitoring | 1 | 🟡 Monitor |
 | 2 | PEI v0.2 — ✅ DONE | 3 | ✅ Complete |
 | 4 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 Pending |
