@@ -139,6 +139,15 @@ input:focus,select:focus{border-color:var(--blue);}
     <div id="settingsStatus" style="padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px;background:var(--light)">Checking settings...</div>
     <a href="../../index.html" class="btn btn-outline btn-sm" style="margin-bottom:4px">&#9881; Open ATLAS Settings</a>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:14px">
+      <div class="config-field" style="min-width:120px">
+        <label class="lbl">Items per domain</label>
+        <select id="itemCount" style="width:100%">
+          <option value="2">2 items</option>
+          <option value="3">3 items</option>
+          <option value="5" selected>5 items</option>
+          <option value="10">10 items</option>
+        </select>
+      </div>
       <div class="config-field" style="flex:2">
         <label class="lbl">Geographies (Ctrl+click multi)</label>
         <select id="cfgGeo" multiple style="height:80px;width:100%">
