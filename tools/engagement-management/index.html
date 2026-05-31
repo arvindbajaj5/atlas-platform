@@ -842,7 +842,7 @@ function renderDashboard(){
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">'
     +'<div><div class="card-title" style="font-size:18px">Engagement Overview</div>'
     +'<div style="font-size:12px;color:var(--mid)">Customers, engagements, dockets and portfolio</div></div>'
-    +'<button class="btn btn-primary" onclick="openModal(\'newCustomerModal\')">\u002B New Customer</button>'
+    +'<button class="btn btn-primary" onclick="openModal(\'newCustomerModal\')">+ New Customer</button>'
     +'</div>'
     +'<div class="stat-grid">'
     +'<div class="stat"><div class="stat-val">'+ALL_CUSTOMERS.length+'</div><div class="stat-lbl">Total Customers</div></div>'
@@ -934,7 +934,7 @@ function switchCustTab(tab){
     // Contacts
     content += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
       +'<div class="card-title" style="margin:0">Key Contacts</div>'
-      +'<button class="btn btn-ghost btn-xs" onclick="addContact(\''+cust.id+'\')">\u002B Add</button>'
+      +'<button class="btn btn-ghost btn-xs" onclick="addContact(\''+cust.id+'\')">+ Add</button>'
       +'</div>'
       +(contacts.length ? contacts.map(function(c){
         return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--light)">'
@@ -949,7 +949,7 @@ function switchCustTab(tab){
   if(tab === 'engagements'){
     content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
       +(cust.tier==='strategic'
-        ? '<button class="btn btn-primary" onclick="openModal(\'newEngagementModal\'); document.getElementById(\'ne-customer-id\').value=\''+cust.id+'\'">\u002B New Engagement</button>'
+        ? '<button class="btn btn-primary" onclick="openModal(\'newEngagementModal\'); document.getElementById(\'ne-customer-id\').value=\''+cust.id+'\'">+ New Engagement</button>'
         : '<div style="font-size:11px;color:var(--mid)">Elevate to strategic to create engagements</div>')
       +'</div>'
     content += custEngs.length ? custEngs.map(function(e){
@@ -964,7 +964,7 @@ function switchCustTab(tab){
 
   if(tab === 'transactions'){
     content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
-      +'<button class="btn btn-ghost btn-sm" onclick="openModal(\'newTxnModal\'); document.getElementById(\'txn-customer-id\').value=\''+cust.id+'\'">\u002B Record Transaction</button>'
+      +'<button class="btn btn-ghost btn-sm" onclick="openModal(\'newTxnModal\'); document.getElementById(\'txn-customer-id\').value=\''+cust.id+'\'">+ Record Transaction</button>'
       +'</div>'
     content += txns.length ? txns.map(function(t){
       return '<div class="card" style="padding:12px 14px">'
@@ -1012,7 +1012,7 @@ async function openEngagement(engId){
   CURRENT_DOCKET_ID = docket.id
   CURRENT_ITEMS = await sbFetch('docket_items','docket_id=eq.'+docket.id+'&order=created_at.asc',200)
 
-  var isL1 = eng.archetype === 'territory_coe' || eng.type === 'new' && eng.domain === 'REG-AIP'
+  var isL1 = eng.archetype === 'tsap' || eng.type === 'new' && eng.domain === 'REG-AIP'
 
   var html = '<div style="background:var(--navy);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;color:var(--white)">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
@@ -1026,7 +1026,7 @@ async function openEngagement(engId){
     +(eng.value?'<span class="pill" style="background:rgba(0,178,144,0.2);color:var(--teal)">\uD83D\uDCB0 '+esc(eng.value)+' '+esc(eng.currency||'')+'</span>':'')
     +'</div></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">'
-    +'<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+docket.id+'\')">\u002B Add Item</button>'
+    +'<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+docket.id+'\')">+ Add Item</button>'
     +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="openPortfolioMap(\''+engId+'\',\''+docket.id+'\')">\uD83D\uDDFA\uFE0F Portfolio</button>'
     +(isL1?'<button class="btn btn-sm" style="background:rgba(255,182,0,0.2);color:var(--amber)" onclick="openL1Config(\''+engId+'\')">L1 Configure</button>':'')
     +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="runRecommendationEngine(\''+engId+'\')">\uD83E\uDD16 Recommend</button>'
@@ -1365,7 +1365,7 @@ async function atlasAddToDocket(item){
   modal.id = 'triggerModal'
   modal.className = 'modal-overlay open'
   var dockets = await sbFetch('engagement_dockets','type=eq.customer&status=eq.active&order=updated_at.desc',20)
-  var opts = '<option value="__new__">\u002B Create New Customer Docket</option>'
+  var opts = '<option value="__new__">+ Create New Docketket</option>'
   dockets.forEach(function(d){ opts+='<option value="'+d.id+'">'+esc(d.name)+'</option>' })
   modal.innerHTML = '<div class="modal" style="max-width:440px"><div class="modal-title">\uD83D\uDCC1 Add to Docket</div>'
     +'<div style="font-size:12px;color:var(--mid);margin-bottom:12px">Adding: "'+esc(item.title)+'" ('+esc(item.type)+')</div>'
