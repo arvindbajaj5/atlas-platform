@@ -1,156 +1,114 @@
-# claude-session-activator.md
 # ATLAS Claude Session Activator
-# Version: 2.4 | Last Updated: 2026-05-29
+# Version: 2.5 | Last Updated: 2026-05-31
 
 ---
 
-## Purpose
+## Session Start Instructions
 
-Upload this file at the start of any ATLAS working session. Claude reads it fully before proceeding.
+At the start of any ATLAS session, load this file to restore full context.
 
-**On loading, Claude confirms:**
-> *"ATLAS Session Activator v1.8 loaded. [State any other files uploaded. Ready to proceed.]"*
-
----
-
-## Platform Identity
-
-- **Platform:** ATLAS — AI Transaction and Lifecycle Architecture Suite
-- **Stack:** GitHub Pages (hosting) + Supabase (central database) + Google Drive (file storage)
-- **Repo:** arvindbajaj5/atlas-platform
-- **Live URL:** https://arvindbajaj5.github.io/atlas-platform/
-- **Gemini API:** `gemini-3.1-flash-lite` — key stored in browser localStorage + GitHub Secret
-- **Supabase:** Central intelligence database — URL and anon key stored in browser localStorage + GitHub Secret
+**Sovereign AI Platform sessions:** Upload `Sovereign_AI_Platform_Playbook_v1.0.docx` + Project Brief → confirm loaded before proceeding.
 
 ---
 
-## Portal Structure (5 stages — LIVE)
+## Platform Overview
 
-```
-🧠 Intelligence Engine    → second-brain, pei-tool, intelligence-scraper
-🚀 Engagement Initiation  → engagement-management, ai-centre-builder, portfolio-portal, vision-doc
-⚙️ Pre-Sales              → domain-config, inferencing, benchmark, ai-sovereignty
-💼 Sales                  → rac-tool, deal-analysis
-🔧 Operations             → compass, hpc-monitor
-```
+**ATLAS** (AI Transaction and Lifecycle Architecture Suite) — internal sales, presales and operations portal.
+- **URL:** https://arvindbajaj5.github.io/atlas-platform/
+- **Stack:** GitHub Pages + Supabase + Multi-provider AI (7 providers)
+- **Auth:** Simple role-based login (localStorage) — Business Head / Sales / Presales / Operations
 
 ---
 
-## Active Tool Set
+## Tool Registry
 
 | Tool | Version | Status | Path |
 |---|---|---|---|
-| Portal | v2.0 | ✅ Live | `index.html` |
 | Second Brain | v2.2 | ✅ Live (91KB) | `tools/second-brain/` |
 | Customer Intelligence (PEI) | v0.2 | ✅ Live (79KB) | `tools/pei-tool/` |
-| Intelligence Scraper | v2.0 | ✅ Live (83KB) | `tools/intelligence-scraper/` |
-| Engagement Management | v1.0 | ⚠️ To be replaced by Engagement Docket | `tools/engagement-management/`
-| Engagement Docket | v1.0 | 🔴 Built, pending SQL + upload | `tools/engagement-docket/` |
-| AI Centre Builder | v1.1 | ⚠️ Form empty — pending fix | `tools/ai-centre-builder/` |
-| Portfolio Portal | — | ✅ Live | `tools/portfolio-portal/` |
-| Vision Document Factory | — | ✅ Live | `tools/vision-document/` |
+| Intelligence Scraper | v2.0 | ✅ Live (84KB) | `tools/intelligence-scraper/` |
+| Engagement Docket | v2.0 | ✅ Live (104KB) | `tools/engagement-docket/` |
+| Engagement Management | v1.0 | ⚠️ Legacy — replaced by Engagement Docket | `tools/engagement-management/` |
+| AI Centre Builder | v1.1 | ⚠️ Legacy — L2 config inside Docket | `tools/ai-centre-builder/` |
 | Domain Configurator | v3.0 | ✅ Live | `tools/domain-configurator/` |
-| AI Inferencing Factory | v2.3 | ✅ Live | `tools/inferencing-factory/` |
-| Benchmark Tool | — | ✅ Live | `tools/benchmark-tool/` |
-| AI Sovereignty Index | v2.1 | ✅ Live | `tools/ai-sovereignty-index/` |
-| RAC Pipeline | v2.0 | ✅ Live | `tools/rac-tool/` |
-| Deal Analysis | — | ✅ Live | `tools/deal-analysis/` |
+| Inferencing Factory | v2.3 | ✅ Live | `tools/inferencing-factory/` |
+| Benchmark Tool | v1.0 | ✅ Live | `tools/benchmark-tool/` |
+| RAC Tool | v2.0 | ✅ Live | `tools/rac-tool/` |
+| Deal Analysis Tool | v1.0 | ✅ Live | `tools/deal-analysis/` |
+| HPC Monitoring | v1.0 | ✅ Live | `tools/hpc-monitoring/` |
 | COMPASS | v2.0 | ✅ Live | `tools/compass-v2/` |
-| HPC Monitoring | — | ✅ Live | `tools/hpc-monitoring/` |
+| `claude-session-activator.md` | v2.5 | ✅ This file | `standards/` |
 
 ---
 
-## Standards Files (in `standards/` on GitHub)
+## Portal Navigation (updated)
 
-| File | Version | Status |
+```
+01 · Intelligence    Second Brain, PEI, Intelligence Scraper
+02 · Engagement      Engagement Docket (TSAP config, portfolio map, recommendation engine)
+03 · Pre-Sales       Use Case Identification, Inferencing Factory, Benchmark
+04 · Sales           RAC Pipeline, Deal Analysis
+05 · Operations      HPC Monitoring, COMPASS
+```
+
+Vision Document Factory removed from nav — output of TSAP workflow inside Engagement Docket.
+AI Centre Builder removed from nav — L2 building block config inside portfolio map.
+
+---
+
+## ATLAS Model Registry (shared utility — embedded in all tools)
+
+Key functions available in all tools:
+- `atlasGetConfiguredProviders()` — returns only providers with keys set in Settings
+- `atlasBuildModelSelect(selectedModel)` — builds select HTML showing only configured providers
+- `atlasGetKeyForModel(modelId)` — returns API key for any model
+- `atlasCallModel(modelId, prompt, systemPrompt, maxTokens)` — universal call, routes to correct provider
+- `atlasGetTaskModel(taskId)` — reads task-specific model from `atlas_global_cfg.model_tiers`
+
+**Design principle:** Tool dropdowns show ONLY models whose provider key is configured in Settings.
+
+---
+
+## Global Settings (atlas_global_cfg)
+
+Single localStorage key shared across all tools. Set once in portal Settings (Business Head only):
+- `sbUrl`, `sbKey` — Supabase credentials
+- `key_gemini`, `key_openai`, `key_anthropic`, `key_mistral`, `key_qwen`, `key_sarvam` — AI provider keys
+- `endpoint_ollama` — local Ollama endpoint
+- `model_tiers` — per-task model assignments
+
+**Model tiers by task (defaults):**
+
+| Task | Default model |
+|---|---|
+| Scraping | `gemini-3.1-flash-lite` |
+| Intel Enrichment | `gemini-3.1-flash-lite` |
+| UC Auto-Enrichment | `gemini-3.5-flash` |
+| PEI Brief | `claude-haiku-4-5-20251001` |
+| Document Generation | `claude-haiku-4-5-20251001` |
+| Indic / Regional | `sarvam-m` |
+| Air-Gapped | `llama3.3` |
+
+**7 AI Providers supported:**
+
+| Provider | Region | Key models |
 |---|---|---|
-| `brand.md` | v1.1 | ✅ Live |
-| `architecture-tiers.md` | v1.0 | ✅ Live |
-| `hardware-preferences.md` | v1.0 | ✅ Live |
-| `project-definition-schema.md` | v1.0 | ✅ Live |
-| `blacklist-whitelist.md` | v1.0 | ✅ Live |
-| `domain-taxonomy.md` | v1.1 | ✅ Live |
-| `tool-features.md` | v1.0 | ⏸ Needs v1.1 |
-| `claude-session-activator.md` | v2.4 | ✅ This file |
+| Google Gemini | US | `gemini-3.1-flash-lite`, `gemini-3.5-flash` |
+| Anthropic Claude | US | `claude-haiku-4-5-20251001`, `claude-sonnet-4-6` |
+| OpenAI | US | `gpt-4o`, `gpt-4o-mini` |
+| Mistral AI | 🇫🇷 EU | `mistral-large-latest`, `mistral-small-latest` |
+| Qwen (Alibaba) | 🇨🇳 CN/Intl | `qwen3.5-plus`, `qwen3.5-flash` |
+| Sarvam AI | 🇮🇳 India | `sarvam-m` |
+| Ollama | Local | any local model |
 
 ---
 
-## Blacklist Summary
+## Gemini API — Critical Rules
 
-**Never reference in customer-facing content:** Krutrim, Chinese models (DeepSeek, Qwen etc.), MeitY, NIC, IndiaAI Mission, CDAC
-
-**Policy whitelist:** Make in India · Viksit Bharat · Digital India · Atmanirbhar Bharat · PM-DevINE · BharatNet · Smart Cities · DPDP Act 2023
-
-**Approved tech stack:** DLC 265kW (4× GB200, 8× MI355, 4× MI450, Vera Rubin NVL72) · Air-cooled (8× Rubin) · CPU DLC (AMD/Intel) · Networking (IB, BXI, NVLink, Infinity Fabric) · OEM AI Platform · OEM HPC Middleware · COMPASS · Modular Datacenter · SMP (up to 32 sockets, 48TB RAM) · HPC Cluster · Quantum Simulator
-
----
-
-## Session Behaviour Rules — Building Tools
-
-1. Read `brand.md` — apply colours, fonts, CSS variables
-2. Read `blacklist-whitelist.md` — no blacklisted items
-3. All tools: single-file HTML, CSS and JS inline, self-contained
-4. Always output a downloadable file
-5. **No nested backticks in template literals** — string concatenation only
-6. **No inline onclick with dynamic JS args** — use data attributes
-7. **No HTML entities in JS** — use Unicode escapes
-8. **No non-ASCII chars in JS** — escape all with \uXXXX
-9. **NEVER use `responseMimeType: 'application/json'`** — hard caps Gemini output to ~40 tokens
-10. **Always disable thinking** — add `thinkingConfig: {thinkingBudget: 0}` to generationConfig
-11. Always run Node.js syntax check before delivering
-
----
-
-## Key Design Principles
-
-- **On-premises first** — never suggest cloud unless explicitly required
-- **Single-file HTML** — no external dependencies except approved CDNs
-- **No backticks in JS** — string concatenation only
-- **Gemini model:** `gemini-3.1-flash-lite` — fast, cheap, no thinking tokens, clean JSON
-- **One model everywhere** — no MacBook, no Qwen, no Ollama (dropped permanently)
-- **NEVER:** `responseMimeType: 'application/json'` or missing `thinkingBudget: 0`
-
----
-
-## Domain Taxonomy v1.1 (LOCKED)
-
-### 17 Intelligence Domains
-
-| Code | Domain |
-|---|---|
-| GOV-GOV | Government & Governance |
-| DEF-MIL | Defence — Armed Forces |
-| DEF-SPC | Defence — Space & Satellite |
-| DEF-HLS | Defence — Homeland Security |
-| DEF-INT | Defence — Intelligence & Signals |
-| GEO-SPA | Geospatial & Earth Observation (civilian) |
-| INF-CIV | Critical Infrastructure |
-| RES-NAT | Natural Resources |
-| TEL-NET | Telecom & Networks |
-| TEC-GEN | Technology |
-| MED-BRD | Media & Broadcast |
-| FIN-BFS | Banking & Financial Services |
-| MFG-IND | Manufacturing & Industry |
-| ENR-UTL | Energy & Utilities |
-| REG-AIP | Regional AI Programmes |
-| LAB-AIR | AI Labs & Research |
-| HLT-LIF | Healthcare & Life Sciences |
-
-DEF is a display umbrella — 4 sub-domains scraped individually.
-GEO-SPA = civilian geospatial (NRSC, Survey of India, Pixxel). Defence geospatial tagged to DEF-MIL/DEF-INT.
-
-### 5 Market News Topics
-
-| Code | Topic |
-|---|---|
-| MKT-HPC | AI & HPC in India |
-| MKT-COM | Competitor & Vendor Activity |
-| MKT-TND | Government AI Tenders |
-| MKT-DEF | Defence Technology News |
-| MKT-SOV | Sovereign AI & Policy |
-
-### 3 Intelligence Streams
-`market_pulse` / `domain_intel` / `tech_watch`
+- **Search Grounding:** `tools:[{googleSearch:{}}]` — do NOT set `thinkingBudget:0` or grounding will not fire
+- **Thinking model:** `gemini-3.5-flash` splits response across multiple `parts[]` — concat ALL parts, not just `parts[0]`
+- **thinkingBudget:0** — safe for plain Gemini calls (RSS extraction etc.) but KILLS search grounding
+- **Scraping model:** `gemini-3.5-flash` hardcoded in `callGeminiGrounded` — bypasses model registry (intentional)
 
 ---
 
@@ -162,246 +120,163 @@ GEO-SPA = civilian geospatial (NRSC, Survey of India, Pixxel). Defence geospatia
 Source 1 — RSS Feeds (GitHub Actions, free, real URLs)
   15 feeds: PIB, MoD, DRDO, GeM, ET, Hindu BL, Mint, BS, Dainik Bhaskar (hi), Eenadu (te)
   → Parse XML → filter last 30 days → Sarvam translate (Indic) → Gemini extract signals
-  → Save with source_url, source_name, published_date, is_real=true
 
 Source 2 — Gemini Search Grounding (browser + GitHub Actions, free on paid tier)
-  tools: [{googleSearch:{}}] added to every Gemini call
-  → Gemini searches Google in real-time → grounding citations = real URLs
-  → Save with source_url from grounding metadata, is_real=true
-
-Dedup: title + URL checked against Supabase (18-month window) — zero token cost
-Multi-geography: configurable dropdown (browser) or GEOGRAPHIES env var (Actions)
+  tools:[{googleSearch:{}}] — Gemini searches Google in real-time
+  → Grounding citations = real URLs → Save with source_url, is_real=true
 ```
 
-**New fields on intelligence_items:** source_url, source_name, published_date, geography, is_real, source_type_v2
-**Existing synthetic items:** flagged is_real=false via migration SQL
+**Fidelity issues deferred (fix separately):**
+- `gemini-3.5-flash` returns thinking parts — need to concat all response parts
+- Response wrapped in ```json markdown — extractJSON strips it but not always reliably
+- Date gate may be too aggressive — rejects 2022-2024 items including legitimate background context
 
-**Browser scraper v2.0:**
-- Config card reads all keys from atlas_global_cfg — no local key entry
-- Status banner shows key/Supabase/model status from global settings
-- Geography multi-select (Ctrl+click)
-- Sources toggle: RSS + Search Grounding / RSS only / Search Grounding only
+**New fields on intelligence_items:** `source_url`, `source_name`, `source_language`, `model_used`, `scrape_method`, `published_date`, `published_year`, `geography`, `is_real`
 
-**GitHub Actions v2:**
-- Script: scripts/scrape-intelligence-v2.js
-- Workflow: .github/workflows/scrape_intelligence_v2.yml
-- New env vars: GEOGRAPHIES, RUN_RSS, RUN_SEARCH, SARVAM_API_KEY (optional)
-- install: npm install node-fetch@3 xml2js
-
-**Sarvam integration:** Optional — if SARVAM_API_KEY set, Indic RSS feeds (Hindi, Telugu) translated before Gemini extraction. Falls back to raw text if no key.
-
-**Network Graph (deferred):** D3.js force-directed graph connecting intel items by shared orgs/domains/tags. Build after 2-3 weeks of real data accumulates.
-
-## Intelligence Engine Architecture — v1.x (RETIRED — synthetic only)
-
-✅ **v2.0 NOTE:** Scraper now uses real web search only — Gemini Search Grounding + RSS feeds. All items tagged is_real=true with source_url stored.
-
-**Two-phase pipeline — browser (on-demand) + GitHub Actions (scheduled):**
-
-```
-Phase 1 — SCRAPE
-  gemini-3.1-flash-lite
-  3 prompt types per domain: Market Pulse / Domain Intel / Tech Watch
-  → writes to Supabase intelligence_items
-
-Phase 2 — ENRICH
-  gemini-3.1-flash-lite
-  Expands each item: problem_statement, technical_context,
-  infrastructure_signals, uc_extracted, depth_score
-  → updates Supabase item
-```
-
-**GitHub Actions background scraper:**
-- File: `scripts/scrape-intelligence.js`
-- Workflow: `.github/workflows/scrape_intelligence.yml`
-- Schedule: daily at 2am IST (20:30 UTC)
-- Manual trigger: Actions tab → Intelligence Scraper → Run workflow
-- Manual inputs: `domains` (comma-separated codes), `items_per_domain`, `run_enrichment`
-- Secrets required: `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`
-- Node.js 22, ES module (`"type": "module"` in `package.json`)
-- Deduplicates against existing Supabase titles before inserting
-
-**Supabase schema (live):**
-Tables: `intelligence_items`, `scraping_metadata`, `uc_queue`, `sales_actions`, `uc_library`
-
-New fields on `intelligence_items`: `intelligence_stream`, `problem_statement`, `technical_context`, `infrastructure_signals` (jsonb), `uc_extracted` (jsonb), `enriched_at`, `depth_score`
-
-`uc_library` table: full rich UC schema — problem, benefit, process, actors, data requirements, technical requirements, hardware profile, maturity, reference deployments, source
+**GitHub Actions v2.1:**
+- Script: `scripts/scrape-intelligence-v2.js`
+- Workflow: `.github/workflows/scrape_intelligence_v2.yml`
+- Install: `npm install node-fetch@3 xml2js`
+- Env vars: `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`, `SARVAM_API_KEY` (optional)
 
 ---
 
-## Second Brain v2.2
+## Engagement Docket v2.0 — Architecture
 
-- 17 domains + 5 MKT news topics in sidebar
-- DEF umbrella — collapsible, shows 4 sub-domains
-- Intelligence tab: filter by stream + 18-month recency filter (clock toggle for All time)
-- **Intel item detail** — click any card to open full detail panel (all enrichment fields, Auto-Enrich button)
-- **UC tab** — two sections: UC Library (curated, expandable detail, Enrich button) + Suggested from Intelligence (queue items, Enrich → Library button)
-- **UC enrichment flow** — Enrich button → form opens → Auto-Enrich with Gemini fills all 12 fields → Save to UC Library
-- **+ Add UC Manually** button for domain-knowledge UCs
-- UC Library fetches from `uc_library` table, queue from `uc_queue` — client-side filtered by domain
-- Supabase config read from `atlas_global_cfg` (global) or `atlas_sb2_cfg` (local fallback)
-- Gemini key read from global settings
-- **Backfill note:** Run this SQL on existing items missing stream: `UPDATE intelligence_items SET intelligence_stream = 'market_pulse' WHERE intelligence_stream IS NULL`
-
----
-
-## ATLAS Model Registry (shared utility — embedded in all tools)
-
-Single source of truth for AI provider configuration. Embedded in Portal, Second Brain, PEI, and all future tools. Key functions:
-
-- `atlasGetConfiguredProviders()` — returns only providers with keys set in Settings
-- `atlasBuildModelSelect(selectedModel)` — builds `<select>` HTML showing only configured providers and their models
-- `atlasGetKeyForModel(modelId)` — returns the correct API key for any model
-- `atlasCallModel(modelId, prompt, systemPrompt, maxTokens)` — universal call, routes to correct provider API
-- `atlasGetTaskModel(taskId)` — reads task-specific model from `atlas_global_cfg.model_tiers`
-
-**Design principle:** Tool dropdowns show ONLY models whose provider key is configured in Settings. No key = no models shown from that provider.
-
-## Global Settings (atlas_global_cfg)
-
-Single localStorage key `atlas_global_cfg` shared across all tools. Set once in portal Settings panel (Business Head only). Contains:
-- `sbUrl`, `sbKey` — Supabase credentials
-- `key_gemini`, `key_openai`, `key_anthropic`, `key_mistral`, `key_qwen`, `key_sarvam` — AI provider keys
-- `endpoint_ollama` — local Ollama endpoint URL
-- `atlas_default_model` — default model ID used across all tools
-
-**Migration:** On save, portal Settings auto-populates legacy keys (`atlas_api_key`, `atlas_gemini_key`) and tool-specific configs (`atlas_sb2_cfg`, `atlas_pei_cfg`, `atlas_scraper_cfg`).
-
-**Model tiers by task (defaults):**
-
-| Task | Default model | Rationale |
-|---|---|---|
-| Scraping | `gemini-3.1-flash-lite` | High volume, quality not critical |
-| Intel Enrichment | `gemini-3.1-flash-lite` | High volume |
-| UC Auto-Enrichment | `gemini-3.5-flash` | Needs reasoning |
-| PEI Brief | `claude-haiku-4-5-20251001` | Better long-form synthesis, $1/$5 per MTok |
-| Document Generation | `claude-haiku-4-5-20251001` | Quality matters, upgrade to Sonnet for flagship |
-| Indic / Regional | `sarvam-m` | Domain fit |
-| Air-Gapped | `llama3.3` | Zero data egress |
-
-**7 AI Providers supported:**
-| Provider | Region | Model IDs |
-|---|---|---|
-| Google Gemini | US | `gemini-3.1-flash-lite`, `gemini-3.5-flash` |
-| OpenAI | US | `gpt-4o`, `gpt-4o-mini` |
-| Anthropic | US | `claude-sonnet-4-6`, `claude-haiku-4-5-20251001` |
-| Mistral AI | 🇫🇷 EU (GDPR) | `mistral-large-latest`, `mistral-small-latest` |
-| Qwen (Alibaba) | 🇨🇳 CN/Intl | `qwen3.5-plus`, `qwen3.5-flash` |
-| Sarvam AI | 🇮🇳 India | `sarvam-m` (10 Indic languages) |
-| Ollama | Local/On-prem | any local model, zero data egress |
-
-## Gemini API — Critical Rules
-
-- **Scraping model:** `gemini-3.5-flash` for search grounding (hardcoded in callGeminiGrounded — thinkingBudget MUST be absent for grounding to fire)
-- **Extraction model:** `gemini-3.1-flash-lite` for RSS signal extraction (cheap, thinkingBudget:0 ok here)
-- **Model:** `gemini-3.1-flash-lite` everywhere else
-- **Always add:** `thinkingConfig: {thinkingBudget: 0}` to generationConfig
-- **Never add:** `responseMimeType: 'application/json'`
-- **Free tier:** 15 RPM, 1500 RPD
-- **Key:** From Google Cloud Console (My First Project, billing enabled) via AI Studio
-
----
-
-## Supabase
-
-- **Project:** atlas-platform — South Asia (Mumbai)
-- **Auth:** None for now (shared anon key) — add when going live
-- **Credentials:** Stored in browser localStorage per tool + GitHub Secrets for Actions
-
----
-
-## Build Sequence (confirmed — left to right on lifecycle)
-
-```
-STAGE 1 — Intelligence Scraper v1.3 + Supabase schema  ✅ COMPLETE
-STAGE 2 — Second Brain v2.2                            ✅ COMPLETE
-STAGE 3 — Customer Intelligence (PEI) v0.2             ✅ COMPLETE
-STAGE 4 — AI Centre Builder fix                        🔴 After stage 3
-STAGE 5 — Engagement Configurator                      🔴 After stage 4
-STAGE 6 — GitHub Actions automation                    ✅ COMPLETE
-```
-
----
-
-## Engagement Docket — Design Decisions (carry forward)
-
-**Architecture:** Full replacement of Engagement Management. Three-layer model:
+**Three-layer model:**
 ```
 customers → engagements → engagement_dockets → docket_items
+           ↓
+      transactions (transactional customers only)
+           ↓
+      l1_configurations (TSAP engagements only)
+           ↓
+      portfolio_catalogue (seed data — L1/L2/L3)
 ```
+
+**Two customer tiers:**
+- **Strategic** — full engagement lifecycle, dockets, TSAP config, portfolio map
+- **Transactional** — lightweight record, transactions, elevatable to strategic
+
+**Elevation flow:** Business Head elevates transactional → docket auto-created → all transactions retrofitted as docket items
 
 **Two docket types:**
-- Customer Engagement Docket — full lifecycle, exportable Word
-- Salesperson Action Docket — one per person, auto-created, actions only
+- Customer Engagement Docket — full lifecycle, Word export
+- Salesperson Action Docket — one per person, auto-created on first action
 
-**New Supabase tables needed (not yet created):**
+**Engagement archetype values:**
+```sql
+-- Run this to fix CHECK constraint (territory_coe → tsap):
+ALTER TABLE engagements DROP CONSTRAINT IF EXISTS engagements_archetype_check;
+ALTER TABLE engagements ADD CONSTRAINT engagements_archetype_check
+  CHECK (archetype IN ('tsap','govt_sectorial','enterprise','defence'));
 ```
-customers (id, name, short_name, country, ownership, sector, org_type,
-           state, parent_org, ai_maturity, notes, contacts jsonb, divisions jsonb)
 
-engagements (id ENG-YYYY-SECTOR-NNNN, customer_id, division_id, name,
-             archetype, type, phase, status, domain, currency, value, notes, owner)
-```
-`engagement_dockets` and `docket_items` tables already created ✅
-
-**Engagement phases:** strategy | presales | proposal | delivery | live
-**Archetypes:** territory_coe | govt_sectorial | enterprise | defence
 **Docket item types:** action | intel | pei | uc | rfp | pitch | solution | bom | proposal | pricing | exec_doc
 
-**"Add to Docket" trigger flow:**
-- Sales Action in SB → confirm → opens docket tool with pending item in localStorage
-- PEI generate → same flow (to be wired)
-- UC acceptance → same flow (to be wired)
-- Auto-create salesperson docket on first action
+**TSAP Configuration (L1) — 4 tabs:**
+1. Territory: name, type, governance, security classification, ownership, scale
+2. Objectives: core objective, vision, justification, uniqueness, success metrics + AI Enrich button
+3. Building Blocks: L2 blocks + L1.x programme components
+4. Financial Model: Side A (financing) + Side B (build costs) → financing gap
 
-**Migration:** Old EM data (localStorage) → import JSON → write to Supabase customers + engagements
+**Generate Vision Document:** calls AI model (documents task tier), saves as exec_doc docket item
 
-**Engagement Docket v1.0 (basic)** already built at `tools/engagement-docket/` — needs:
-- SQL for customers + engagements tables
-- Customer profile UI (contacts, divisions, AI maturity)
-- Engagement creation with phase + archetype + ENG-ID
-- Full docket detail view wired to engagement
-- Word export via docx skill
+---
+
+## Portfolio Catalogue — Finalized Taxonomy
+
+```
+L1     L1-TSAP    Territory Sovereign AI Programme (flagship)
+L1.1   L1.1-TSAP  AI Skills & Workforce Development (partner-led, population-scale)
+L1.2   L1.2-TSAP  Startup & Innovation Ecosystem (partner-led)
+L1.3   L1.3-TSAP  Data Governance & Sovereign Data (partner-led)
+L1.4   L1.4-TSAP  Research & Academic Partnership (partner-led)
+L1.5   L1.5-TSAP  AI Policy, Regulation & Governance (partner-led)
+
+L2     L2-AIF     AI Factory (general-purpose GPU compute)
+L2     L2-INF     Inferencing Factory (generic baseline)
+L2.1   L2.1-INF   GeoAI Inferencing Factory (pre-configured, EO/geospatial stack)
+L2.2   L2.2-INF   Defence AI Inferencing Factory (air-gapped, MIL-SPEC)
+L2.3   L2.3-INF   Health AI Inferencing Factory (DICOM/FHIR, clinical)
+L2.4   L2.4-INF   FinAI Inferencing Factory (fraud, AML, RBI compliance)
+L2     L2-TRC     Training Cluster
+L2     L2-HPC     HPC Cluster
+L2     L2-EDG     Edge AI Node
+L2     L2-MDC     Modular Datacenter
+
+L3     L3-*       23 Lifecycle Services across 5 journey stages (V5 portfolio)
+```
+
+**Key design rules:**
+- `level_code` is NOT unique — multiple items share `L2`, `L3` etc.
+- `code` IS unique — `L2-AIF`, `L2.1-INF` etc.
+- `partner_led = true` for all L1.x components
+- L2.x items are pre-architected Inferencing Factory variants — same hardware, domain-specific software stack
+- Vision Document is an OUTPUT of TSAP config, not a standalone tool
+
+---
+
+## Supabase Tables
+
+| Table | Purpose | Status |
+|---|---|---|
+| `intelligence_items` | Intelligence engine | ✅ Live |
+| `uc_queue` | UC suggestions from scraper | ✅ Live |
+| `uc_library` | Curated use case library | ✅ Live (39 GeoAI UCs) |
+| `sales_actions` | Sales actions from Second Brain | ✅ Live |
+| `engagement_dockets` | Docket containers | ✅ Live |
+| `docket_items` | Items inside dockets | ✅ Live |
+| `customers` | Customer profiles | 🔴 Run schema SQL |
+| `engagements` | Engagement records | 🔴 Run schema SQL |
+| `transactions` | Transactional customer sales | 🔴 Run schema SQL |
+| `portfolio_catalogue` | Portfolio items L1/L2/L3 | 🔴 Run schema SQL |
+| `l1_configurations` | TSAP programme configs | 🔴 Run schema SQL |
+
+**Schema file:** `engagement_docket_full_schema.sql` (run in Supabase SQL Editor)
+
+---
+
+## Engagement Docket v2.0 — Known Issues (fix next iteration)
+
+| # | Issue |
+|---|---|
+| ED-1 | Button text showing unicode escapes (`\uD83D\uDCBC`, `\u002B`) in browser — root cause: JS string concat writes escape sequences as literal DOM text. Fix: use `el.textContent` or actual characters in template strings, not JS unicode escapes. |
+| ED-2 | Supabase CHECK constraint on `engagements.archetype` does not include `tsap` — run ALTER TABLE fix above. |
+| ED-3 | Contact management UI — `addContact()` is a placeholder, needs full contacts card. |
+| ED-4 | My Action Docket — `openMyActions()` is a placeholder. |
+| ED-5 | TSAP territory map — GeoJSON/Leaflet integration pending. |
+
+---
+
+## Build Sequence Status
+
+```
+STAGE 1 — Intelligence Scraper v2.0          ✅ Live (fidelity issues deferred)
+STAGE 2 — Second Brain v2.2                  ✅ Live
+STAGE 3 — PEI v0.2                           ✅ Live
+STAGE 4 — AI Centre Builder fix              ⚠️ Superseded by Engagement Docket
+STAGE 5 — Engagement Docket v2.0             ✅ Built — ED-1 to ED-5 fixes pending
+STAGE 6 — GitHub Actions automation          ✅ Live (v2.1 pending upload to scripts/)
+STAGE 7 — Portfolio Catalogue                ✅ Schema written, pending SQL run
+```
+
+---
 
 ## Current Pending Items
 
-| # | Item | Stage | Priority |
-|---|---|---|---|
-| 1 | Intelligence Scraper — results panel below log not populating after run | 1 | 🟡 Deferred |
-| 1c | Intelligence Scraper v2.0 — ✅ DONE: Gemini Search Grounding + RSS feeds, source_url stored, multi-geography dropdown, reads keys from global settings | 1 | ✅ Complete |
-| 1d | Intelligence Scraper v2.0 — bugs fixed: sleep() missing, init() crashing on removed DOM refs, domains start all-selected | 1 | ✅ Fixed |
-| 1e | Intelligence Scraper v2.0 — uses gemini-3.5-flash for grounding (hardcoded, bypasses registry), thinkingBudget removed from grounded call, date gate rejects pre-2025 items, Roman numeral dedup, full traceability fields (model_used, source_language, scrape_method, published_year) | 1 | ✅ Live |
-| 1f | Intelligence Scraper v2.0 — root causes identified and partially fixed: (1) missing + concat in prompt truncated it, (2) gemini-3.5-flash returns thoughtSignature/thinking parts — need to concat all parts not just parts[0], (3) response wrapped in ```json markdown despite instructions. Mechanics working (API calls fire, Supabase writes, dedup works). Fidelity issues deferred. | 1 | 🟡 Deferred — fix later |
-| 1h | Intelligence Scraper v2.0 — remaining fidelity fixes needed: (a) concat all response parts for thinking model, (b) stronger no-markdown instruction, (c) gemini-3.5-flash thinking mode compatibility. Fix when returning to intelligence section. | 1 | 🟡 Deferred |
-| 1g | GitHub Actions scraper v2.1 — built with 14 RSS feeds (3 Indic via Sarvam), gemini-3.5-flash grounding, full traceability. Pending upload to scripts/ | 1 | 🔴 Upload pending |
-| 1b | Intelligence Scraper — Market Pulse duplicates — monitoring | 1 | 🟡 Monitor |
-| 2 | PEI v0.2 — ✅ DONE | 3 | ✅ Complete |
-| 4 | AI Centre Builder — form empty, investigate and fix | 4 | 🔴 Pending |
-| 5 | Engagement Docket — customers + engagements Supabase tables | 5 | 🔴 Next session |
-| 6 | Engagement Docket — Customer UI (contacts, divisions, AI maturity) | 5 | 🔴 Next session |
-| 7 | Engagement Docket — Engagement creation with phase/archetype/ENG-ID | 5 | 🔴 Next session |
-| 8 | Engagement Docket — Word export via docx skill | 5 | 🔴 Next session |
-| 9 | Wire PEI → Add to Docket trigger | 5 | 🔴 Next session |
-| 10 | Wire UC acceptance → Add to Docket trigger | 5 | 🔴 Next session |
-| 5 | Engagement Configurator — receives converted Sales Actions, full lifecycle docket | 5 | 🔴 Major build |
-| 6 | UC Library — manual add + bulk import (39 GeoAI UCs + civil aviation UCs) | 2 | 🔴 With Second Brain v2.2 |
-| 6b | UC Library — rich structured form per UC: problem, benefit, how it works, process steps, key actors, data requirements, technical requirements, model type, hardware profile, maturity, reference deployments, regulatory, estimated effort | 2 | 🔴 v2.2 |
-| 7 | Second Brain — UC Library tab (rich form, manual add, bulk import) | 2 | 🔴 v2.2 |
-| 8 | Network Graph View — D3.js force-directed graph in Second Brain | 2 | 🟡 Stretch goal |
-| 9 | GDrive sync | — | 🔴 Low priority |
-| 10 | RAC Tool exports testing | — | 🟡 Cosmetic |
-| 11 | `tool-features.md` v1.1 | — | ⏸ On hold |
-
----
-
-## ATLAS Phase 2 — Architecture Backlog
-
-| # | Item | Notes |
+| # | Item | Priority |
 |---|---|---|
-| P2-1 | Intelligence Engine v2 | 17-domain — COMPLETE |
-| P2-2 | Technical Solution Builder | 10-block modular configurator |
-| P2-3 | Tokenomics Module | Make vs rent, sovereign vs cloud breakeven |
-| P2-4 | Recommendation Engine | Smart version of Sales Actions — auto-matches intel to prospects |
-| P2-5 | Engagement Design Engine | Archetype-driven — Territory/Govt/Defence/Enterprise |
-| P2-6 | Solution Document Generator | Architecture, BOM,
+| 1 | Run `engagement_docket_full_schema.sql` in Supabase | 🔴 Now |
+| 2 | Fix archetype CHECK constraint (tsap) | 🔴 Now |
+| 3 | Fix ED-1: Button unicode escapes in Engagement Docket | 🔴 Next build |
+| 4 | Upload GitHub Actions scraper v2.1 (`scrape-intelligence-v2.js`) | 🔴 Next |
+| 5 | Upload workflow yml v2 | 🔴 Next |
+| 6 | Wire PEI → Add to Docket trigger | 🟡 Soon |
+| 7 | Wire UC acceptance → Add to Docket trigger | 🟡 Soon |
+| 8 | TSAP territory map (GeoJSON/Leaflet) | 🟡 Soon |
+| 9 | Contact management UI in Docket | 🟡 Soon |
+| 10 | My Action Docket (salesperson) | 🟡 Soon |
+| 11 | Word export for docket (docx skill) | 🟡 Soon |
+| 12 | Intelligence scraper fidelity (thinking model, date gate) | 🟡 Soon |
+| 13 | Network graph for intel items (defer until real data accumulates) | ⬜ Later |
