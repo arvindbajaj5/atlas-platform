@@ -2,16 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>ATLAS &mdash; Engagement Docket</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{
-  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;
-  --white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;
-  --r:8px;--r-sm:6px;--r-lg:12px;
-  --shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);
-}
+:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--r-sm:6px;--r-lg:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;display:flex;flex-direction:column;}
 /* Header */
@@ -19,51 +14,95 @@ body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);m
 .hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
 .hdr-brand span{color:var(--orange);}
 .hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
-.hdr-right{display:flex;align-items:center;gap:8px;}
 /* Layout */
 .layout{display:flex;flex:1;min-height:0;}
-.sidebar{width:280px;flex-shrink:0;background:var(--white);border-right:1px solid #e0e0e8;display:flex;flex-direction:column;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;}
-.main{flex:1;padding:24px;overflow-y:auto;}
-/* Sidebar */
-.sb-section{padding:12px 16px 6px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;justify-content:space-between;}
+.sidebar{width:260px;flex-shrink:0;background:var(--white);border-right:1px solid #e0e0e8;display:flex;flex-direction:column;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;}
+.main{flex:1;padding:24px;overflow-y:auto;max-width:900px;}
+/* Sidebar nav */
+.sb-section{padding:10px 16px 4px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.5px;display:flex;justify-content:space-between;align-items:center;}
 .sb-item{padding:8px 16px;cursor:pointer;font-size:13px;color:var(--dark);display:flex;align-items:center;gap:8px;border-left:3px solid transparent;transition:all 0.15s;}
 .sb-item:hover{background:var(--light);}
 .sb-item.active{background:rgba(0,40,112,0.06);border-left-color:var(--orange);font-weight:600;color:var(--navy);}
-.sb-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.sb-item-count{font-size:10px;background:var(--light);color:var(--mid);padding:1px 6px;border-radius:8px;}
-.sb-item-status{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.status-active{background:var(--teal);}
-.status-paused{background:var(--amber);}
-.status-won{background:var(--blue);}
-.status-lost{background:#DC2626;}
-.status-closed{background:var(--mid);}
-.sb-add-btn{margin:8px 16px;padding:7px 12px;background:var(--orange);color:var(--white);border:none;border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer;width:calc(100% - 32px);font-family:inherit;}
-.sb-add-btn:hover{background:#e6421f;}
+.sb-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
+.sb-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dot-strategic{background:var(--blue);}
+.dot-transactional{background:var(--mid);}
+.dot-active{background:var(--teal);}
+.dot-won{background:var(--blue);}
+.dot-lost{background:#DC2626;}
+.dot-paused{background:var(--amber);}
+.sb-add{margin:8px 16px;padding:7px 12px;background:var(--orange);color:var(--white);border:none;border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer;width:calc(100% - 32px);font-family:inherit;}
+.sb-add:hover{background:#e6421f;}
 .sb-search{margin:8px 16px 4px;position:relative;}
-.sb-search input{width:100%;padding:7px 10px 7px 30px;border:1px solid #e0e0e8;border-radius:var(--r-sm);font-size:12px;background:var(--light);font-family:inherit;}
-.sb-search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--mid);}
+.sb-search input{width:100%;padding:7px 10px 7px 28px;border:1px solid #e0e0e8;border-radius:var(--r-sm);font-size:12px;background:var(--light);font-family:inherit;}
+.sb-search:before{content:'\uD83D\uDD0D';position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;}
 /* Cards */
 .card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
 .card-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px;}
-.card-sub{font-size:11px;color:var(--mid);margin-bottom:16px;line-height:1.6;}
-/* Docket header */
-.docket-hdr{background:var(--navy);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;color:var(--white);}
-.docket-name{font-size:20px;font-weight:700;margin-bottom:4px;}
-.docket-meta{font-size:11px;color:rgba(255,255,255,0.55);display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;}
-.docket-pills{display:flex;gap:8px;flex-wrap:wrap;}
-.pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;text-transform:uppercase;}
-.pill-active{background:rgba(0,178,144,0.2);color:var(--teal);}
-.pill-paused{background:rgba(255,182,0,0.2);color:var(--amber);}
-.pill-won{background:rgba(28,56,245,0.2);color:var(--blue);}
-.pill-lost{background:rgba(220,38,38,0.15);color:#DC2626;}
-.pill-customer{background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.8);}
-/* Items */
-.item-type-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
-.type-filter{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #e0e0e8;background:var(--white);cursor:pointer;color:var(--mid);font-family:inherit;}
-.type-filter.active{background:var(--navy);color:var(--white);border-color:var(--navy);}
-.docket-item{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;transition:border-color 0.15s;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:14px;line-height:1.6;}
+/* Forms */
+label{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;margin-top:14px;}
+label:first-child{margin-top:0;}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+textarea{resize:vertical;min-height:72px;}
+.form-hint{font-size:10px;color:var(--mid);margin-top:4px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;text-decoration:none;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-navy{background:var(--navy);color:var(--white);}
+.btn-navy:hover{background:#001d5c;}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-ghost{background:var(--light);color:var(--dark);border:1px solid #e0e0e8;}
+.btn-ghost:hover{border-color:var(--navy);color:var(--navy);}
+.btn-danger{background:rgba(220,38,38,0.08);color:#DC2626;border:1px solid rgba(220,38,38,0.2);}
+.btn-sm{padding:5px 12px;font-size:11px;}
+.btn-xs{padding:3px 8px;font-size:10px;}
+/* Tabs */
+.tab-bar{display:flex;gap:2px;border-bottom:2px solid #e0e0e8;margin-bottom:20px;}
+.tab{padding:8px 16px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
+.tab:hover{color:var(--dark);}
+.tab.active{color:var(--navy);border-bottom-color:var(--orange);}
+/* Pills */
+.pill{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase;}
+.pill-strategic{background:rgba(28,56,245,0.1);color:var(--blue);}
+.pill-transactional{background:rgba(180,180,190,0.15);color:var(--mid);}
+.pill-active{background:rgba(0,178,144,0.12);color:var(--teal);}
+.pill-won{background:rgba(28,56,245,0.12);color:var(--blue);}
+.pill-lost{background:rgba(220,38,38,0.1);color:#DC2626;}
+.pill-paused{background:rgba(255,182,0,0.12);color:#9a7000;}
+.pill-l1{background:rgba(255,85,57,0.1);color:var(--orange);}
+.pill-l2{background:rgba(0,40,112,0.08);color:var(--navy);}
+.pill-l3{background:rgba(0,178,144,0.08);color:var(--teal);}
+/* Dashboard stats */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:14px 16px;}
+.stat-val{font-size:26px;font-weight:700;color:var(--navy);}
+.stat-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+/* Customer cards */
+.cust-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color 0.15s;}
+.cust-card:hover{border-color:var(--teal);}
+.cust-avatar{width:36px;height:36px;border-radius:var(--r-sm);background:var(--navy);color:var(--white);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+.cust-body{flex:1;min-width:0;}
+.cust-name{font-size:13px;font-weight:600;color:var(--dark);}
+.cust-meta{font-size:10px;color:var(--mid);margin-top:2px;}
+/* Engagement cards */
+.eng-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;border-left:4px solid var(--light);}
+.eng-card:hover{border-color:var(--teal);}
+.eng-card.phase-strategy{border-left-color:var(--amber);}
+.eng-card.phase-presales{border-left-color:var(--blue);}
+.eng-card.phase-proposal{border-left-color:var(--orange);}
+.eng-card.phase-delivery{border-left-color:var(--teal);}
+.eng-card.phase-live{border-left-color:#22c55e;}
+/* Docket items */
+.docket-item{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;transition:border-color 0.15s;}
 .docket-item:hover{border-color:var(--teal);}
-.item-icon{width:34px;height:34px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.item-icon{width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
 .icon-action{background:rgba(255,182,0,0.1);}
 .icon-intel{background:rgba(0,40,112,0.08);}
 .icon-pei{background:rgba(28,56,245,0.08);}
@@ -76,122 +115,119 @@ body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);m
 .icon-pricing{background:rgba(0,178,144,0.08);}
 .icon-exec_doc{background:rgba(255,85,57,0.08);}
 .item-body{flex:1;min-width:0;}
-.item-title{font-size:13px;font-weight:600;color:var(--dark);margin-bottom:3px;}
-.item-meta{font-size:10px;color:var(--mid);display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
-.item-notes{font-size:11px;color:#555;line-height:1.5;}
-.item-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
-.item-status{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;}
+.item-title{font-size:12px;font-weight:600;color:var(--dark);}
+.item-meta{font-size:10px;color:var(--mid);margin-top:2px;}
+.item-status{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;}
 .is-pending{background:rgba(180,180,190,0.15);color:var(--mid);}
 .is-in_progress{background:rgba(255,182,0,0.12);color:#9a7000;}
 .is-done{background:rgba(0,178,144,0.12);color:var(--teal);}
 .is-closed{background:rgba(40,40,50,0.08);color:var(--mid);}
-/* Buttons */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
-.btn-primary{background:var(--orange);color:var(--white);}
-.btn-primary:hover{background:#e6421f;}
-.btn-navy{background:var(--navy);color:var(--white);}
-.btn-navy:hover{background:#001d5c;}
-.btn-teal{background:var(--teal);color:var(--white);}
-.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
-.btn-outline:hover{background:var(--navy);color:var(--white);}
-.btn-ghost{background:var(--light);color:var(--dark);border:1px solid #e0e0e8;}
-.btn-ghost:hover{border-color:var(--navy);color:var(--navy);}
-.btn-danger{background:rgba(220,38,38,0.08);color:#DC2626;border:1px solid rgba(220,38,38,0.2);}
-.btn-sm{padding:4px 10px;font-size:11px;}
-.btn-xs{padding:2px 8px;font-size:10px;}
-/* Forms */
-label{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;margin-top:12px;}
-label:first-child{margin-top:0;}
-input,select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
-input:focus,select:focus,textarea:focus{border-color:var(--blue);}
-textarea{resize:vertical;min-height:80px;}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.form-hint{font-size:10px;color:var(--mid);margin-top:4px;}
+/* Portfolio map */
+.portfolio-map{display:grid;grid-template-rows:auto auto auto;gap:12px;}
+.portfolio-section-label{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.portfolio-items-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;}
+.portfolio-item{border:2px solid #e0e0e8;border-radius:var(--r);padding:10px 12px;cursor:pointer;transition:all 0.15s;background:var(--white);text-align:left;}
+.portfolio-item:hover{border-color:var(--navy);}
+.portfolio-item.selected{border-color:var(--teal);background:rgba(0,178,144,0.05);}
+.portfolio-item.recommended{border-color:var(--orange);background:rgba(255,85,57,0.04);}
+.portfolio-item.recommended.selected{border-color:var(--teal);background:rgba(0,178,144,0.05);}
+.pi-code{font-size:9px;font-family:Roboto Mono,monospace;color:var(--mid);margin-bottom:4px;}
+.pi-name{font-size:11px;font-weight:600;color:var(--dark);}
+.pi-cat{font-size:10px;color:var(--mid);}
+.pi-badge{display:inline-block;font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;margin-top:4px;}
+.pi-badge.rec{background:rgba(255,85,57,0.12);color:var(--orange);}
+.pi-badge.sel{background:rgba(0,178,144,0.12);color:var(--teal);}
+/* Rec engine */
+.rec-card{background:rgba(0,178,144,0.05);border:1px solid rgba(0,178,144,0.2);border-radius:var(--r);padding:14px;margin-bottom:12px;}
+.rec-title{font-size:12px;font-weight:700;color:var(--teal);margin-bottom:8px;}
+.rec-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,178,144,0.1);font-size:11px;}
 /* Modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--white);border-radius:var(--r-lg);padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.modal{background:var(--white);border-radius:var(--r-lg);padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.modal-lg{max-width:780px;}
 .modal-title{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:16px;}
 .modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end;}
-/* Dashboard */
-.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
-.dash-stat{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px 20px;}
-.dash-stat-val{font-size:28px;font-weight:700;color:var(--navy);}
-.dash-stat-lbl{font-size:11px;color:var(--mid);margin-top:2px;}
-/* Empty */
+/* L2 blocks */
+.l2-block{border:1px solid #e0e0e8;border-radius:var(--r);padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;}
+.l2-icon{width:32px;height:32px;border-radius:var(--r-sm);background:var(--navy);color:var(--white);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+/* Financing rows */
+.fin-row{border:1px solid #e0e0e8;border-radius:var(--r);padding:12px;margin-bottom:8px;}
+.fin-row-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+/* Empty state */
 .empty{text-align:center;padding:48px 24px;color:var(--mid);}
 .empty-icon{font-size:40px;margin-bottom:12px;}
 .empty-title{font-size:15px;font-weight:600;color:var(--navy);margin-bottom:6px;}
 .empty-sub{font-size:12px;line-height:1.6;}
-/* Action docket */
-.action-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #e0e0e8;border-radius:var(--r);margin-bottom:8px;background:var(--white);}
-.action-row.done{opacity:0.5;}
-.action-check{width:18px;height:18px;border-radius:4px;border:2px solid #d0d0d8;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all 0.15s;}
-.action-check.checked{background:var(--teal);border-color:var(--teal);color:var(--white);}
-.action-text{flex:1;font-size:12px;color:var(--dark);}
-.action-domain{font-size:10px;background:var(--light);color:var(--mid);padding:1px 6px;border-radius:4px;}
-/* Upload zone */
-.upload-zone{border:2px dashed #d0d0d8;border-radius:var(--r-lg);padding:32px;text-align:center;cursor:pointer;transition:all 0.15s;}
-.upload-zone:hover,.upload-zone.drag{border-color:var(--teal);background:rgba(0,178,144,0.03);}
-.upload-zone-icon{font-size:32px;margin-bottom:8px;}
-.upload-zone-text{font-size:13px;color:var(--mid);}
-/* Tags */
-.tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--light);color:var(--mid);margin:2px;}
-/* Responsive */
-@media(max-width:768px){.layout{flex-direction:column;}.sidebar{width:100%;height:auto;position:static;}.dash-grid{grid-template-columns:1fr 1fr;}.form-grid{grid-template-columns:1fr;}}
+/* Elevate banner */
+.elevate-banner{background:rgba(255,182,0,0.1);border:1px solid rgba(255,182,0,0.3);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.elevate-text{font-size:12px;color:#9a7000;}
 </style>
 </head>
 <body>
 
 <div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S</div>
-  <div style="font-size:11px;color:rgba(255,255,255,0.5)">Engagement Docket</div>
-  <div class="hdr-right">
-    <span class="hdr-badge">Docket v1.0</span>
-    <button class="btn btn-outline btn-sm" style="color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.3)" onclick="window.history.back()">&#8592; Portal</button>
+  <div style="font-size:11px;color:rgba(255,255,255,0.5)">Engagement Docket v2.0</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="hdr-badge">ED v2.0</span>
+    <button class="btn btn-ghost btn-sm" style="color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.3)" onclick="history.back()">\u2190 Portal</button>
   </div>
 </div>
 
 <div class="layout">
   <!-- Sidebar -->
   <div class="sidebar">
-    <div class="sb-search">
-      <span class="sb-search-icon">&#128269;</span>
-      <input type="text" id="sbSearch" placeholder="Search dockets..." oninput="renderSidebar()">
-    </div>
-    <button class="sb-add-btn" onclick="openNewDocketModal()">+ New Customer Docket</button>
-    <div class="sb-section">
-      <span>Customer Dockets</span>
-      <span id="sbCustCount">0</span>
-    </div>
-    <div id="sbCustomerList"></div>
-    <div class="sb-section" style="margin-top:8px">
-      <span>My Action Docket</span>
-    </div>
+    <div class="sb-search"><input type="text" id="sbSearch" placeholder="Search customers..." oninput="renderSidebar()"></div>
+    <button class="sb-add" onclick="openModal('newCustomerModal')">\u002B New Customer</button>
+    <div class="sb-section"><span>Strategic</span><span id="sbStrategicCount" style="font-size:10px;color:var(--mid)">0</span></div>
+    <div id="sbStrategicList"></div>
+    <div class="sb-section" style="margin-top:8px"><span>Transactional</span><span id="sbTransactionalCount" style="font-size:10px;color:var(--mid)">0</span></div>
+    <div id="sbTransactionalList"></div>
+    <div class="sb-section" style="margin-top:8px"><span>My Actions</span></div>
     <div id="sbMyDocket"></div>
   </div>
 
-  <!-- Main -->
-  <div class="main" id="mainPanel">
-    <!-- Dashboard shown by default -->
-  </div>
+  <!-- Main panel -->
+  <div class="main" id="mainPanel"></div>
 </div>
 
-<!-- New Docket Modal -->
-<div class="modal-overlay" id="newDocketModal">
+<!-- New Customer Modal -->
+<div class="modal-overlay" id="newCustomerModal">
   <div class="modal">
-    <div class="modal-title">&#128193; New Customer Docket</div>
+    <div class="modal-title">\uD83C\uDFE2 New Customer</div>
     <label>Customer Name *</label>
-    <input type="text" id="nd-customer" placeholder="e.g. Indian Army">
-    <label>Engagement Name *</label>
-    <input type="text" id="nd-engagement" placeholder="e.g. Border Surveillance AI 2026">
+    <input type="text" id="nc-name" placeholder="e.g. Indian Army, NTPC, Pixxel">
+    <label>Short Name</label>
+    <input type="text" id="nc-short" placeholder="e.g. IA, NTPC">
+    <div class="form-grid">
+      <div>
+        <label>Tier *</label>
+        <select id="nc-tier">
+          <option value="transactional">Transactional (one-off)</option>
+          <option value="strategic">Strategic (major account)</option>
+        </select>
+      </div>
+      <div>
+        <label>Ownership</label>
+        <select id="nc-ownership">
+          <option value="">-- Select --</option>
+          <option value="GOV">Government (GOV)</option>
+          <option value="MIL">Military / Defence (MIL)</option>
+          <option value="PSU">Public Sector Undertaking (PSU)</option>
+          <option value="PVT">Private (PVT)</option>
+          <option value="INT">International (INT)</option>
+          <option value="PPP">Public-Private Partnership (PPP)</option>
+        </select>
+      </div>
+    </div>
     <div class="form-grid">
       <div>
         <label>Sector</label>
-        <select id="nd-sector">
-          <option value="">— Select —</option>
+        <select id="nc-sector">
+          <option value="">-- Select --</option>
           <option>Defence &amp; Armed Forces</option>
-          <option>Governance &amp; e-Governance</option>
+          <option>Government &amp; Governance</option>
           <option>Intelligence &amp; Signals</option>
           <option>Homeland Security</option>
           <option>Geospatial &amp; Earth Observation</option>
@@ -200,75 +236,158 @@ textarea{resize:vertical;min-height:80px;}
           <option>Natural Resources</option>
           <option>Energy &amp; Utilities</option>
           <option>Telecom &amp; Networks</option>
-          <option>BFSI &amp; Financial Services</option>
+          <option>Banking &amp; Financial Services</option>
           <option>Health &amp; Life Sciences</option>
           <option>Manufacturing &amp; Industry</option>
           <option>Regional AI Programmes</option>
-          <option>General Enterprise</option>
+          <option>Technology</option>
+          <option>Media &amp; Broadcast</option>
         </select>
       </div>
       <div>
         <label>Country</label>
-        <select id="nd-country">
+        <select id="nc-country">
           <option value="India" selected>India</option>
-          <option>UAE</option><option>Saudi Arabia</option><option>Qatar</option>
-          <option>Singapore</option><option>Malaysia</option><option>Australia</option>
-          <option>United Kingdom</option><option>France</option><option>Germany</option>
-          <option>United States</option>
+          <option value="UAE">UAE</option>
+          <option value="Saudi Arabia">Saudi Arabia</option>
+          <option value="Qatar">Qatar</option>
+          <option value="Singapore">Singapore</option>
+          <option value="Malaysia">Malaysia</option>
+          <option value="Australia">Australia</option>
+          <option value="United Kingdom">United Kingdom</option>
+          <option value="France">France</option>
+          <option value="United States">United States</option>
         </select>
       </div>
     </div>
-    <label>Estimated Deal Value</label>
-    <input type="text" id="nd-deal" placeholder="e.g. INR 50 Cr, USD 5M">
-    <label>Source</label>
-    <select id="nd-source">
-      <option value="manual">Manual</option>
-      <option value="sales_action">Sales Action</option>
-      <option value="pei">PEI Output</option>
-      <option value="rfp">RFP</option>
-      <option value="inbound">Inbound Enquiry</option>
+    <label>State / Province</label>
+    <input type="text" id="nc-state" placeholder="e.g. Himachal Pradesh">
+    <label>AI Maturity</label>
+    <select id="nc-maturity">
+      <option value="">Unknown</option>
+      <option value="none">None</option>
+      <option value="exploring">Exploring</option>
+      <option value="piloting">Piloting</option>
+      <option value="scaling">Scaling</option>
+      <option value="advanced">Advanced</option>
     </select>
+    <label>Notes</label>
+    <textarea id="nc-notes" placeholder="Key context about this customer..."></textarea>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('newDocketModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="createCustomerDocket()">Create Docket</button>
+      <button class="btn btn-ghost" onclick="closeModal('newCustomerModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createCustomer()">Create Customer</button>
     </div>
   </div>
 </div>
 
-<!-- Add Item Modal -->
+<!-- New Engagement Modal -->
+<div class="modal-overlay" id="newEngagementModal">
+  <div class="modal">
+    <div class="modal-title">\uD83D\uDCBC New Engagement</div>
+    <input type="hidden" id="ne-customer-id">
+    <label>Engagement Name *</label>
+    <input type="text" id="ne-name" placeholder="e.g. Border Surveillance AI Platform">
+    <div class="form-grid">
+      <div>
+        <label>Archetype</label>
+        <select id="ne-archetype">
+          <option value="territory_coe">Territory / AI CoE</option>
+          <option value="govt_sectorial">Govt Sectorial</option>
+          <option value="enterprise">Enterprise</option>
+          <option value="defence">Defence</option>
+        </select>
+      </div>
+      <div>
+        <label>Type</label>
+        <select id="ne-type">
+          <option value="new">New</option>
+          <option value="expansion">Expansion</option>
+          <option value="renewal">Renewal</option>
+          <option value="rfp">RFP / Tender</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div>
+        <label>Phase</label>
+        <select id="ne-phase">
+          <option value="strategy">Strategy</option>
+          <option value="presales">Presales</option>
+          <option value="proposal">Proposal</option>
+          <option value="delivery">Delivery</option>
+          <option value="live">Live</option>
+        </select>
+      </div>
+      <div>
+        <label>Domain</label>
+        <select id="ne-domain">
+          <option value="">-- Select --</option>
+          <option value="GOV-GOV">Government &amp; Governance</option>
+          <option value="DEF-MIL">Defence — Armed Forces</option>
+          <option value="DEF-SPC">Defence — Space</option>
+          <option value="DEF-HLS">Homeland Security</option>
+          <option value="GEO-SPA">Geospatial &amp; EO</option>
+          <option value="FIN-BFS">Banking &amp; Finance</option>
+          <option value="TEC-GEN">Technology</option>
+          <option value="REG-AIP">Regional AI Programme</option>
+          <option value="ENR-UTL">Energy &amp; Utilities</option>
+          <option value="HLT-LIF">Healthcare</option>
+          <option value="MFG-IND">Manufacturing</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div>
+        <label>Estimated Value</label>
+        <input type="text" id="ne-value" placeholder="e.g. 500 Cr, USD 50M">
+      </div>
+      <div>
+        <label>Currency</label>
+        <select id="ne-currency">
+          <option value="INR">INR</option>
+          <option value="USD">USD</option>
+          <option value="AED">AED</option>
+          <option value="EUR">EUR</option>
+          <option value="GBP">GBP</option>
+          <option value="SGD">SGD</option>
+        </select>
+      </div>
+    </div>
+    <label>Notes</label>
+    <textarea id="ne-notes" placeholder="Key context, source of opportunity..."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('newEngagementModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createEngagement()">Create Engagement</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add to Docket Modal -->
 <div class="modal-overlay" id="addItemModal">
   <div class="modal">
-    <div class="modal-title" id="addItemTitle">&#43; Add Item to Docket</div>
+    <div class="modal-title" id="addItemTitle">\u002B Add Item to Docket</div>
     <input type="hidden" id="ai-docket-id">
-    <input type="hidden" id="ai-preset-type">
-    <input type="hidden" id="ai-source-id">
     <label>Item Type</label>
-    <select id="ai-type" onchange="updateItemTypeHints()">
-      <option value="action">&#9889; Action</option>
-      <option value="intel">&#128202; Intelligence Item</option>
-      <option value="pei">&#128269; PEI Brief</option>
-      <option value="uc">&#128161; Use Case</option>
-      <option value="rfp">&#128196; RFP / Tender</option>
-      <option value="pitch">&#128202; Pitch Report</option>
-      <option value="solution">&#9881; Technical Solution</option>
-      <option value="bom">&#128220; Bill of Materials</option>
-      <option value="proposal">&#128196; Proposal</option>
-      <option value="pricing">&#128176; Pricing</option>
-      <option value="exec_doc">&#127891; Executive Document</option>
+    <select id="ai-type" onchange="updateItemHint()">
+      <option value="action">\u26A1 Action</option>
+      <option value="intel">\uD83D\uDCCA Intelligence</option>
+      <option value="pei">\uD83D\uDD0D PEI Brief</option>
+      <option value="uc">\uD83D\uDCA1 Use Case</option>
+      <option value="rfp">\uD83D\uDCC4 RFP / Tender</option>
+      <option value="pitch">\uD83D\uDCCA Pitch Report</option>
+      <option value="solution">\u2699\uFE0F Technical Solution</option>
+      <option value="bom">\uD83D\uDCDC Bill of Materials</option>
+      <option value="proposal">\uD83D\uDCC4 Proposal</option>
+      <option value="pricing">\uD83D\uDCB0 Pricing</option>
+      <option value="exec_doc">\uD83C\uDF93 Executive Document</option>
     </select>
     <label>Title *</label>
     <input type="text" id="ai-title" placeholder="Descriptive title for this item">
     <label>Notes / Summary</label>
-    <textarea id="ai-notes" placeholder="Key details, decisions, or context..."></textarea>
+    <textarea id="ai-notes" placeholder="Key details, decisions, context..."></textarea>
     <div class="form-grid">
-      <div>
-        <label>Assigned To</label>
-        <input type="text" id="ai-assigned" placeholder="Name or team">
-      </div>
-      <div>
-        <label>Due Date</label>
-        <input type="date" id="ai-due">
-      </div>
+      <div><label>Assigned To</label><input type="text" id="ai-assigned" placeholder="Name or team"></div>
+      <div><label>Due Date</label><input type="date" id="ai-due"></div>
     </div>
     <div id="ai-hint" style="font-size:11px;color:var(--mid);margin-top:10px;padding:8px 12px;background:var(--light);border-radius:var(--r-sm);display:none"></div>
     <div class="modal-actions">
@@ -278,36 +397,60 @@ textarea{resize:vertical;min-height:80px;}
   </div>
 </div>
 
-<!-- Add to Docket Trigger Modal (called from other tools) -->
-<div class="modal-overlay" id="triggerModal">
-  <div class="modal" style="max-width:440px">
-    <div class="modal-title">&#128193; Add to Docket</div>
-    <div style="font-size:12px;color:var(--mid);margin-bottom:12px" id="trigger-item-desc"></div>
-    <label>Select Docket</label>
-    <select id="trigger-docket-select">
-      <option value="__new__">+ Create New Customer Docket</option>
-    </select>
-    <div id="trigger-new-fields" style="display:none">
-      <label>Customer Name</label>
-      <input type="text" id="trigger-customer" placeholder="e.g. Indian Army">
-      <label>Engagement Name</label>
-      <input type="text" id="trigger-engagement" placeholder="e.g. Border Surveillance AI">
+<!-- Portfolio Map Modal -->
+<div class="modal-overlay" id="portfolioMapModal">
+  <div class="modal modal-lg">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div class="modal-title" style="margin-bottom:0">\uD83D\uDDFA\uFE0F Portfolio Map</div>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal('portfolioMapModal')">\u2715</button>
     </div>
+    <div style="font-size:11px;color:var(--mid);margin-bottom:16px" id="portfolioMapDesc">Select portfolio items for this engagement. AI-recommended items are pre-selected.</div>
+    <div id="portfolioMapContent"></div>
+    <div style="margin-top:16px;padding:12px;background:var(--light);border-radius:var(--r);font-size:11px;color:var(--mid)" id="portfolioMapSummary"></div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('triggerModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="confirmAddToDocket()">Add to Docket</button>
+      <button class="btn btn-ghost" onclick="closeModal('portfolioMapModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePortfolioSelection()">Save Selection</button>
     </div>
   </div>
 </div>
 
-<!-- View Item Modal -->
-<div class="modal-overlay" id="viewItemModal">
-  <div class="modal" style="max-width:600px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-      <div class="modal-title" style="margin-bottom:0" id="vi-title">Item Detail</div>
-      <button class="btn btn-ghost btn-xs" onclick="closeModal('viewItemModal')">&#10005;</button>
+<!-- Add Transaction Modal -->
+<div class="modal-overlay" id="newTxnModal">
+  <div class="modal">
+    <div class="modal-title">\uD83D\uDCB3 Record Transaction</div>
+    <input type="hidden" id="txn-customer-id">
+    <label>Product / Service *</label>
+    <input type="text" id="txn-product" placeholder="e.g. GenAI-in-a-Box, Inferencing Factory PoC">
+    <div class="form-grid">
+      <div><label>Value</label><input type="text" id="txn-value" placeholder="e.g. 2.5 Cr"></div>
+      <div>
+        <label>Currency</label>
+        <select id="txn-currency">
+          <option value="INR">INR</option>
+          <option value="USD">USD</option>
+          <option value="AED">AED</option>
+          <option value="EUR">EUR</option>
+        </select>
+      </div>
     </div>
-    <div id="vi-body"></div>
+    <div class="form-grid">
+      <div><label>Date</label><input type="date" id="txn-date"></div>
+      <div>
+        <label>Channel</label>
+        <select id="txn-channel">
+          <option value="direct">Direct</option>
+          <option value="tender">Tender / RFP</option>
+          <option value="partner">Partner</option>
+          <option value="referral">Referral</option>
+        </select>
+      </div>
+    </div>
+    <label>Notes</label>
+    <textarea id="txn-notes" placeholder="Key details about this transaction..."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('newTxnModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTransaction()">Save Transaction</button>
+    </div>
   </div>
 </div>
 
@@ -569,49 +712,38 @@ function atlasGetTaskModel(taskId){
 // \u2500\u2500 End ATLAS Model Registry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 
-// \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var CFG_KEY = 'atlas_global_cfg'
+// \u2500\u2500 Supabase \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function getSB(){
   var g = atlasGetGlobal()
   return {url: g.sbUrl||'', key: g.sbKey||''}
 }
-
-// \u2500\u2500 Supabase helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function sbFetch(table, params, limit){
-  var sb = getSB()
-  if(!sb.url||!sb.key) return []
+  var sb = getSB(); if(!sb.url) return []
   var url = sb.url+'/rest/v1/'+table+'?'+params+(limit?'&limit='+limit:'')
-  var r = await fetch(url, {headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}})
-  if(!r.ok) return []
-  return await r.json()
+  var r = await fetch(url,{headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}})
+  return r.ok ? await r.json() : []
 }
-
 async function sbInsert(table, data){
-  var sb = getSB()
-  if(!sb.url||!sb.key) return false
-  var r = await fetch(sb.url+'/rest/v1/'+table, {
+  var sb = getSB(); if(!sb.url) return false
+  var r = await fetch(sb.url+'/rest/v1/'+table,{
     method:'POST',
     headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=minimal'},
     body:JSON.stringify(data)
   })
   return r.ok
 }
-
 async function sbPatch(table, filter, data){
-  var sb = getSB()
-  if(!sb.url||!sb.key) return false
-  var r = await fetch(sb.url+'/rest/v1/'+table+'?'+filter, {
+  var sb = getSB(); if(!sb.url) return false
+  var r = await fetch(sb.url+'/rest/v1/'+table+'?'+filter,{
     method:'PATCH',
     headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key,'Content-Type':'application/json','Prefer':'return=minimal'},
     body:JSON.stringify(data)
   })
   return r.ok
 }
-
 async function sbDelete(table, filter){
-  var sb = getSB()
-  if(!sb.url||!sb.key) return false
-  var r = await fetch(sb.url+'/rest/v1/'+table+'?'+filter, {
+  var sb = getSB(); if(!sb.url) return false
+  var r = await fetch(sb.url+'/rest/v1/'+table+'?'+filter,{
     method:'DELETE',
     headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
   })
@@ -619,561 +751,666 @@ async function sbDelete(table, filter){
 }
 
 // \u2500\u2500 State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var ALL_DOCKETS = []
+var ALL_CUSTOMERS = []
+var ALL_ENGAGEMENTS = []
+var PORTFOLIO_CATALOGUE = []
+var CURRENT_CUSTOMER_ID = null
+var CURRENT_ENGAGEMENT_ID = null
+var CURRENT_VIEW = 'dashboard'  // dashboard|customer|engagement|docket
 var CURRENT_DOCKET_ID = null
 var CURRENT_ITEMS = []
-var ACTIVE_FILTER = 'all'
-var PENDING_TRIGGER_ITEM = null  // item waiting to be added to a docket
+var PORTFOLIO_SELECTION = []
+var PENDING_TRIGGER_ITEM = null
 
-// Item type config
+// \u2500\u2500 Utils \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function fmtDate(d){ if(!d) return ''; try{ return new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) }catch(e){ return d } }
+function genId(prefix){ return prefix+'-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+Math.floor(Math.random()*9999) }
+function initials(name){ return (name||'?').split(' ').slice(0,2).map(function(w){ return w[0] }).join('').toUpperCase() }
+
 var ITEM_TYPES = {
-  action:   {icon:'\u26A1', label:'Action',        hint:'A specific action or follow-up task assigned to the engagement.'},
-  intel:    {icon:'\uD83D\uDCCA', label:'Intelligence', hint:'An intelligence item from Second Brain linked to this engagement.'},
-  pei:      {icon:'\uD83D\uDD0D', label:'PEI Brief',    hint:'Customer intelligence brief generated from PEI tool.'},
-  uc:       {icon:'\uD83D\uDCA1', label:'Use Case',     hint:'A validated use case from the UC Library.'},
-  rfp:      {icon:'\uD83D\uDCC4', label:'RFP / Tender', hint:'A Request for Proposal or government tender document.'},
-  pitch:    {icon:'\uD83D\uDCCA', label:'Pitch Report',  hint:'Pitch deck or report prepared for the customer.'},
-  solution: {icon:'\u2699\uFE0F', label:'Tech Solution', hint:'Technical architecture and solution design.'},
-  bom:      {icon:'\uD83D\uDCDC', label:'BOM',           hint:'Bill of materials for the proposed solution.'},
-  proposal: {icon:'\uD83D\uDCC4', label:'Proposal',      hint:'Formal proposal document.'},
-  pricing:  {icon:'\uD83D\uDCB0', label:'Pricing',       hint:'Pricing model and financial structure.'},
-  exec_doc: {icon:'\uD83C\uDF93', label:'Exec Document', hint:'Executive summary or board-level document.'},
+  action:  {icon:'\u26A1',label:'Action'},intel:{icon:'\uD83D\uDCCA',label:'Intelligence'},
+  pei:     {icon:'\uD83D\uDD0D',label:'PEI Brief'},uc:{icon:'\uD83D\uDCA1',label:'Use Case'},
+  rfp:     {icon:'\uD83D\uDCC4',label:'RFP'},pitch:{icon:'\uD83D\uDCCA',label:'Pitch'},
+  solution:{icon:'\u2699\uFE0F',label:'Solution'},bom:{icon:'\uD83D\uDCDC',label:'BOM'},
+  proposal:{icon:'\uD83D\uDCC4',label:'Proposal'},pricing:{icon:'\uD83D\uDCB0',label:'Pricing'},
+  exec_doc:{icon:'\uD83C\uDF93',label:'Exec Doc'}
 }
 
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
-function genId(prefix){ return prefix+'-'+Date.now()+'-'+Math.floor(Math.random()*9999) }
-function fmtDate(d){ if(!d) return ''; try{ return new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) }catch(e){ return d } }
-
 // \u2500\u2500 Load \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function loadDockets(){
-  ALL_DOCKETS = await sbFetch('engagement_dockets','order=updated_at.desc',200)
+async function loadAll(){
+  ALL_CUSTOMERS = await sbFetch('customers','order=updated_at.desc',500)
+  ALL_ENGAGEMENTS = await sbFetch('engagements','order=updated_at.desc',500)
+  PORTFOLIO_CATALOGUE = await sbFetch('portfolio_catalogue','order=level.asc,code.asc',100)
   renderSidebar()
-  if(!CURRENT_DOCKET_ID) renderDashboard()
+  renderDashboard()
 }
 
 // \u2500\u2500 Sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function renderSidebar(){
   var q = (document.getElementById('sbSearch').value||'').toLowerCase()
-  var customers = ALL_DOCKETS.filter(function(d){ return d.type==='customer' && (!q || d.name.toLowerCase().includes(q)) })
-  var myDocket = ALL_DOCKETS.find(function(d){ return d.type==='salesperson' })
+  var strategic = ALL_CUSTOMERS.filter(function(c){ return c.tier==='strategic' && (!q||c.name.toLowerCase().includes(q)) })
+  var transact = ALL_CUSTOMERS.filter(function(c){ return c.tier==='transactional' && (!q||c.name.toLowerCase().includes(q)) })
 
-  document.getElementById('sbCustCount').textContent = customers.length
+  document.getElementById('sbStrategicCount').textContent = strategic.length
+  document.getElementById('sbTransactionalCount').textContent = transact.length
 
-  // Customer dockets
-  document.getElementById('sbCustomerList').innerHTML = customers.length
-    ? customers.map(function(d){
-        var itemCount = 0  // We'll show from cached if available
-        var statusClass = 'status-'+d.status
-        return '<div class="sb-item'+(CURRENT_DOCKET_ID===d.id?' active':'')+'" onclick="openDocket(\''+d.id+'\')">'
-          +'<span class="sb-item-status '+statusClass+'"></span>'
-          +'<span class="sb-item-name" title="'+esc(d.name)+'">'+esc(d.name)+'</span>'
-          +'<span class="sb-item-count">'+esc(d.status)+'</span>'
-          +'</div>'
-      }).join('')
-    : '<div style="padding:8px 16px;font-size:11px;color:var(--mid)">No dockets yet</div>'
+  function custItem(c){
+    return '<div class="sb-item'+(CURRENT_CUSTOMER_ID===c.id?' active':'')+'" onclick="openCustomer(\''+c.id+'\')">'
+      +'<span class="sb-dot dot-'+(c.tier||'transactional')+'"></span>'
+      +'<span class="sb-item-name" title="'+esc(c.name)+'">'+esc(c.name)+'</span>'
+      +'<span style="font-size:9px;color:var(--mid)">'+esc(c.ownership||'')+'</span>'
+      +'</div>'
+  }
 
-  // My action docket
-  document.getElementById('sbMyDocket').innerHTML = myDocket
-    ? '<div class="sb-item'+(CURRENT_DOCKET_ID===myDocket.id?' active':'')+'" onclick="openDocket(\''+myDocket.id+'\')">'
-        +'<span style="font-size:14px">\uD83D\uDCCB</span>'
-        +'<span class="sb-item-name">'+esc(myDocket.name)+' Actions</span>'
-        +'</div>'
-    : '<div style="padding:8px 16px;font-size:11px;color:var(--mid)">Auto-created on first action</div>'
+  document.getElementById('sbStrategicList').innerHTML = strategic.length
+    ? strategic.map(custItem).join('')
+    : '<div style="padding:6px 16px;font-size:11px;color:var(--mid)">None yet</div>'
+  document.getElementById('sbTransactionalList').innerHTML = transact.length
+    ? transact.map(custItem).join('')
+    : '<div style="padding:6px 16px;font-size:11px;color:var(--mid)">None yet</div>'
+
+  document.getElementById('sbMyDocket').innerHTML =
+    '<div class="sb-item" onclick="openMyActions()">'
+    +'<span style="font-size:14px">\uD83D\uDCCB</span>'
+    +'<span class="sb-item-name">My Action Docket</span>'
+    +'</div>'
 }
 
 // \u2500\u2500 Dashboard \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function renderDashboard(){
-  CURRENT_DOCKET_ID = null
-  var active = ALL_DOCKETS.filter(function(d){ return d.type==='customer' && d.status==='active' }).length
-  var won = ALL_DOCKETS.filter(function(d){ return d.status==='won' }).length
-  var total = ALL_DOCKETS.filter(function(d){ return d.type==='customer' }).length
-  var myActions = ALL_DOCKETS.find(function(d){ return d.type==='salesperson' })
+  CURRENT_VIEW='dashboard'; CURRENT_CUSTOMER_ID=null; CURRENT_ENGAGEMENT_ID=null
+  var strat = ALL_CUSTOMERS.filter(function(c){ return c.type==='strategic' }).length
+  var active = ALL_ENGAGEMENTS.filter(function(e){ return e.status==='active' }).length
+  var won = ALL_ENGAGEMENTS.filter(function(e){ return e.status==='won' }).length
 
-  var recentCards = ALL_DOCKETS.filter(function(d){ return d.type==='customer' }).slice(0,6).map(function(d){
-    return '<div class="docket-item" style="cursor:pointer" onclick="openDocket(\''+d.id+'\')">'
-      +'<div class="item-icon icon-pitch" style="font-size:18px">\uD83C\uDFE2</div>'
-      +'<div class="item-body">'
-      +'<div class="item-title">'+esc(d.name)+'</div>'
-      +'<div class="item-meta"><span>'+esc(d.customer_name||'')+'</span><span>'+esc(d.sector||'')+'</span><span>'+esc(d.country||'')+'</span><span>Updated '+fmtDate(d.updated_at)+'</span></div>'
-      +(d.deal_value?'<div class="item-notes">Deal: '+esc(d.deal_value)+'</div>':'')
+  var recentEngs = ALL_ENGAGEMENTS.slice(0,6).map(function(e){
+    var cust = ALL_CUSTOMERS.find(function(c){ return c.id===e.customer_id })
+    return '<div class="eng-card phase-'+e.phase+'" onclick="openEngagement(\''+e.id+'\')">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+      +'<div style="font-size:13px;font-weight:600;color:var(--dark)">'+esc(e.name)+'</div>'
+      +'<span class="pill pill-'+e.status+'">'+e.status+'</span>'
       +'</div>'
-      +'<span class="item-status is-'+d.status+'">'+d.status+'</span>'
+      +'<div style="font-size:10px;color:var(--mid)">'
+      +(cust?esc(cust.name)+' \u00B7 ':'')
+      +esc(e.phase)+' \u00B7 '+esc(e.domain||'')+' \u00B7 '+fmtDate(e.updated_at)
+      +'</div>'
       +'</div>'
   }).join('')
 
   document.getElementById('mainPanel').innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">'
     +'<div><div class="card-title" style="font-size:18px">Engagement Overview</div>'
-    +'<div style="font-size:12px;color:var(--mid)">All customer engagements and sales actions</div></div>'
-    +'<button class="btn btn-primary" onclick="openNewDocketModal()">+ New Docket</button>'
+    +'<div style="font-size:12px;color:var(--mid)">Customers, engagements, dockets and portfolio</div></div>'
+    +'<button class="btn btn-primary" onclick="openModal(\'newCustomerModal\')">\u002B New Customer</button>'
     +'</div>'
-    +'<div class="dash-grid">'
-    +'<div class="dash-stat"><div class="dash-stat-val">'+total+'</div><div class="dash-stat-lbl">Total Engagements</div></div>'
-    +'<div class="dash-stat"><div class="dash-stat-val" style="color:var(--teal)">'+active+'</div><div class="dash-stat-lbl">Active</div></div>'
-    +'<div class="dash-stat"><div class="dash-stat-val" style="color:var(--blue)">'+won+'</div><div class="dash-stat-lbl">Won</div></div>'
-    +'<div class="dash-stat"><div class="dash-stat-val" style="color:var(--orange)">'+(myActions?'\u2713':'0')+'</div><div class="dash-stat-lbl">My Action Docket</div></div>'
+    +'<div class="stat-grid">'
+    +'<div class="stat"><div class="stat-val">'+ALL_CUSTOMERS.length+'</div><div class="stat-lbl">Total Customers</div></div>'
+    +'<div class="stat"><div class="stat-val" style="color:var(--blue)">'+ALL_CUSTOMERS.filter(function(c){return c.tier==='strategic'}).length+'</div><div class="stat-lbl">Strategic</div></div>'
+    +'<div class="stat"><div class="stat-val" style="color:var(--teal)">'+active+'</div><div class="stat-lbl">Active Engagements</div></div>'
+    +'<div class="stat"><div class="stat-val" style="color:var(--orange)">'+won+'</div><div class="stat-lbl">Won</div></div>'
     +'</div>'
-    +(recentCards
-      ? '<div class="card-title" style="margin-bottom:12px">Recent Engagements</div>'+recentCards
-      : '<div class="empty"><div class="empty-icon">\uD83D\uDCC1</div><div class="empty-title">No engagements yet</div><div class="empty-sub">Create a customer docket to start tracking an engagement,<br>or add an action from Second Brain.</div></div>'
+    +(recentEngs
+      ? '<div class="card-title" style="margin-bottom:12px">Recent Engagements</div>'+recentEngs
+      : '<div class="empty"><div class="empty-icon">\uD83D\uDCC1</div><div class="empty-title">No engagements yet</div><div class="empty-sub">Add a customer to get started.</div></div>'
     )
   renderSidebar()
 }
 
-// \u2500\u2500 Open Docket \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function openDocket(id){
-  CURRENT_DOCKET_ID = id
-  ACTIVE_FILTER = 'all'
-  var docket = ALL_DOCKETS.find(function(d){ return d.id===id })
-  if(!docket) return
+// \u2500\u2500 Customer View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function openCustomer(custId){
+  CURRENT_CUSTOMER_ID = custId
+  CURRENT_ENGAGEMENT_ID = null
+  CURRENT_VIEW = 'customer'
+  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===custId })
+  if(!cust) return
 
-  // Fetch items
-  CURRENT_ITEMS = await sbFetch('docket_items','docket_id=eq.'+id+'&order=created_at.asc',200)
+  var custEngs = ALL_ENGAGEMENTS.filter(function(e){ return e.customer_id===custId })
+  var txns = await sbFetch('transactions','customer_id=eq.'+custId+'&order=txn_date.desc',50)
 
-  renderDocketDetail(docket)
+  var isTransactional = cust.tier === 'transactional'
+  var contacts = Array.isArray(cust.contacts) ? cust.contacts : []
+  var divisions = Array.isArray(cust.divisions) ? cust.divisions : []
+
+  var html = '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">'
+    +'<div style="display:flex;align-items:center;gap:12px">'
+    +'<div class="cust-avatar" style="width:48px;height:48px;font-size:18px">'+initials(cust.name)+'</div>'
+    +'<div>'
+    +'<div style="font-size:20px;font-weight:700;color:var(--navy)">'+esc(cust.name)+'</div>'
+    +'<div style="font-size:11px;color:var(--mid);margin-top:2px">'
+    +[cust.ownership,cust.sector,cust.country,cust.state].filter(Boolean).map(esc).join(' \u00B7 ')
+    +'</div>'
+    +'</div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<span class="pill pill-'+(cust.tier||'transactional')+'">'+esc(cust.tier||'transactional')+'</span>'
+    +(cust.ai_maturity?'<span class="pill" style="background:rgba(0,40,112,0.08);color:var(--navy)">AI: '+esc(cust.ai_maturity)+'</span>':'')
+    +'</div>'
+    +'</div>'
+
+  // Elevation banner for transactional customers
+  if(isTransactional){
+    html += '<div class="elevate-banner">'
+      +'<div class="elevate-text">\u26A1 This is a transactional customer. Elevate to strategic to create an Engagement Docket and unlock the full engagement lifecycle.</div>'
+      +'<button class="btn btn-navy btn-sm" onclick="elevateCustomer(\''+custId+'\')">\u2191 Elevate to Strategic</button>'
+      +'</div>'
+  }
+
+  // Tabs
+  html += '<div class="tab-bar">'
+    +'<div class="tab active" id="tab-profile" onclick="switchCustTab(\'profile\')">Profile</div>'
+    +'<div class="tab" id="tab-engagements" onclick="switchCustTab(\'engagements\')">Engagements ('+custEngs.length+')</div>'
+    +'<div class="tab" id="tab-transactions" onclick="switchCustTab(\'transactions\')">Transactions ('+txns.length+')</div>'
+    +'</div>'
+    +'<div id="cust-tab-content"></div>'
+
+  document.getElementById('mainPanel').innerHTML = html
+  window._custEngs = custEngs
+  window._txns = txns
+  window._cust = cust
+  switchCustTab('profile')
   renderSidebar()
 }
 
-function renderDocketDetail(docket){
-  var isSP = docket.type === 'salesperson'
-  var statusPillClass = 'pill-'+docket.status
-
-  // Filter bar
-  var typeCounts = {}
-  CURRENT_ITEMS.forEach(function(item){ typeCounts[item.item_type] = (typeCounts[item.item_type]||0)+1 })
-  var typeBar = '<button class="type-filter'+(ACTIVE_FILTER==='all'?' active':'')+'" onclick="setFilter(\'all\')">All ('+CURRENT_ITEMS.length+')</button>'
-  var typeOrder = ['action','intel','pei','uc','rfp','pitch','solution','bom','proposal','pricing','exec_doc']
-  typeOrder.forEach(function(t){
-    if(typeCounts[t]){
-      var tc = ITEM_TYPES[t]
-      typeBar += '<button class="type-filter'+(ACTIVE_FILTER===t?' active':'')+'" onclick="setFilter(\''+t+'\')">'+(tc?tc.icon+' '+tc.label:t)+' ('+typeCounts[t]+')</button>'
-    }
+function switchCustTab(tab){
+  ['profile','engagements','transactions'].forEach(function(t){
+    var el = document.getElementById('tab-'+t)
+    if(el) el.className = 'tab'+(t===tab?' active':'')
   })
+  var cust = window._cust
+  var custEngs = window._custEngs || []
+  var txns = window._txns || []
+  var content = ''
 
-  // Filtered items
-  var filtered = ACTIVE_FILTER==='all' ? CURRENT_ITEMS : CURRENT_ITEMS.filter(function(i){ return i.item_type===ACTIVE_FILTER })
+  if(tab === 'profile'){
+    var contacts = Array.isArray(cust.contacts) ? cust.contacts : []
+    var divisions = Array.isArray(cust.divisions) ? cust.divisions : []
+    content = '<div class="card"><div class="card-title">Organisation Details</div>'
+      +'<div class="form-grid">'
+      +'<div><label>Parent Organisation</label><div style="font-size:13px">'+esc(cust.parent_org||'\u2014')+'</div></div>'
+      +'<div><label>Org Type</label><div style="font-size:13px">'+esc(cust.org_type||'\u2014')+'</div></div>'
+      +'</div>'
+      +(cust.notes?'<div style="margin-top:12px;font-size:12px;color:var(--mid);line-height:1.6">'+esc(cust.notes)+'</div>':'')
+      +'</div>'
+    // Contacts
+    content += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      +'<div class="card-title" style="margin:0">Key Contacts</div>'
+      +'<button class="btn btn-ghost btn-xs" onclick="addContact(\''+cust.id+'\')">\u002B Add</button>'
+      +'</div>'
+      +(contacts.length ? contacts.map(function(c){
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--light)">'
+          +'<div style="flex:1"><div style="font-size:12px;font-weight:600">'+esc(c.name)+'</div>'
+          +'<div style="font-size:10px;color:var(--mid)">'+esc(c.role||'')+(c.seniority?' \u00B7 '+esc(c.seniority):'')+'</div></div>'
+          +(c.influence?'<span class="pill" style="background:rgba(0,178,144,0.1);color:var(--teal)">'+esc(c.influence)+'</span>':'')
+          +'</div>'
+      }).join('') : '<div style="font-size:11px;color:var(--mid);padding:8px 0">No contacts added yet</div>')
+      +'</div>'
+  }
 
-  var itemsHtml = filtered.length
-    ? filtered.map(function(item){ return renderItem(item) }).join('')
-    : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCCB</div><div class="empty-title">No items yet</div><div class="empty-sub">Add intelligence, PEI, UCs, or actions to this docket.</div></div>'
+  if(tab === 'engagements'){
+    content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      +(cust.tier==='strategic'
+        ? '<button class="btn btn-primary" onclick="openModal(\'newEngagementModal\'); document.getElementById(\'ne-customer-id\').value=\''+cust.id+'\'">\u002B New Engagement</button>'
+        : '<div style="font-size:11px;color:var(--mid)">Elevate to strategic to create engagements</div>')
+      +'</div>'
+    content += custEngs.length ? custEngs.map(function(e){
+      return '<div class="eng-card phase-'+e.phase+'" onclick="openEngagement(\''+e.id+'\')">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+        +'<div style="font-size:13px;font-weight:600">'+esc(e.name)+'</div>'
+        +'<span class="pill pill-'+e.status+'">'+e.status+'</span></div>'
+        +'<div style="font-size:10px;color:var(--mid)">'+esc(e.phase)+' \u00B7 '+esc(e.archetype||'')+' \u00B7 '+esc(e.value||'')+' '+esc(e.currency||'')+'</div>'
+        +'</div>'
+    }).join('') : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCBC</div><div class="empty-title">No engagements</div></div>'
+  }
 
-  document.getElementById('mainPanel').innerHTML =
-    '<div class="docket-hdr">'
+  if(tab === 'transactions'){
+    content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      +'<button class="btn btn-ghost btn-sm" onclick="openModal(\'newTxnModal\'); document.getElementById(\'txn-customer-id\').value=\''+cust.id+'\'">\u002B Record Transaction</button>'
+      +'</div>'
+    content += txns.length ? txns.map(function(t){
+      return '<div class="card" style="padding:12px 14px">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between">'
+        +'<div style="font-size:13px;font-weight:600">'+esc(t.product_name)+'</div>'
+        +'<div style="font-size:12px;font-weight:600;color:var(--teal)">'+esc(t.value||'')+' '+esc(t.currency||'')+'</div></div>'
+        +'<div style="font-size:10px;color:var(--mid);margin-top:4px">'+fmtDate(t.txn_date)+' \u00B7 '+esc(t.channel||'')+' \u00B7 '+esc(t.product_code||'')+'</div>'
+        +(t.notes?'<div style="font-size:11px;color:var(--mid);margin-top:4px">'+esc(t.notes)+'</div>':'')
+        +'</div>'
+    }).join('') : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCB3</div><div class="empty-title">No transactions</div></div>'
+  }
+
+  document.getElementById('cust-tab-content').innerHTML = content
+}
+
+// \u2500\u2500 Engagement View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function openEngagement(engId){
+  CURRENT_ENGAGEMENT_ID = engId
+  CURRENT_VIEW = 'engagement'
+  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
+  if(!eng) return
+  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===eng.customer_id })
+
+  // Get or create docket for this engagement
+  var dockets = await sbFetch('engagement_dockets','engagement_id=eq.'+engId,1)
+  var docket = dockets[0]
+  if(!docket){
+    // Auto-create docket for this engagement
+    var newDocket = {
+      id: genId('ENG'),
+      type: 'customer',
+      name: (cust?cust.name+' \u2014 ':'')+eng.name,
+      customer_name: cust?cust.name:'',
+      customer_id: eng.customer_id,
+      engagement_id: engId,
+      owner: '',
+      status: 'active',
+      sector: eng.domain||'',
+      metadata: {}
+    }
+    await sbInsert('engagement_dockets', newDocket)
+    docket = newDocket
+  }
+
+  CURRENT_DOCKET_ID = docket.id
+  CURRENT_ITEMS = await sbFetch('docket_items','docket_id=eq.'+docket.id+'&order=created_at.asc',200)
+
+  var isL1 = eng.archetype === 'territory_coe' || eng.type === 'new' && eng.domain === 'REG-AIP'
+
+  var html = '<div style="background:var(--navy);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;color:var(--white)">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
     +'<div>'
-    +'<div class="docket-name">'+esc(docket.name)+'</div>'
-    +'<div class="docket-meta">'
-    +(docket.customer_name?'<span>\uD83C\uDFE2 '+esc(docket.customer_name)+'</span>':'')
-    +(docket.sector?'<span>\uD83D\uDCCA '+esc(docket.sector)+'</span>':'')
-    +(docket.country?'<span>\uD83C\uDF0D '+esc(docket.country)+'</span>':'')
-    +(docket.deal_value?'<span>\uD83D\uDCB0 '+esc(docket.deal_value)+'</span>':'')
-    +'<span>\uD83D\uDCC5 Updated '+fmtDate(docket.updated_at)+'</span>'
-    +'</div>'
-    +'<div class="docket-pills">'
-    +'<span class="pill '+statusPillClass+'">'+docket.status+'</span>'
-    +(isSP?'<span class="pill pill-customer">My Actions</span>':'<span class="pill pill-customer">Customer Docket</span>')
-    +'</div>'
-    +'</div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    +'<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+docket.id+'\')">+ Add Item</button>'
-    +(isSP?'':'<button class="btn btn-ghost btn-sm" onclick="exportWordDoc(\''+docket.id+'\')">&#128196; Export Word</button>')
-    +'<select onchange="changeDocketStatus(\''+docket.id+'\',this.value)" style="padding:4px 8px;font-size:11px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:var(--white);font-family:inherit">'
-    +'<option value="active"'+(docket.status==='active'?' selected':'')+'>Active</option>'
-    +'<option value="paused"'+(docket.status==='paused'?' selected':'')+'>Paused</option>'
-    +'<option value="won"'+(docket.status==='won'?' selected':'')+'>Won</option>'
-    +'<option value="lost"'+(docket.status==='lost'?' selected':'')+'>Lost</option>'
-    +'<option value="closed"'+(docket.status==='closed'?' selected':'')+'>Closed</option>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">'+(cust?esc(cust.name)+' \u00B7 ':'')+'<span id="eng-id-badge">'+esc(eng.id)+'</span></div>'
+    +'<div style="font-size:20px;font-weight:700">'+esc(eng.name)+'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'
+    +'<span class="pill pill-'+eng.status+'">'+eng.status+'</span>'
+    +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.phase)+'</span>'
+    +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.archetype||'')+'</span>'
+    +(eng.value?'<span class="pill" style="background:rgba(0,178,144,0.2);color:var(--teal)">\uD83D\uDCB0 '+esc(eng.value)+' '+esc(eng.currency||'')+'</span>':'')
+    +'</div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">'
+    +'<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+docket.id+'\')">\u002B Add Item</button>'
+    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="openPortfolioMap(\''+engId+'\',\''+docket.id+'\')">\uD83D\uDDFA\uFE0F Portfolio</button>'
+    +(isL1?'<button class="btn btn-sm" style="background:rgba(255,182,0,0.2);color:var(--amber)" onclick="openL1Config(\''+engId+'\')">L1 Configure</button>':'')
+    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="runRecommendationEngine(\''+engId+'\')">\uD83E\uDD16 Recommend</button>'
+    +'<select onchange="changeEngStatus(\''+engId+'\',this.value)" style="padding:4px 8px;font-size:11px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:var(--white);font-family:inherit">'
+    +'<option value="active"'+(eng.status==='active'?' selected':'')+'>Active</option>'
+    +'<option value="paused"'+(eng.status==='paused'?' selected':'')+'>Paused</option>'
+    +'<option value="won"'+(eng.status==='won'?' selected':'')+'>Won</option>'
+    +'<option value="lost"'+(eng.status==='lost'?' selected':'')+'>Lost</option>'
     +'</select>'
     +'</div></div></div>'
-    +'<div class="item-type-bar">'+typeBar+'</div>'
-    +itemsHtml
+
+  // Docket items
+  var itemsByType = {}
+  CURRENT_ITEMS.forEach(function(item){ if(!itemsByType[item.item_type]) itemsByType[item.item_type]=0; itemsByType[item.item_type]++ })
+
+  // Filter bar
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'
+    +'<button class="btn btn-ghost btn-xs" style="background:var(--navy);color:var(--white)" onclick="renderItems(\'all\')">All ('+CURRENT_ITEMS.length+')</button>'
+  Object.keys(ITEM_TYPES).forEach(function(t){
+    if(itemsByType[t]) html += '<button class="btn btn-ghost btn-xs" onclick="renderItems(\''+t+'\')">'+(ITEM_TYPES[t].icon)+' '+ITEM_TYPES[t].label+' ('+itemsByType[t]+')</button>'
+  })
+  html += '</div><div id="docket-items-container"></div>'
+
+  document.getElementById('mainPanel').innerHTML = html
+  window._currentEng = eng
+  renderItems('all')
+  renderSidebar()
+}
+
+function renderItems(filterType){
+  var items = filterType==='all' ? CURRENT_ITEMS : CURRENT_ITEMS.filter(function(i){ return i.item_type===filterType })
+  var html = items.length ? items.map(renderItem).join('')
+    : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCCB</div><div class="empty-title">No items yet</div><div class="empty-sub">Add intelligence, PEI, UCs, or actions to this docket.</div></div>'
+  document.getElementById('docket-items-container').innerHTML = html
 }
 
 function renderItem(item){
-  var tc = ITEM_TYPES[item.item_type] || {icon:'\uD83D\uDCCC',label:item.item_type}
-  var content = item.content || {}
+  var tc = ITEM_TYPES[item.item_type]||{icon:'\uD83D\uDCCC',label:item.item_type}
+  var content = item.content||{}
   var preview = item.notes || content.summary || content.problem_statement || ''
   return '<div class="docket-item">'
     +'<div class="item-icon icon-'+item.item_type+'">'+tc.icon+'</div>'
     +'<div class="item-body">'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
     +'<div class="item-title">'+esc(item.title)+'</div>'
     +'<span class="item-status is-'+item.status+'">'+item.status.replace('_',' ')+'</span>'
     +'</div>'
-    +'<div class="item-meta">'
-    +'<span class="tag">'+tc.label+'</span>'
-    +(item.assigned_to?'<span>\uD83D\uDC64 '+esc(item.assigned_to)+'</span>':'')
-    +(item.due_date?'<span>\uD83D\uDCC5 '+fmtDate(item.due_date)+'</span>':'')
-    +'<span>'+fmtDate(item.created_at)+'</span>'
-    +'</div>'
-    +(preview?'<div class="item-notes">'+esc(preview.slice(0,150))+(preview.length>150?'\u2026':'')+'</div>':'')
-    +'<div class="item-actions">'
-    +'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="viewItem(this.dataset.id)">\uD83D\uDC41 View</button>'
-    +buildStatusButtons(item)
-    +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteItem(this.dataset.id)">&#10007;</button>'
+    +'<div class="item-meta">'+(item.assigned_to?'\uD83D\uDC64 '+esc(item.assigned_to)+' \u00B7 ':'')+(item.due_date?'\uD83D\uDCC5 '+fmtDate(item.due_date)+' \u00B7 ':'')+'Added '+fmtDate(item.created_at)+'</div>'
+    +(preview?'<div style="font-size:11px;color:#555;margin-top:4px;line-height:1.5">'+esc(preview.slice(0,120))+(preview.length>120?'\u2026':'')+'</div>':'')
+    +'<div style="display:flex;gap:6px;margin-top:6px">'
+    +(item.status==='pending'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">\u25B6 Start</button>':'')
+    +(item.status==='in_progress'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">\u2713 Done</button>':'')
+    +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteItem(this.dataset.id)">\u2715</button>'
     +'</div></div></div>'
 }
 
-function buildStatusButtons(item){
-  var btns = ''
-  if(item.status==='pending') btns += '<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">&#9654; Start</button>'
-  if(item.status==='in_progress') btns += '<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">&#10003; Done</button>'
-  if(item.status==='done') btns += '<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'closed\')">&#8679; Close</button>'
-  return btns
-}
+// \u2500\u2500 Recommendation Engine \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function runRecommendationEngine(engId){
+  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
+  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===(eng&&eng.customer_id) })
+  if(!eng) return
 
-function setFilter(f){
-  ACTIVE_FILTER = f
-  var docket = ALL_DOCKETS.find(function(d){ return d.id===CURRENT_DOCKET_ID })
-  if(docket) renderDocketDetail(docket)
-}
+  var model = atlasGetTaskModel('pei')
+  var key = atlasGetKeyForModel(model)
+  if(!key){ alert('Configure AI keys in ATLAS Settings to use the Recommendation Engine.'); return }
 
-// \u2500\u2500 Create docket \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function openNewDocketModal(){
-  document.getElementById('nd-customer').value=''
-  document.getElementById('nd-engagement').value=''
-  document.getElementById('nd-deal').value=''
-  document.getElementById('nd-source').value='manual'
-  document.getElementById('newDocketModal').classList.add('open')
-}
+  var panel = document.getElementById('mainPanel')
+  var recDiv = document.createElement('div')
+  recDiv.className = 'rec-card'
+  recDiv.innerHTML = '<div class="rec-title">\uD83E\uDD16 Running Recommendation Engine...</div>'
+  panel.insertBefore(recDiv, panel.firstChild.nextSibling.nextSibling)
 
-async function createCustomerDocket(opts){
-  opts = opts || {}
-  var customer = opts.customer || document.getElementById('nd-customer').value.trim()
-  var engagement = opts.engagement || document.getElementById('nd-engagement').value.trim()
-  if(!customer||!engagement){ alert('Customer name and engagement name are required.'); return null }
-  var sector = opts.sector || document.getElementById('nd-sector').value
-  var country = opts.country || document.getElementById('nd-country').value
-  var deal = opts.deal || document.getElementById('nd-deal').value.trim()
-  var source = opts.source || document.getElementById('nd-source').value
+  var prompt = 'You are an AI business development assistant for an on-premises AI hardware and software OEM.'
+    +' Analyse this engagement and recommend the most relevant portfolio items.'
+    +' Customer: '+JSON.stringify({name:cust&&cust.name,sector:cust&&cust.sector,ownership:cust&&cust.ownership,country:cust&&cust.country,ai_maturity:cust&&cust.ai_maturity})+''
+    +' Engagement: '+JSON.stringify({name:eng.name,archetype:eng.archetype,type:eng.type,phase:eng.phase,domain:eng.domain,value:eng.value})+''
+    +' Portfolio: '+JSON.stringify(PORTFOLIO_CATALOGUE.map(function(p){ return {code:p.code,name:p.name,level:p.level,category:p.category} }))+''
+    +' Respond with JSON: {recommendations:[{code,reason,priority(high|medium|low)}], upsell:[{code,reason}], summary(2 sentences)}'
+    +' Start { end }. No markdown.'
 
-  var id = 'ENG-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+Math.floor(Math.random()*9999)
-  var docket = {
-    id:id, type:'customer',
-    name: customer+' \u2014 '+engagement,
-    customer_name: customer,
-    owner: '',
-    status:'active',
-    sector: sector,
-    country: country,
-    deal_value: deal,
-    source: source,
-    metadata:{},
+  try{
+    var text = await atlasCallModel(model, prompt, null, 1500)
+    var first = text.indexOf('{'), last = text.lastIndexOf('}')
+    if(first<0) throw new Error('No JSON in response')
+    var result = JSON.parse(text.slice(first,last+1))
+    var recs = result.recommendations||[]
+    var upsells = result.upsell||[]
+    var recHtml = '<div class="rec-title">\uD83E\uDD16 Portfolio Recommendations</div>'
+      +(result.summary?'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">'+esc(result.summary)+'</div>':'')
+      +'<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;margin-bottom:6px">Recommended</div>'
+      +recs.map(function(r){
+        return '<div class="rec-item"><span class="pill pill-l'+(r.code&&r.code[1]||'3')+'" style="flex-shrink:0">'+esc(r.code)+'</span>'
+          +'<span style="flex:1">'+esc(r.reason)+'</span>'
+          +'<span class="pill" style="background:rgba(255,85,57,0.1);color:var(--orange)">'+esc(r.priority)+'</span></div>'
+      }).join('')
+      +(upsells.length?'<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;margin:10px 0 6px">Upsell / Cross-sell</div>'
+        +upsells.map(function(r){
+          return '<div class="rec-item"><span class="pill pill-l'+(r.code&&r.code[1]||'3')+'" style="flex-shrink:0">'+esc(r.code)+'</span>'
+            +'<span>'+esc(r.reason)+'</span></div>'
+        }).join('') : '')
+    recDiv.innerHTML = recHtml
+    window._lastRecommendations = recs.concat(upsells).map(function(r){ return r.code })
+  }catch(e){
+    recDiv.innerHTML = '<div class="rec-title">\uD83E\uDD16 Recommendation Engine</div>'
+      +'<div style="font-size:11px;color:#DC2626">Error: '+esc(e.message)+'</div>'
   }
-  var ok = await sbInsert('engagement_dockets', docket)
-  if(ok){
-    closeModal('newDocketModal')
-    await loadDockets()
-    openDocket(id)
-    return id
+}
+
+// \u2500\u2500 Portfolio Map \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function openPortfolioMap(engId, docketId){
+  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
+  window._portfolioEngId = engId
+  window._portfolioDocketId = docketId
+  var recommended = window._lastRecommendations || []
+
+  var l1 = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level===1 })
+  var l2 = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level===2 })
+  var l3 = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level===3 })
+
+  function renderGroup(items, label, levelClass){
+    return '<div style="margin-bottom:16px">'
+      +'<div class="portfolio-section-label"><span class="pill '+levelClass+'">'+levelClass.replace('pill-','L').toUpperCase()+'</span>'+label+'</div>'
+      +'<div class="portfolio-items-grid">'
+      +items.map(function(p){
+        var isRec = recommended.indexOf(p.code)>=0
+        var isSel = PORTFOLIO_SELECTION.indexOf(p.code)>=0 || isRec
+        return '<div class="portfolio-item'+(isSel?' selected':'')+(isRec?' recommended':'')+'" data-code="'+p.code+'" onclick="togglePortfolioItem(this,\''+p.code+'\')">'
+          +'<div class="pi-code">'+esc(p.code)+'</div>'
+          +'<div class="pi-name">'+esc(p.name)+'</div>'
+          +'<div class="pi-cat">'+esc(p.category||p.deal_size||'')+'</div>'
+          +(isRec?'<span class="pi-badge rec">\u2605 Recommended</span>':'')
+          +(isSel&&!isRec?'<span class="pi-badge sel">\u2713 Selected</span>':'')
+          +'</div>'
+      }).join('')
+      +'</div></div>'
+  }
+
+  var mapHtml = renderGroup(l1,'Strategic Offering','pill-l1')
+    + renderGroup(l2,'Technical Building Blocks','pill-l2')
+    + renderGroup(l3,'Lifecycle Services (select relevant)','pill-l3')
+
+  document.getElementById('portfolioMapContent').innerHTML = mapHtml
+  updatePortfolioSummary()
+  openModal('portfolioMapModal')
+}
+
+function togglePortfolioItem(el, code){
+  el.classList.toggle('selected')
+  var idx = PORTFOLIO_SELECTION.indexOf(code)
+  if(idx>=0) PORTFOLIO_SELECTION.splice(idx,1)
+  else PORTFOLIO_SELECTION.push(code)
+  var badge = el.querySelector('.pi-badge.sel')
+  if(el.classList.contains('selected') && !el.classList.contains('recommended')){
+    if(!badge){ var b=document.createElement('span'); b.className='pi-badge sel'; b.textContent='\u2713 Selected'; el.appendChild(b) }
   } else {
-    alert('Failed to create docket. Check Supabase connection in Settings.')
-    return null
+    if(badge && !el.classList.contains('recommended')) badge.remove()
   }
+  updatePortfolioSummary()
 }
 
-async function getOrCreateSalespersonDocket(){
-  var existing = ALL_DOCKETS.find(function(d){ return d.type==='salesperson' })
-  if(existing) return existing.id
-  // Auto-create
-  var g = atlasGetGlobal()
-  var ownerName = g.owner_name || 'My'
-  var id = 'SP-'+Date.now()
-  var ok = await sbInsert('engagement_dockets',{
-    id:id, type:'salesperson',
-    name: ownerName,
-    status:'active',
-    metadata:{}
-  })
+function updatePortfolioSummary(){
+  var selected = document.querySelectorAll('.portfolio-item.selected')
+  document.getElementById('portfolioMapSummary').textContent = selected.length+' items selected. Click Save to add as a Solution item in the docket.'
+}
+
+async function savePortfolioSelection(){
+  var items = Array.from(document.querySelectorAll('.portfolio-item.selected'))
+  var codes = items.map(function(el){ return el.dataset.code })
+  if(!codes.length){ closeModal('portfolioMapModal'); return }
+
+  var selectedItems = PORTFOLIO_CATALOGUE.filter(function(p){ return codes.indexOf(p.code)>=0 })
+  var summary = 'Portfolio selection: '+codes.join(', ')
+  var newItem = {
+    id: genId('DI'),
+    docket_id: window._portfolioDocketId,
+    item_type: 'solution',
+    title: 'Portfolio Selection \u2014 '+new Date().toLocaleDateString('en-IN'),
+    content: {portfolio_codes: codes, portfolio_items: selectedItems.map(function(p){ return {code:p.code,name:p.name,level:p.level} })},
+    source_id: null, status: 'pending',
+    notes: summary,
+    created_by: 'ATLAS Portfolio Map',
+    assigned_to: null, due_date: null
+  }
+  var ok = await sbInsert('docket_items', newItem)
   if(ok){
-    await loadDockets()
-    return id
-  }
-  return null
+    CURRENT_ITEMS.push(newItem)
+    closeModal('portfolioMapModal')
+    renderItems('all')
+    PORTFOLIO_SELECTION = []
+  } else { alert('Failed to save. Check Supabase connection.') }
 }
 
-// \u2500\u2500 Add Item \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function openAddItemModal(docketId, presetType, presetTitle, presetNotes, sourceId){
-  document.getElementById('ai-docket-id').value = docketId
-  document.getElementById('ai-preset-type').value = presetType||''
-  document.getElementById('ai-source-id').value = sourceId||''
-  document.getElementById('ai-title').value = presetTitle||''
-  document.getElementById('ai-notes').value = presetNotes||''
-  document.getElementById('ai-assigned').value = ''
-  document.getElementById('ai-due').value = ''
-  if(presetType) document.getElementById('ai-type').value = presetType
-  updateItemTypeHints()
-  document.getElementById('addItemModal').classList.add('open')
+// \u2500\u2500 Create customer / engagement \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function createCustomer(){
+  var name = document.getElementById('nc-name').value.trim()
+  if(!name){ alert('Customer name is required.'); return }
+  var cust = {
+    id: genId('CUST'),
+    name: name,
+    short_name: document.getElementById('nc-short').value.trim()||null,
+    tier: document.getElementById('nc-tier').value,
+    ownership: document.getElementById('nc-ownership').value||null,
+    sector: document.getElementById('nc-sector').value||null,
+    country: document.getElementById('nc-country').value||'India',
+    state: document.getElementById('nc-state').value.trim()||null,
+    ai_maturity: document.getElementById('nc-maturity').value||null,
+    notes: document.getElementById('nc-notes').value.trim()||null,
+    contacts: [], divisions: []
+  }
+  var ok = await sbInsert('customers', cust)
+  if(ok){
+    ALL_CUSTOMERS.unshift(cust)
+    closeModal('newCustomerModal')
+    renderSidebar()
+    openCustomer(cust.id)
+  } else { alert('Failed to create customer. Check Supabase connection.') }
 }
 
-function updateItemTypeHints(){
-  var t = document.getElementById('ai-type').value
-  var tc = ITEM_TYPES[t]
-  var hint = document.getElementById('ai-hint')
-  if(tc && tc.hint){
-    hint.textContent = tc.hint
-    hint.style.display = 'block'
-  } else {
-    hint.style.display = 'none'
+async function createEngagement(){
+  var custId = document.getElementById('ne-customer-id').value
+  var name = document.getElementById('ne-name').value.trim()
+  if(!name){ alert('Engagement name is required.'); return }
+  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===custId })
+  var year = new Date().getFullYear()
+  var domain = document.getElementById('ne-domain').value||'GEN'
+  var seq = String(Math.floor(Math.random()*9000)+1000)
+  var engId = 'ENG-'+year+'-'+domain.replace('-','').slice(0,3)+'-'+seq
+  var eng = {
+    id: engId,
+    customer_id: custId,
+    name: name,
+    archetype: document.getElementById('ne-archetype').value,
+    type: document.getElementById('ne-type').value,
+    phase: document.getElementById('ne-phase').value,
+    status: 'active',
+    domain: domain,
+    currency: document.getElementById('ne-currency').value,
+    value: document.getElementById('ne-value').value.trim()||null,
+    notes: document.getElementById('ne-notes').value.trim()||null,
+    owner: ''
   }
+  var ok = await sbInsert('engagements', eng)
+  if(ok){
+    ALL_ENGAGEMENTS.unshift(eng)
+    closeModal('newEngagementModal')
+    openEngagement(engId)
+  } else { alert('Failed to create engagement.') }
+}
+
+// \u2500\u2500 Elevation \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function elevateCustomer(custId){
+  if(!confirm('Elevate this customer to Strategic? This will enable full engagement dockets and retrofit all transactions.')) return
+  var ok = await sbPatch('customers','id=eq.'+custId,{tier:'strategic',elevated_at:new Date().toISOString(),elevated_by:'Business Head'})
+  if(ok){
+    var cust = ALL_CUSTOMERS.find(function(c){ return c.id===custId })
+    if(cust){ cust.tier='strategic'; cust.elevated_at=new Date().toISOString() }
+    // Retrofit transactions as docket items (create a docket first)
+    var txns = await sbFetch('transactions','customer_id=eq.'+custId,100)
+    if(txns.length > 0){
+      var docketId = genId('ENG')
+      var docket = {id:docketId,type:'customer',name:(cust?cust.name:'')+' \u2014 Elevated Account',customer_id:custId,customer_name:cust?cust.name:'',owner:'',status:'active',metadata:{elevated:true}}
+      await sbInsert('engagement_dockets',docket)
+      for(var i=0;i<txns.length;i++){
+        var t=txns[i]
+        await sbInsert('docket_items',{id:genId('DI'),docket_id:docketId,item_type:'action',title:'Transaction: '+t.product_name,content:{product_code:t.product_code,value:t.value,currency:t.currency,channel:t.channel},source_id:t.id,status:'closed',notes:t.notes,created_at:t.created_at,created_by:'Elevation Retrofit'})
+      }
+    }
+    renderSidebar()
+    openCustomer(custId)
+  } else { alert('Elevation failed.') }
+}
+
+// \u2500\u2500 CRUD helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function openAddItemModal(docketId){
+  document.getElementById('ai-docket-id').value=docketId
+  document.getElementById('ai-title').value=''
+  document.getElementById('ai-notes').value=''
+  document.getElementById('ai-assigned').value=''
+  document.getElementById('ai-due').value=''
+  document.getElementById('ai-type').value='action'
+  updateItemHint()
+  openModal('addItemModal')
+}
+
+function updateItemHint(){
+  var hints={action:'A specific task or follow-up for this engagement.',intel:'An intelligence item from Second Brain.',pei:'Customer intelligence brief from PEI tool.',uc:'A validated use case from the UC Library.',rfp:'An RFP or tender document.',solution:'Technical architecture or solution design.',bom:'Bill of materials.',proposal:'Formal proposal document.',pricing:'Pricing model.',exec_doc:'Executive summary or board brief.'}
+  var t=document.getElementById('ai-type').value
+  var el=document.getElementById('ai-hint')
+  if(hints[t]){el.textContent=hints[t];el.style.display='block'}else el.style.display='none'
 }
 
 async function saveItem(){
-  var docketId = document.getElementById('ai-docket-id').value
-  var type = document.getElementById('ai-type').value
-  var title = document.getElementById('ai-title').value.trim()
-  var notes = document.getElementById('ai-notes').value.trim()
-  var assigned = document.getElementById('ai-assigned').value.trim()
-  var due = document.getElementById('ai-due').value
-  var sourceId = document.getElementById('ai-source-id').value
-
-  if(!title){ alert('Title is required.'); return }
-
-  var item = {
-    id: genId('DI'),
-    docket_id: docketId,
-    item_type: type,
-    title: title,
-    content: {},
-    source_id: sourceId||null,
-    status: 'pending',
-    assigned_to: assigned||null,
-    due_date: due||null,
-    notes: notes||null,
-    created_by: 'ATLAS',
-  }
-
-  var ok = await sbInsert('docket_items', item)
-  if(ok){
-    closeModal('addItemModal')
-    CURRENT_ITEMS.push(item)
-    var docket = ALL_DOCKETS.find(function(d){ return d.id===docketId })
-    if(docket) renderDocketDetail(docket)
-  } else {
-    alert('Failed to add item. Check Supabase connection.')
-  }
+  var docketId=document.getElementById('ai-docket-id').value
+  var title=document.getElementById('ai-title').value.trim()
+  if(!title){alert('Title required.');return}
+  var item={id:genId('DI'),docket_id:docketId,item_type:document.getElementById('ai-type').value,title:title,content:{},source_id:null,status:'pending',assigned_to:document.getElementById('ai-assigned').value.trim()||null,due_date:document.getElementById('ai-due').value||null,notes:document.getElementById('ai-notes').value.trim()||null,created_by:'ATLAS'}
+  var ok=await sbInsert('docket_items',item)
+  if(ok){closeModal('addItemModal');CURRENT_ITEMS.push(item);renderItems('all')}
+  else alert('Failed to save item.')
 }
 
-// \u2500\u2500 Status changes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function setItemStatus(itemId, newStatus){
-  var ok = await sbPatch('docket_items','id=eq.'+itemId,{status:newStatus})
-  if(ok){
-    var item = CURRENT_ITEMS.find(function(i){ return i.id===itemId })
-    if(item) item.status = newStatus
-    var docket = ALL_DOCKETS.find(function(d){ return d.id===CURRENT_DOCKET_ID })
-    if(docket) renderDocketDetail(docket)
-  }
-}
-
-async function changeDocketStatus(docketId, newStatus){
-  var ok = await sbPatch('engagement_dockets','id=eq.'+docketId,{status:newStatus})
-  if(ok){
-    var docket = ALL_DOCKETS.find(function(d){ return d.id===docketId })
-    if(docket){
-      docket.status = newStatus
-      renderDocketDetail(docket)
-      renderSidebar()
-    }
-  }
+async function setItemStatus(itemId,status){
+  var ok=await sbPatch('docket_items','id=eq.'+itemId,{status:status})
+  if(ok){var item=CURRENT_ITEMS.find(function(i){return i.id===itemId});if(item)item.status=status;renderItems('all')}
 }
 
 async function deleteItem(itemId){
-  if(!confirm('Delete this item? This cannot be undone.')) return
-  var ok = await sbDelete('docket_items','id=eq.'+itemId)
-  if(ok){
-    CURRENT_ITEMS = CURRENT_ITEMS.filter(function(i){ return i.id!==itemId })
-    var docket = ALL_DOCKETS.find(function(d){ return d.id===CURRENT_DOCKET_ID })
-    if(docket) renderDocketDetail(docket)
-  }
+  if(!confirm('Delete this item?'))return
+  var ok=await sbDelete('docket_items','id=eq.'+itemId)
+  if(ok){CURRENT_ITEMS=CURRENT_ITEMS.filter(function(i){return i.id!==itemId});renderItems('all')}
 }
 
-// \u2500\u2500 View Item \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function viewItem(itemId){
-  var item = CURRENT_ITEMS.find(function(i){ return i.id===itemId })
-  if(!item) return
-  var tc = ITEM_TYPES[item.item_type]||{icon:'\uD83D\uDCCC',label:item.item_type}
-  var content = item.content||{}
-
-  function field(label, val){
-    if(!val) return ''
-    return '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px">'+label+'</div>'
-      +'<div style="font-size:12px;color:var(--dark);line-height:1.6">'+esc(String(val))+'</div></div>'
-  }
-
-  var body = ''
-  body += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
-    +'<span class="tag">'+tc.icon+' '+tc.label+'</span>'
-    +'<span class="item-status is-'+item.status+'" style="font-size:10px">'+item.status.replace('_',' ')+'</span>'
-    +(item.assigned_to?'<span class="tag">\uD83D\uDC64 '+esc(item.assigned_to)+'</span>':'')
-    +(item.due_date?'<span class="tag">\uD83D\uDCC5 '+fmtDate(item.due_date)+'</span>':'')
-    +'</div>'
-  body += field('Notes', item.notes)
-
-  // Show content fields
-  var FIELD_LABELS = {
-    summary:'Summary',problem_statement:'Problem',organisation_summary:'Org Summary',
-    our_positioning:'Positioning',uc_name:'UC Name',cluster:'Cluster',
-    problem_statement:'Problem Statement',benefit:'Benefit',
-    hardware_profile:'Hardware Profile',maturity:'Maturity',
-  }
-  Object.keys(FIELD_LABELS).forEach(function(k){
-    if(content[k]) body += field(FIELD_LABELS[k], content[k])
-  })
-
-  body += '<div style="display:flex;gap:8px;margin-top:16px">'
-    +'<button class="btn btn-ghost btn-sm" onclick="closeModal(\'viewItemModal\')">Close</button>'
-    +buildStatusButtons(item).replace(/btn-xs/g,'btn-sm')
-    +'</div>'
-
-  document.getElementById('vi-title').textContent = item.title
-  document.getElementById('vi-body').innerHTML = body
-  document.getElementById('viewItemModal').classList.add('open')
+async function changeEngStatus(engId,status){
+  var ok=await sbPatch('engagements','id=eq.'+engId,{status:status})
+  if(ok){var eng=ALL_ENGAGEMENTS.find(function(e){return e.id===engId});if(eng)eng.status=status}
 }
 
-// \u2500\u2500 Add to Docket trigger (called from other tools via postMessage or direct) \u2500
-// This function is exposed globally so Second Brain, PEI etc. can call it
+async function saveTransaction(){
+  var custId=document.getElementById('txn-customer-id').value
+  var product=document.getElementById('txn-product').value.trim()
+  if(!product){alert('Product name required.');return}
+  var txn={id:genId('TXN'),customer_id:custId,product_name:product,value:document.getElementById('txn-value').value.trim()||null,currency:document.getElementById('txn-currency').value,txn_date:document.getElementById('txn-date').value||null,channel:document.getElementById('txn-channel').value,notes:document.getElementById('txn-notes').value.trim()||null}
+  var ok=await sbInsert('transactions',txn)
+  if(ok){closeModal('newTxnModal');if(window._cust&&window._cust.id===custId){window._txns=window._txns||[];window._txns.unshift(txn);switchCustTab('transactions')}}
+  else alert('Failed to save transaction.')
+}
+
+function addContact(custId){alert('Contact management \u2014 coming in next build.')}
+function openMyActions(){alert('My Action Docket \u2014 coming in next build.')}
+function openL1Config(engId){alert('L1 Territory Configuration \u2014 coming in next build.')}
+
+// \u2500\u2500 Add to Docket trigger (from other tools) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function atlasAddToDocket(item){
-  // item: {type, title, notes, content, source_id}
   PENDING_TRIGGER_ITEM = item
-
-  // Build docket dropdown
-  var customerDockets = ALL_DOCKETS.filter(function(d){ return d.type==='customer' && d.status==='active' })
-  var opts = '<option value="__new__">+ Create New Customer Docket</option>'
-  opts += '<option value="__sp__">My Action Docket</option>'
-  customerDockets.forEach(function(d){
-    opts += '<option value="'+d.id+'">'+esc(d.name)+'</option>'
-  })
-  document.getElementById('trigger-docket-select').innerHTML = opts
-  document.getElementById('trigger-item-desc').textContent = 'Adding: "'+item.title+'" ('+item.type+')'
-  document.getElementById('trigger-new-fields').style.display = 'none'
-  document.getElementById('trigger-docket-select').onchange = function(){
-    document.getElementById('trigger-new-fields').style.display = this.value==='__new__'?'block':'none'
+  var modal = document.createElement('div')
+  modal.id = 'triggerModal'
+  modal.className = 'modal-overlay open'
+  var dockets = await sbFetch('engagement_dockets','type=eq.customer&status=eq.active&order=updated_at.desc',20)
+  var opts = '<option value="__new__">\u002B Create New Customer Docket</option>'
+  dockets.forEach(function(d){ opts+='<option value="'+d.id+'">'+esc(d.name)+'</option>' })
+  modal.innerHTML = '<div class="modal" style="max-width:440px"><div class="modal-title">\uD83D\uDCC1 Add to Docket</div>'
+    +'<div style="font-size:12px;color:var(--mid);margin-bottom:12px">Adding: "'+esc(item.title)+'" ('+esc(item.type)+')</div>'
+    +'<label>Select Docket</label><select id="trigger-sel">'+opts+'</select>'
+    +'<div id="trigger-new" style="display:none"><label>Customer Name</label><input type="text" id="trigger-cust" placeholder="Customer name"><label>Engagement Name</label><input type="text" id="trigger-eng" placeholder="Engagement name"></div>'
+    +'<div class="modal-actions"><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button><button class="btn btn-primary" onclick="confirmTrigger()">Add</button></div>'
+    +'</div>'
+  document.body.appendChild(modal)
+  document.getElementById('trigger-sel').onchange = function(){
+    document.getElementById('trigger-new').style.display = this.value==='__new__'?'block':'none'
   }
-  document.getElementById('triggerModal').classList.add('open')
 }
 
-async function confirmAddToDocket(){
-  var sel = document.getElementById('trigger-docket-select').value
+async function confirmTrigger(){
+  var sel = document.getElementById('trigger-sel').value
   var item = PENDING_TRIGGER_ITEM
   if(!item) return
-
-  var docketId = null
-
-  if(sel === '__new__'){
-    var customer = document.getElementById('trigger-customer').value.trim()
-    var engagement = document.getElementById('trigger-engagement').value.trim()
-    if(!customer||!engagement){ alert('Please enter customer and engagement name.'); return }
-    docketId = await createCustomerDocket({customer:customer,engagement:engagement,source:item.type})
-    if(!docketId) return
-  } else if(sel === '__sp__'){
-    docketId = await getOrCreateSalespersonDocket()
-    if(!docketId){ alert('Could not create action docket.'); return }
-  } else {
-    docketId = sel
+  var docketId = sel
+  if(sel==='__new__'){
+    var cname=document.getElementById('trigger-cust').value.trim()
+    var ename=document.getElementById('trigger-eng').value.trim()
+    if(!cname||!ename){alert('Enter customer and engagement name.');return}
+    var did=genId('ENG')
+    await sbInsert('engagement_dockets',{id:did,type:'customer',name:cname+' \u2014 '+ename,customer_name:cname,owner:'',status:'active',metadata:{source:item.type}})
+    docketId=did
   }
-
-  var newItem = {
-    id: genId('DI'),
-    docket_id: docketId,
-    item_type: item.type || 'action',
-    title: item.title,
-    content: item.content || {},
-    source_id: item.source_id || null,
-    status: 'pending',
-    assigned_to: null,
-    due_date: null,
-    notes: item.notes || null,
-    created_by: 'ATLAS',
-  }
-
-  var ok = await sbInsert('docket_items', newItem)
-  if(ok){
-    closeModal('triggerModal')
-    PENDING_TRIGGER_ITEM = null
-    await loadDockets()
-    openDocket(docketId)
-  } else {
-    alert('Failed to add item.')
-  }
+  var newItem={id:genId('DI'),docket_id:docketId,item_type:item.type||'action',title:item.title,content:item.content||{},source_id:item.source_id||null,status:'pending',notes:item.notes||null,created_by:'ATLAS'}
+  await sbInsert('docket_items',newItem)
+  document.getElementById('triggerModal').remove()
+  PENDING_TRIGGER_ITEM=null
+  await loadAll()
 }
 
-// \u2500\u2500 Word Export \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function exportWordDoc(docketId){
-  var docket = ALL_DOCKETS.find(function(d){ return d.id===docketId })
-  if(!docket){ alert('Docket not found.'); return }
-
-  // Fetch all items
-  var items = await sbFetch('docket_items','docket_id=eq.'+docketId+'&order=item_type.asc,created_at.asc',200)
-
-  // Build plain text document content
-  var lines = []
-  lines.push('ATLAS ENGAGEMENT DOCKET')
-  lines.push('=======================')
-  lines.push('')
-  lines.push('Engagement: '+docket.name)
-  if(docket.customer_name) lines.push('Customer: '+docket.customer_name)
-  if(docket.sector) lines.push('Sector: '+docket.sector)
-  if(docket.country) lines.push('Country: '+docket.country)
-  if(docket.deal_value) lines.push('Deal Value: '+docket.deal_value)
-  lines.push('Status: '+docket.status)
-  lines.push('Exported: '+new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}))
-  lines.push('')
-  lines.push('ITEMS ('+items.length+')')
-  lines.push('---------------')
-
-  var typeGroups = {}
-  items.forEach(function(item){
-    if(!typeGroups[item.item_type]) typeGroups[item.item_type] = []
-    typeGroups[item.item_type].push(item)
-  })
-
-  var typeOrder = ['intel','pei','uc','rfp','solution','bom','pricing','proposal','pitch','exec_doc','action']
-  typeOrder.forEach(function(t){
-    var group = typeGroups[t]
-    if(!group||!group.length) return
-    var tc = ITEM_TYPES[t]||{label:t}
-    lines.push('')
-    lines.push(tc.label.toUpperCase()+' ('+group.length+')')
-    lines.push('---')
-    group.forEach(function(item){
-      lines.push('')
-      lines.push(item.title)
-      lines.push('Status: '+item.status+(item.assigned_to?' | Assigned: '+item.assigned_to:'')+(item.due_date?' | Due: '+fmtDate(item.due_date):''))
-      if(item.notes) lines.push(item.notes)
-      var c = item.content||{}
-      if(c.organisation_summary) lines.push('Summary: '+c.organisation_summary)
-      if(c.our_positioning) lines.push('Positioning: '+c.our_positioning)
-      if(c.problem_statement) lines.push('Problem: '+c.problem_statement)
-      if(c.benefit) lines.push('Benefit: '+c.benefit)
-    })
-  })
-
-  var blob = new Blob([lines.join('\n')],{type:'text/plain'})
-  var url = URL.createObjectURL(blob)
-  var a = document.createElement('a')
-  a.href=url; a.download='Docket-'+docket.customer_name.replace(/\s+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.txt'
-  a.click()
-  URL.revokeObjectURL(url)
-  // Note: Full .docx export will use the docx skill in next iteration
-}
-
-// \u2500\u2500 Modal helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function closeModal(id){
-  document.getElementById(id).classList.remove('open')
-}
+// \u2500\u2500 Modals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function openModal(id){ document.getElementById(id).classList.add('open') }
+function closeModal(id){ document.getElementById(id).classList.remove('open') }
 
 // \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 window.addEventListener('DOMContentLoaded', function(){
-  loadDockets().then(function(){
-    // Check if opened from another tool with a pending item
+  loadAll().then(function(){
     var params = new URLSearchParams(window.location.search)
     if(params.get('addItem')==='1'){
       try{
-        var pending = JSON.parse(localStorage.getItem('atlas_pending_docket_item')||'null')
-        if(pending){
-          localStorage.removeItem('atlas_pending_docket_item')
-          atlasAddToDocket(pending)
-        }
+        var pending=JSON.parse(localStorage.getItem('atlas_pending_docket_item')||'null')
+        if(pending){ localStorage.removeItem('atlas_pending_docket_item'); atlasAddToDocket(pending) }
       }catch(e){}
     }
   })
