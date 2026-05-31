@@ -1409,13 +1409,24 @@ var TSAP_CFG = {territory:{name:'',type:'state',governance:'central',security:'c
 var CURRENT_TSAP_ENG_ID = null
 
 var L2_BLOCKS_DEF = [
-  {code:'L2-AIF',name:'AI Factory',icon:'\uD83C\uDFED',desc:'General-purpose GPU compute'},
-  {code:'L2-INF',name:'Inferencing Factory',icon:'\u26A1',desc:'High-throughput production inference'},
-  {code:'L2-TRC',name:'Training Cluster',icon:'\uD83E\uDDE0',desc:'HPC-class model training'},
-  {code:'L2-GEO',name:'GeoAI Node',icon:'\uD83D\uDEF0\uFE0F',desc:'Inferencing + GeoAI stack'},
-  {code:'L2-HPC',name:'HPC Cluster',icon:'\uD83D\uDCCA',desc:'Scientific compute and simulation'},
-  {code:'L2-EDG',name:'Edge AI Node',icon:'\uD83D\uDCF6',desc:'Field-deployed inference'},
-  {code:'L2-MDC',name:'Modular Datacenter',icon:'\uD83C\uDFD7\uFE0F',desc:'Houses any L2 building block'},
+  {code:'L2-AIF',  name:'AI Factory',                  icon:'\uD83C\uDFED', desc:'General-purpose GPU compute \u2014 training + inference'},
+  {code:'L2-INF',  name:'Inferencing Factory',          icon:'\u26A1',        desc:'High-throughput production inference (generic baseline)'},
+  {code:'L2.1-INF',name:'GeoAI Inferencing Factory',    icon:'\uD83D\uDEF0\uFE0F',desc:'Pre-configured for geospatial/EO workloads \u2014 EO pipeline, imagery AI, GIS'},
+  {code:'L2.2-INF',name:'Defence AI Inferencing Factory',icon:'\uD83D\uDEF1', desc:'Air-gapped, MIL-SPEC, ISR pipeline, classified network integration'},
+  {code:'L2.3-INF',name:'Health AI Inferencing Factory', icon:'\uD83C\uDFE5', desc:'DICOM/FHIR, medical imaging AI, clinical compliance stack'},
+  {code:'L2.4-INF',name:'FinAI Inferencing Factory',     icon:'\uD83C\uDFE6', desc:'Fraud detection, credit risk, AML/KYC, RBI/SEBI compliance'},
+  {code:'L2-TRC',  name:'Training Cluster',              icon:'\uD83E\uDDE0', desc:'HPC-class large-scale model training'},
+  {code:'L2-HPC',  name:'HPC Cluster',                   icon:'\uD83D\uDCCA', desc:'Scientific compute \u2014 simulation and modelling'},
+  {code:'L2-EDG',  name:'Edge AI Node',                  icon:'\uD83D\uDCF6', desc:'Field-deployed, air-gappable inference'},
+  {code:'L2-MDC',  name:'Modular Datacenter',            icon:'\uD83C\uDFD7\uFE0F', desc:'Houses any L2 building block \u2014 rapid deployment'},
+]
+
+var L1X_COMPONENTS_DEF = [
+  {code:'L1.1-TSAP',name:'AI Skills & Workforce Development',icon:'\uD83C\uDF93',desc:'Mass digital/AI literacy \u2014 public servants, practitioners, population-scale. Partner-delivered.',partner:true},
+  {code:'L1.2-TSAP',name:'Startup & Innovation Ecosystem',  icon:'\uD83D\uDE80',desc:'Incubator, accelerator, seed funding framework, anchor tenant attraction. Partner-delivered.',partner:true},
+  {code:'L1.3-TSAP',name:'Data Governance & Sovereign Data',icon:'\uD83D\uDDC4\uFE0F',desc:'Territory data catalogue, data sharing frameworks, DPDP compliance. Often a prerequisite for compute.',partner:true},
+  {code:'L1.4-TSAP',name:'Research & Academic Partnership', icon:'\uD83D\uDD2C',desc:'IIT/IIIT/university MoUs, research grants, PhD fellowships. Long-term talent pipeline.',partner:true},
+  {code:'L1.5-TSAP',name:'AI Policy, Regulation & Governance',icon:'\u2696\uFE0F',desc:'Territory AI policy framework, oversight authority, ethical AI guidelines, procurement policy. Legal partner-led.',partner:true},
 ]
 
 var FINANCING_OPTS_DEF = [
@@ -1496,9 +1507,13 @@ function switchTsapTab(tab){
   }
 
   if(tab==='blocks'){
-    content = '<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Select L2 building blocks to deploy within this territory.</div>'
-      +'<div id="tsap-blocks-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"></div>'
+    content = '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">L2 Technical Building Blocks</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Select compute and infrastructure nodes to deploy within this territory.</div>'
+      +'<div id="tsap-blocks-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px"></div>'
       +'<div id="tsap-blocks-config"></div>'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin:16px 0 6px">L1.x Programme Components</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Programme-level initiatives that sit alongside the technical infrastructure. Typically partner-delivered.</div>'
+      +'<div id="tsap-l1x-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"></div>'
   }
 
   if(tab==='financial'){
@@ -1575,6 +1590,26 @@ function switchTsapTab(tab){
         })
       } else if(configDiv){
         configDiv.innerHTML = '<div style="font-size:11px;color:var(--mid);margin-top:8px">Select blocks above to configure.</div>'
+      }
+      // Render L1.x programme components
+      var l1xGrid = document.getElementById('tsap-l1x-grid')
+      if(l1xGrid){
+        l1xGrid.innerHTML = L1X_COMPONENTS_DEF.map(function(c,ci){
+          var sel = TSAP_CFG.blocks.some(function(s){return s.code===c.code})
+          return '<div id="tsap-l1x-'+ci+'" style="border:2px solid '+(sel?'var(--orange)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(255,85,57,0.04)':'var(--white)')+'">'
+            +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+            +'<span style="font-size:16px">'+c.icon+'</span>'
+            +(c.partner?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(0,40,112,0.08);color:var(--navy)">PARTNER</span>':'')
+            +'</div>'
+            +'<div style="font-size:12px;font-weight:600">'+c.name+'</div>'
+            +'<div style="font-size:10px;color:var(--mid);margin-top:2px">'+c.desc+'</div>'
+            +(sel?'<span style="font-size:9px;font-weight:700;color:var(--orange)">\u2713 Selected</span>':'')
+            +'</div>'
+        }).join('')
+        L1X_COMPONENTS_DEF.forEach(function(c,ci){
+          var el = document.getElementById('tsap-l1x-'+ci)
+          if(el) el.onclick = function(){ toggleTsapBlock(c.code) }
+        })
       }
     }
   }
@@ -1664,7 +1699,10 @@ async function saveTsapConfig(){
   saveTsapCurrentData()
   var docketId=CURRENT_DOCKET_ID
   if(!docketId){alert('Open an engagement first.');return}
-  var item={id:genId('DI'),docket_id:docketId,item_type:'solution',title:'TSAP Config \u2014 '+esc(TSAP_CFG.territory.name||'Territory'),content:TSAP_CFG,status:'in_progress',notes:'Territory: '+esc(TSAP_CFG.territory.name)+'. Blocks: '+TSAP_CFG.blocks.length+'. Financing models: '+TSAP_CFG.financial.financing_models.length+'.',created_by:'ATLAS TSAP'}
+  var l2Count = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2')===0 && b.code.indexOf('.')===2}).length
+  var l2xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2.')===0}).length
+  var l1xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L1.')===0}).length
+  var item={id:genId('DI'),docket_id:docketId,item_type:'solution',title:'TSAP Config \u2014 '+esc(TSAP_CFG.territory.name||'Territory'),content:TSAP_CFG,status:'in_progress',notes:'Territory: '+esc(TSAP_CFG.territory.name)+'. L2 blocks: '+l2Count+'. Specialised factories: '+l2xCount+'. L1.x programmes: '+l1xCount+'. Financing models: '+TSAP_CFG.financial.financing_models.length+'.',created_by:'ATLAS TSAP'}
   var ok=await sbInsert('docket_items',item)
   if(ok){CURRENT_ITEMS.push(item);closeModal('tsapModal');renderItems('all');alert('TSAP configuration saved to docket.')}
   else alert('Failed to save.')
