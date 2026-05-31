@@ -1,6 +1,6 @@
 # claude-session-activator.md
 # ATLAS Claude Session Activator
-# Version: 2.3 | Last Updated: 2026-05-29
+# Version: 2.4 | Last Updated: 2026-05-29
 
 ---
 
@@ -71,7 +71,7 @@ Upload this file at the start of any ATLAS working session. Claude reads it full
 | `blacklist-whitelist.md` | v1.0 | ✅ Live |
 | `domain-taxonomy.md` | v1.1 | ✅ Live |
 | `tool-features.md` | v1.0 | ⏸ Needs v1.1 |
-| `claude-session-activator.md` | v2.3 | ✅ This file |
+| `claude-session-activator.md` | v2.4 | ✅ This file |
 
 ---
 
@@ -372,7 +372,8 @@ engagements (id ENG-YYYY-SECTOR-NNNN, customer_id, division_id, name,
 | 1c | Intelligence Scraper v2.0 — ✅ DONE: Gemini Search Grounding + RSS feeds, source_url stored, multi-geography dropdown, reads keys from global settings | 1 | ✅ Complete |
 | 1d | Intelligence Scraper v2.0 — bugs fixed: sleep() missing, init() crashing on removed DOM refs, domains start all-selected | 1 | ✅ Fixed |
 | 1e | Intelligence Scraper v2.0 — uses gemini-3.5-flash for grounding (hardcoded, bypasses registry), thinkingBudget removed from grounded call, date gate rejects pre-2025 items, Roman numeral dedup, full traceability fields (model_used, source_language, scrape_method, published_year) | 1 | ✅ Live |
-| 1f | Intelligence Scraper v2.0 — first run with all fixes returned 0 items. Cause unknown — needs log review next session. May be date gate too aggressive or grounding still not firing. | 1 | 🔴 Investigate next session |
+| 1f | Intelligence Scraper v2.0 — root causes identified and partially fixed: (1) missing + concat in prompt truncated it, (2) gemini-3.5-flash returns thoughtSignature/thinking parts — need to concat all parts not just parts[0], (3) response wrapped in ```json markdown despite instructions. Mechanics working (API calls fire, Supabase writes, dedup works). Fidelity issues deferred. | 1 | 🟡 Deferred — fix later |
+| 1h | Intelligence Scraper v2.0 — remaining fidelity fixes needed: (a) concat all response parts for thinking model, (b) stronger no-markdown instruction, (c) gemini-3.5-flash thinking mode compatibility. Fix when returning to intelligence section. | 1 | 🟡 Deferred |
 | 1g | GitHub Actions scraper v2.1 — built with 14 RSS feeds (3 Indic via Sarvam), gemini-3.5-flash grounding, full traceability. Pending upload to scripts/ | 1 | 🔴 Upload pending |
 | 1b | Intelligence Scraper — Market Pulse duplicates — monitoring | 1 | 🟡 Monitor |
 | 2 | PEI v0.2 — ✅ DONE | 3 | ✅ Complete |
@@ -403,31 +404,4 @@ engagements (id ENG-YYYY-SECTOR-NNNN, customer_id, division_id, name,
 | P2-3 | Tokenomics Module | Make vs rent, sovereign vs cloud breakeven |
 | P2-4 | Recommendation Engine | Smart version of Sales Actions — auto-matches intel to prospects |
 | P2-5 | Engagement Design Engine | Archetype-driven — Territory/Govt/Defence/Enterprise |
-| P2-6 | Solution Document Generator | Architecture, BOM, pricing |
-| P2-7 | Portfolio Portal update | Dynamic from Technical Solution Builder |
-| P2-8 | Modular DC Configurator | Container count, layout, power/cooling |
-| P2-9 | Agents | Phase 2 only — needs server |
-
----
-
-## Engagement Docket (future — Stage 5)
-
-Replaces current Engagement Management. Builds over engagement lifecycle:
-```
-Intelligence Brief → UC Set → Pitch Report → Technical Solution
-→ Financial Structuring → Proposal Document → Executive Documents
-```
-Portfolio selection updates docket automatically. Linked to Sales Actions via ENG-ID.
-
----
-
-## Google Drive
-
-```
-📁 AI Portal (root) — ID: 1L6Ta_fqSlUpzE0iNr0Be9ooRjfhPRsRd
-```
-Portal Drive file ID: `1F_qo4b6_jfhL-Skx7YFU5GtQH8Jry8Wt`
-
----
-
-*End of ATLAS Session Activator v1.8*
+| P2-6 | Solution Document Generator | Architecture, BOM,
