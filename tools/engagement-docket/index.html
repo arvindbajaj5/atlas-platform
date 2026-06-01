@@ -2,459 +2,809 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>ATLAS &mdash; Engagement Docket</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS &mdash; Customer Intelligence</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@9.0.2/build/index.umd.js"></script>
 <style>
 :root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--r-sm:6px;--r-lg:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;display:flex;flex-direction:column;}
-/* Header */
-.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:200;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:100;}
 .hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
 .hdr-brand span{color:var(--orange);}
+.hdr-note{font-size:11px;color:rgba(255,255,255,0.5);}
 .hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
-/* Layout */
-.layout{display:flex;flex:1;min-height:0;}
-.sidebar{width:260px;flex-shrink:0;background:var(--white);border-right:1px solid #e0e0e8;display:flex;flex-direction:column;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;}
-.main{flex:1;padding:24px;overflow-y:auto;max-width:900px;}
-/* Sidebar nav */
-.sb-section{padding:10px 16px 4px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.5px;display:flex;justify-content:space-between;align-items:center;}
-.sb-item{padding:8px 16px;cursor:pointer;font-size:13px;color:var(--dark);display:flex;align-items:center;gap:8px;border-left:3px solid transparent;transition:all 0.15s;}
-.sb-item:hover{background:var(--light);}
-.sb-item.active{background:rgba(0,40,112,0.06);border-left-color:var(--orange);font-weight:600;color:var(--navy);}
-.sb-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
-.sb-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.dot-strategic{background:var(--blue);}
-.dot-transactional{background:var(--mid);}
-.dot-active{background:var(--teal);}
-.dot-won{background:var(--blue);}
-.dot-lost{background:#DC2626;}
-.dot-paused{background:var(--amber);}
-.sb-add{margin:8px 16px;padding:7px 12px;background:var(--orange);color:var(--white);border:none;border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer;width:calc(100% - 32px);font-family:inherit;}
-.sb-add:hover{background:#e6421f;}
-.sb-search{margin:8px 16px 4px;position:relative;}
-.sb-search input{width:100%;padding:7px 10px;border:1px solid #e0e0e8;border-radius:var(--r-sm);font-size:12px;background:var(--light);font-family:inherit;}
-.sb-search:before{content:'';display:none;}
-/* Cards */
-.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.container{max-width:820px;margin:32px auto;padding:0 24px;}
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:24px;margin-bottom:20px;box-shadow:var(--shadow);}
 .card-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px;}
-.card-sub{font-size:11px;color:var(--mid);margin-bottom:14px;line-height:1.6;}
-/* Forms */
-label{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;margin-top:14px;}
-label:first-child{margin-top:0;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:18px;line-height:1.6;}
+label{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;}
 input,select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
 input:focus,select:focus,textarea:focus{border-color:var(--blue);}
-textarea{resize:vertical;min-height:72px;}
-.form-hint{font-size:10px;color:var(--mid);margin-top:4px;}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
-/* Buttons */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;text-decoration:none;}
+input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
+.field-hint{font-size:10px;color:var(--mid);margin-top:4px;line-height:1.5;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.form-row{margin-bottom:16px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:var(--r-sm);font-size:13px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
 .btn-primary{background:var(--orange);color:var(--white);}
 .btn-primary:hover{background:#e6421f;}
-.btn-navy{background:var(--navy);color:var(--white);}
-.btn-navy:hover{background:#001d5c;}
-.btn-teal{background:var(--teal);color:var(--white);}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
 .btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
 .btn-outline:hover{background:var(--navy);color:var(--white);}
-.btn-ghost{background:var(--light);color:var(--dark);border:1px solid #e0e0e8;}
-.btn-ghost:hover{border-color:var(--navy);color:var(--navy);}
-.btn-danger{background:rgba(220,38,38,0.08);color:#DC2626;border:1px solid rgba(220,38,38,0.2);}
+.btn-teal{background:var(--teal);color:var(--white);}
 .btn-sm{padding:5px 12px;font-size:11px;}
-.btn-xs{padding:3px 8px;font-size:10px;}
-/* Tabs */
-.tab-bar{display:flex;gap:2px;border-bottom:2px solid #e0e0e8;margin-bottom:20px;}
-.tab{padding:8px 16px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
-.tab:hover{color:var(--dark);}
-.tab.active{color:var(--navy);border-bottom-color:var(--orange);}
-/* Pills */
-.pill{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase;}
-.pill-strategic{background:rgba(28,56,245,0.1);color:var(--blue);}
-.pill-transactional{background:rgba(180,180,190,0.15);color:var(--mid);}
-.pill-active{background:rgba(0,178,144,0.12);color:var(--teal);}
-.pill-won{background:rgba(28,56,245,0.12);color:var(--blue);}
-.pill-lost{background:rgba(220,38,38,0.1);color:#DC2626;}
-.pill-paused{background:rgba(255,182,0,0.12);color:#9a7000;}
-.pill-l1{background:rgba(255,85,57,0.1);color:var(--orange);}
-.pill-l2{background:rgba(0,40,112,0.08);color:var(--navy);}
-.pill-l3{background:rgba(0,178,144,0.08);color:var(--teal);}
-/* Dashboard stats */
-.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
-.stat{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:14px 16px;}
-.stat-val{font-size:26px;font-weight:700;color:var(--navy);}
-.stat-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
-/* Customer cards */
-.cust-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color 0.15s;}
-.cust-card:hover{border-color:var(--teal);}
-.cust-avatar{width:36px;height:36px;border-radius:var(--r-sm);background:var(--navy);color:var(--white);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
-.cust-body{flex:1;min-width:0;}
-.cust-name{font-size:13px;font-weight:600;color:var(--dark);}
-.cust-meta{font-size:10px;color:var(--mid);margin-top:2px;}
-/* Engagement cards */
-.eng-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;border-left:4px solid var(--light);}
-.eng-card:hover{border-color:var(--teal);}
-.eng-card.phase-strategy{border-left-color:var(--amber);}
-.eng-card.phase-presales{border-left-color:var(--blue);}
-.eng-card.phase-proposal{border-left-color:var(--orange);}
-.eng-card.phase-delivery{border-left-color:var(--teal);}
-.eng-card.phase-live{border-left-color:#22c55e;}
-/* Docket items */
-.docket-item{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;transition:border-color 0.15s;}
-.docket-item:hover{border-color:var(--teal);}
-.item-icon{width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-.icon-action{background:rgba(255,182,0,0.1);}
-.icon-intel{background:rgba(0,40,112,0.08);}
-.icon-pei{background:rgba(28,56,245,0.08);}
-.icon-uc{background:rgba(0,178,144,0.1);}
-.icon-rfp{background:rgba(220,38,38,0.08);}
-.icon-pitch{background:rgba(255,85,57,0.1);}
-.icon-solution{background:rgba(0,40,112,0.1);}
-.icon-bom{background:rgba(40,40,50,0.06);}
-.icon-proposal{background:rgba(28,56,245,0.1);}
-.icon-pricing{background:rgba(0,178,144,0.08);}
-.icon-exec_doc{background:rgba(255,85,57,0.08);}
-.item-body{flex:1;min-width:0;}
-.item-title{font-size:12px;font-weight:600;color:var(--dark);}
-.item-meta{font-size:10px;color:var(--mid);margin-top:2px;}
-.item-status{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;}
-.is-pending{background:rgba(180,180,190,0.15);color:var(--mid);}
-.is-in_progress{background:rgba(255,182,0,0.12);color:#9a7000;}
-.is-done{background:rgba(0,178,144,0.12);color:var(--teal);}
-.is-closed{background:rgba(40,40,50,0.08);color:var(--mid);}
-/* Portfolio map */
-.portfolio-map{display:grid;grid-template-rows:auto auto auto;gap:12px;}
-.portfolio-section-label{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
-.portfolio-items-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;}
-.portfolio-item{border:2px solid #e0e0e8;border-radius:var(--r);padding:10px 12px;cursor:pointer;transition:all 0.15s;background:var(--white);text-align:left;}
-.portfolio-item:hover{border-color:var(--navy);}
-.portfolio-item.selected{border-color:var(--teal);background:rgba(0,178,144,0.05);}
-.portfolio-item.recommended{border-color:var(--orange);background:rgba(255,85,57,0.04);}
-.portfolio-item.recommended.selected{border-color:var(--teal);background:rgba(0,178,144,0.05);}
-.pi-code{font-size:9px;font-family:Roboto Mono,monospace;color:var(--mid);margin-bottom:4px;}
-.pi-name{font-size:11px;font-weight:600;color:var(--dark);}
-.pi-cat{font-size:10px;color:var(--mid);}
-.pi-badge{display:inline-block;font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;margin-top:4px;}
-.pi-badge.rec{background:rgba(255,85,57,0.12);color:var(--orange);}
-.pi-badge.sel{background:rgba(0,178,144,0.12);color:var(--teal);}
-/* Rec engine */
-.rec-card{background:rgba(0,178,144,0.05);border:1px solid rgba(0,178,144,0.2);border-radius:var(--r);padding:14px;margin-bottom:12px;}
-.rec-title{font-size:12px;font-weight:700;color:var(--teal);margin-bottom:8px;}
-.rec-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,178,144,0.1);font-size:11px;}
-/* Modal */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;}
-.modal-overlay.open{display:flex;}
-.modal{background:var(--white);border-radius:var(--r-lg);padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
-.modal-lg{max-width:780px;}
-.modal-title{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:16px;}
-.modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end;}
-/* L2 blocks */
-.l2-block{border:1px solid #e0e0e8;border-radius:var(--r);padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;}
-.l2-icon{width:32px;height:32px;border-radius:var(--r-sm);background:var(--navy);color:var(--white);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-/* Financing rows */
-.fin-row{border:1px solid #e0e0e8;border-radius:var(--r);padding:12px;margin-bottom:8px;}
-.fin-row-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-/* Empty state */
-.empty{text-align:center;padding:48px 24px;color:var(--mid);}
-.empty-icon{font-size:40px;margin-bottom:12px;}
-.empty-title{font-size:15px;font-weight:600;color:var(--navy);margin-bottom:6px;}
-.empty-sub{font-size:12px;line-height:1.6;}
-/* Elevate banner */
-.elevate-banner{background:rgba(255,182,0,0.1);border:1px solid rgba(255,182,0,0.3);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.elevate-text{font-size:12px;color:#9a7000;}
+.alert{padding:10px 14px;border-radius:var(--r);font-size:11px;margin-bottom:14px;line-height:1.6;}
+.alert-warn{background:rgba(255,182,0,0.08);border:1px solid rgba(255,182,0,0.3);color:#9a7000;}
+.alert-info{background:rgba(28,56,245,0.06);border:1px solid rgba(28,56,245,0.2);color:var(--blue);}
+.alert-error{background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);color:#DC2626;}
+.alert-success{background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.2);color:var(--teal);}
+.loading{text-align:center;padding:40px;}
+.loading-icon{font-size:36px;animation:spin 1.5s linear infinite;display:inline-block;}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.loading-text{font-size:12px;color:var(--mid);margin-top:10px;}
+.pei-output{display:none;}
+.pei-header{background:var(--navy);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;color:var(--white);}
+.pei-org{font-size:22px;font-weight:700;margin-bottom:4px;}
+.pei-meta{font-size:11px;color:rgba(255,255,255,0.55);display:flex;gap:16px;flex-wrap:wrap;}
+.pei-meta span{display:flex;align-items:center;gap:4px;}
+.draft-pill{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;background:rgba(255,85,57,0.2);color:var(--orange);border-radius:6px;margin-top:8px;}
+.pei-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.pei-section{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px;}
+.pei-section.full{grid-column:1/-1;}
+.pei-section.db-section{border-color:var(--teal);background:rgba(0,178,144,0.03);}
+.pei-section-title{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--light);}
+.pei-section.db-section .pei-section-title{color:var(--teal);border-bottom-color:rgba(0,178,144,0.2);}
+.pei-text{font-size:12px;line-height:1.7;color:var(--dark);}
+.pei-text ul{margin:6px 0 0 16px;}
+.pei-text li{margin-bottom:3px;}
+.db-item{background:var(--white);border:1px solid rgba(0,178,144,0.2);border-radius:6px;padding:10px 12px;margin-bottom:8px;}
+.db-item-title{font-size:12px;font-weight:700;color:var(--dark);margin-bottom:3px;}
+.db-item-meta{font-size:10px;color:var(--mid);margin-bottom:4px;display:flex;gap:8px;}
+.db-item-summary{font-size:11px;color:#555;line-height:1.5;}
+.db-badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;text-transform:uppercase;}
+.badge-mp{background:rgba(255,85,57,0.1);color:var(--orange);}
+.badge-di{background:rgba(0,40,112,0.08);color:var(--navy);}
+.badge-tw{background:rgba(0,178,144,0.1);color:var(--teal);}
+.maturity-bar{height:8px;background:var(--light);border-radius:4px;overflow:hidden;margin-top:8px;}
+.maturity-fill{height:100%;border-radius:4px;background:var(--teal);transition:width 0.5s;}
+.maturity-label{display:flex;justify-content:space-between;font-size:10px;color:var(--mid);margin-top:4px;}
+.confidence-pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;}
+.conf-high{background:rgba(0,178,144,0.1);color:var(--teal);}
+.conf-medium{background:rgba(255,182,0,0.1);color:#9a7000;}
+.conf-low{background:rgba(255,85,57,0.1);color:var(--orange);}
+.positioning-box{background:rgba(0,40,112,0.04);border:1px solid rgba(0,40,112,0.15);border-radius:var(--r);padding:14px;font-size:12px;line-height:1.7;color:var(--dark);}
+.vendor-tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--light);color:var(--mid);margin:2px;}
+.actions-bar{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+.config-saved{font-size:10px;color:var(--teal);margin-left:8px;}
+@media(max-width:640px){.form-grid,.pei-grid{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
-
 <div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S</div>
-  <div style="font-size:11px;color:rgba(255,255,255,0.5)">Engagement Docket v2.0</div>
-  <div style="display:flex;align-items:center;gap:8px">
-    <span class="hdr-badge">ED v2.0</span>
-    <button class="btn btn-ghost btn-sm" style="color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.3)" onclick="history.back()">← Portal</button>
+  <div class="hdr-note">Customer Intelligence (PEI)</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">PEI v0.2</span>
+    <button class="btn btn-outline btn-sm" style="color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.3)" onclick="window.history.back()">&#8592; Portal</button>
   </div>
 </div>
 
-<div class="layout">
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <div class="sb-search"><input type="text" id="sbSearch" placeholder="Search customers..." oninput="renderSidebar()"></div>
-    <button class="sb-add" onclick="openModal('newCustomerModal')">+ New Customer</button>
-    <div class="sb-section"><span>Strategic</span><span id="sbStrategicCount" style="font-size:10px;color:var(--mid)">0</span></div>
-    <div id="sbStrategicList"></div>
-    <div class="sb-section" style="margin-top:8px"><span>Transactional</span><span id="sbTransactionalCount" style="font-size:10px;color:var(--mid)">0</span></div>
-    <div id="sbTransactionalList"></div>
-    <div class="sb-section" style="margin-top:8px"><span>My Actions</span></div>
-    <div id="sbMyDocket"></div>
-  </div>
+<div class="container">
 
-  <!-- Main panel -->
-  <div class="main" id="mainPanel"></div>
-</div>
-
-<!-- New Customer Modal -->
-<div class="modal-overlay" id="newCustomerModal">
-  <div class="modal">
-    <div class="modal-title">New Customer</div>
-    <label>Customer Name *</label>
-    <input type="text" id="nc-name" placeholder="e.g. Indian Army, NTPC, Pixxel">
-    <label>Short Name</label>
-    <input type="text" id="nc-short" placeholder="e.g. IA, NTPC">
-    <div class="form-grid">
-      <div>
-        <label>Tier *</label>
-        <select id="nc-tier">
-          <option value="transactional">Transactional (one-off)</option>
-          <option value="strategic">Strategic (major account)</option>
-        </select>
-      </div>
-      <div>
-        <label>Ownership</label>
-        <select id="nc-ownership">
-          <option value="">-- Select --</option>
-          <option value="GOV">Government (GOV)</option>
-          <option value="MIL">Military / Defence (MIL)</option>
-          <option value="PSU">Public Sector Undertaking (PSU)</option>
-          <option value="PVT">Private (PVT)</option>
-          <option value="INT">International (INT)</option>
-          <option value="PPP">Public-Private Partnership (PPP)</option>
-        </select>
-      </div>
+  <!-- Configuration Card -->
+  <div class="card">
+    <div class="card-title">&#9881; Configuration</div>
+    <div class="card-sub">API keys and Supabase credentials are read from ATLAS Global Settings. No need to enter them here.</div>
+    <div id="peiSettingsStatus" style="padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:10px;background:var(--light)">Checking settings...</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <a href="../../index.html" class="btn btn-outline btn-sm">&#9881; Open ATLAS Settings</a>
+      <button class="btn btn-ghost btn-sm" onclick="checkPEISettings()">&#8635; Refresh</button>
     </div>
+    <div style="margin-top:12px">
+      <label>Model (auto-selected from settings)</label>
+      <select id="modelSelect" style="max-width:300px">
+        <option value="">Loading configured models...</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn btn-primary btn-sm" onclick="saveConfig()">&#10003; Save Config</button>
+      <span class="config-saved" id="configSaved" style="display:none">&#10003; Saved</span>
+    </div>
+  </div>
+
+  <!-- Organisation Card -->
+  <div class="card">
+    <div class="card-title">&#127970; Organisation</div>
+    <div class="card-sub">Enter publicly known information only. This will be sent to the Gemini API for research. Do not enter confidential internal data.</div>
+
+    <div class="alert alert-warn">&#128274; Keep your API key private. Do not share this tool with the key pre-filled.</div>
+
     <div class="form-grid">
       <div>
-        <label>Sector</label>
-        <select id="nc-sector">
-          <option value="">-- Select --</option>
-          <option>Defence &amp; Armed Forces</option>
-          <option>Government &amp; Governance</option>
-          <option>Intelligence &amp; Signals</option>
-          <option>Homeland Security</option>
-          <option>Geospatial &amp; Earth Observation</option>
-          <option>Space &amp; Aerospace</option>
-          <option>Critical Infrastructure</option>
-          <option>Natural Resources</option>
-          <option>Energy &amp; Utilities</option>
-          <option>Telecom &amp; Networks</option>
-          <option>Banking &amp; Financial Services</option>
-          <option>Health &amp; Life Sciences</option>
-          <option>Manufacturing &amp; Industry</option>
-          <option>Regional AI Programmes</option>
-          <option>Technology</option>
-          <option>Media &amp; Broadcast</option>
-        </select>
+        <label>Organisation Name *</label>
+        <input type="text" id="orgName" placeholder="e.g. Indian Army" oninput="clearOutput()">
       </div>
       <div>
         <label>Country</label>
-        <select id="nc-country">
-          <option value="India" selected>India</option>
-          <option value="UAE">UAE</option>
-          <option value="Saudi Arabia">Saudi Arabia</option>
-          <option value="Qatar">Qatar</option>
-          <option value="Singapore">Singapore</option>
-          <option value="Malaysia">Malaysia</option>
-          <option value="Australia">Australia</option>
-          <option value="United Kingdom">United Kingdom</option>
-          <option value="France">France</option>
-          <option value="United States">United States</option>
+        <select id="orgCountry" onchange="clearOutput()">
+          <optgroup label="Asia Pacific">
+            <option value="India" data-currency="INR" selected>India</option>
+            <option value="Australia" data-currency="AUD">Australia</option>
+            <option value="Bangladesh" data-currency="BDT">Bangladesh</option>
+            <option value="China" data-currency="CNY">China</option>
+            <option value="Japan" data-currency="JPY">Japan</option>
+            <option value="Malaysia" data-currency="MYR">Malaysia</option>
+            <option value="Singapore" data-currency="SGD">Singapore</option>
+            <option value="South Korea" data-currency="KRW">South Korea</option>
+            <option value="Thailand" data-currency="THB">Thailand</option>
+            <option value="Vietnam" data-currency="VND">Vietnam</option>
+          </optgroup>
+          <optgroup label="Middle East">
+            <option value="Bahrain" data-currency="BHD">Bahrain</option>
+            <option value="Egypt" data-currency="EGP">Egypt</option>
+            <option value="Kuwait" data-currency="KWD">Kuwait</option>
+            <option value="Oman" data-currency="OMR">Oman</option>
+            <option value="Qatar" data-currency="QAR">Qatar</option>
+            <option value="Saudi Arabia" data-currency="SAR">Saudi Arabia</option>
+            <option value="UAE" data-currency="AED">UAE</option>
+          </optgroup>
+          <optgroup label="Europe">
+            <option value="France" data-currency="EUR">France</option>
+            <option value="Germany" data-currency="EUR">Germany</option>
+            <option value="United Kingdom" data-currency="GBP">United Kingdom</option>
+          </optgroup>
+          <optgroup label="North America">
+            <option value="United States" data-currency="USD">United States</option>
+            <option value="Canada" data-currency="CAD">Canada</option>
+          </optgroup>
         </select>
       </div>
     </div>
-    <label>State / Province</label>
-    <input type="text" id="nc-state" placeholder="e.g. Himachal Pradesh">
-    <label>AI Maturity</label>
-    <select id="nc-maturity">
-      <option value="">Unknown</option>
-      <option value="none">None</option>
-      <option value="exploring">Exploring</option>
-      <option value="piloting">Piloting</option>
-      <option value="scaling">Scaling</option>
-      <option value="advanced">Advanced</option>
-    </select>
-    <label>Notes</label>
-    <textarea id="nc-notes" placeholder="Key context about this customer..."></textarea>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('newCustomerModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="createCustomer()">Create Customer</button>
+
+    <div class="form-grid">
+      <div>
+        <label>Ownership Type</label>
+        <select id="orgOwnership" onchange="clearOutput()">
+          <option value="Government Ministry / Department">Government Ministry / Department</option>
+          <option value="Military / Armed Forces">Military / Armed Forces</option>
+          <option value="Intelligence / Security Agency">Intelligence / Security Agency</option>
+          <option value="Public Sector Undertaking (PSU)">Public Sector Undertaking (PSU)</option>
+          <option value="Private Enterprise">Private Enterprise</option>
+        </select>
+      </div>
+      <div>
+        <label>Functional Sector</label>
+        <select id="orgSector" onchange="clearOutput()">
+          <option value="Defence &amp; Armed Forces">Defence &amp; Armed Forces</option>
+          <option value="Intelligence &amp; Signals">Intelligence &amp; Signals</option>
+          <option value="Homeland Security">Homeland Security</option>
+          <option value="Governance &amp; e-Governance">Governance &amp; e-Governance</option>
+          <option value="Space &amp; Aerospace / Aviation">Space &amp; Aerospace / Aviation</option>
+          <option value="Geospatial &amp; Earth Observation">Geospatial &amp; Earth Observation</option>
+          <option value="Critical Infrastructure">Critical Infrastructure</option>
+          <option value="Natural Resources">Natural Resources</option>
+          <option value="Energy &amp; Utilities">Energy &amp; Utilities</option>
+          <option value="Telecom &amp; Networks">Telecom &amp; Networks</option>
+          <option value="BFSI &amp; Financial Services">BFSI &amp; Financial Services</option>
+          <option value="Health &amp; Life Sciences">Health &amp; Life Sciences</option>
+          <option value="Manufacturing &amp; Industry">Manufacturing &amp; Industry</option>
+          <option value="Media &amp; Broadcast">Media &amp; Broadcast</option>
+          <option value="Regional AI Programmes">Regional AI Programmes</option>
+          <option value="General Enterprise">General Enterprise</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Division / Unit (optional)</label>
+      <input type="text" id="orgDivision" placeholder="e.g. Signals Corps, Northern Command &mdash; leave blank for full organisation" oninput="clearOutput()">
+    </div>
+
+    <div class="form-row">
+      <label>Additional Context (optional)</label>
+      <textarea id="orgContext" rows="2" placeholder="Any specific focus area, known challenge, or engagement context&#133;" oninput="clearOutput()"></textarea>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="generateBtn" onclick="generatePEI()">&#128269; Generate Intelligence Brief</button>
+      <div id="dbStatus" style="font-size:11px;color:var(--mid)"></div>
     </div>
   </div>
-</div>
 
-<!-- New Engagement Modal -->
-<div class="modal-overlay" id="newEngagementModal">
-  <div class="modal">
-    <div class="modal-title">New Engagement</div>
-    <input type="hidden" id="ne-customer-id">
-    <label>Engagement Name *</label>
-    <input type="text" id="ne-name" placeholder="e.g. Border Surveillance AI Platform">
-    <div class="form-grid">
-      <div>
-        <label>Archetype</label>
-        <select id="ne-archetype">
-          <option value="territory_coe">Territory / AI CoE</option>
-          <option value="govt_sectorial">Govt Sectorial</option>
-          <option value="enterprise">Enterprise</option>
-          <option value="defence">Defence</option>
-        </select>
-      </div>
-      <div>
-        <label>Type</label>
-        <select id="ne-type">
-          <option value="new">New</option>
-          <option value="expansion">Expansion</option>
-          <option value="renewal">Renewal</option>
-          <option value="rfp">RFP / Tender</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-grid">
-      <div>
-        <label>Phase</label>
-        <select id="ne-phase">
-          <option value="strategy">Strategy</option>
-          <option value="presales">Presales</option>
-          <option value="proposal">Proposal</option>
-          <option value="delivery">Delivery</option>
-          <option value="live">Live</option>
-        </select>
-      </div>
-      <div>
-        <label>Domain</label>
-        <select id="ne-domain">
-          <option value="">-- Select --</option>
-          <option value="GOV-GOV">Government &amp; Governance</option>
-          <option value="DEF-MIL">Defence — Armed Forces</option>
-          <option value="DEF-SPC">Defence — Space</option>
-          <option value="DEF-HLS">Homeland Security</option>
-          <option value="GEO-SPA">Geospatial &amp; EO</option>
-          <option value="FIN-BFS">Banking &amp; Finance</option>
-          <option value="TEC-GEN">Technology</option>
-          <option value="REG-AIP">Regional AI Programme</option>
-          <option value="ENR-UTL">Energy &amp; Utilities</option>
-          <option value="HLT-LIF">Healthcare</option>
-          <option value="MFG-IND">Manufacturing</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-grid">
-      <div>
-        <label>Estimated Value</label>
-        <input type="text" id="ne-value" placeholder="e.g. 500 Cr, USD 50M">
-      </div>
-      <div>
-        <label>Currency</label>
-        <select id="ne-currency">
-          <option value="INR">INR</option>
-          <option value="USD">USD</option>
-          <option value="AED">AED</option>
-          <option value="EUR">EUR</option>
-          <option value="GBP">GBP</option>
-          <option value="SGD">SGD</option>
-        </select>
-      </div>
-    </div>
-    <label>Notes</label>
-    <textarea id="ne-notes" placeholder="Key context, source of opportunity..."></textarea>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('newEngagementModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="createEngagement()">Create Engagement</button>
+  <!-- Loading -->
+  <div id="loadingPanel" style="display:none">
+    <div class="loading">
+      <div class="loading-icon">&#128269;</div>
+      <div class="loading-text">Researching <span id="loadingOrg"></span>&#8230;<br>Querying intelligence database and Gemini&#8230;</div>
     </div>
   </div>
-</div>
 
-<!-- Add to Docket Modal -->
-<div class="modal-overlay" id="addItemModal">
-  <div class="modal">
-    <div class="modal-title" id="addItemTitle">+ Add Item to Docket</div>
-    <input type="hidden" id="ai-docket-id">
-    <label>Item Type</label>
-    <select id="ai-type" onchange="updateItemHint()">
-      <option value="action">Action</option>
-      <option value="intel">Intelligence</option>
-      <option value="pei">PEI Brief</option>
-      <option value="uc">Use Case</option>
-      <option value="rfp">RFP / Tender</option>
-      <option value="pitch">Pitch Report</option>
-      <option value="solution">Technical Solution</option>
-      <option value="bom">Bill of Materials</option>
-      <option value="proposal">Proposal</option>
-      <option value="pricing">Pricing</option>
-      <option value="exec_doc">Executive Document</option>
-    </select>
-    <label>Title *</label>
-    <input type="text" id="ai-title" placeholder="Descriptive title for this item">
-    <label>Notes / Summary</label>
-    <textarea id="ai-notes" placeholder="Key details, decisions, context..."></textarea>
-    <div class="form-grid">
-      <div><label>Assigned To</label><input type="text" id="ai-assigned" placeholder="Name or team"></div>
-      <div><label>Due Date</label><input type="date" id="ai-due"></div>
-    </div>
-    <div id="ai-hint" style="font-size:11px;color:var(--mid);margin-top:10px;padding:8px 12px;background:var(--light);border-radius:var(--r-sm);display:none"></div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('addItemModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveItem()">Add to Docket</button>
-    </div>
+  <!-- Error -->
+  <div id="errorPanel" style="display:none">
+    <div class="alert alert-error" id="errorText"></div>
   </div>
-</div>
 
-<!-- Portfolio Map Modal -->
-<div class="modal-overlay" id="portfolioMapModal">
-  <div class="modal modal-lg">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <div class="modal-title" style="margin-bottom:0">Portfolio Map</div>
-      <button class="btn btn-ghost btn-xs" onclick="closeModal('portfolioMapModal')">x</button>
+  <!-- PEI Output -->
+  <div class="pei-output" id="peiOutput">
+    <div class="actions-bar">
+      <button class="btn btn-outline btn-sm" onclick="copyJSON()">&#128203; Copy JSON</button>
+      <button class="btn btn-outline btn-sm" onclick="downloadJSON()">&#8615; JSON</button>
+      <button class="btn btn-sm" style="background:var(--navy);color:var(--white)" onclick="downloadWord()">&#128196; Word (.docx)</button>
+      <button class="btn btn-primary btn-sm" onclick="downloadPPTX()">&#128202; PPTX</button>
+      <button class="btn btn-outline btn-sm" id="addToDocketBtn" onclick="addPEIToDocket()" style="display:none">+ Add to Docket</button>
+      <button class="btn btn-teal btn-sm" onclick="clearOutput()">&#8635; New Brief</button>
     </div>
-    <div style="font-size:11px;color:var(--mid);margin-bottom:16px" id="portfolioMapDesc">Select portfolio items for this engagement. AI-recommended items are pre-selected.</div>
-    <div id="portfolioMapContent"></div>
-    <div style="margin-top:16px;padding:12px;background:var(--light);border-radius:var(--r);font-size:11px;color:var(--mid)" id="portfolioMapSummary"></div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('portfolioMapModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="savePortfolioSelection()">Save Selection</button>
-    </div>
-  </div>
-</div>
 
-<!-- Add Transaction Modal -->
-<div class="modal-overlay" id="newTxnModal">
-  <div class="modal">
-    <div class="modal-title">Record Transaction</div>
-    <input type="hidden" id="txn-customer-id">
-    <label>Product / Service *</label>
-    <input type="text" id="txn-product" placeholder="e.g. GenAI-in-a-Box, Inferencing Factory PoC">
-    <div class="form-grid">
-      <div><label>Value</label><input type="text" id="txn-value" placeholder="e.g. 2.5 Cr"></div>
-      <div>
-        <label>Currency</label>
-        <select id="txn-currency">
-          <option value="INR">INR</option>
-          <option value="USD">USD</option>
-          <option value="AED">AED</option>
-          <option value="EUR">EUR</option>
-        </select>
+    <div class="pei-header">
+      <div class="pei-org" id="out-org">&mdash;</div>
+      <div class="pei-meta">
+        <span>&#127970; <span id="out-ownership">&mdash;</span></span>
+        <span>&#127981; <span id="out-sector">&mdash;</span></span>
+        <span>&#127965; <span id="out-country">&mdash;</span></span>
+        <span>&#9889; <span id="out-model">&mdash;</span></span>
+        <span>&#128197; <span id="out-date">&mdash;</span></span>
+      </div>
+      <div class="draft-pill">DRAFT &mdash; Internal Use Only</div>
+    </div>
+
+    <!-- Intelligence DB section (shown when Supabase has relevant items) -->
+    <div id="dbSection" style="display:none">
+      <div class="pei-section full db-section" style="margin-bottom:14px">
+        <div class="pei-section-title">&#128202; From Intelligence Database</div>
+        <div id="out-db-items"></div>
       </div>
     </div>
-    <div class="form-grid">
-      <div><label>Date</label><input type="date" id="txn-date"></div>
-      <div>
-        <label>Channel</label>
-        <select id="txn-channel">
-          <option value="direct">Direct</option>
-          <option value="tender">Tender / RFP</option>
-          <option value="partner">Partner</option>
-          <option value="referral">Referral</option>
-        </select>
+
+    <div class="pei-grid">
+      <div class="pei-section full">
+        <div class="pei-section-title">&#127970; Organisation Summary</div>
+        <div class="pei-text" id="out-summary">&mdash;</div>
+      </div>
+      <div class="pei-section">
+        <div class="pei-section-title">&#128150; AI Maturity</div>
+        <div class="pei-text" id="out-maturity-label">&mdash;</div>
+        <div class="maturity-bar"><div class="maturity-fill" id="out-maturity-bar" style="width:0%"></div></div>
+        <div class="maturity-label"><span>None</span><span>Aware</span><span>Piloting</span><span>Deploying</span><span>Scaling</span></div>
+        <div class="pei-text" style="margin-top:8px" id="out-maturity-evidence">&mdash;</div>
+      </div>
+      <div class="pei-section">
+        <div class="pei-section-title">&#128251; Technology Profile</div>
+        <div class="pei-text" id="out-tech">&mdash;</div>
+        <div style="margin-top:8px" id="out-vendors"></div>
+      </div>
+      <div class="pei-section full">
+        <div class="pei-section-title">&#128176; Budget &amp; Procurement</div>
+        <div class="pei-text" id="out-budget">&mdash;</div>
+      </div>
+      <div class="pei-section full">
+        <div class="pei-section-title">&#128100; Key Decision Makers</div>
+        <div id="out-decision-makers">&mdash;</div>
+      </div>
+      <div class="pei-section full">
+        <div class="pei-section-title">&#128167; Strategic Initiatives</div>
+        <div class="pei-text" id="out-initiatives">&mdash;</div>
+      </div>
+      <div class="pei-section">
+        <div class="pei-section-title">&#9878; Regulatory &amp; Compliance</div>
+        <div class="pei-text" id="out-regulatory">&mdash;</div>
+      </div>
+      <div class="pei-section">
+        <div class="pei-section-title">&#9888; Known Challenges</div>
+        <div class="pei-text" id="out-challenges">&mdash;</div>
+      </div>
+      <div class="pei-section full">
+        <div class="pei-section-title">&#128240; Recent Activity</div>
+        <div class="pei-text" id="out-recent">&mdash;</div>
+      </div>
+      <div class="pei-section full">
+        <div class="pei-section-title">&#127878; Known Suppliers &amp; Competition</div>
+        <div class="pei-text" id="out-suppliers">&mdash;</div>
+      </div>
+      <div class="pei-section full">
+        <div class="pei-section-title">&#128405; Competitive Signals</div>
+        <div class="pei-text" id="out-competitive">&mdash;</div>
+      </div>
+      <div class="pei-section">
+        <div class="pei-section-title">&#128421; Partnership History</div>
+        <div class="pei-text" id="out-partnerships">&mdash;</div>
+      </div>
+      <div class="pei-section">
+        <div class="pei-section-title">&#128057; Risk Flags</div>
+        <div class="pei-text" id="out-risks">&mdash;</div>
+      </div>
+      <div class="pei-section full">
+        <div class="pei-section-title">&#127919; Solution Fit &amp; Entry Points</div>
+        <div class="pei-text" id="out-solution-fit">&mdash;</div>
+      </div>
+      <div class="pei-section full">
+        <div class="pei-section-title">&#128211; Recommended Next Actions</div>
+        <div class="pei-text" id="out-next-actions">&mdash;</div>
+      </div>
+      <div class="pei-section full">
+        <div class="pei-section-title">&#127919; Our Positioning &mdash; Suggested Opening Angle</div>
+        <div class="positioning-box" id="out-positioning">&mdash;</div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--mid)">Confidence:</span>
+          <span class="confidence-pill" id="out-confidence">&mdash;</span>
+        </div>
       </div>
     </div>
-    <label>Notes</label>
-    <textarea id="txn-notes" placeholder="Key details about this transaction..."></textarea>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('newTxnModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveTransaction()">Save Transaction</button>
-    </div>
   </div>
+
 </div>
 
-<script charset="utf-8">
+<script>
+function checkPEISettings(){
+  var g = atlasGetGlobal ? atlasGetGlobal() : {}
+  var el = document.getElementById('peiSettingsStatus')
+  if(!el) return
+  var ok = [], warn = []
+  var hasGemini = !!(g.key_gemini || localStorage.getItem('atlas_gemini_key'))
+  var hasAnthropic = !!(g.key_anthropic)
+  var hasOpenAI = !!(g.key_openai)
+  var hasSB = !!(g.sbUrl && g.sbKey)
+  if(hasGemini||hasAnthropic||hasOpenAI) ok.push('AI key configured')
+  else warn.push('No AI key \u2014 configure in ATLAS Settings')
+  if(hasSB) ok.push('Supabase connected')
+  else warn.push('Supabase not configured \u2014 intelligence enrichment unavailable')
+  el.innerHTML = ok.concat(warn).join(' &nbsp;&middot;&nbsp; ')
+  el.style.background = warn.length ? 'rgba(255,182,0,0.1)' : 'rgba(0,178,144,0.08)'
+  el.style.color = warn.length ? '#9a7000' : 'var(--teal)'
+}
+
+var PEI_DATA = null
+
+// \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function loadConfig(){
+  try{ return JSON.parse(localStorage.getItem('atlas_pei_cfg')||'{}') }catch(e){ return {} }
+}
+function getGlobal(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } }
+
+async function callProvider(model, prompt, keyOverride){
+  var g = getGlobal()
+  var isGemini = model.indexOf('gemini') >= 0
+  var isClaude = model.indexOf('claude') >= 0
+  var isMistral = model.indexOf('mistral') >= 0
+  var isQwen = model.indexOf('qwen') >= 0
+  var isSarvam = model.indexOf('sarvam') >= 0
+  var isOpenAI = model.indexOf('gpt') >= 0
+
+  if(isGemini){
+    var key = keyOverride || g['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
+    if(!key) throw new Error('Gemini API key not configured.')
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+key
+    var body = {contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:8192,thinkingConfig:{thinkingBudget:0}}}
+    var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    if(!r.ok){var e=await r.json();throw new Error(e.error?.message||'Gemini error '+r.status)}
+    var d = await r.json()
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  }
+
+  // OpenAI-compatible providers
+  var endpoints = {
+    claude: 'https://api.anthropic.com/v1/messages',
+    mistral: 'https://api.mistral.ai/v1/chat/completions',
+    qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
+    sarvam: 'https://api.sarvam.ai/v1/chat/completions',
+    gpt: 'https://api.openai.com/v1/chat/completions',
+  }
+  var provider = isClaude?'claude':isMistral?'mistral':isQwen?'qwen':isSarvam?'sarvam':'gpt'
+  var key = keyOverride || g['key_'+(isClaude?'anthropic':isMistral?'mistral':isQwen?'qwen':isSarvam?'sarvam':'openai')] || ''
+  if(!key && provider !== 'ollama') throw new Error((isClaude?'Anthropic':isMistral?'Mistral':isQwen?'Qwen':isSarvam?'Sarvam':'OpenAI')+' API key not configured in ATLAS Settings.')
+
+  if(isClaude){
+    var body = {model:model,max_tokens:8192,messages:[{role:'user',content:prompt}]}
+    var r = await fetch(endpoints.claude,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)})
+    if(!r.ok){var e=await r.json();throw new Error(e.error?.message||'Claude error '+r.status)}
+    var d = await r.json()
+    return d.content?.[0]?.text || ''
+  }
+
+  var headers = {'Content-Type':'application/json'}
+  if(isSarvam) headers['api-subscription-key'] = key
+  else if(key) headers['Authorization'] = 'Bearer '+key
+  var body = {model:model,messages:[{role:'user',content:prompt}],max_tokens:8192,temperature:0.2}
+  var r = await fetch(endpoints[provider],{method:'POST',headers:headers,body:JSON.stringify(body)})
+  if(!r.ok){var e=await r.json();throw new Error('API error '+r.status)}
+  var d = await r.json()
+  return d.choices?.[0]?.message?.content || ''
+}
+function getTaskModel(taskId){
+  var g=getGlobal()
+  var DEFAULTS={scraping:'gemini-3.1-flash-lite',enrichment:'gemini-3.1-flash-lite',uc_enrich:'gemini-3.5-flash',pei:'claude-haiku-4-5-20251001',documents:'claude-haiku-4-5-20251001',specialist:'sarvam-m',airgap:'llama3.3'}
+  return (g.model_tiers&&g.model_tiers[taskId])||localStorage.getItem('atlas_default_model')||DEFAULTS[taskId]||'gemini-3.1-flash-lite'
+}
+function getEffectiveCfg(){
+  var local = loadConfig(), g = atlasGetGlobal()
+  return {
+    key: local.key || g['key_gemini'] || localStorage.getItem('atlas_gemini_key') || '',
+    sbUrl: local.sbUrl || g.sbUrl || '',
+    sbKey: local.sbKey || g.sbKey || '',
+    model: local.model || atlasGetTaskModel('pei')
+  }
+}
+function saveConfig(){
+  var model = document.getElementById('modelSelect').value
+  if(model){
+    var cfg = {}
+    try{ cfg = JSON.parse(localStorage.getItem('atlas_pei_cfg')||'{}') }catch(e){}
+    cfg.model = model
+    localStorage.setItem('atlas_pei_cfg', JSON.stringify(cfg))
+  }
+  var saved = document.getElementById('configSaved')
+  if(saved){ saved.style.display='inline'; setTimeout(function(){ saved.style.display='none' }, 2000) }
+}
+
+window.addEventListener('DOMContentLoaded', function(){ setTimeout(checkPEISettings, 500) })
+window.addEventListener('DOMContentLoaded', function(){
+  // Populate model selector from configured providers
+  var sel = document.getElementById('modelSelect')
+  var defaultModel = atlasGetTaskModel('pei')
+  sel.innerHTML = atlasBuildModelSelect(defaultModel)
+  if(!sel.options.length || sel.options[0].value === '') {
+    sel.innerHTML = '<option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (configure keys in Settings)</option>'
+  }
+
+  var cfg = getEffectiveCfg()
+  if(cfg.key)   var modelToSet = cfg.model || getTaskModel('pei')
+  if(modelToSet){
+    var sel = document.getElementById('modelSelect')
+    // Try to set saved model, fall back to task default
+    for(var i=0;i<sel.options.length;i++){
+      if(sel.options[i].value === modelToSet){ sel.value = modelToSet; break }
+    }
+  }
+})
+
+// \u2500\u2500 Supabase intelligence query \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function queryIntelligenceDB(sector, country, ownership){
+  var cfg = getEffectiveCfg()
+  if(!cfg.sbUrl||!cfg.sbKey) return []
+
+  // Map sector to domain codes
+  var sectorMap = {
+    'Defence & Armed Forces': ['DEF-MIL','DEF-HLS','DEF-INT'],
+    'Intelligence & Signals': ['DEF-INT','DEF-MIL'],
+    'Homeland Security': ['DEF-HLS'],
+    'Governance & e-Governance': ['GOV-GOV'],
+    'Space & Aerospace / Aviation': ['DEF-SPC','INF-CIV'],
+    'Geospatial & Earth Observation': ['GEO-SPA'],
+    'Critical Infrastructure': ['INF-CIV'],
+    'Natural Resources': ['RES-NAT'],
+    'Energy & Utilities': ['ENR-UTL'],
+    'Telecom & Networks': ['TEL-NET'],
+    'BFSI & Financial Services': ['FIN-BFS'],
+    'Health & Life Sciences': ['HLT-LIF'],
+    'Manufacturing & Industry': ['MFG-IND'],
+    'Media & Broadcast': ['MED-BRD'],
+    'Regional AI Programmes': ['REG-AIP'],
+    'General Enterprise': ['TEC-GEN'],
+  }
+
+  var codes = sectorMap[sector] || []
+  if(codes.length === 0) return []
+
+  // Fetch up to 10 relevant items from the last 18 months
+  var cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - 18)
+  var cutoffStr = cutoff.toISOString()
+
+  var allItems = []
+  for(var i=0; i<codes.length && allItems.length < 10; i++){
+    try{
+      var resp = await fetch(
+        cfg.sbUrl+'/rest/v1/intelligence_items?domain_code=eq.'+codes[i]+'&scraped_at=gte.'+cutoffStr+'&order=depth_score.desc.nullslast,scraped_at.desc&limit=5',
+        {headers:{'apikey':cfg.sbKey,'Authorization':'Bearer '+cfg.sbKey}}
+      )
+      if(resp.ok){
+        var items = await resp.json()
+        items.forEach(function(item){
+          if(!allItems.find(function(e){return e.id===item.id})) allItems.push(item)
+        })
+      }
+    }catch(e){ console.error('DB query error:', e) }
+  }
+  return allItems.slice(0,8)
+}
+
+// \u2500\u2500 Main generate function \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function generatePEI(){
+  var model = document.getElementById('modelSelect').value || atlasGetTaskModel('pei')
+  // Robust key resolution: model key \u2192 any global key \u2192 local input
+  var apiKey = atlasGetKeyForModel(model)
+  if(!apiKey){
+    // Try getting key from global settings directly
+    var g = atlasGetGlobal()
+    apiKey = g.key_gemini || g.key_anthropic || g.key_openai || ''
+  }
+  if(!apiKey) apiKey = document.getElementById('apiKey').value.trim()
+  // Also ensure model matches the key we found
+  if(!atlasGetKeyForModel(model) && apiKey){
+    // Find which model matches the key we have
+    if(apiKey === (atlasGetGlobal().key_gemini||'')) model = atlasGetTaskModel('pei') || 'gemini-3.5-flash'
+    else if(apiKey === (atlasGetGlobal().key_anthropic||'')) model = 'claude-haiku-4-5-20251001'
+  }
+  var orgName = document.getElementById('orgName').value.trim()
+  var country = document.getElementById('orgCountry').value
+  var ownership = document.getElementById('orgOwnership').value
+  var sector = document.getElementById('orgSector').value
+  var division = document.getElementById('orgDivision').value.trim()
+  var context = document.getElementById('orgContext').value.trim()
+  var model = document.getElementById('modelSelect').value
+
+  if(!apiKey){ alert('No API key found for '+model+'. Configure it in ATLAS Settings \u2192 AI Model Registry.'); return }
+  if(!orgName){ alert('Please enter an organisation name.'); return }
+
+  document.getElementById('peiOutput').style.display = 'none'
+  document.getElementById('errorPanel').style.display = 'none'
+  document.getElementById('loadingPanel').style.display = 'block'
+  document.getElementById('loadingOrg').textContent = orgName
+  document.getElementById('generateBtn').disabled = true
+  document.getElementById('dbStatus').textContent = 'Querying intelligence database...'
+
+  var target = division ? orgName + ' \u2014 ' + division : orgName
+  var countrySelect = document.getElementById('orgCountry')
+  var currency = countrySelect.options[countrySelect.selectedIndex]?.dataset?.currency || 'USD'
+  var currencyNote = currency !== 'USD' ? currency + ' (with USD equivalent where relevant)' : 'USD'
+
+  try{
+    // Step 1: Query Supabase intelligence DB
+    var dbItems = await queryIntelligenceDB(sector, country, ownership)
+    document.getElementById('dbStatus').textContent = dbItems.length > 0
+      ? '\u2705 ' + dbItems.length + ' intelligence items found in database'
+      : 'No matching items in intelligence database'
+
+    // Step 2: Build context from DB items for Gemini prompt
+    var dbContext = ''
+    if(dbItems.length > 0){
+      dbContext = '\n\nINTERNAL INTELLIGENCE DATABASE CONTEXT (from recent market scraping):\n'
+      dbItems.forEach(function(item, i){
+        dbContext += (i+1) + '. [' + (item.intelligence_stream||'').replace(/_/g,' ') + '] ' + (item.title||'') + ': ' + (item.summary||'').slice(0,150) + '\n'
+      })
+      dbContext += '\nUse this internal intelligence context to enrich your analysis where relevant.\n'
+    }
+
+    // Step 3: Call Gemini
+    var prompt = 'You are a senior business intelligence analyst preparing a comprehensive Pre-Engagement Intelligence (PEI) brief for a BD team at an AI and HPC hardware/software OEM. Research the following organisation thoroughly using publicly available information only \u2014 news, press releases, tenders, annual reports, government documents, parliamentary questions, media interviews.'
+      + '\n\nTARGET: ' + target
+      + '\nCOUNTRY: ' + country
+      + '\nOWNERSHIP TYPE: ' + ownership
+      + '\nSECTOR: ' + sector
+      + (context ? '\nADDITIONAL CONTEXT: ' + context : '')
+      + '\nCURRENCY: Report all amounts in ' + currencyNote + '.'
+      + dbContext
+      + '\n\nRespond ONLY with a valid JSON object. No preamble, no markdown, no backticks. Use this exact schema:\n\n'
+      + '{"organisation_summary":"3-4 sentence factual overview","ai_maturity":"none|aware|piloting|deploying|scaling","ai_maturity_evidence":"specific evidence","hpc_exposure":"none|limited|active","quantum_awareness":"none|exploring|active","technology_profile":{"current_it_infrastructure":"string","data_posture":"string","key_technology_programmes":["list"],"current_vendors":["list"]},"budget_and_procurement":{"annual_it_budget_estimate":"string","recent_tender_sizes":"string","procurement_pattern":"string","financial_year":"string","budget_authority":"string"},"key_decision_makers":[{"name":"string","role":"string","relevance":"string","known_priorities":"string"}],"strategic_initiatives":["list"],"regulatory_and_compliance":"string","known_challenges":["5-7 items"],"recent_activity":"detailed summary last 18-24 months","known_suppliers":{"ai_hpc_vendors":["list"],"software_vendors":["list"],"si_partners":["list"],"notes":"string"},"competitive_signals":"string","partnership_history":"string","risk_flags":["list"],"solution_fit":{"strongest_fit_areas":["list"],"entry_point_recommendations":["list"],"products_to_lead_with":["list"]},"recommended_next_actions":["5-7 items"],"our_positioning":"detailed suggested opening angle","confidence":"high|medium|low","confidence_reason":"string"}'
+
+    var rawText = await atlasCallModel(model, prompt, null, 8192)
+    if(!rawText) throw new Error('No response from model.')
+
+    // Parse JSON
+    var fence = String.fromCharCode(96,96,96)
+    var cleaned = rawText.trim()
+    if(cleaned.indexOf(fence) >= 0){
+      cleaned = cleaned.replace(new RegExp('^'+fence+'json\\s*','i'),'').replace(new RegExp('^'+fence+'\\s*','i'),'').replace(new RegExp('\\s*'+fence+'$'),'').trim()
+    }
+    var firstBrace = cleaned.indexOf('{')
+    var lastBrace = cleaned.lastIndexOf('}')
+    if(firstBrace === -1 || lastBrace === -1) throw new Error('Gemini did not return valid JSON.')
+    cleaned = cleaned.slice(firstBrace, lastBrace+1)
+
+    var pei
+    try{ pei = JSON.parse(cleaned) }
+    catch(parseErr){
+      var lastComma = cleaned.lastIndexOf(',')
+      if(lastComma > 0){
+        try{ pei = JSON.parse(cleaned.slice(0,lastComma)+'\n}') }
+        catch(e2){ throw new Error('Response was truncated. Try again.') }
+      } else { throw new Error('Could not parse Gemini response.') }
+    }
+
+    PEI_DATA = {meta:{organisation:target, ownership_type:ownership, functional_sector:sector, country:country, generated_at:new Date().toISOString(), model:model, tool:'ATLAS PEI v0.2', db_items_used:dbItems.length}, ...pei}
+
+    renderPEI(PEI_DATA, target, ownership, sector, country, dbItems)
+
+  }catch(err){
+    document.getElementById('loadingPanel').style.display = 'none'
+    document.getElementById('errorPanel').style.display = 'block'
+    document.getElementById('errorText').innerHTML = '<strong>Error:</strong> ' + err.message
+  } finally {
+    document.getElementById('generateBtn').disabled = false
+  var docketBtn = document.getElementById('addToDocketBtn'); if(docketBtn) docketBtn.style.display='inline-flex'
+    document.getElementById('dbStatus').textContent = ''
+  }
+}
+
+function renderPEI(pei, target, ownership, sector, country, dbItems){
+  document.getElementById('loadingPanel').style.display = 'none'
+  var date = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
+
+  document.getElementById('out-org').textContent = target
+  document.getElementById('out-ownership').textContent = ownership
+  document.getElementById('out-sector').textContent = sector
+  document.getElementById('out-country').textContent = country
+  document.getElementById('out-model').textContent = pei.meta.model
+  document.getElementById('out-date').textContent = date
+
+  // Intelligence DB section
+  if(dbItems && dbItems.length > 0){
+    document.getElementById('dbSection').style.display = 'block'
+    document.getElementById('out-db-items').innerHTML = dbItems.map(function(item){
+      var streamClass = item.intelligence_stream==='market_pulse'?'badge-mp':item.intelligence_stream==='domain_intel'?'badge-di':'badge-tw'
+      var streamLabel = item.intelligence_stream ? item.intelligence_stream.replace(/_/g,' ') : ''
+      return '<div class="db-item">'
+        +'<div class="db-item-title">'+esc(item.title||'')+'</div>'
+        +'<div class="db-item-meta">'
+        +(streamLabel?'<span class="db-badge '+streamClass+'">'+streamLabel+'</span>':'')
+        +'<span style="color:var(--mid)">'+new Date(item.scraped_at||'').toLocaleDateString('en-IN')+'</span>'
+        +(item.depth_score?'<span style="color:var(--blue);font-size:9px">depth '+item.depth_score+'</span>':'')
+        +'</div>'
+        +'<div class="db-item-summary">'+esc(item.summary||'')+'</div>'
+        +(item.opportunity?'<div style="font-size:10px;color:var(--teal);margin-top:4px">Opportunity: '+esc(item.opportunity)+'</div>':'')
+        +'</div>'
+    }).join('')
+  } else {
+    document.getElementById('dbSection').style.display = 'none'
+  }
+
+  // AI Maturity
+  var matMap = {none:0,aware:25,piloting:50,deploying:75,scaling:100}
+  var matLabels = {none:'None',aware:'Aware',piloting:'Piloting',deploying:'Deploying',scaling:'Scaling'}
+  var mat = pei.ai_maturity || 'none'
+  document.getElementById('out-maturity-label').innerHTML = '<strong>'+(matLabels[mat]||mat)+'</strong>'
+  document.getElementById('out-maturity-bar').style.width = (matMap[mat]||0)+'%'
+  document.getElementById('out-maturity-evidence').textContent = pei.ai_maturity_evidence || '\u2014'
+
+  // Summary
+  document.getElementById('out-summary').textContent = pei.organisation_summary || '\u2014'
+
+  // Tech profile
+  var tp = pei.technology_profile || {}
+  var hpcMap = {none:'No known HPC exposure',limited:'Limited HPC exposure',active:'Active HPC usage'}
+  var qMap = {none:'No quantum awareness',exploring:'Exploring quantum',active:'Active quantum programme'}
+  var techHtml = '<div style="margin-bottom:6px">HPC: <strong>'+(hpcMap[pei.hpc_exposure]||pei.hpc_exposure||'\u2014')+'</strong></div>'
+  techHtml += '<div style="margin-bottom:8px">Quantum: <strong>'+(qMap[pei.quantum_awareness]||pei.quantum_awareness||'\u2014')+'</strong></div>'
+  if(tp.current_it_infrastructure) techHtml += '<div style="margin-bottom:6px"><strong>Infrastructure:</strong> '+esc(tp.current_it_infrastructure)+'</div>'
+  if(tp.data_posture) techHtml += '<div style="margin-bottom:6px"><strong>Data posture:</strong> '+esc(tp.data_posture)+'</div>'
+  if(tp.key_technology_programmes?.length) techHtml += '<div style="margin-bottom:4px"><strong>Key programmes:</strong></div><ul>'+tp.key_technology_programmes.map(function(p){return '<li>'+esc(p)+'</li>'}).join('')+'</ul>'
+  document.getElementById('out-tech').innerHTML = techHtml
+  var vendors = tp.current_vendors || pei.current_vendors || []
+  document.getElementById('out-vendors').innerHTML = vendors.length
+    ? '<div style="font-size:10px;font-weight:700;color:var(--mid);margin-bottom:4px">KNOWN VENDORS</div>'+vendors.map(function(v){return '<span class="vendor-tag">'+esc(v)+'</span>'}).join('')
+    : '<span style="font-size:11px;color:var(--mid)">No known vendors identified</span>'
+
+  // Budget
+  var bp = pei.budget_and_procurement || {}
+  var budgetHtml = ''
+  if(bp.annual_it_budget_estimate) budgetHtml += '<div style="margin-bottom:5px"><strong>Annual IT Budget:</strong> '+esc(bp.annual_it_budget_estimate)+'</div>'
+  if(bp.recent_tender_sizes) budgetHtml += '<div style="margin-bottom:5px"><strong>Recent Tender Sizes:</strong> '+esc(bp.recent_tender_sizes)+'</div>'
+  if(bp.procurement_pattern) budgetHtml += '<div style="margin-bottom:5px"><strong>Procurement Pattern:</strong> '+esc(bp.procurement_pattern)+'</div>'
+  if(bp.financial_year) budgetHtml += '<div style="margin-bottom:5px"><strong>Financial Year:</strong> '+esc(bp.financial_year)+'</div>'
+  if(bp.budget_authority) budgetHtml += '<div style="margin-bottom:5px"><strong>Budget Authority:</strong> '+esc(bp.budget_authority)+'</div>'
+  document.getElementById('out-budget').innerHTML = budgetHtml || '\u2014'
+
+  // Decision makers
+  var dms = pei.key_decision_makers || []
+  document.getElementById('out-decision-makers').innerHTML = dms.length
+    ? '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--light)"><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Name</th><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Role</th><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Relevance</th><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Priorities</th></tr></thead><tbody>'
+      + dms.map(function(d){return '<tr style="border-bottom:1px solid var(--light)"><td style="padding:6px 8px;font-weight:600">'+esc(d.name||'')+'</td><td style="padding:6px 8px;color:var(--mid)">'+esc(d.role||'')+'</td><td style="padding:6px 8px">'+esc(d.relevance||'')+'</td><td style="padding:6px 8px">'+esc(d.known_priorities||'')+'</td></tr>'}).join('')
+      + '</tbody></table>'
+    : '<span style="font-size:11px;color:var(--mid)">No publicly known decision makers identified</span>'
+
+  // Lists
+  var inits = pei.strategic_initiatives || []
+  document.getElementById('out-initiatives').innerHTML = inits.length ? '<ul>'+inits.map(function(i){return '<li>'+esc(i)+'</li>'}).join('')+'</ul>' : '\u2014'
+  document.getElementById('out-regulatory').textContent = pei.regulatory_and_compliance || '\u2014'
+  var chals = pei.known_challenges || []
+  document.getElementById('out-challenges').innerHTML = chals.length ? '<ul>'+chals.map(function(c){return '<li>'+esc(c)+'</li>'}).join('')+'</ul>' : '\u2014'
+  document.getElementById('out-recent').textContent = pei.recent_activity || '\u2014'
+
+  // Suppliers
+  var ks = pei.known_suppliers || {}
+  var suppHtml = ''
+  if(ks.ai_hpc_vendors?.length) suppHtml += '<div style="margin-bottom:8px"><strong>AI & HPC Vendors:</strong><br>'+ks.ai_hpc_vendors.map(function(v){return '<span class="vendor-tag">'+esc(v)+'</span>'}).join('')+'</div>'
+  if(ks.software_vendors?.length) suppHtml += '<div style="margin-bottom:8px"><strong>Software & Cloud:</strong><br>'+ks.software_vendors.map(function(v){return '<span class="vendor-tag">'+esc(v)+'</span>'}).join('')+'</div>'
+  if(ks.si_partners?.length) suppHtml += '<div style="margin-bottom:8px"><strong>SI Partners:</strong><br>'+ks.si_partners.map(function(v){return '<span class="vendor-tag">'+esc(v)+'</span>'}).join('')+'</div>'
+  if(ks.notes) suppHtml += '<div style="font-size:11px;color:var(--mid);margin-top:6px">'+esc(ks.notes)+'</div>'
+  document.getElementById('out-suppliers').innerHTML = suppHtml || '\u2014'
+
+  document.getElementById('out-competitive').textContent = pei.competitive_signals || '\u2014'
+  document.getElementById('out-partnerships').textContent = pei.partnership_history || '\u2014'
+  var risks = pei.risk_flags || []
+  document.getElementById('out-risks').innerHTML = risks.length ? '<ul>'+risks.map(function(r){return '<li>'+esc(r)+'</li>'}).join('')+'</ul>' : '\u2014'
+
+  // Solution fit
+  var sf = pei.solution_fit || {}
+  var sfHtml = ''
+  if(sf.strongest_fit_areas?.length){ sfHtml += '<div style="margin-bottom:8px"><strong>Strongest Fit Areas:</strong><ul>'+sf.strongest_fit_areas.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul></div>' }
+  if(sf.entry_point_recommendations?.length){ sfHtml += '<div style="margin-bottom:8px"><strong>Entry Point Recommendations:</strong><ul>'+sf.entry_point_recommendations.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul></div>' }
+  if(sf.products_to_lead_with?.length){ sfHtml += '<div><strong>Lead With:</strong><ul>'+sf.products_to_lead_with.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul></div>' }
+  document.getElementById('out-solution-fit').innerHTML = sfHtml || '\u2014'
+
+  var actions = pei.recommended_next_actions || []
+  document.getElementById('out-next-actions').innerHTML = actions.length ? '<ol style="margin-left:16px">'+actions.map(function(a){return '<li style="margin-bottom:5px">'+esc(a)+'</li>'}).join('')+'</ol>' : '\u2014'
+
+  document.getElementById('out-positioning').innerHTML = pei.our_positioning
+    ? esc(pei.our_positioning).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    : '\u2014'
+
+  var conf = pei.confidence || 'low'
+  var confEl = document.getElementById('out-confidence')
+  confEl.textContent = conf.charAt(0).toUpperCase()+conf.slice(1)+(pei.confidence_reason?' \u2014 '+pei.confidence_reason:'')
+  confEl.className = 'confidence-pill conf-'+conf
+
+  document.getElementById('peiOutput').style.display = 'block'
+  document.getElementById('peiOutput').scrollIntoView({behavior:'smooth'})
+}
+
+function esc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+function clearOutput(){
+  document.getElementById('peiOutput').style.display = 'none'
+  document.getElementById('errorPanel').style.display = 'none'
+  document.getElementById('dbSection').style.display = 'none'
+  PEI_DATA = null
+}
+
+function copyJSON(){
+  if(!PEI_DATA) return
+  navigator.clipboard.writeText(JSON.stringify(PEI_DATA,null,2)).then(function(){
+    var btn = event.target; btn.textContent = '\u2713 Copied'
+    setTimeout(function(){btn.innerHTML='&#128203; Copy JSON'},2000)
+  })
+}
+
+function downloadJSON(){
+  if(!PEI_DATA) return
+  var org = document.getElementById('orgName').value.replace(/[^a-z0-9]/gi,'_').slice(0,30)
+  dl(JSON.stringify(PEI_DATA,null,2),'application/json','PEI-'+org+'-'+new Date().toISOString().slice(0,10)+'.json')
+}
+
+function dl(content,type,fname){
+  var blob = new Blob([content],{type})
+  var url = URL.createObjectURL(blob)
+  var a = document.createElement('a')
+  a.href=url; a.download=fname; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadWord(){
+  if(!PEI_DATA) return
+  alert('Word export: feature identical to v0.1 - coming in next update.')
+}
+
+function addPEIToDocket(){
+  var orgName = document.getElementById('orgName') ? document.getElementById('orgName').value.trim() : ''
+  if(!orgName){ alert('Generate a PEI brief first.'); return }
+  var summary = document.getElementById('out-exec-summary') ? document.getElementById('out-exec-summary').textContent : ''
+  var positioning = document.getElementById('out-positioning') ? document.getElementById('out-positioning').textContent : ''
+  var nextActions = document.getElementById('out-next-actions') ? document.getElementById('out-next-actions').textContent : ''
+  var item = {
+    type: 'pei',
+    title: 'PEI Brief - ' + orgName,
+    content: {
+      organisation_summary: summary.slice(0,500),
+      our_positioning: positioning.slice(0,500),
+      next_actions: nextActions.slice(0,300),
+    },
+    notes: summary.slice(0,200),
+    source_id: null
+  }
+  localStorage.setItem('atlas_pending_docket_item', JSON.stringify(item))
+  // Open docket in new tab
+  var docketUrl = window.location.href.replace(/tools\/pei-tool.*/, 'tools/engagement-docket/?addItem=1')
+  window.open(docketUrl, '_blank')
+}
+
+function downloadPPTX(){
+  if(!PEI_DATA) return
+  alert('PPTX export: feature identical to v0.1 - coming in next update.')
+}// \u2500\u2500 ATLAS Model Registry (embedded) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 // \u2500\u2500 ATLAS Model Registry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 // Central utility \u2014 reads atlas_global_cfg, returns only configured providers
@@ -711,1325 +1061,427 @@ function atlasGetTaskModel(taskId){
 }
 // \u2500\u2500 End ATLAS Model Registry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
+// Wrappers
+function getGlobal(){ return atlasGetGlobal() }
+function getTaskModel(taskId){ return atlasGetTaskModel(taskId) }
 
-// \u2500\u2500 Supabase \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function getSB(){
-  var g = atlasGetGlobal()
-  return {url: g.sbUrl||'', key: g.sbKey||''}
+// \u2500\u2500 ConfigTA = null
+
+// \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function loadConfig(){
+  try{ return JSON.parse(localStorage.getItem('atlas_pei_cfg')||'{}') }catch(e){ return {} }
 }
-async function sbFetch(table, params, limit){
-  var sb = getSB(); if(!sb.url) return []
-  var url = sb.url+'/rest/v1/'+table+'?'+params+(limit?'&limit='+limit:'')
-  var r = await fetch(url,{headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}})
-  return r.ok ? await r.json() : []
-}
-async function sbInsert(table, data){
-  var sb = getSB(); if(!sb.url) return false
-  var r = await fetch(sb.url+'/rest/v1/'+table,{
-    method:'POST',
-    headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=minimal'},
-    body:JSON.stringify(data)
-  })
-  return r.ok
-}
-async function sbPatch(table, filter, data){
-  var sb = getSB(); if(!sb.url) return false
-  var r = await fetch(sb.url+'/rest/v1/'+table+'?'+filter,{
-    method:'PATCH',
-    headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key,'Content-Type':'application/json','Prefer':'return=minimal'},
-    body:JSON.stringify(data)
-  })
-  return r.ok
-}
-async function sbDelete(table, filter){
-  var sb = getSB(); if(!sb.url) return false
-  var r = await fetch(sb.url+'/rest/v1/'+table+'?'+filter,{
-    method:'DELETE',
-    headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
-  })
-  return r.ok
-}
+function getGlobal(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } }
 
-// \u2500\u2500 State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var ALL_CUSTOMERS = []
-var ALL_ENGAGEMENTS = []
-var PORTFOLIO_CATALOGUE = []
-var CURRENT_CUSTOMER_ID = null
-var CURRENT_ENGAGEMENT_ID = null
-var CURRENT_VIEW = 'dashboard'  // dashboard|customer|engagement|docket
-var CURRENT_DOCKET_ID = null
-var CURRENT_ITEMS = []
-var PORTFOLIO_SELECTION = []
-var PENDING_TRIGGER_ITEM = null
+async function callProvider(model, prompt, keyOverride){
+  var g = getGlobal()
+  var isGemini = model.indexOf('gemini') >= 0
+  var isClaude = model.indexOf('claude') >= 0
+  var isMistral = model.indexOf('mistral') >= 0
+  var isQwen = model.indexOf('qwen') >= 0
+  var isSarvam = model.indexOf('sarvam') >= 0
+  var isOpenAI = model.indexOf('gpt') >= 0
 
-// \u2500\u2500 Utils \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
-function fmtDate(d){ if(!d) return ''; try{ return new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) }catch(e){ return d } }
-function genId(prefix){ return prefix+'-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+Math.floor(Math.random()*9999) }
-function initials(name){ return (name||'?').split(' ').slice(0,2).map(function(w){ return w[0] }).join('').toUpperCase() }
-
-var ITEM_TYPES = {
-  action:  {icon:'',label:'Action'},
-  intel:   {icon:'',label:'Intelligence'},
-  pei:     {icon:'',label:'PEI Brief'},
-  uc:      {icon:'',label:'Use Case'},
-  rfp:     {icon:'',label:'RFP'},
-  pitch:   {icon:'',label:'Pitch'},
-  solution:{icon:'',label:'Solution'},
-  bom:     {icon:'',label:'BOM'},
-  proposal:{icon:'',label:'Proposal'},
-  pricing: {icon:'',label:'Pricing'},
-  exec_doc:{icon:'',label:'Exec Doc'}
-}
-
-// \u2500\u2500 Load \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function loadAll(){
-  ALL_CUSTOMERS = await sbFetch('customers','order=updated_at.desc',500)
-  ALL_ENGAGEMENTS = await sbFetch('engagements','order=updated_at.desc',500)
-  PORTFOLIO_CATALOGUE = await sbFetch('portfolio_catalogue','order=level.asc,code.asc',100)
-  renderSidebar()
-  renderDashboard()
-}
-
-// \u2500\u2500 Sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function renderSidebar(){
-  var q = (document.getElementById('sbSearch').value||'').toLowerCase()
-  var strategic = ALL_CUSTOMERS.filter(function(c){ return c.tier==='strategic' && (!q||c.name.toLowerCase().includes(q)) })
-  var transact = ALL_CUSTOMERS.filter(function(c){ return c.tier==='transactional' && (!q||c.name.toLowerCase().includes(q)) })
-
-  document.getElementById('sbStrategicCount').textContent = strategic.length
-  document.getElementById('sbTransactionalCount').textContent = transact.length
-
-  function custItem(c){
-    return '<div class="sb-item'+(CURRENT_CUSTOMER_ID===c.id?' active':'')+'" onclick="openCustomer(\''+c.id+'\')">'
-      +'<span class="sb-dot dot-'+(c.tier||'transactional')+'"></span>'
-      +'<span class="sb-item-name" title="'+esc(c.name)+'">'+esc(c.name)+'</span>'
-      +'<span style="font-size:9px;color:var(--mid)">'+esc(c.ownership||'')+'</span>'
-      +'</div>'
+  if(isGemini){
+    var key = keyOverride || g['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
+    if(!key) throw new Error('Gemini API key not configured.')
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+key
+    var body = {contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:8192,thinkingConfig:{thinkingBudget:0}}}
+    var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    if(!r.ok){var e=await r.json();throw new Error(e.error?.message||'Gemini error '+r.status)}
+    var d = await r.json()
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || ''
   }
 
-  document.getElementById('sbStrategicList').innerHTML = strategic.length
-    ? strategic.map(custItem).join('')
-    : '<div style="padding:6px 16px;font-size:11px;color:var(--mid)">None yet</div>'
-  document.getElementById('sbTransactionalList').innerHTML = transact.length
-    ? transact.map(custItem).join('')
-    : '<div style="padding:6px 16px;font-size:11px;color:var(--mid)">None yet</div>'
+  // OpenAI-compatible providers
+  var endpoints = {
+    claude: 'https://api.anthropic.com/v1/messages',
+    mistral: 'https://api.mistral.ai/v1/chat/completions',
+    qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
+    sarvam: 'https://api.sarvam.ai/v1/chat/completions',
+    gpt: 'https://api.openai.com/v1/chat/completions',
+  }
+  var provider = isClaude?'claude':isMistral?'mistral':isQwen?'qwen':isSarvam?'sarvam':'gpt'
+  var key = keyOverride || g['key_'+(isClaude?'anthropic':isMistral?'mistral':isQwen?'qwen':isSarvam?'sarvam':'openai')] || ''
+  if(!key && provider !== 'ollama') throw new Error((isClaude?'Anthropic':isMistral?'Mistral':isQwen?'Qwen':isSarvam?'Sarvam':'OpenAI')+' API key not configured in ATLAS Settings.')
 
-  document.getElementById('sbMyDocket').innerHTML =
-    '<div class="sb-item" onclick="openMyActions()">'
-    +'<span style="font-size:14px"></span>'
-    +'<span class="sb-item-name">My Action Docket</span>'
-    +'</div>'
-}
-
-// \u2500\u2500 Dashboard \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function renderDashboard(){
-  CURRENT_VIEW='dashboard'; CURRENT_CUSTOMER_ID=null; CURRENT_ENGAGEMENT_ID=null
-  var strat = ALL_CUSTOMERS.filter(function(c){ return c.type==='strategic' }).length
-  var active = ALL_ENGAGEMENTS.filter(function(e){ return e.status==='active' }).length
-  var won = ALL_ENGAGEMENTS.filter(function(e){ return e.status==='won' }).length
-
-  var recentEngs = ALL_ENGAGEMENTS.slice(0,6).map(function(e){
-    var cust = ALL_CUSTOMERS.find(function(c){ return c.id===e.customer_id })
-    return '<div class="eng-card phase-'+e.phase+'" onclick="openEngagement(\''+e.id+'\')">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
-      +'<div style="font-size:13px;font-weight:600;color:var(--dark)">'+esc(e.name)+'</div>'
-      +'<span class="pill pill-'+e.status+'">'+e.status+'</span>'
-      +'</div>'
-      +'<div style="font-size:10px;color:var(--mid)">'
-      +(cust?esc(cust.name)+' \u00B7 ':'')
-      +esc(e.phase)+' \u00B7 '+esc(e.domain||'')+' \u00B7 '+fmtDate(e.updated_at)
-      +'</div>'
-      +'</div>'
-  }).join('')
-
-  document.getElementById('mainPanel').innerHTML =
-    '<div style="margin-bottom:20px">'
-    +'<div class="card-title" style="font-size:18px">Engagement Overview</div>'
-    +'<div style="font-size:12px;color:var(--mid)">Select a customer from the sidebar or add a new one using the button above.</div>'
-    +'</div>'
-    +'<div class="stat-grid">'
-    +'<div class="stat"><div class="stat-val">'+ALL_CUSTOMERS.length+'</div><div class="stat-lbl">Total Customers</div></div>'
-    +'<div class="stat"><div class="stat-val" style="color:var(--blue)">'+ALL_CUSTOMERS.filter(function(c){return c.tier==='strategic'}).length+'</div><div class="stat-lbl">Strategic</div></div>'
-    +'<div class="stat"><div class="stat-val" style="color:var(--teal)">'+active+'</div><div class="stat-lbl">Active Engagements</div></div>'
-    +'<div class="stat"><div class="stat-val" style="color:var(--orange)">'+won+'</div><div class="stat-lbl">Won</div></div>'
-    +'</div>'
-    +(recentEngs
-      ? '<div class="card-title" style="margin-bottom:12px">Recent Engagements</div>'+recentEngs
-      : '<div class="empty"><div class="empty-icon">&#128193;</div><div class="empty-title">No engagements yet</div><div class="empty-sub">Add a customer to get started.</div></div>'
-    )
-  renderSidebar()
-}
-
-// \u2500\u2500 Customer View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function openCustomer(custId){
-  CURRENT_CUSTOMER_ID = custId
-  CURRENT_ENGAGEMENT_ID = null
-  CURRENT_VIEW = 'customer'
-  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===custId })
-  if(!cust) return
-
-  var custEngs = ALL_ENGAGEMENTS.filter(function(e){ return e.customer_id===custId })
-  var txns = await sbFetch('transactions','customer_id=eq.'+custId+'&order=txn_date.desc',50)
-
-  var isTransactional = cust.tier === 'transactional'
-  var contacts = Array.isArray(cust.contacts) ? cust.contacts : []
-  var divisions = Array.isArray(cust.divisions) ? cust.divisions : []
-
-  var html = '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">'
-    +'<div style="display:flex;align-items:center;gap:12px">'
-    +'<div class="cust-avatar" style="width:48px;height:48px;font-size:18px">'+initials(cust.name)+'</div>'
-    +'<div>'
-    +'<div style="font-size:20px;font-weight:700;color:var(--navy)">'+esc(cust.name)+'</div>'
-    +'<div style="font-size:11px;color:var(--mid);margin-top:2px">'
-    +[cust.ownership,cust.sector,cust.country,cust.state].filter(Boolean).map(esc).join(' \u00B7 ')
-    +'</div>'
-    +'</div></div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    +'<span class="pill pill-'+(cust.tier||'transactional')+'">'+esc(cust.tier||'transactional')+'</span>'
-    +(cust.ai_maturity?'<span class="pill" style="background:rgba(0,40,112,0.08);color:var(--navy)">AI: '+esc(cust.ai_maturity)+'</span>':'')
-    +'</div>'
-    +'</div>'
-
-  // Elevation banner for transactional customers
-  if(isTransactional){
-    html += '<div class="elevate-banner">'
-      +'<div class="elevate-text">\u26A1 This is a transactional customer. Elevate to strategic to create an Engagement Docket and unlock the full engagement lifecycle.</div>'
-      +'<button class="btn btn-navy btn-sm" onclick="elevateCustomer(\''+custId+'\')">Elevate to Strategic</button>'
-      +'</div>'
+  if(isClaude){
+    var body = {model:model,max_tokens:8192,messages:[{role:'user',content:prompt}]}
+    var r = await fetch(endpoints.claude,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)})
+    if(!r.ok){var e=await r.json();throw new Error(e.error?.message||'Claude error '+r.status)}
+    var d = await r.json()
+    return d.content?.[0]?.text || ''
   }
 
-  // Tabs
-  html += '<div class="tab-bar">'
-    +'<div class="tab active" id="tab-profile" onclick="switchCustTab(\'profile\')">Profile</div>'
-    +'<div class="tab" id="tab-engagements" onclick="switchCustTab(\'engagements\')">Engagements ('+custEngs.length+')</div>'
-    +'<div class="tab" id="tab-transactions" onclick="switchCustTab(\'transactions\')">Transactions ('+txns.length+')</div>'
-    +'</div>'
-    +'<div id="cust-tab-content"></div>'
-
-  document.getElementById('mainPanel').innerHTML = html
-  window._custEngs = custEngs
-  window._txns = txns
-  window._cust = cust
-  switchCustTab('profile')
-  renderSidebar()
+  var headers = {'Content-Type':'application/json'}
+  if(isSarvam) headers['api-subscription-key'] = key
+  else if(key) headers['Authorization'] = 'Bearer '+key
+  var body = {model:model,messages:[{role:'user',content:prompt}],max_tokens:8192,temperature:0.2}
+  var r = await fetch(endpoints[provider],{method:'POST',headers:headers,body:JSON.stringify(body)})
+  if(!r.ok){var e=await r.json();throw new Error('API error '+r.status)}
+  var d = await r.json()
+  return d.choices?.[0]?.message?.content || ''
+}
+function getTaskModel(taskId){
+  var g=getGlobal()
+  var DEFAULTS={scraping:'gemini-3.1-flash-lite',enrichment:'gemini-3.1-flash-lite',uc_enrich:'gemini-3.5-flash',pei:'claude-haiku-4-5-20251001',documents:'claude-haiku-4-5-20251001',specialist:'sarvam-m',airgap:'llama3.3'}
+  return (g.model_tiers&&g.model_tiers[taskId])||localStorage.getItem('atlas_default_model')||DEFAULTS[taskId]||'gemini-3.1-flash-lite'
+}
+function getEffectiveCfg(){
+  var local = loadConfig(), global = getGlobal()
+  return {
+    key: local.key || global['key_gemini'] || localStorage.getItem('atlas_gemini_key') || '',
+    sbUrl: local.sbUrl || global.sbUrl || '',
+    sbKey: local.sbKey || global.sbKey || '',
+    model: local.model || getTaskModel('pei') || 'claude-haiku-4-5-20251001'
+  }
+}
+function saveConfig(){
+  var key = document.getElementById('apiKey').value.trim()
+  var sbUrl = document.getElementById('sbUrl').value.trim()
+  var sbKey = document.getElementById('sbKey').value.trim()
+  var model = document.getElementById('modelSelect').value
+  if(!key){ alert('Please enter your Gemini API key.'); return }
+  localStorage.setItem('atlas_pei_cfg', JSON.stringify({key:key, sbUrl:sbUrl, sbKey:sbKey, model:model}))
+  var savedEl = document.getElementById('configSaved')
+  savedEl.style.display = 'inline'
+  setTimeout(function(){ savedEl.style.display = 'none' }, 3000)
 }
 
-function switchCustTab(tab){
-  ['profile','engagements','transactions'].forEach(function(t){
-    var el = document.getElementById('tab-'+t)
-    if(el) el.className = 'tab'+(t===tab?' active':'')
-  })
-  var cust = window._cust
-  var custEngs = window._custEngs || []
-  var txns = window._txns || []
-  var content = ''
-
-  if(tab === 'profile'){
-    var contacts = Array.isArray(cust.contacts) ? cust.contacts : []
-    var divisions = Array.isArray(cust.divisions) ? cust.divisions : []
-    content = '<div class="card"><div class="card-title">Organisation Details</div>'
-      +'<div class="form-grid">'
-      +'<div><label>Parent Organisation</label><div style="font-size:13px">'+esc(cust.parent_org||'\u2014')+'</div></div>'
-      +'<div><label>Org Type</label><div style="font-size:13px">'+esc(cust.org_type||'\u2014')+'</div></div>'
-      +'</div>'
-      +(cust.notes?'<div style="margin-top:12px;font-size:12px;color:var(--mid);line-height:1.6">'+esc(cust.notes)+'</div>':'')
-      +'</div>'
-    // Contacts
-    content += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
-      +'<div class="card-title" style="margin:0">Key Contacts</div>'
-      +'<button class="btn btn-ghost btn-xs" onclick="addContact(\''+cust.id+'\')">+ Add</button>'
-      +'</div>'
-      +(contacts.length ? contacts.map(function(c){
-        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--light)">'
-          +'<div style="flex:1"><div style="font-size:12px;font-weight:600">'+esc(c.name)+'</div>'
-          +'<div style="font-size:10px;color:var(--mid)">'+esc(c.role||'')+(c.seniority?' \u00B7 '+esc(c.seniority):'')+'</div></div>'
-          +(c.influence?'<span class="pill" style="background:rgba(0,178,144,0.1);color:var(--teal)">'+esc(c.influence)+'</span>':'')
-          +'</div>'
-      }).join('') : '<div style="font-size:11px;color:var(--mid);padding:8px 0">No contacts added yet</div>')
-      +'</div>'
-  }
-
-  if(tab === 'engagements'){
-    content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
-      +(cust.tier==='strategic'
-        ? '<button class="btn btn-primary" onclick="openModal(\'newEngagementModal\'); document.getElementById(\'ne-customer-id\').value=\''+cust.id+'\'">+ New Engagement</button>'
-        : '<div style="font-size:11px;color:var(--mid)">Elevate to strategic to create engagements</div>')
-      +'</div>'
-    content += custEngs.length ? custEngs.map(function(e){
-      return '<div class="eng-card phase-'+e.phase+'" onclick="openEngagement(\''+e.id+'\')">'
-        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
-        +'<div style="font-size:13px;font-weight:600">'+esc(e.name)+'</div>'
-        +'<span class="pill pill-'+e.status+'">'+e.status+'</span></div>'
-        +'<div style="font-size:10px;color:var(--mid)">'+esc(e.phase)+' \u00B7 '+esc(e.archetype||'')+' \u00B7 '+esc(e.value||'')+' '+esc(e.currency||'')+'</div>'
-        +'</div>'
-    }).join('') : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCBC</div><div class="empty-title">No engagements</div></div>'
-  }
-
-  if(tab === 'transactions'){
-    content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
-      +'<button class="btn btn-ghost btn-sm" onclick="openModal(\'newTxnModal\'); document.getElementById(\'txn-customer-id\').value=\''+cust.id+'\'">+ Record Transaction</button>'
-      +'</div>'
-    content += txns.length ? txns.map(function(t){
-      return '<div class="card" style="padding:12px 14px">'
-        +'<div style="display:flex;align-items:center;justify-content:space-between">'
-        +'<div style="font-size:13px;font-weight:600">'+esc(t.product_name)+'</div>'
-        +'<div style="font-size:12px;font-weight:600;color:var(--teal)">'+esc(t.value||'')+' '+esc(t.currency||'')+'</div></div>'
-        +'<div style="font-size:10px;color:var(--mid);margin-top:4px">'+fmtDate(t.txn_date)+' \u00B7 '+esc(t.channel||'')+' \u00B7 '+esc(t.product_code||'')+'</div>'
-        +(t.notes?'<div style="font-size:11px;color:var(--mid);margin-top:4px">'+esc(t.notes)+'</div>':'')
-        +'</div>'
-    }).join('') : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCB3</div><div class="empty-title">No transactions</div></div>'
-  }
-
-  document.getElementById('cust-tab-content').innerHTML = content
-}
-
-// \u2500\u2500 Engagement View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function openEngagement(engId){
-  CURRENT_ENGAGEMENT_ID = engId
-  CURRENT_VIEW = 'engagement'
-  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
-  if(!eng) return
-  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===eng.customer_id })
-
-  // Get or create docket for this engagement
-  var dockets = await sbFetch('engagement_dockets','engagement_id=eq.'+engId,1)
-  var docket = dockets[0]
-  if(!docket){
-    // Auto-create docket for this engagement
-    var newDocket = {
-      id: genId('ENG'),
-      type: 'customer',
-      name: (cust?cust.name+' \u2014 ':'')+eng.name,
-      customer_name: cust?cust.name:'',
-      customer_id: eng.customer_id,
-      engagement_id: engId,
-      owner: '',
-      status: 'active',
-      sector: eng.domain||'',
-      metadata: {}
+window.addEventListener('DOMContentLoaded', function(){
+  var cfg = getEffectiveCfg()
+  if(cfg.key) document.getElementById('apiKey').value = cfg.key
+  if(cfg.sbUrl) document.getElementById('sbUrl').value = cfg.sbUrl
+  if(cfg.sbKey) document.getElementById('sbKey').value = cfg.sbKey
+  var modelToSet = cfg.model || getTaskModel('pei')
+  if(modelToSet){
+    var sel = document.getElementById('modelSelect')
+    // Try to set saved model, fall back to task default
+    for(var i=0;i<sel.options.length;i++){
+      if(sel.options[i].value === modelToSet){ sel.value = modelToSet; break }
     }
-    await sbInsert('engagement_dockets', newDocket)
-    docket = newDocket
+  }
+})
+
+// \u2500\u2500 Supabase intelligence query \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function queryIntelligenceDB(sector, country, ownership){
+  var cfg = getEffectiveCfg()
+  if(!cfg.sbUrl||!cfg.sbKey) return []
+
+  // Map sector to domain codes
+  var sectorMap = {
+    'Defence & Armed Forces': ['DEF-MIL','DEF-HLS','DEF-INT'],
+    'Intelligence & Signals': ['DEF-INT','DEF-MIL'],
+    'Homeland Security': ['DEF-HLS'],
+    'Governance & e-Governance': ['GOV-GOV'],
+    'Space & Aerospace / Aviation': ['DEF-SPC','INF-CIV'],
+    'Geospatial & Earth Observation': ['GEO-SPA'],
+    'Critical Infrastructure': ['INF-CIV'],
+    'Natural Resources': ['RES-NAT'],
+    'Energy & Utilities': ['ENR-UTL'],
+    'Telecom & Networks': ['TEL-NET'],
+    'BFSI & Financial Services': ['FIN-BFS'],
+    'Health & Life Sciences': ['HLT-LIF'],
+    'Manufacturing & Industry': ['MFG-IND'],
+    'Media & Broadcast': ['MED-BRD'],
+    'Regional AI Programmes': ['REG-AIP'],
+    'General Enterprise': ['TEC-GEN'],
   }
 
-  CURRENT_DOCKET_ID = docket.id
-  CURRENT_ITEMS = await sbFetch('docket_items','docket_id=eq.'+docket.id+'&order=created_at.asc',200)
+  var codes = sectorMap[sector] || []
+  if(codes.length === 0) return []
 
-  var isL1 = eng.archetype === 'tsap' || eng.type === 'new' && eng.domain === 'REG-AIP'
+  // Fetch up to 10 relevant items from the last 18 months
+  var cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - 18)
+  var cutoffStr = cutoff.toISOString()
 
-  var html = '<div style="background:var(--navy);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;color:var(--white)">'
-    +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-    +'<div>'
-    +'<div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">'+(cust?esc(cust.name)+' \u00B7 ':'')+'<span id="eng-id-badge">'+esc(eng.id)+'</span></div>'
-    +'<div style="font-size:20px;font-weight:700">'+esc(eng.name)+'</div>'
-    +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'
-    +'<span class="pill pill-'+eng.status+'">'+eng.status+'</span>'
-    +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.phase)+'</span>'
-    +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.archetype||'')+'</span>'
-    +(eng.value?'<span class="pill" style="background:rgba(0,178,144,0.2);color:var(--teal)">\uD83D\uDCB0 '+esc(eng.value)+' '+esc(eng.currency||'')+'</span>':'')
-    +'</div></div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">'
-    +'<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+docket.id+'\')">+ Add Item</button>'
-    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="openPortfolioMap(\''+engId+'\',\''+docket.id+'\')">Portfolio Map</button>'
-    +(isL1?'<button class="btn btn-sm" style="background:rgba(255,182,0,0.2);color:var(--amber)" onclick="openL1Config(\''+engId+'\')">TSAP Configure</button>':'')
-    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="runRecommendationEngine(\''+engId+'\')">Recommend</button>'
-    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="exportWordDoc(\''+docket.id+'\')\">'+'Export</button>'
-    +'<select onchange="changeEngStatus(\''+engId+'\',this.value)" style="padding:4px 8px;font-size:11px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:var(--white);font-family:inherit">'
-    +'<option value="active"'+(eng.status==='active'?' selected':'')+'>Active</option>'
-    +'<option value="paused"'+(eng.status==='paused'?' selected':'')+'>Paused</option>'
-    +'<option value="won"'+(eng.status==='won'?' selected':'')+'>Won</option>'
-    +'<option value="lost"'+(eng.status==='lost'?' selected':'')+'>Lost</option>'
-    +'</select>'
-    +'</div></div></div>'
-
-  // Docket items
-  var itemsByType = {}
-  CURRENT_ITEMS.forEach(function(item){ if(!itemsByType[item.item_type]) itemsByType[item.item_type]=0; itemsByType[item.item_type]++ })
-
-  // Filter bar
-  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'
-    +'<button class="btn btn-ghost btn-xs" style="background:var(--navy);color:var(--white)" onclick="renderItems(\'all\')">All ('+CURRENT_ITEMS.length+')</button>'
-  Object.keys(ITEM_TYPES).forEach(function(t){
-    if(itemsByType[t]) html += '<button class="btn btn-ghost btn-xs" onclick="renderItems(\''+t+'\')">'+(ITEM_TYPES[t].icon)+' '+ITEM_TYPES[t].label+' ('+itemsByType[t]+')</button>'
-  })
-  html += '</div><div id="docket-items-container"></div>'
-
-  document.getElementById('mainPanel').innerHTML = html
-  window._currentEng = eng
-  renderItems('all')
-  renderSidebar()
+  var allItems = []
+  for(var i=0; i<codes.length && allItems.length < 10; i++){
+    try{
+      var resp = await fetch(
+        cfg.sbUrl+'/rest/v1/intelligence_items?domain_code=eq.'+codes[i]+'&scraped_at=gte.'+cutoffStr+'&order=depth_score.desc.nullslast,scraped_at.desc&limit=5',
+        {headers:{'apikey':cfg.sbKey,'Authorization':'Bearer '+cfg.sbKey}}
+      )
+      if(resp.ok){
+        var items = await resp.json()
+        items.forEach(function(item){
+          if(!allItems.find(function(e){return e.id===item.id})) allItems.push(item)
+        })
+      }
+    }catch(e){ console.error('DB query error:', e) }
+  }
+  return allItems.slice(0,8)
 }
 
-function renderItems(filterType){
-  var items = filterType==='all' ? CURRENT_ITEMS : CURRENT_ITEMS.filter(function(i){ return i.item_type===filterType })
-  var html = items.length ? items.map(renderItem).join('')
-    : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCCB</div><div class="empty-title">No items yet</div><div class="empty-sub">Add intelligence, PEI, UCs, or actions to this docket.</div></div>'
-  document.getElementById('docket-items-container').innerHTML = html
-}
+// \u2500\u2500 Main generate function \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function generatePEI(){
+  var cfg = getEffectiveCfg()
+  var model = cfg.model
+  var g = getGlobal()
+  // Get key for the selected provider
+  var isClaude = model.indexOf('claude') >= 0
+  var isMistral = model.indexOf('mistral') >= 0
+  var isGemini = model.indexOf('gemini') >= 0
+  var providerKey = isGemini ? (cfg.key||g['key_gemini']||localStorage.getItem('atlas_gemini_key')||'')
+    : isClaude ? (g['key_anthropic']||'')
+    : isMistral ? (g['key_mistral']||'')
+    : (cfg.key||'')
+  var apiKey = providerKey || document.getElementById('apiKey').value.trim()
+  var orgName = document.getElementById('orgName').value.trim()
+  var country = document.getElementById('orgCountry').value
+  var ownership = document.getElementById('orgOwnership').value
+  var sector = document.getElementById('orgSector').value
+  var division = document.getElementById('orgDivision').value.trim()
+  var context = document.getElementById('orgContext').value.trim()
+  var model = document.getElementById('modelSelect').value
 
-function renderItem(item){
-  var tc = ITEM_TYPES[item.item_type]||{icon:'\uD83D\uDCCC',label:item.item_type}
-  var content = item.content||{}
-  var preview = item.notes || content.summary || content.problem_statement || ''
-  return '<div class="docket-item">'
-    +'<div class="item-icon icon-'+item.item_type+'">'+tc.icon+'</div>'
-    +'<div class="item-body">'
-    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
-    +'<div class="item-title">'+esc(item.title)+'</div>'
-    +'<span class="item-status is-'+item.status+'">'+item.status.replace('_',' ')+'</span>'
-    +'</div>'
-    +'<div class="item-meta">'+(item.assigned_to?'\uD83D\uDC64 '+esc(item.assigned_to)+' \u00B7 ':'')+(item.due_date?'\uD83D\uDCC5 '+fmtDate(item.due_date)+' \u00B7 ':'')+'Added '+fmtDate(item.created_at)+'</div>'
-    +(preview?'<div style="font-size:11px;color:#555;margin-top:4px;line-height:1.5">'+esc(preview.slice(0,120))+(preview.length>120?'\u2026':'')+'</div>':'')
-    +'<div style="display:flex;gap:6px;margin-top:6px">'
-    +(item.status==='pending'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">Start</button>':'')
-    +(item.status==='in_progress'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">Done</button>':'')
-    +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteItem(this.dataset.id)">x</button>'
-    +'</div></div></div>'
-}
+  if(!apiKey){ alert('Please configure an API key in ATLAS Settings or the Config card above.'); return }
+  if(!orgName){ alert('Please enter an organisation name.'); return }
 
-// \u2500\u2500 Recommendation Engine \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function runRecommendationEngine(engId){
-  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
-  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===(eng&&eng.customer_id) })
-  if(!eng) return
+  document.getElementById('peiOutput').style.display = 'none'
+  document.getElementById('errorPanel').style.display = 'none'
+  document.getElementById('loadingPanel').style.display = 'block'
+  document.getElementById('loadingOrg').textContent = orgName
+  document.getElementById('generateBtn').disabled = true
+  document.getElementById('dbStatus').textContent = 'Querying intelligence database...'
 
-  var model = atlasGetTaskModel('pei')
-  var key = atlasGetKeyForModel(model)
-  if(!key){ alert('Configure AI keys in ATLAS Settings to use the Recommendation Engine.'); return }
-
-  var panel = document.getElementById('mainPanel')
-  var recDiv = document.createElement('div')
-  recDiv.className = 'rec-card'
-  recDiv.innerHTML = '<div class="rec-title">\uD83E\uDD16 Running Recommendation Engine...</div>'
-  panel.insertBefore(recDiv, panel.firstChild.nextSibling.nextSibling)
-
-  var prompt = 'You are an AI business development assistant for an on-premises AI hardware and software OEM.'
-    +' Analyse this engagement and recommend the most relevant portfolio items.'
-    +' Customer: '+JSON.stringify({name:cust&&cust.name,sector:cust&&cust.sector,ownership:cust&&cust.ownership,country:cust&&cust.country,ai_maturity:cust&&cust.ai_maturity})+''
-    +' Engagement: '+JSON.stringify({name:eng.name,archetype:eng.archetype,type:eng.type,phase:eng.phase,domain:eng.domain,value:eng.value})+''
-    +' Portfolio: '+JSON.stringify(PORTFOLIO_CATALOGUE.map(function(p){ return {code:p.code,name:p.name,level:p.level,category:p.category} }))+''
-    +' Respond with JSON: {recommendations:[{code,reason,priority(high|medium|low)}], upsell:[{code,reason}], summary(2 sentences)}'
-    +' Start { end }. No markdown.'
+  var target = division ? orgName + ' \u2014 ' + division : orgName
+  var countrySelect = document.getElementById('orgCountry')
+  var currency = countrySelect.options[countrySelect.selectedIndex]?.dataset?.currency || 'USD'
+  var currencyNote = currency !== 'USD' ? currency + ' (with USD equivalent where relevant)' : 'USD'
 
   try{
-    var text = await atlasCallModel(model, prompt, null, 1500)
-    var first = text.indexOf('{'), last = text.lastIndexOf('}')
-    if(first<0) throw new Error('No JSON in response')
-    var result = JSON.parse(text.slice(first,last+1))
-    var recs = result.recommendations||[]
-    var upsells = result.upsell||[]
-    var recHtml = '<div class="rec-title">\uD83E\uDD16 Portfolio Recommendations</div>'
-      +(result.summary?'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">'+esc(result.summary)+'</div>':'')
-      +'<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;margin-bottom:6px">Recommended</div>'
-      +recs.map(function(r){
-        return '<div class="rec-item"><span class="pill pill-l'+(r.code&&r.code[1]||'3')+'" style="flex-shrink:0">'+esc(r.code)+'</span>'
-          +'<span style="flex:1">'+esc(r.reason)+'</span>'
-          +'<span class="pill" style="background:rgba(255,85,57,0.1);color:var(--orange)">'+esc(r.priority)+'</span></div>'
-      }).join('')
-      +(upsells.length?'<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;margin:10px 0 6px">Upsell / Cross-sell</div>'
-        +upsells.map(function(r){
-          return '<div class="rec-item"><span class="pill pill-l'+(r.code&&r.code[1]||'3')+'" style="flex-shrink:0">'+esc(r.code)+'</span>'
-            +'<span>'+esc(r.reason)+'</span></div>'
-        }).join('') : '')
-    recDiv.innerHTML = recHtml
-    window._lastRecommendations = recs.concat(upsells).map(function(r){ return r.code })
-  }catch(e){
-    recDiv.innerHTML = '<div class="rec-title">Recommendation Engine</div>'
-      +'<div style="font-size:11px;color:#DC2626">Error: '+esc(e.message)+'</div>'
+    // Step 1: Query Supabase intelligence DB
+    var dbItems = await queryIntelligenceDB(sector, country, ownership)
+    document.getElementById('dbStatus').textContent = dbItems.length > 0
+      ? '\u2705 ' + dbItems.length + ' intelligence items found in database'
+      : 'No matching items in intelligence database'
+
+    // Step 2: Build context from DB items for Gemini prompt
+    var dbContext = ''
+    if(dbItems.length > 0){
+      dbContext = '\n\nINTERNAL INTELLIGENCE DATABASE CONTEXT (from recent market scraping):\n'
+      dbItems.forEach(function(item, i){
+        dbContext += (i+1) + '. [' + (item.intelligence_stream||'').replace(/_/g,' ') + '] ' + (item.title||'') + ': ' + (item.summary||'').slice(0,150) + '\n'
+      })
+      dbContext += '\nUse this internal intelligence context to enrich your analysis where relevant.\n'
+    }
+
+    // Step 3: Call Gemini
+    var prompt = 'You are a senior business intelligence analyst preparing a comprehensive Pre-Engagement Intelligence (PEI) brief for a BD team at an AI and HPC hardware/software OEM. Research the following organisation thoroughly using publicly available information only \u2014 news, press releases, tenders, annual reports, government documents, parliamentary questions, media interviews.'
+      + '\n\nTARGET: ' + target
+      + '\nCOUNTRY: ' + country
+      + '\nOWNERSHIP TYPE: ' + ownership
+      + '\nSECTOR: ' + sector
+      + (context ? '\nADDITIONAL CONTEXT: ' + context : '')
+      + '\nCURRENCY: Report all amounts in ' + currencyNote + '.'
+      + dbContext
+      + '\n\nRespond ONLY with a valid JSON object. No preamble, no markdown, no backticks. Use this exact schema:\n\n'
+      + '{"organisation_summary":"3-4 sentence factual overview","ai_maturity":"none|aware|piloting|deploying|scaling","ai_maturity_evidence":"specific evidence","hpc_exposure":"none|limited|active","quantum_awareness":"none|exploring|active","technology_profile":{"current_it_infrastructure":"string","data_posture":"string","key_technology_programmes":["list"],"current_vendors":["list"]},"budget_and_procurement":{"annual_it_budget_estimate":"string","recent_tender_sizes":"string","procurement_pattern":"string","financial_year":"string","budget_authority":"string"},"key_decision_makers":[{"name":"string","role":"string","relevance":"string","known_priorities":"string"}],"strategic_initiatives":["list"],"regulatory_and_compliance":"string","known_challenges":["5-7 items"],"recent_activity":"detailed summary last 18-24 months","known_suppliers":{"ai_hpc_vendors":["list"],"software_vendors":["list"],"si_partners":["list"],"notes":"string"},"competitive_signals":"string","partnership_history":"string","risk_flags":["list"],"solution_fit":{"strongest_fit_areas":["list"],"entry_point_recommendations":["list"],"products_to_lead_with":["list"]},"recommended_next_actions":["5-7 items"],"our_positioning":"detailed suggested opening angle","confidence":"high|medium|low","confidence_reason":"string"}'
+
+    var rawText = await callProvider(model, prompt, apiKey)
+    if(!rawText) throw new Error('No response from model.')
+
+    // Parse JSON
+    var fence = String.fromCharCode(96,96,96)
+    var cleaned = rawText.trim()
+    if(cleaned.indexOf(fence) >= 0){
+      cleaned = cleaned.replace(new RegExp('^'+fence+'json\\s*','i'),'').replace(new RegExp('^'+fence+'\\s*','i'),'').replace(new RegExp('\\s*'+fence+'$'),'').trim()
+    }
+    var firstBrace = cleaned.indexOf('{')
+    var lastBrace = cleaned.lastIndexOf('}')
+    if(firstBrace === -1 || lastBrace === -1) throw new Error('Gemini did not return valid JSON.')
+    cleaned = cleaned.slice(firstBrace, lastBrace+1)
+
+    var pei
+    try{ pei = JSON.parse(cleaned) }
+    catch(parseErr){
+      var lastComma = cleaned.lastIndexOf(',')
+      if(lastComma > 0){
+        try{ pei = JSON.parse(cleaned.slice(0,lastComma)+'\n}') }
+        catch(e2){ throw new Error('Response was truncated. Try again.') }
+      } else { throw new Error('Could not parse Gemini response.') }
+    }
+
+    PEI_DATA = {meta:{organisation:target, ownership_type:ownership, functional_sector:sector, country:country, generated_at:new Date().toISOString(), model:model, tool:'ATLAS PEI v0.2', db_items_used:dbItems.length}, ...pei}
+
+    renderPEI(PEI_DATA, target, ownership, sector, country, dbItems)
+
+  }catch(err){
+    document.getElementById('loadingPanel').style.display = 'none'
+    document.getElementById('errorPanel').style.display = 'block'
+    document.getElementById('errorText').innerHTML = '<strong>Error:</strong> ' + err.message
+  } finally {
+    document.getElementById('generateBtn').disabled = false
+    document.getElementById('dbStatus').textContent = ''
   }
 }
 
-// \u2500\u2500 Portfolio Map \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function openPortfolioMap(engId, docketId){
-  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
-  window._portfolioEngId = engId
-  window._portfolioDocketId = docketId
-  var recommended = window._lastRecommendations || []
+function renderPEI(pei, target, ownership, sector, country, dbItems){
+  document.getElementById('loadingPanel').style.display = 'none'
+  var date = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
 
-  var l1 = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level===1 })
-  var l2 = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level===2 })
-  var l3 = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level===3 })
+  document.getElementById('out-org').textContent = target
+  document.getElementById('out-ownership').textContent = ownership
+  document.getElementById('out-sector').textContent = sector
+  document.getElementById('out-country').textContent = country
+  document.getElementById('out-model').textContent = pei.meta.model
+  document.getElementById('out-date').textContent = date
 
-  function renderGroup(items, label, levelClass){
-    return '<div style="margin-bottom:16px">'
-      +'<div class="portfolio-section-label"><span class="pill '+levelClass+'">'+levelClass.replace('pill-','L').toUpperCase()+'</span>'+label+'</div>'
-      +'<div class="portfolio-items-grid">'
-      +items.map(function(p){
-        var isRec = recommended.indexOf(p.code)>=0
-        var isSel = PORTFOLIO_SELECTION.indexOf(p.code)>=0 || isRec
-        return '<div class="portfolio-item'+(isSel?' selected':'')+(isRec?' recommended':'')+'" data-code="'+p.code+'" onclick="togglePortfolioItem(this,\''+p.code+'\')">'
-          +'<div class="pi-code">'+esc(p.code)+'</div>'
-          +'<div class="pi-name">'+esc(p.name)+'</div>'
-          +'<div class="pi-cat">'+esc(p.category||p.deal_size||'')+'</div>'
-          +(isRec?'<span class="pi-badge rec">\u2605 Recommended</span>':'')
-          +(isSel&&!isRec?'<span class="pi-badge sel">\u2713 Selected</span>':'')
-          +'</div>'
-      }).join('')
-      +'</div></div>'
-  }
-
-  var mapHtml = renderGroup(l1,'Strategic Offering','pill-l1')
-    + renderGroup(l2,'Technical Building Blocks','pill-l2')
-    + renderGroup(l3,'Lifecycle Services (select relevant)','pill-l3')
-
-  document.getElementById('portfolioMapContent').innerHTML = mapHtml
-  updatePortfolioSummary()
-  openModal('portfolioMapModal')
-}
-
-function togglePortfolioItem(el, code){
-  el.classList.toggle('selected')
-  var idx = PORTFOLIO_SELECTION.indexOf(code)
-  if(idx>=0) PORTFOLIO_SELECTION.splice(idx,1)
-  else PORTFOLIO_SELECTION.push(code)
-  var badge = el.querySelector('.pi-badge.sel')
-  if(el.classList.contains('selected') && !el.classList.contains('recommended')){
-    if(!badge){ var b=document.createElement('span'); b.className='pi-badge sel'; b.textContent='\u2713 Selected'; el.appendChild(b) }
+  // Intelligence DB section
+  if(dbItems && dbItems.length > 0){
+    document.getElementById('dbSection').style.display = 'block'
+    document.getElementById('out-db-items').innerHTML = dbItems.map(function(item){
+      var streamClass = item.intelligence_stream==='market_pulse'?'badge-mp':item.intelligence_stream==='domain_intel'?'badge-di':'badge-tw'
+      var streamLabel = item.intelligence_stream ? item.intelligence_stream.replace(/_/g,' ') : ''
+      return '<div class="db-item">'
+        +'<div class="db-item-title">'+esc(item.title||'')+'</div>'
+        +'<div class="db-item-meta">'
+        +(streamLabel?'<span class="db-badge '+streamClass+'">'+streamLabel+'</span>':'')
+        +'<span style="color:var(--mid)">'+new Date(item.scraped_at||'').toLocaleDateString('en-IN')+'</span>'
+        +(item.depth_score?'<span style="color:var(--blue);font-size:9px">depth '+item.depth_score+'</span>':'')
+        +'</div>'
+        +'<div class="db-item-summary">'+esc(item.summary||'')+'</div>'
+        +(item.opportunity?'<div style="font-size:10px;color:var(--teal);margin-top:4px">Opportunity: '+esc(item.opportunity)+'</div>':'')
+        +'</div>'
+    }).join('')
   } else {
-    if(badge && !el.classList.contains('recommended')) badge.remove()
-  }
-  updatePortfolioSummary()
-}
-
-function updatePortfolioSummary(){
-  var selected = document.querySelectorAll('.portfolio-item.selected')
-  document.getElementById('portfolioMapSummary').textContent = selected.length+' items selected. Click Save to add as a Solution item in the docket.'
-}
-
-async function savePortfolioSelection(){
-  var items = Array.from(document.querySelectorAll('.portfolio-item.selected'))
-  var codes = items.map(function(el){ return el.dataset.code })
-  if(!codes.length){ closeModal('portfolioMapModal'); return }
-
-  var selectedItems = PORTFOLIO_CATALOGUE.filter(function(p){ return codes.indexOf(p.code)>=0 })
-  var summary = 'Portfolio selection: '+codes.join(', ')
-  var newItem = {
-    id: genId('DI'),
-    docket_id: window._portfolioDocketId,
-    item_type: 'solution',
-    title: 'Portfolio Selection \u2014 '+new Date().toLocaleDateString('en-IN'),
-    content: {portfolio_codes: codes, portfolio_items: selectedItems.map(function(p){ return {code:p.code,name:p.name,level:p.level} })},
-    source_id: null, status: 'pending',
-    notes: summary,
-    created_by: 'ATLAS Portfolio Map',
-    assigned_to: null, due_date: null
-  }
-  var ok = await sbInsert('docket_items', newItem)
-  if(ok){
-    CURRENT_ITEMS.push(newItem)
-    closeModal('portfolioMapModal')
-    renderItems('all')
-    PORTFOLIO_SELECTION = []
-  } else { alert('Failed to save. Check Supabase connection.') }
-}
-
-// \u2500\u2500 Create customer / engagement \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function createCustomer(){
-  var name = document.getElementById('nc-name').value.trim()
-  if(!name){ alert('Customer name is required.'); return }
-  var cust = {
-    id: genId('CUST'),
-    name: name,
-    short_name: document.getElementById('nc-short').value.trim()||null,
-    tier: document.getElementById('nc-tier').value,
-    ownership: document.getElementById('nc-ownership').value||null,
-    sector: document.getElementById('nc-sector').value||null,
-    country: document.getElementById('nc-country').value||'India',
-    state: document.getElementById('nc-state').value.trim()||null,
-    ai_maturity: document.getElementById('nc-maturity').value||null,
-    notes: document.getElementById('nc-notes').value.trim()||null,
-    contacts: [], divisions: []
-  }
-  var ok = await sbInsert('customers', cust)
-  if(ok){
-    ALL_CUSTOMERS.unshift(cust)
-    closeModal('newCustomerModal')
-    renderSidebar()
-    openCustomer(cust.id)
-  } else { alert('Failed to create customer. Check Supabase connection.') }
-}
-
-async function createEngagement(){
-  var custId = document.getElementById('ne-customer-id').value
-  var name = document.getElementById('ne-name').value.trim()
-  if(!name){ alert('Engagement name is required.'); return }
-  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===custId })
-  var year = new Date().getFullYear()
-  var domain = document.getElementById('ne-domain').value||'GEN'
-  var seq = String(Math.floor(Math.random()*9000)+1000)
-  var engId = 'ENG-'+year+'-'+domain.replace('-','').slice(0,3)+'-'+seq
-  var eng = {
-    id: engId,
-    customer_id: custId,
-    name: name,
-    archetype: document.getElementById('ne-archetype').value,
-    type: document.getElementById('ne-type').value,
-    phase: document.getElementById('ne-phase').value,
-    status: 'active',
-    domain: domain,
-    currency: document.getElementById('ne-currency').value,
-    value: document.getElementById('ne-value').value.trim()||null,
-    notes: document.getElementById('ne-notes').value.trim()||null,
-    owner: ''
-  }
-  var ok = await sbInsert('engagements', eng)
-  if(ok){
-    ALL_ENGAGEMENTS.unshift(eng)
-    closeModal('newEngagementModal')
-    openEngagement(engId)
-  } else { alert('Failed to create engagement.') }
-}
-
-// \u2500\u2500 Elevation \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function elevateCustomer(custId){
-  if(!confirm('Elevate this customer to Strategic? This will enable full engagement dockets and retrofit all transactions.')) return
-  var ok = await sbPatch('customers','id=eq.'+custId,{tier:'strategic',elevated_at:new Date().toISOString(),elevated_by:'Business Head'})
-  if(ok){
-    var cust = ALL_CUSTOMERS.find(function(c){ return c.id===custId })
-    if(cust){ cust.tier='strategic'; cust.elevated_at=new Date().toISOString() }
-    // Retrofit transactions as docket items (create a docket first)
-    var txns = await sbFetch('transactions','customer_id=eq.'+custId,100)
-    if(txns.length > 0){
-      var docketId = genId('ENG')
-      var docket = {id:docketId,type:'customer',name:(cust?cust.name:'')+' \u2014 Elevated Account',customer_id:custId,customer_name:cust?cust.name:'',owner:'',status:'active',metadata:{elevated:true}}
-      await sbInsert('engagement_dockets',docket)
-      for(var i=0;i<txns.length;i++){
-        var t=txns[i]
-        await sbInsert('docket_items',{id:genId('DI'),docket_id:docketId,item_type:'action',title:'Transaction: '+t.product_name,content:{product_code:t.product_code,value:t.value,currency:t.currency,channel:t.channel},source_id:t.id,status:'closed',notes:t.notes,created_at:t.created_at,created_by:'Elevation Retrofit'})
-      }
-    }
-    renderSidebar()
-    openCustomer(custId)
-  } else { alert('Elevation failed.') }
-}
-
-// \u2500\u2500 CRUD helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function openAddItemModal(docketId){
-  document.getElementById('ai-docket-id').value=docketId
-  document.getElementById('ai-title').value=''
-  document.getElementById('ai-notes').value=''
-  document.getElementById('ai-assigned').value=''
-  document.getElementById('ai-due').value=''
-  document.getElementById('ai-type').value='action'
-  updateItemHint()
-  openModal('addItemModal')
-}
-
-function updateItemHint(){
-  var hints={action:'A specific task or follow-up for this engagement.',intel:'An intelligence item from Second Brain.',pei:'Customer intelligence brief from PEI tool.',uc:'A validated use case from the UC Library.',rfp:'An RFP or tender document.',solution:'Technical architecture or solution design.',bom:'Bill of materials.',proposal:'Formal proposal document.',pricing:'Pricing model.',exec_doc:'Executive summary or board brief.'}
-  var t=document.getElementById('ai-type').value
-  var el=document.getElementById('ai-hint')
-  if(hints[t]){el.textContent=hints[t];el.style.display='block'}else el.style.display='none'
-}
-
-async function saveItem(){
-  var docketId=document.getElementById('ai-docket-id').value
-  var title=document.getElementById('ai-title').value.trim()
-  if(!title){alert('Title required.');return}
-  var item={id:genId('DI'),docket_id:docketId,item_type:document.getElementById('ai-type').value,title:title,content:{},source_id:null,status:'pending',assigned_to:document.getElementById('ai-assigned').value.trim()||null,due_date:document.getElementById('ai-due').value||null,notes:document.getElementById('ai-notes').value.trim()||null,created_by:'ATLAS'}
-  var ok=await sbInsert('docket_items',item)
-  if(ok){closeModal('addItemModal');CURRENT_ITEMS.push(item);renderItems('all')}
-  else alert('Failed to save item.')
-}
-
-async function setItemStatus(itemId,status){
-  var ok=await sbPatch('docket_items','id=eq.'+itemId,{status:status})
-  if(ok){var item=CURRENT_ITEMS.find(function(i){return i.id===itemId});if(item)item.status=status;renderItems('all')}
-}
-
-async function deleteItem(itemId){
-  if(!confirm('Delete this item?'))return
-  var ok=await sbDelete('docket_items','id=eq.'+itemId)
-  if(ok){CURRENT_ITEMS=CURRENT_ITEMS.filter(function(i){return i.id!==itemId});renderItems('all')}
-}
-
-async function changeEngStatus(engId,status){
-  var ok=await sbPatch('engagements','id=eq.'+engId,{status:status})
-  if(ok){var eng=ALL_ENGAGEMENTS.find(function(e){return e.id===engId});if(eng)eng.status=status}
-}
-
-async function saveTransaction(){
-  var custId=document.getElementById('txn-customer-id').value
-  var product=document.getElementById('txn-product').value.trim()
-  if(!product){alert('Product name required.');return}
-  var txn={id:genId('TXN'),customer_id:custId,product_name:product,value:document.getElementById('txn-value').value.trim()||null,currency:document.getElementById('txn-currency').value,txn_date:document.getElementById('txn-date').value||null,channel:document.getElementById('txn-channel').value,notes:document.getElementById('txn-notes').value.trim()||null}
-  var ok=await sbInsert('transactions',txn)
-  if(ok){closeModal('newTxnModal');if(window._cust&&window._cust.id===custId){window._txns=window._txns||[];window._txns.unshift(txn);switchCustTab('transactions')}}
-  else alert('Failed to save transaction.')
-}
-
-
-
-
-
-// \u2500\u2500 Add to Docket trigger (from other tools) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function atlasAddToDocket(item){
-  PENDING_TRIGGER_ITEM = item
-  var modal = document.createElement('div')
-  modal.id = 'triggerModal'
-  modal.className = 'modal-overlay open'
-  var dockets = await sbFetch('engagement_dockets','type=eq.customer&status=eq.active&order=updated_at.desc',20)
-  var opts = '<option value="__new__">+ Create New Docketket</option>'
-  dockets.forEach(function(d){ opts+='<option value="'+d.id+'">'+esc(d.name)+'</option>' })
-  modal.innerHTML = '<div class="modal" style="max-width:440px"><div class="modal-title">\uD83D\uDCC1 Add to Docket</div>'
-    +'<div style="font-size:12px;color:var(--mid);margin-bottom:12px">Adding: "'+esc(item.title)+'" ('+esc(item.type)+')</div>'
-    +'<label>Select Docket</label><select id="trigger-sel">'+opts+'</select>'
-    +'<div id="trigger-new" style="display:none"><label>Customer Name</label><input type="text" id="trigger-cust" placeholder="Customer name"><label>Engagement Name</label><input type="text" id="trigger-eng" placeholder="Engagement name"></div>'
-    +'<div class="modal-actions"><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button><button class="btn btn-primary" onclick="confirmTrigger()">Add</button></div>'
-    +'</div>'
-  document.body.appendChild(modal)
-  document.getElementById('trigger-sel').onchange = function(){
-    document.getElementById('trigger-new').style.display = this.value==='__new__'?'block':'none'
-  }
-}
-
-async function confirmTrigger(){
-  var sel = document.getElementById('trigger-sel').value
-  var item = PENDING_TRIGGER_ITEM
-  if(!item) return
-  var docketId = sel
-  if(sel==='__new__'){
-    var cname=document.getElementById('trigger-cust').value.trim()
-    var ename=document.getElementById('trigger-eng').value.trim()
-    if(!cname||!ename){alert('Enter customer and engagement name.');return}
-    var did=genId('ENG')
-    await sbInsert('engagement_dockets',{id:did,type:'customer',name:cname+' \u2014 '+ename,customer_name:cname,owner:'',status:'active',metadata:{source:item.type}})
-    docketId=did
-  }
-  var newItem={id:genId('DI'),docket_id:docketId,item_type:item.type||'action',title:item.title,content:item.content||{},source_id:item.source_id||null,status:'pending',notes:item.notes||null,created_by:'ATLAS'}
-  await sbInsert('docket_items',newItem)
-  document.getElementById('triggerModal').remove()
-  PENDING_TRIGGER_ITEM=null
-  await loadAll()
-}
-
-// \u2500\u2500 Modals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function openModal(id){ document.getElementById(id).classList.add('open') }
-function closeModal(id){ document.getElementById(id).classList.remove('open') }
-
-
-// TSAP L1 Configuration
-var TSAP_CFG = {territory:{name:'',type:'state',governance:'central',security:'civilian',ownership:'government',scale:''},objectives:{core_objective:'',vision:'',justification:'',uniqueness:'',success_metrics:{jobs:'',startups:'',compute:''}},blocks:[],financial:{financing_models:[],infra_cost:'',hardware_cost:'',software_cost:'',services_cost:'',opex_cost:'',financing_gap:''}}
-var CURRENT_TSAP_ENG_ID = null
-
-var L2_BLOCKS_DEF = [
-  {code:'L2-AIF',  name:'AI Factory',                  icon:'\uD83C\uDFED', desc:'General-purpose GPU compute \u2014 training + inference'},
-  {code:'L2-INF',  name:'Inferencing Factory',          icon:'\u26A1',        desc:'High-throughput production inference (generic baseline)'},
-  {code:'L2.1-INF',name:'GeoAI Inferencing Factory',    icon:'\uD83D\uDEF0\uFE0F',desc:'Pre-configured for geospatial/EO workloads \u2014 EO pipeline, imagery AI, GIS'},
-  {code:'L2.2-INF',name:'Defence AI Inferencing Factory',icon:'\uD83D\uDEF1', desc:'Air-gapped, MIL-SPEC, ISR pipeline, classified network integration'},
-  {code:'L2.3-INF',name:'Health AI Inferencing Factory', icon:'\uD83C\uDFE5', desc:'DICOM/FHIR, medical imaging AI, clinical compliance stack'},
-  {code:'L2.4-INF',name:'FinAI Inferencing Factory',     icon:'\uD83C\uDFE6', desc:'Fraud detection, credit risk, AML/KYC, RBI/SEBI compliance'},
-  {code:'L2-TRC',  name:'Training Cluster',              icon:'\uD83E\uDDE0', desc:'HPC-class large-scale model training'},
-  {code:'L2-HPC',  name:'HPC Cluster',                   icon:'\uD83D\uDCCA', desc:'Scientific compute \u2014 simulation and modelling'},
-  {code:'L2-EDG',  name:'Edge AI Node',                  icon:'\uD83D\uDCF6', desc:'Field-deployed, air-gappable inference'},
-  {code:'L2-MDC',  name:'Modular Datacenter',            icon:'\uD83C\uDFD7\uFE0F', desc:'Houses any L2 building block \u2014 rapid deployment'},
-]
-
-var L1X_COMPONENTS_DEF = [
-  {code:'L1.1-TSAP',name:'AI Skills & Workforce Development',icon:'\uD83C\uDF93',desc:'Mass digital/AI literacy \u2014 public servants, practitioners, population-scale. Partner-delivered.',partner:true},
-  {code:'L1.2-TSAP',name:'Startup & Innovation Ecosystem',  icon:'\uD83D\uDE80',desc:'Incubator, accelerator, seed funding framework, anchor tenant attraction. Partner-delivered.',partner:true},
-  {code:'L1.3-TSAP',name:'Data Governance & Sovereign Data',icon:'\uD83D\uDDC4\uFE0F',desc:'Territory data catalogue, data sharing frameworks, DPDP compliance. Often a prerequisite for compute.',partner:true},
-  {code:'L1.4-TSAP',name:'Research & Academic Partnership', icon:'\uD83D\uDD2C',desc:'IIT/IIIT/university MoUs, research grants, PhD fellowships. Long-term talent pipeline.',partner:true},
-  {code:'L1.5-TSAP',name:'AI Policy, Regulation & Governance',icon:'\u2696\uFE0F',desc:'Territory AI policy framework, oversight authority, ethical AI guidelines, procurement policy. Legal partner-led.',partner:true},
-]
-
-var FINANCING_OPTS_DEF = [
-  {type:'self_funded',label:'Self-Funded (State / Internal Budget)'},
-  {type:'central_grant',label:'Central Government Grant (PM-DevINE, IndiaAI etc.)'},
-  {type:'domestic_debt',label:'Domestic Borrowing (DFI / Bonds / NABARD)'},
-  {type:'multilateral',label:'Multilateral Agency (World Bank / ADB / AIIB)'},
-  {type:'bilateral',label:'Bilateral Country Financing (Low-Interest Credit Line)'},
-  {type:'ppp',label:'PPP (Private Anchor Tenant + Govt Land/Grant)'},
-  {type:'mixed',label:'Mixed / Blended Finance'},
-]
-
-function openL1Config(engId){
-  CURRENT_TSAP_ENG_ID = engId
-  switchTsapTab('territory')
-  openModal('tsapModal')
-}
-
-function switchTsapTab(tab){
-  var tabs = document.querySelectorAll('#tsapTabBar .tab')
-  var names = ['territory','objectives','blocks','financial']
-  tabs.forEach(function(t,i){ t.className='tab'+(names[i]===tab?' active':'') })
-  saveTsapCurrentData()
-  var content = ''
-
-  if(tab==='territory'){
-    content = '<div class="form-grid">'
-      +'<div><label>Territory Name</label><input type="text" id="tsap-name" value="'+esc(TSAP_CFG.territory.name)+'" placeholder="e.g. Himachal Pradesh, Northeast India Cluster"></div>'
-      +'<div><label>Territory Type</label><select id="tsap-type">'
-      +'<option value="country"'+(TSAP_CFG.territory.type==='country'?' selected':'')+'>Country</option>'
-      +'<option value="state"'+(TSAP_CFG.territory.type==='state'?' selected':'')+'>State</option>'
-      +'<option value="city"'+(TSAP_CFG.territory.type==='city'?' selected':'')+'>City</option>'
-      +'<option value="region"'+(TSAP_CFG.territory.type==='region'?' selected':'')+'>Region</option>'
-      +'<option value="cluster"'+(TSAP_CFG.territory.type==='cluster'?' selected':'')+'>Cluster</option>'
-      +'</select></div></div>'
-      +'<div class="form-grid">'
-      +'<div><label>Governance Model</label><select id="tsap-gov">'
-      +'<option value="central"'+(TSAP_CFG.territory.governance==='central'?' selected':'')+'>Central</option>'
-      +'<option value="federated"'+(TSAP_CFG.territory.governance==='federated'?' selected':'')+'>Federated</option>'
-      +'<option value="distributed"'+(TSAP_CFG.territory.governance==='distributed'?' selected':'')+'>Distributed</option>'
-      +'</select></div>'
-      +'<div><label>Security Classification</label><select id="tsap-sec">'
-      +'<option value="civilian"'+(TSAP_CFG.territory.security==='civilian'?' selected':'')+'>Civilian</option>'
-      +'<option value="restricted"'+(TSAP_CFG.territory.security==='restricted'?' selected':'')+'>Restricted</option>'
-      +'<option value="classified"'+(TSAP_CFG.territory.security==='classified'?' selected':'')+'>Classified</option>'
-      +'<option value="air_gapped"'+(TSAP_CFG.territory.security==='air_gapped'?' selected':'')+'>Air-Gapped</option>'
-      +'</select></div></div>'
-      +'<div class="form-grid">'
-      +'<div><label>Ownership Model</label><select id="tsap-own">'
-      +'<option value="government"'+(TSAP_CFG.territory.ownership==='government'?' selected':'')+'>Government</option>'
-      +'<option value="ppp"'+(TSAP_CFG.territory.ownership==='ppp'?' selected':'')+'>PPP</option>'
-      +'<option value="private"'+(TSAP_CFG.territory.ownership==='private'?' selected':'')+'>Private</option>'
-      +'</select></div>'
-      +'<div><label>Population / Scale</label><input type="text" id="tsap-scale" value="'+esc(TSAP_CFG.territory.scale)+'" placeholder="e.g. 7M people, 12 districts"></div></div>'
-      +'<div style="margin-top:14px;padding:12px;background:rgba(0,40,112,0.04);border-radius:var(--r);border:1px dashed #d0d0d8;text-align:center;font-size:11px;color:var(--mid)">'
-      +'\uD83D\uDDFA\uFE0F Territory map (GeoJSON boundary visualisation) \u2014 next build</div>'
+    document.getElementById('dbSection').style.display = 'none'
   }
 
-  if(tab==='objectives'){
-    content = '<label>Core Objective *</label>'
-      +'<textarea id="tsap-obj" placeholder="What problem does this programme solve?" style="min-height:64px">'+esc(TSAP_CFG.objectives.core_objective)+'</textarea>'
-      +'<label>Vision (5-10 year horizon)</label>'
-      +'<textarea id="tsap-vis" placeholder="What does this territory look like when the programme succeeds?" style="min-height:64px">'+esc(TSAP_CFG.objectives.vision)+'</textarea>'
-      +'<label>Justification (Why now, why here, why us?)</label>'
-      +'<textarea id="tsap-just" placeholder="Economic case, political mandate, existing assets, strategic window..." style="min-height:64px">'+esc(TSAP_CFG.objectives.justification)+'</textarea>'
-      +'<label>Uniqueness vs Other Centres</label>'
-      +'<textarea id="tsap-uniq" placeholder="What makes this centre distinctive?" style="min-height:64px">'+esc(TSAP_CFG.objectives.uniqueness)+'</textarea>'
-      +'<div class="form-grid-3" style="margin-top:4px">'
-      +'<div><label>Jobs (target)</label><input type="text" id="tsap-jobs" value="'+esc(TSAP_CFG.objectives.success_metrics.jobs)+'" placeholder="e.g. 5,000"></div>'
-      +'<div><label>Startups Enabled</label><input type="text" id="tsap-startups" value="'+esc(TSAP_CFG.objectives.success_metrics.startups)+'" placeholder="e.g. 200"></div>'
-      +'<div><label>Compute Capacity</label><input type="text" id="tsap-compute" value="'+esc(TSAP_CFG.objectives.success_metrics.compute)+'" placeholder="e.g. 10 PFlops"></div>'
-      +'</div>'
-      +'<div style="margin-top:14px;display:flex;gap:10px;align-items:center">'
-      +'<button class="btn btn-outline btn-sm" onclick="aiEnrichTsap()">AI Enrich \u2014 Research territory</button>'
-      +'<span style="font-size:10px;color:var(--mid)">Uses AI + web search to suggest uniqueness, UCs, economic case.</span>'
-      +'</div>'
-      +'<div id="tsap-enrich" style="display:none;margin-top:12px;padding:12px;background:rgba(0,178,144,0.05);border:1px solid rgba(0,178,144,0.2);border-radius:var(--r);font-size:11px;line-height:1.6"></div>'
-  }
+  // AI Maturity
+  var matMap = {none:0,aware:25,piloting:50,deploying:75,scaling:100}
+  var matLabels = {none:'None',aware:'Aware',piloting:'Piloting',deploying:'Deploying',scaling:'Scaling'}
+  var mat = pei.ai_maturity || 'none'
+  document.getElementById('out-maturity-label').innerHTML = '<strong>'+(matLabels[mat]||mat)+'</strong>'
+  document.getElementById('out-maturity-bar').style.width = (matMap[mat]||0)+'%'
+  document.getElementById('out-maturity-evidence').textContent = pei.ai_maturity_evidence || '\u2014'
 
-  if(tab==='blocks'){
-    content = '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">L2 Technical Building Blocks</div>'
-      +'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Select compute and infrastructure nodes to deploy within this territory.</div>'
-      +'<div id="tsap-blocks-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px"></div>'
-      +'<div id="tsap-blocks-config"></div>'
-      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin:16px 0 6px">L1.x Programme Components</div>'
-      +'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Programme-level initiatives that sit alongside the technical infrastructure. Typically partner-delivered.</div>'
-      +'<div id="tsap-l1x-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"></div>'
-  }
+  // Summary
+  document.getElementById('out-summary').textContent = pei.organisation_summary || '\u2014'
 
-  if(tab==='financial'){
-    content = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">\u00A0 Side A \u2014 Financing Model</div>'
-      +'<div style="font-size:10px;color:var(--mid);margin-bottom:8px">How the programme will be funded. Multiple models can be combined.</div>'
-      +'<div id="tsap-fin-models"></div></div>'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">\uD83D\uDCB0 Side B \u2014 Build Cost</div>'
-      +'<div id="tsap-fin-costs"></div>'
-      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%;margin-top:4px">Calculate Gap</button>'
-      +'<div id="tsap-gap" style="font-size:11px;color:var(--navy);margin-top:8px;padding:8px;background:var(--light);border-radius:var(--r)">Enter costs and calculate.</div>'
-      +'</div></div>'
-  }
+  // Tech profile
+  var tp = pei.technology_profile || {}
+  var hpcMap = {none:'No known HPC exposure',limited:'Limited HPC exposure',active:'Active HPC usage'}
+  var qMap = {none:'No quantum awareness',exploring:'Exploring quantum',active:'Active quantum programme'}
+  var techHtml = '<div style="margin-bottom:6px">HPC: <strong>'+(hpcMap[pei.hpc_exposure]||pei.hpc_exposure||'\u2014')+'</strong></div>'
+  techHtml += '<div style="margin-bottom:8px">Quantum: <strong>'+(qMap[pei.quantum_awareness]||pei.quantum_awareness||'\u2014')+'</strong></div>'
+  if(tp.current_it_infrastructure) techHtml += '<div style="margin-bottom:6px"><strong>Infrastructure:</strong> '+esc(tp.current_it_infrastructure)+'</div>'
+  if(tp.data_posture) techHtml += '<div style="margin-bottom:6px"><strong>Data posture:</strong> '+esc(tp.data_posture)+'</div>'
+  if(tp.key_technology_programmes?.length) techHtml += '<div style="margin-bottom:4px"><strong>Key programmes:</strong></div><ul>'+tp.key_technology_programmes.map(function(p){return '<li>'+esc(p)+'</li>'}).join('')+'</ul>'
+  document.getElementById('out-tech').innerHTML = techHtml
+  var vendors = tp.current_vendors || pei.current_vendors || []
+  document.getElementById('out-vendors').innerHTML = vendors.length
+    ? '<div style="font-size:10px;font-weight:700;color:var(--mid);margin-bottom:4px">KNOWN VENDORS</div>'+vendors.map(function(v){return '<span class="vendor-tag">'+esc(v)+'</span>'}).join('')
+    : '<span style="font-size:11px;color:var(--mid)">No known vendors identified</span>'
 
-  document.getElementById('tsapTabContent').innerHTML = content
-  if(tab==='financial'){
-    var modelsDiv = document.getElementById('tsap-fin-models')
-    var costsDiv = document.getElementById('tsap-fin-costs')
-    if(modelsDiv){
-      modelsDiv.innerHTML = FINANCING_OPTS_DEF.map(function(f,i){
-        var sel = TSAP_CFG.financial.financing_models.some(function(m){return m.type===f.type})
-        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--light)">'
-          +'<input type="checkbox" id="fin-chk-'+i+'"'+(sel?' checked':'')+'>'
-          +'<label for="fin-chk-'+i+'" style="font-size:11px;margin:0;text-transform:none;letter-spacing:0;font-weight:400;cursor:pointer">'+f.label+'</label>'
-          +'</div>'
-      }).join('')
-      FINANCING_OPTS_DEF.forEach(function(f,i){
-        var el = document.getElementById('fin-chk-'+i)
-        if(el) el.onchange = function(){ toggleTsapFinancing(f.type, f.label) }
-      })
-    }
-    if(costsDiv){
-      var costFields = [['infra_cost','Infrastructure / Civil'],['hardware_cost','L2 Hardware'],['software_cost','Software Stack'],['services_cost','L3 Services'],['opex_cost','Year 1 Operations']]
-      costsDiv.innerHTML = costFields.map(function(f){
-        return '<div style="margin-bottom:8px"><label style="font-size:10px;text-transform:none;letter-spacing:0;font-weight:600">'+f[1]+'</label>'
-          +'<input type="text" id="tsap-fin-'+f[0]+'" value="'+(TSAP_CFG.financial[f[0]]||'')+'" placeholder="e.g. INR 50 Cr" style="padding:6px 10px;font-size:11px"></div>'
-      }).join('')
-    }
-    var gapEl = document.getElementById('tsap-gap')
-    if(gapEl) gapEl.textContent = TSAP_CFG.financial.financing_gap || 'Enter costs and calculate.'
-  }
-  if(tab==='blocks'){
-    var grid = document.getElementById('tsap-blocks-grid')
-    if(grid){
-      grid.innerHTML = L2_BLOCKS_DEF.map(function(b,i){
-        var sel = TSAP_CFG.blocks.some(function(s){return s.code===b.code})
-        return '<div id="tsap-blk-'+i+'" style="border:2px solid '+(sel?'var(--teal)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(0,178,144,0.04)':'var(--white)')+'">'
-          +'<div style="font-size:18px;margin-bottom:4px">'+b.icon+'</div>'
-          +'<div style="font-size:12px;font-weight:600">'+b.name+'</div>'
-          +'<div style="font-size:10px;color:var(--mid)">'+b.desc+'</div>'
-          +(sel?'<span style="font-size:9px;font-weight:700;color:var(--teal)">\u2713 Selected</span>':'')
-          +'</div>'
-      }).join('')
-      grid.querySelectorAll('div[id^="tsap-blk-"]').forEach(function(el,i){
-        el.onclick = function(){ toggleTsapBlock(L2_BLOCKS_DEF[i].code) }
-      })
-      // Render config for selected blocks
-      var configDiv = document.getElementById('tsap-blocks-config')
-      if(configDiv && TSAP_CFG.blocks.length){
-        configDiv.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px">Configure selected blocks:</div>'
-          + TSAP_CFG.blocks.map(function(b,bi){
-            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--light)">'
-              +'<span style="font-size:12px;font-weight:600;min-width:140px">'+b.icon+' '+b.name+'</span>'
-              +'<input type="text" id="blk-loc-'+bi+'" value="'+(b.location||'')+'" placeholder="Location in territory" style="flex:1;padding:4px 8px;font-size:11px">'
-              +'<input type="number" id="blk-cnt-'+bi+'" value="'+(b.count||1)+'" min="1" max="20" style="width:60px;padding:4px 8px;font-size:11px">'
-              +'<span style="font-size:10px;color:var(--mid)">units</span>'
-              +'</div>'
-          }).join('')
-        TSAP_CFG.blocks.forEach(function(b,bi){
-          var locEl = document.getElementById('blk-loc-'+bi)
-          var cntEl = document.getElementById('blk-cnt-'+bi)
-          if(locEl) locEl.oninput = function(){ b.location = this.value }
-          if(cntEl) cntEl.oninput = function(){ b.count = parseInt(this.value)||1 }
-        })
-      } else if(configDiv){
-        configDiv.innerHTML = '<div style="font-size:11px;color:var(--mid);margin-top:8px">Select blocks above to configure.</div>'
-      }
-      // Render L1.x programme components
-      var l1xGrid = document.getElementById('tsap-l1x-grid')
-      if(l1xGrid){
-        l1xGrid.innerHTML = L1X_COMPONENTS_DEF.map(function(c,ci){
-          var sel = TSAP_CFG.blocks.some(function(s){return s.code===c.code})
-          return '<div id="tsap-l1x-'+ci+'" style="border:2px solid '+(sel?'var(--orange)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(255,85,57,0.04)':'var(--white)')+'">'
-            +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
-            +'<span style="font-size:16px">'+c.icon+'</span>'
-            +(c.partner?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(0,40,112,0.08);color:var(--navy)">PARTNER</span>':'')
-            +'</div>'
-            +'<div style="font-size:12px;font-weight:600">'+c.name+'</div>'
-            +'<div style="font-size:10px;color:var(--mid);margin-top:2px">'+c.desc+'</div>'
-            +(sel?'<span style="font-size:9px;font-weight:700;color:var(--orange)">\u2713 Selected</span>':'')
-            +'</div>'
-        }).join('')
-        L1X_COMPONENTS_DEF.forEach(function(c,ci){
-          var el = document.getElementById('tsap-l1x-'+ci)
-          if(el) el.onclick = function(){ toggleTsapBlock(c.code) }
-        })
-      }
-    }
-  }
+  // Budget
+  var bp = pei.budget_and_procurement || {}
+  var budgetHtml = ''
+  if(bp.annual_it_budget_estimate) budgetHtml += '<div style="margin-bottom:5px"><strong>Annual IT Budget:</strong> '+esc(bp.annual_it_budget_estimate)+'</div>'
+  if(bp.recent_tender_sizes) budgetHtml += '<div style="margin-bottom:5px"><strong>Recent Tender Sizes:</strong> '+esc(bp.recent_tender_sizes)+'</div>'
+  if(bp.procurement_pattern) budgetHtml += '<div style="margin-bottom:5px"><strong>Procurement Pattern:</strong> '+esc(bp.procurement_pattern)+'</div>'
+  if(bp.financial_year) budgetHtml += '<div style="margin-bottom:5px"><strong>Financial Year:</strong> '+esc(bp.financial_year)+'</div>'
+  if(bp.budget_authority) budgetHtml += '<div style="margin-bottom:5px"><strong>Budget Authority:</strong> '+esc(bp.budget_authority)+'</div>'
+  document.getElementById('out-budget').innerHTML = budgetHtml || '\u2014'
+
+  // Decision makers
+  var dms = pei.key_decision_makers || []
+  document.getElementById('out-decision-makers').innerHTML = dms.length
+    ? '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--light)"><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Name</th><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Role</th><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Relevance</th><th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:var(--mid)">Priorities</th></tr></thead><tbody>'
+      + dms.map(function(d){return '<tr style="border-bottom:1px solid var(--light)"><td style="padding:6px 8px;font-weight:600">'+esc(d.name||'')+'</td><td style="padding:6px 8px;color:var(--mid)">'+esc(d.role||'')+'</td><td style="padding:6px 8px">'+esc(d.relevance||'')+'</td><td style="padding:6px 8px">'+esc(d.known_priorities||'')+'</td></tr>'}).join('')
+      + '</tbody></table>'
+    : '<span style="font-size:11px;color:var(--mid)">No publicly known decision makers identified</span>'
+
+  // Lists
+  var inits = pei.strategic_initiatives || []
+  document.getElementById('out-initiatives').innerHTML = inits.length ? '<ul>'+inits.map(function(i){return '<li>'+esc(i)+'</li>'}).join('')+'</ul>' : '\u2014'
+  document.getElementById('out-regulatory').textContent = pei.regulatory_and_compliance || '\u2014'
+  var chals = pei.known_challenges || []
+  document.getElementById('out-challenges').innerHTML = chals.length ? '<ul>'+chals.map(function(c){return '<li>'+esc(c)+'</li>'}).join('')+'</ul>' : '\u2014'
+  document.getElementById('out-recent').textContent = pei.recent_activity || '\u2014'
+
+  // Suppliers
+  var ks = pei.known_suppliers || {}
+  var suppHtml = ''
+  if(ks.ai_hpc_vendors?.length) suppHtml += '<div style="margin-bottom:8px"><strong>AI & HPC Vendors:</strong><br>'+ks.ai_hpc_vendors.map(function(v){return '<span class="vendor-tag">'+esc(v)+'</span>'}).join('')+'</div>'
+  if(ks.software_vendors?.length) suppHtml += '<div style="margin-bottom:8px"><strong>Software & Cloud:</strong><br>'+ks.software_vendors.map(function(v){return '<span class="vendor-tag">'+esc(v)+'</span>'}).join('')+'</div>'
+  if(ks.si_partners?.length) suppHtml += '<div style="margin-bottom:8px"><strong>SI Partners:</strong><br>'+ks.si_partners.map(function(v){return '<span class="vendor-tag">'+esc(v)+'</span>'}).join('')+'</div>'
+  if(ks.notes) suppHtml += '<div style="font-size:11px;color:var(--mid);margin-top:6px">'+esc(ks.notes)+'</div>'
+  document.getElementById('out-suppliers').innerHTML = suppHtml || '\u2014'
+
+  document.getElementById('out-competitive').textContent = pei.competitive_signals || '\u2014'
+  document.getElementById('out-partnerships').textContent = pei.partnership_history || '\u2014'
+  var risks = pei.risk_flags || []
+  document.getElementById('out-risks').innerHTML = risks.length ? '<ul>'+risks.map(function(r){return '<li>'+esc(r)+'</li>'}).join('')+'</ul>' : '\u2014'
+
+  // Solution fit
+  var sf = pei.solution_fit || {}
+  var sfHtml = ''
+  if(sf.strongest_fit_areas?.length){ sfHtml += '<div style="margin-bottom:8px"><strong>Strongest Fit Areas:</strong><ul>'+sf.strongest_fit_areas.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul></div>' }
+  if(sf.entry_point_recommendations?.length){ sfHtml += '<div style="margin-bottom:8px"><strong>Entry Point Recommendations:</strong><ul>'+sf.entry_point_recommendations.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul></div>' }
+  if(sf.products_to_lead_with?.length){ sfHtml += '<div><strong>Lead With:</strong><ul>'+sf.products_to_lead_with.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul></div>' }
+  document.getElementById('out-solution-fit').innerHTML = sfHtml || '\u2014'
+
+  var actions = pei.recommended_next_actions || []
+  document.getElementById('out-next-actions').innerHTML = actions.length ? '<ol style="margin-left:16px">'+actions.map(function(a){return '<li style="margin-bottom:5px">'+esc(a)+'</li>'}).join('')+'</ol>' : '\u2014'
+
+  document.getElementById('out-positioning').innerHTML = pei.our_positioning
+    ? esc(pei.our_positioning).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    : '\u2014'
+
+  var conf = pei.confidence || 'low'
+  var confEl = document.getElementById('out-confidence')
+  confEl.textContent = conf.charAt(0).toUpperCase()+conf.slice(1)+(pei.confidence_reason?' \u2014 '+pei.confidence_reason:'')
+  confEl.className = 'confidence-pill conf-'+conf
+
+  document.getElementById('peiOutput').style.display = 'block'
+  document.getElementById('peiOutput').scrollIntoView({behavior:'smooth'})
 }
 
-function saveTsapCurrentData(){
-  if(document.getElementById('tsap-name')) TSAP_CFG.territory.name = document.getElementById('tsap-name').value||''
-  if(document.getElementById('tsap-type')) TSAP_CFG.territory.type = document.getElementById('tsap-type').value||'state'
-  if(document.getElementById('tsap-gov')) TSAP_CFG.territory.governance = document.getElementById('tsap-gov').value||'central'
-  if(document.getElementById('tsap-sec')) TSAP_CFG.territory.security = document.getElementById('tsap-sec').value||'civilian'
-  if(document.getElementById('tsap-own')) TSAP_CFG.territory.ownership = document.getElementById('tsap-own').value||'government'
-  if(document.getElementById('tsap-scale')) TSAP_CFG.territory.scale = document.getElementById('tsap-scale').value||''
-  if(document.getElementById('tsap-obj')) TSAP_CFG.objectives.core_objective = document.getElementById('tsap-obj').value||''
-  if(document.getElementById('tsap-vis')) TSAP_CFG.objectives.vision = document.getElementById('tsap-vis').value||''
-  if(document.getElementById('tsap-just')) TSAP_CFG.objectives.justification = document.getElementById('tsap-just').value||''
-  if(document.getElementById('tsap-uniq')) TSAP_CFG.objectives.uniqueness = document.getElementById('tsap-uniq').value||''
-  if(document.getElementById('tsap-jobs')) TSAP_CFG.objectives.success_metrics.jobs = document.getElementById('tsap-jobs').value||''
-  if(document.getElementById('tsap-startups')) TSAP_CFG.objectives.success_metrics.startups = document.getElementById('tsap-startups').value||''
-  if(document.getElementById('tsap-compute')) TSAP_CFG.objectives.success_metrics.compute = document.getElementById('tsap-compute').value||''
-  var costFields = ['infra_cost','hardware_cost','software_cost','services_cost','opex_cost']
-  costFields.forEach(function(k){var el=document.getElementById('tsap-fin-'+k);if(el)TSAP_CFG.financial[k]=el.value||''})
+function esc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }
 
-function toggleTsapBlock(code){
-  var idx=TSAP_CFG.blocks.findIndex(function(b){return b.code===code})
-  var def=L2_BLOCKS_DEF.find(function(b){return b.code===code})
-  if(idx>=0) TSAP_CFG.blocks.splice(idx,1)
-  else if(def) TSAP_CFG.blocks.push({code:code,name:def.name,icon:def.icon,count:1,location:''})
-  switchTsapTab('blocks')
+function clearOutput(){
+  document.getElementById('peiOutput').style.display = 'none'
+  document.getElementById('errorPanel').style.display = 'none'
+  document.getElementById('dbSection').style.display = 'none'
+  PEI_DATA = null
 }
 
-function updateTsapBlock(code,field,val){
-  var b=TSAP_CFG.blocks.find(function(b){return b.code===code})
-  if(b) b[field] = field==='count'?parseInt(val)||1:val
-}
-
-function toggleTsapFinancing(type,label){
-  var idx=TSAP_CFG.financial.financing_models.findIndex(function(m){return m.type===type})
-  if(idx>=0) TSAP_CFG.financial.financing_models.splice(idx,1)
-  else TSAP_CFG.financial.financing_models.push({type:type,label:label,amount:'',notes:''})
-}
-
-function calcTsapGap(){
-  saveTsapCurrentData()
-  var costs=['infra_cost','hardware_cost','software_cost','services_cost','opex_cost']
-  var total=0,hasVal=false
-  costs.forEach(function(k){var v=TSAP_CFG.financial[k];if(v){var n=parseFloat(String(v).replace(/[^0-9.]/g,''));if(!isNaN(n)){total+=n;hasVal=true}}})
-  var finCount=TSAP_CFG.financial.financing_models.length
-  TSAP_CFG.financial.financing_gap = hasVal
-    ? 'Total build cost: ~'+total.toFixed(1)+' (same currency). '+finCount+' financing model'+(finCount===1?'':'s')+' selected.'
-    : 'Enter cost estimates to calculate.'
-  document.getElementById('tsap-gap').textContent=TSAP_CFG.financial.financing_gap
-}
-
-async function aiEnrichTsap(){
-  saveTsapCurrentData()
-  var territory=TSAP_CFG.territory.name||'this territory'
-  var objective=TSAP_CFG.objectives.core_objective||'AI and digital transformation'
-  var model=atlasGetTaskModel('pei')
-  var key=atlasGetKeyForModel(model)
-  if(!key){alert('Configure AI keys in ATLAS Settings.');return}
-  var el=document.getElementById('tsap-enrich')
-  el.style.display='block';el.textContent='Researching '+territory+'...'
-  var prompt='Strategic consultant for Territory Sovereign AI Programme. Territory: '+territory+'. Objective: '+objective+'.'
-    +' Provide: (1) 3-4 unique assets/strengths of this territory for AI programme, (2) 5 most relevant AI use cases given sector profile, (3) 3 economic justification points, (4) 2 comparable AI programme references from other regions.'
-    +' JSON: {uniqueness:[string],use_cases:[{name,rationale}],economic_case:[string],comparables:[{region,programme,lesson}]}'
-    +' Start { end }. No markdown.'
-  try{
-    var text=await atlasCallModel(model,prompt,null,2000)
-    var first=text.indexOf('{'),last=text.lastIndexOf('}')
-    if(first<0) throw new Error('No JSON')
-    var r=JSON.parse(text.slice(first,last+1))
-    var html=''
-    if(r.uniqueness&&r.uniqueness.length) html+='<b>Unique Strengths:</b><br>'+r.uniqueness.map(function(u){return '\u2022 '+esc(u)}).join('<br>')+'<br><br>'
-    if(r.use_cases&&r.use_cases.length) html+='<b>Suggested Use Cases:</b><br>'+r.use_cases.map(function(u){return '\u2022 <b>'+esc(u.name)+'</b> \u2014 '+esc(u.rationale)}).join('<br>')+'<br><br>'
-    if(r.economic_case&&r.economic_case.length) html+='<b>Economic Case:</b><br>'+r.economic_case.map(function(e){return '\u2022 '+esc(e)}).join('<br>')+'<br><br>'
-    if(r.comparables&&r.comparables.length) html+='<b>Comparable Programmes:</b><br>'+r.comparables.map(function(c){return '\u2022 <b>'+esc(c.region)+'</b>: '+esc(c.programme)+' \u2014 '+esc(c.lesson)}).join('<br>')
-    el.innerHTML=html||'No structured result. Try again.'
-    if(!TSAP_CFG.objectives.uniqueness&&r.uniqueness){
-      var uEl=document.getElementById('tsap-uniq')
-      if(uEl) uEl.value=r.uniqueness.join('. ')
-    }
-  }catch(e){el.textContent='Error: '+e.message}
-}
-
-async function saveTsapConfig(){
-  saveTsapCurrentData()
-  var docketId=CURRENT_DOCKET_ID
-  if(!docketId){alert('Open an engagement first.');return}
-  var l2Count = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2')===0 && b.code.indexOf('.')===2}).length
-  var l2xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2.')===0}).length
-  var l1xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L1.')===0}).length
-  var item={id:genId('DI'),docket_id:docketId,item_type:'solution',title:'TSAP Config \u2014 '+esc(TSAP_CFG.territory.name||'Territory'),content:TSAP_CFG,status:'in_progress',notes:'Territory: '+esc(TSAP_CFG.territory.name)+'. L2 blocks: '+l2Count+'. Specialised factories: '+l2xCount+'. L1.x programmes: '+l1xCount+'. Financing models: '+TSAP_CFG.financial.financing_models.length+'.',created_by:'ATLAS TSAP'}
-  var ok=await sbInsert('docket_items',item)
-  if(ok){CURRENT_ITEMS.push(item);closeModal('tsapModal');renderItems('all');alert('TSAP configuration saved to docket.')}
-  else alert('Failed to save.')
-}
-
-async function generateVisionDoc(){
-  saveTsapCurrentData()
-  var territory=TSAP_CFG.territory.name
-  if(!territory){alert('Enter territory name first.');return}
-  if(!TSAP_CFG.objectives.core_objective){alert('Enter core objective first.');return}
-  var model=atlasGetTaskModel('documents')
-  var key=atlasGetKeyForModel(model)
-  if(!key){alert('Configure Documents model key in ATLAS Settings.');return}
-  closeModal('tsapModal')
-  var main=document.getElementById('mainPanel')
-  var genDiv=document.createElement('div')
-  genDiv.className='rec-card'
-  genDiv.innerHTML='<div class="rec-title">\uD83D\uDCC4 Generating Vision Document for '+esc(territory)+'...</div>'
-  main.insertBefore(genDiv,main.firstChild)
-  var blocks=TSAP_CFG.blocks.map(function(b){return b.name+(b.count>1?' (x'+b.count+')':'')+(b.location?' at '+b.location:'')}).join(', ')
-  var financing=TSAP_CFG.financial.financing_models.map(function(f){return f.label}).join(', ')
-  var prompt='Write an executive Vision Document for the '+territory+' Territory Sovereign AI Programme.'
-    +' Core objective: '+TSAP_CFG.objectives.core_objective+'.'
-    +' Vision: '+TSAP_CFG.objectives.vision+'.'
-    +' Justification: '+TSAP_CFG.objectives.justification+'.'
-    +' Uniqueness: '+TSAP_CFG.objectives.uniqueness+'.'
-    +' Building blocks: '+(blocks||'AI Factory, Inferencing Factory')+'.'
-    +' Financing: '+(financing||'TBD')+'.'
-    +' Target: '+(TSAP_CFG.objectives.success_metrics.jobs||'TBD')+' jobs, '+(TSAP_CFG.objectives.success_metrics.startups||'TBD')+' startups.'
-    +' Structure: Executive Summary, Territory Context, Programme Vision, Proposed Architecture, Expected Impact, Implementation Approach, Call to Action.'
-    +' Audience: Chief Minister or Minister level. Confident, strategic, territory-specific. 800-1000 words.'
-  try{
-    var text=await atlasCallModel(model,prompt,null,4096)
-    var docketId=CURRENT_DOCKET_ID
-    if(docketId){
-      var item={id:genId('DI'),docket_id:docketId,item_type:'exec_doc',title:territory+' \u2014 TSAP Vision Document',content:{vision_doc_text:text,territory:territory},status:'done',notes:text.slice(0,200)+'...',created_by:'ATLAS Vision Doc'}
-      await sbInsert('docket_items',item)
-      CURRENT_ITEMS.push(item)
-      renderItems('all')
-    }
-    genDiv.innerHTML='<div class="rec-title">\uD83D\uDCC4 Vision Document Generated \u2014 saved to docket</div>'
-      +'<div style="max-height:300px;overflow-y:auto;font-size:12px;line-height:1.7;white-space:pre-wrap;border:1px solid #e0e0e8;border-radius:var(--r);padding:12px;background:var(--white);margin-top:8px">'+esc(text)+'</div>'
-  }catch(e){genDiv.innerHTML='<div style="color:#DC2626">\u274C Error: '+esc(e.message)+'</div>'}
-}
-
-
-// \u2500\u2500 Contact Management \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var EDIT_CUSTOMER_ID = null
-
-function addContact(custId){
-  EDIT_CUSTOMER_ID = custId
-  var modal = document.getElementById('contactModal')
-  if(!modal){
-    var m = document.createElement('div')
-    m.id = 'contactModal'
-    m.className = 'modal-overlay'
-    m.innerHTML = '<div class="modal" style="max-width:440px">'
-      +'<div class="modal-title">Add Contact</div>'
-      +'<label>Name *</label><input type="text" id="ct-name" placeholder="Full name">'
-      +'<label>Role / Title</label><input type="text" id="ct-role" placeholder="e.g. Director AI, CTO">'
-      +'<div class="form-grid">'
-      +'<div><label>Seniority</label><select id="ct-seniority">'
-      +'<option value="">Unknown</option>'
-      +'<option value="c_suite">C-Suite / Secretary</option>'
-      +'<option value="director">Director / Jt Secretary</option>'
-      +'<option value="manager">Manager / Deputy</option>'
-      +'<option value="technical">Technical / Specialist</option>'
-      +'</select></div>'
-      +'<div><label>Influence</label><select id="ct-influence">'
-      +'<option value="">Unknown</option>'
-      +'<option value="decision_maker">Decision Maker</option>'
-      +'<option value="influencer">Influencer</option>'
-      +'<option value="champion">Champion</option>'
-      +'<option value="blocker">Blocker</option>'
-      +'</select></div>'
-      +'</div>'
-      +'<label>Email</label><input type="email" id="ct-email" placeholder="email@org.gov.in">'
-      +'<label>Phone</label><input type="text" id="ct-phone" placeholder="+91 98...">'
-      +'<div class="modal-actions">'
-      +'<button class="btn btn-ghost" onclick="closeContactModal()">Cancel</button>'
-      +'<button class="btn btn-primary" onclick="saveContact()">Add Contact</button>'
-      +'</div></div>'
-    document.body.appendChild(m)
-  }
-  document.getElementById('ct-name').value=''
-  document.getElementById('ct-role').value=''
-  document.getElementById('ct-email').value=''
-  document.getElementById('ct-phone').value=''
-  document.getElementById('ct-seniority').value=''
-  document.getElementById('ct-influence').value=''
-  document.getElementById('contactModal').classList.add('open')
-}
-
-function closeContactModal(){
-  var m = document.getElementById('contactModal')
-  if(m) m.classList.remove('open')
-}
-
-async function saveContact(){
-  var name = document.getElementById('ct-name').value.trim()
-  if(!name){ alert('Name required.'); return }
-  var contact = {
-    id: 'ct-'+Date.now(),
-    name: name,
-    role: document.getElementById('ct-role').value.trim(),
-    seniority: document.getElementById('ct-seniority').value,
-    influence: document.getElementById('ct-influence').value,
-    email: document.getElementById('ct-email').value.trim(),
-    phone: document.getElementById('ct-phone').value.trim(),
-  }
-  var cust = ALL_CUSTOMERS.find(function(c){return c.id===EDIT_CUSTOMER_ID})
-  if(!cust) return
-  var contacts = Array.isArray(cust.contacts) ? cust.contacts : []
-  contacts.push(contact)
-  var ok = await sbPatch('customers','id=eq.'+EDIT_CUSTOMER_ID,{contacts:JSON.stringify(contacts)})
-  if(ok){
-    cust.contacts = contacts
-    window._cust = cust
-    closeContactModal()
-    switchCustTab('profile')
-  } else alert('Failed to save contact.')
-}
-
-// \u2500\u2500 My Action Docket \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var MY_ACTIONS = []
-var MY_OWNER_NAME = ''
-
-async function openMyActions(){
-  CURRENT_VIEW = 'my_actions'
-  CURRENT_CUSTOMER_ID = null
-  CURRENT_ENGAGEMENT_ID = null
-
-  var g = atlasGetGlobal()
-  MY_OWNER_NAME = g.owner_name || 'My'
-
-  // Find or create salesperson docket
-  var spDocket = null  // Will fetch from Supabase below
-  if(!spDocket){
-    var dockets = await sbFetch('engagement_dockets','type=eq.salesperson',1)
-    spDocket = dockets[0]
-  }
-
-  if(!spDocket){
-    // Auto-create
-    var id = 'SP-'+Date.now()
-    await sbInsert('engagement_dockets',{id:id,type:'salesperson',name:MY_OWNER_NAME,status:'active',metadata:{}})
-    spDocket = {id:id,type:'salesperson',name:MY_OWNER_NAME,status:'active'}
-  }
-
-  MY_ACTIONS = await sbFetch('docket_items','docket_id=eq.'+spDocket.id+'&order=created_at.desc',200)
-
-  var open_count = MY_ACTIONS.filter(function(a){return a.status!=='closed'}).length
-  var done_count = MY_ACTIONS.filter(function(a){return a.status==='done'||a.status==='closed'}).length
-
-  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">'
-    +'<div><div class="card-title" style="font-size:18px">My Action Docket</div>'
-    +'<div style="font-size:12px;color:var(--mid)">Personal action list sourced from intelligence items and engagements</div></div>'
-    +'<button class="btn btn-primary" onclick="addMyAction(\''+spDocket.id+'\')">+ Add Action</button>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">'
-    +'<div class="stat"><div class="stat-val" style="color:var(--teal)">'+open_count+'</div><div class="stat-lbl">Open Actions</div></div>'
-    +'<div class="stat"><div class="stat-val" style="color:var(--mid)">'+done_count+'</div><div class="stat-lbl">Completed</div></div>'
-    +'<div class="stat"><div class="stat-val">'+MY_ACTIONS.length+'</div><div class="stat-lbl">Total</div></div>'
-    +'</div>'
-
-  // Filter tabs
-  html += '<div style="display:flex;gap:6px;margin-bottom:14px">'
-    +'<button class="btn btn-ghost btn-sm" style="background:var(--navy);color:var(--white)" onclick="renderMyActions(\'all\')">All ('+MY_ACTIONS.length+')</button>'
-    +'<button class="btn btn-ghost btn-sm" onclick="renderMyActions(\'open\')">Open ('+open_count+')</button>'
-    +'<button class="btn btn-ghost btn-sm" onclick="renderMyActions(\'done\')">Done ('+done_count+')</button>'
-    +'</div>'
-    +'<div id="my-actions-list"></div>'
-
-  document.getElementById('mainPanel').innerHTML = html
-  window._spDocketId = spDocket.id
-  renderMyActions('open')
-  renderSidebar()
-}
-
-function renderMyActions(filter){
-  var items = filter==='all' ? MY_ACTIONS
-    : filter==='open' ? MY_ACTIONS.filter(function(a){return a.status==='pending'||a.status==='in_progress'})
-    : MY_ACTIONS.filter(function(a){return a.status==='done'||a.status==='closed'})
-
-  var html = items.length ? items.map(function(item){
-    var content = item.content||{}
-    return '<div class="docket-item" style="'+(item.status==='done'||item.status==='closed'?'opacity:0.6':'')+'">'
-      +'<div class="item-body">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
-      +'<div class="item-title">'+esc(item.title)+'</div>'
-      +'<span class="item-status is-'+item.status+'">'+item.status.replace('_',' ')+'</span>'
-      +'</div>'
-      +(content.domain_code?'<span style="font-size:10px;background:rgba(0,40,112,0.08);color:var(--navy);padding:1px 6px;border-radius:4px;margin-right:6px">'+esc(content.domain_code)+'</span>':'')
-      +(item.due_date?'<span style="font-size:10px;color:var(--mid)">Due: '+fmtDate(item.due_date)+'</span>':'')
-      +(item.notes?'<div style="font-size:11px;color:#555;margin-top:4px">'+esc(item.notes.slice(0,100))+'</div>':'')
-      +'<div style="display:flex;gap:6px;margin-top:6px">'
-      +(item.status==='pending'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">Start</button>':'')
-      +(item.status==='in_progress'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">Done</button>':'')
-      +(item.status==='done'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'closed\')">Close</button>':'')
-      +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteMyAction(this.dataset.id)">x</button>'
-      +'</div></div></div>'
-  }).join('')
-  : '<div class="empty" style="padding:32px"><div class="empty-title">No '+filter+' actions</div>'
-    +'<div class="empty-sub">Actions sourced from intelligence items in Second Brain will appear here.</div></div>'
-
-  document.getElementById('my-actions-list').innerHTML = html
-}
-
-function addMyAction(docketId){
-  openAddItemModal(docketId)
-  document.getElementById('ai-type').value = 'action'
-  updateItemHint()
-}
-
-async function deleteMyAction(itemId){
-  if(!confirm('Delete this action?')) return
-  var ok = await sbDelete('docket_items','id=eq.'+itemId)
-  if(ok){
-    MY_ACTIONS = MY_ACTIONS.filter(function(a){return a.id!==itemId})
-    renderMyActions('all')
-  }
-}
-
-// Override setItemStatus to work for my actions too
-var _origSetItemStatus = setItemStatus
-setItemStatus = async function(itemId, status){
-  var ok = await sbPatch('docket_items','id=eq.'+itemId,{status:status})
-  if(ok){
-    // Update in CURRENT_ITEMS
-    var item = CURRENT_ITEMS.find(function(i){return i.id===itemId})
-    if(item) item.status = status
-    // Also update in MY_ACTIONS
-    var myItem = MY_ACTIONS.find(function(i){return i.id===itemId})
-    if(myItem) myItem.status = status
-    // Re-render appropriately
-    if(CURRENT_VIEW==='my_actions') renderMyActions('all')
-    else {
-      var docket = ALL_ENGAGEMENTS.find(function(e){return e.id===CURRENT_ENGAGEMENT_ID})
-      if(docket) renderItems('all')
-    }
-  }
-}
-
-// \u2500\u2500 Word Export (docx via client-side generation) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function exportWordDoc(docketId){
-  var docket = null
-  var eng = ALL_ENGAGEMENTS.find(function(e){return e.id===CURRENT_ENGAGEMENT_ID})
-  var cust = ALL_CUSTOMERS.find(function(c){return c.id===(eng&&eng.customer_id)})
-
-  var items = CURRENT_ITEMS.length > 0 ? CURRENT_ITEMS
-    : await sbFetch('docket_items','docket_id=eq.'+docketId+'&order=item_type.asc,created_at.asc',200)
-
-  // Build document content as structured text
-  var lines = []
-  lines.push('ATLAS ENGAGEMENT DOCKET')
-  lines.push('=' .repeat(60))
-  lines.push('')
-  if(cust) lines.push('Customer: '+cust.name+(cust.sector?' | '+cust.sector:'')+(cust.country?' | '+cust.country:''))
-  if(eng){
-    lines.push('Engagement: '+eng.name)
-    lines.push('ID: '+eng.id+' | Phase: '+eng.phase+' | Status: '+eng.status)
-    if(eng.value) lines.push('Estimated Value: '+eng.value+' '+eng.currency)
-  }
-  lines.push('Exported: '+new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}))
-  lines.push('')
-
-  // Group by type
-  var typeOrder = ['intel','pei','uc','rfp','solution','bom','pricing','proposal','pitch','exec_doc','action']
-  var typeLabels = {intel:'Intelligence',pei:'PEI Brief',uc:'Use Cases',rfp:'RFP / Tender',
-    solution:'Technical Solution',bom:'Bill of Materials',pricing:'Pricing',proposal:'Proposal',
-    pitch:'Pitch',exec_doc:'Executive Documents',action:'Actions'}
-
-  typeOrder.forEach(function(t){
-    var group = items.filter(function(i){return i.item_type===t})
-    if(!group.length) return
-    lines.push('')
-    lines.push((typeLabels[t]||t).toUpperCase()+' ('+group.length+')')
-    lines.push('-'.repeat(40))
-    group.forEach(function(item){
-      lines.push('')
-      lines.push(item.title)
-      var meta = []
-      if(item.status) meta.push('Status: '+item.status)
-      if(item.assigned_to) meta.push('Assigned: '+item.assigned_to)
-      if(item.due_date) meta.push('Due: '+fmtDate(item.due_date))
-      if(meta.length) lines.push(meta.join(' | '))
-      if(item.notes) lines.push(item.notes)
-      var c = item.content||{}
-      if(c.vision_doc_text) lines.push(c.vision_doc_text)
-      if(c.organisation_summary) lines.push('Summary: '+c.organisation_summary)
-      if(c.our_positioning) lines.push('Positioning: '+c.our_positioning)
-      if(c.portfolio_codes) lines.push('Portfolio: '+c.portfolio_codes.join(', '))
-    })
+function copyJSON(){
+  if(!PEI_DATA) return
+  navigator.clipboard.writeText(JSON.stringify(PEI_DATA,null,2)).then(function(){
+    var btn = event.target; btn.textContent = '\u2713 Copied'
+    setTimeout(function(){btn.innerHTML='&#128203; Copy JSON'},2000)
   })
+}
 
-  var blob = new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'})
+function downloadJSON(){
+  if(!PEI_DATA) return
+  var org = document.getElementById('orgName').value.replace(/[^a-z0-9]/gi,'_').slice(0,30)
+  dl(JSON.stringify(PEI_DATA,null,2),'application/json','PEI-'+org+'-'+new Date().toISOString().slice(0,10)+'.json')
+}
+
+function dl(content,type,fname){
+  var blob = new Blob([content],{type})
   var url = URL.createObjectURL(blob)
   var a = document.createElement('a')
-  a.href = url
-  a.download = 'Docket-'+(cust?cust.name.replace(/\s+/g,'-'):'Engagement')+'-'+new Date().toISOString().slice(0,10)+'.txt'
-  a.click()
+  a.href=url; a.download=fname; a.click()
   URL.revokeObjectURL(url)
-  // Note: Full .docx via docx-js requires server-side or service worker \u2014 txt export for now
 }
 
-// \u2500\u2500 Add to Docket from PEI (called from PEI tool via localStorage) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function checkPendingDocketItem(){
-  try{
-    var pending = JSON.parse(localStorage.getItem('atlas_pending_docket_item')||'null')
-    if(pending){
-      localStorage.removeItem('atlas_pending_docket_item')
-      atlasAddToDocket(pending)
-    }
-  }catch(e){}
+function downloadWord(){
+  if(!PEI_DATA) return
+  alert('Word export: feature identical to v0.1 - coming in next update.')
 }
 
-// \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-window.addEventListener('DOMContentLoaded', function(){
-  loadAll().then(function(){
-    checkPendingDocketItem()
-  })
-})
+function downloadPPTX(){
+  if(!PEI_DATA) return
+  alert('PPTX export: feature identical to v0.1 - coming in next update.')
+}
 </script>
 </body>
 </html>
