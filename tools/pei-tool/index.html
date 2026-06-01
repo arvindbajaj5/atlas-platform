@@ -512,7 +512,20 @@ async function queryIntelligenceDB(sector, country, ownership){
 // \u2500\u2500 Main generate function \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function generatePEI(){
   var model = document.getElementById('modelSelect').value || atlasGetTaskModel('pei')
-  var apiKey = atlasGetKeyForModel(model) || document.getElementById('apiKey').value.trim()
+  // Robust key resolution: model key \u2192 any global key \u2192 local input
+  var apiKey = atlasGetKeyForModel(model)
+  if(!apiKey){
+    // Try getting key from global settings directly
+    var g = atlasGetGlobal()
+    apiKey = g.key_gemini || g.key_anthropic || g.key_openai || ''
+  }
+  if(!apiKey) apiKey = document.getElementById('apiKey').value.trim()
+  // Also ensure model matches the key we found
+  if(!atlasGetKeyForModel(model) && apiKey){
+    // Find which model matches the key we have
+    if(apiKey === (atlasGetGlobal().key_gemini||'')) model = atlasGetTaskModel('pei') || 'gemini-3.5-flash'
+    else if(apiKey === (atlasGetGlobal().key_anthropic||'')) model = 'claude-haiku-4-5-20251001'
+  }
   var orgName = document.getElementById('orgName').value.trim()
   var country = document.getElementById('orgCountry').value
   var ownership = document.getElementById('orgOwnership').value
