@@ -1359,9 +1359,9 @@ async function saveTransaction(){
   else alert('Failed to save transaction.')
 }
 
-function addContact(custId){alert('Contact management \u2014 coming in next build.')}
-function openMyActions(){alert('My Action Docket \u2014 coming in next build.')}
-function openL1Config(engId){alert('L1 Territory Configuration \u2014 coming in next build.')}
+
+
+
 
 // \u2500\u2500 Add to Docket trigger (from other tools) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function atlasAddToDocket(item){
@@ -1844,7 +1844,7 @@ async function openMyActions(){
   MY_OWNER_NAME = g.owner_name || 'My'
 
   // Find or create salesperson docket
-  var spDocket = ALL_DOCKETS ? ALL_DOCKETS.find(function(d){return d.type==='salesperson'}) : null
+  var spDocket = null  // Will fetch from Supabase below
   if(!spDocket){
     var dockets = await sbFetch('engagement_dockets','type=eq.salesperson',1)
     spDocket = dockets[0]
