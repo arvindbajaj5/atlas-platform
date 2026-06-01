@@ -171,7 +171,7 @@ textarea{resize:vertical;min-height:72px;}
   <div style="font-size:11px;color:rgba(255,255,255,0.5)">Engagement Docket v2.0</div>
   <div style="display:flex;align-items:center;gap:8px">
     <span class="hdr-badge">ED v2.0</span>
-    <button class="btn btn-ghost btn-sm" style="color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.3)" onclick="history.back()">\u2190 Portal</button>
+    <button class="btn btn-ghost btn-sm" style="color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.3)" onclick="history.back()">← Portal</button>
   </div>
 </div>
 
@@ -179,7 +179,7 @@ textarea{resize:vertical;min-height:72px;}
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="sb-search"><input type="text" id="sbSearch" placeholder="Search customers..." oninput="renderSidebar()"></div>
-    <button class="sb-add" onclick="openModal('newCustomerModal')">\u002B New Customer</button>
+    <button class="sb-add" onclick="openModal('newCustomerModal')">+ New Customer</button>
     <div class="sb-section"><span>Strategic</span><span id="sbStrategicCount" style="font-size:10px;color:var(--mid)">0</span></div>
     <div id="sbStrategicList"></div>
     <div class="sb-section" style="margin-top:8px"><span>Transactional</span><span id="sbTransactionalCount" style="font-size:10px;color:var(--mid)">0</span></div>
@@ -195,7 +195,7 @@ textarea{resize:vertical;min-height:72px;}
 <!-- New Customer Modal -->
 <div class="modal-overlay" id="newCustomerModal">
   <div class="modal">
-    <div class="modal-title">\uD83C\uDFE2 New Customer</div>
+    <div class="modal-title">New Customer</div>
     <label>Customer Name *</label>
     <input type="text" id="nc-name" placeholder="e.g. Indian Army, NTPC, Pixxel">
     <label>Short Name</label>
@@ -283,7 +283,7 @@ textarea{resize:vertical;min-height:72px;}
 <!-- New Engagement Modal -->
 <div class="modal-overlay" id="newEngagementModal">
   <div class="modal">
-    <div class="modal-title">\uD83D\uDCBC New Engagement</div>
+    <div class="modal-title">New Engagement</div>
     <input type="hidden" id="ne-customer-id">
     <label>Engagement Name *</label>
     <input type="text" id="ne-name" placeholder="e.g. Border Surveillance AI Platform">
@@ -365,21 +365,21 @@ textarea{resize:vertical;min-height:72px;}
 <!-- Add to Docket Modal -->
 <div class="modal-overlay" id="addItemModal">
   <div class="modal">
-    <div class="modal-title" id="addItemTitle">\u002B Add Item to Docket</div>
+    <div class="modal-title" id="addItemTitle">+ Add Item to Docket</div>
     <input type="hidden" id="ai-docket-id">
     <label>Item Type</label>
     <select id="ai-type" onchange="updateItemHint()">
-      <option value="action">\u26A1 Action</option>
-      <option value="intel">\uD83D\uDCCA Intelligence</option>
-      <option value="pei">\uD83D\uDD0D PEI Brief</option>
-      <option value="uc">\uD83D\uDCA1 Use Case</option>
-      <option value="rfp">\uD83D\uDCC4 RFP / Tender</option>
-      <option value="pitch">\uD83D\uDCCA Pitch Report</option>
-      <option value="solution">\u2699\uFE0F Technical Solution</option>
-      <option value="bom">\uD83D\uDCDC Bill of Materials</option>
-      <option value="proposal">\uD83D\uDCC4 Proposal</option>
-      <option value="pricing">\uD83D\uDCB0 Pricing</option>
-      <option value="exec_doc">\uD83C\uDF93 Executive Document</option>
+      <option value="action">Action</option>
+      <option value="intel">Intelligence</option>
+      <option value="pei">PEI Brief</option>
+      <option value="uc">Use Case</option>
+      <option value="rfp">RFP / Tender</option>
+      <option value="pitch">Pitch Report</option>
+      <option value="solution">Technical Solution</option>
+      <option value="bom">Bill of Materials</option>
+      <option value="proposal">Proposal</option>
+      <option value="pricing">Pricing</option>
+      <option value="exec_doc">Executive Document</option>
     </select>
     <label>Title *</label>
     <input type="text" id="ai-title" placeholder="Descriptive title for this item">
@@ -401,8 +401,8 @@ textarea{resize:vertical;min-height:72px;}
 <div class="modal-overlay" id="portfolioMapModal">
   <div class="modal modal-lg">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <div class="modal-title" style="margin-bottom:0">\uD83D\uDDFA\uFE0F Portfolio Map</div>
-      <button class="btn btn-ghost btn-xs" onclick="closeModal('portfolioMapModal')">\u2715</button>
+      <div class="modal-title" style="margin-bottom:0">Portfolio Map</div>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal('portfolioMapModal')">×</button>
     </div>
     <div style="font-size:11px;color:var(--mid);margin-bottom:16px" id="portfolioMapDesc">Select portfolio items for this engagement. AI-recommended items are pre-selected.</div>
     <div id="portfolioMapContent"></div>
@@ -417,7 +417,7 @@ textarea{resize:vertical;min-height:72px;}
 <!-- Add Transaction Modal -->
 <div class="modal-overlay" id="newTxnModal">
   <div class="modal">
-    <div class="modal-title">\uD83D\uDCB3 Record Transaction</div>
+    <div class="modal-title">Record Transaction</div>
     <input type="hidden" id="txn-customer-id">
     <label>Product / Service *</label>
     <input type="text" id="txn-product" placeholder="e.g. GenAI-in-a-Box, Inferencing Factory PoC">
@@ -842,7 +842,7 @@ function renderDashboard(){
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">'
     +'<div><div class="card-title" style="font-size:18px">Engagement Overview</div>'
     +'<div style="font-size:12px;color:var(--mid)">Customers, engagements, dockets and portfolio</div></div>'
-    +'<button class="btn btn-primary" onclick="openModal(\'newCustomerModal\')">\u002B New Customer</button>'
+    +'<button class="btn btn-primary" onclick="openModal(\'newCustomerModal\')">+ New Customer</button>'
     +'</div>'
     +'<div class="stat-grid">'
     +'<div class="stat"><div class="stat-val">'+ALL_CUSTOMERS.length+'</div><div class="stat-lbl">Total Customers</div></div>'
@@ -934,7 +934,7 @@ function switchCustTab(tab){
     // Contacts
     content += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
       +'<div class="card-title" style="margin:0">Key Contacts</div>'
-      +'<button class="btn btn-ghost btn-xs" onclick="addContact(\''+cust.id+'\')">\u002B Add</button>'
+      +'<button class="btn btn-ghost btn-xs" onclick="addContact(\''+cust.id+'\')">+ Add</button>'
       +'</div>'
       +(contacts.length ? contacts.map(function(c){
         return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--light)">'
@@ -949,7 +949,7 @@ function switchCustTab(tab){
   if(tab === 'engagements'){
     content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
       +(cust.tier==='strategic'
-        ? '<button class="btn btn-primary" onclick="openModal(\'newEngagementModal\'); document.getElementById(\'ne-customer-id\').value=\''+cust.id+'\'">\u002B New Engagement</button>'
+        ? '<button class="btn btn-primary" onclick="openModal(\'newEngagementModal\'); document.getElementById(\'ne-customer-id\').value=\''+cust.id+'\'">+ New Engagement</button>'
         : '<div style="font-size:11px;color:var(--mid)">Elevate to strategic to create engagements</div>')
       +'</div>'
     content += custEngs.length ? custEngs.map(function(e){
@@ -964,7 +964,7 @@ function switchCustTab(tab){
 
   if(tab === 'transactions'){
     content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
-      +'<button class="btn btn-ghost btn-sm" onclick="openModal(\'newTxnModal\'); document.getElementById(\'txn-customer-id\').value=\''+cust.id+'\'">\u002B Record Transaction</button>'
+      +'<button class="btn btn-ghost btn-sm" onclick="openModal(\'newTxnModal\'); document.getElementById(\'txn-customer-id\').value=\''+cust.id+'\'">+ Record Transaction</button>'
       +'</div>'
     content += txns.length ? txns.map(function(t){
       return '<div class="card" style="padding:12px 14px">'
@@ -1012,7 +1012,7 @@ async function openEngagement(engId){
   CURRENT_DOCKET_ID = docket.id
   CURRENT_ITEMS = await sbFetch('docket_items','docket_id=eq.'+docket.id+'&order=created_at.asc',200)
 
-  var isL1 = eng.archetype === 'territory_coe' || eng.type === 'new' && eng.domain === 'REG-AIP'
+  var isL1 = eng.archetype === 'tsap' || eng.type === 'new' && eng.domain === 'REG-AIP'
 
   var html = '<div style="background:var(--navy);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;color:var(--white)">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
@@ -1026,7 +1026,7 @@ async function openEngagement(engId){
     +(eng.value?'<span class="pill" style="background:rgba(0,178,144,0.2);color:var(--teal)">\uD83D\uDCB0 '+esc(eng.value)+' '+esc(eng.currency||'')+'</span>':'')
     +'</div></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">'
-    +'<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+docket.id+'\')">\u002B Add Item</button>'
+    +'<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+docket.id+'\')">+ Add Item</button>'
     +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="openPortfolioMap(\''+engId+'\',\''+docket.id+'\')">\uD83D\uDDFA\uFE0F Portfolio</button>'
     +(isL1?'<button class="btn btn-sm" style="background:rgba(255,182,0,0.2);color:var(--amber)" onclick="openL1Config(\''+engId+'\')">L1 Configure</button>':'')
     +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="runRecommendationEngine(\''+engId+'\')">\uD83E\uDD16 Recommend</button>'
@@ -1079,7 +1079,7 @@ function renderItem(item){
     +'<div style="display:flex;gap:6px;margin-top:6px">'
     +(item.status==='pending'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">\u25B6 Start</button>':'')
     +(item.status==='in_progress'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">\u2713 Done</button>':'')
-    +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteItem(this.dataset.id)">\u2715</button>'
+    +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteItem(this.dataset.id)">\u00D7</button>'
     +'</div></div></div>'
 }
 
@@ -1365,7 +1365,7 @@ async function atlasAddToDocket(item){
   modal.id = 'triggerModal'
   modal.className = 'modal-overlay open'
   var dockets = await sbFetch('engagement_dockets','type=eq.customer&status=eq.active&order=updated_at.desc',20)
-  var opts = '<option value="__new__">\u002B Create New Customer Docket</option>'
+  var opts = '<option value="__new__">+ Create New Docketket</option>'
   dockets.forEach(function(d){ opts+='<option value="'+d.id+'">'+esc(d.name)+'</option>' })
   modal.innerHTML = '<div class="modal" style="max-width:440px"><div class="modal-title">\uD83D\uDCC1 Add to Docket</div>'
     +'<div style="font-size:12px;color:var(--mid);margin-bottom:12px">Adding: "'+esc(item.title)+'" ('+esc(item.type)+')</div>'
@@ -1402,6 +1402,351 @@ async function confirmTrigger(){
 // \u2500\u2500 Modals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function openModal(id){ document.getElementById(id).classList.add('open') }
 function closeModal(id){ document.getElementById(id).classList.remove('open') }
+
+
+// TSAP L1 Configuration
+var TSAP_CFG = {territory:{name:'',type:'state',governance:'central',security:'civilian',ownership:'government',scale:''},objectives:{core_objective:'',vision:'',justification:'',uniqueness:'',success_metrics:{jobs:'',startups:'',compute:''}},blocks:[],financial:{financing_models:[],infra_cost:'',hardware_cost:'',software_cost:'',services_cost:'',opex_cost:'',financing_gap:''}}
+var CURRENT_TSAP_ENG_ID = null
+
+var L2_BLOCKS_DEF = [
+  {code:'L2-AIF',  name:'AI Factory',                  icon:'\uD83C\uDFED', desc:'General-purpose GPU compute \u2014 training + inference'},
+  {code:'L2-INF',  name:'Inferencing Factory',          icon:'\u26A1',        desc:'High-throughput production inference (generic baseline)'},
+  {code:'L2.1-INF',name:'GeoAI Inferencing Factory',    icon:'\uD83D\uDEF0\uFE0F',desc:'Pre-configured for geospatial/EO workloads \u2014 EO pipeline, imagery AI, GIS'},
+  {code:'L2.2-INF',name:'Defence AI Inferencing Factory',icon:'\uD83D\uDEF1', desc:'Air-gapped, MIL-SPEC, ISR pipeline, classified network integration'},
+  {code:'L2.3-INF',name:'Health AI Inferencing Factory', icon:'\uD83C\uDFE5', desc:'DICOM/FHIR, medical imaging AI, clinical compliance stack'},
+  {code:'L2.4-INF',name:'FinAI Inferencing Factory',     icon:'\uD83C\uDFE6', desc:'Fraud detection, credit risk, AML/KYC, RBI/SEBI compliance'},
+  {code:'L2-TRC',  name:'Training Cluster',              icon:'\uD83E\uDDE0', desc:'HPC-class large-scale model training'},
+  {code:'L2-HPC',  name:'HPC Cluster',                   icon:'\uD83D\uDCCA', desc:'Scientific compute \u2014 simulation and modelling'},
+  {code:'L2-EDG',  name:'Edge AI Node',                  icon:'\uD83D\uDCF6', desc:'Field-deployed, air-gappable inference'},
+  {code:'L2-MDC',  name:'Modular Datacenter',            icon:'\uD83C\uDFD7\uFE0F', desc:'Houses any L2 building block \u2014 rapid deployment'},
+]
+
+var L1X_COMPONENTS_DEF = [
+  {code:'L1.1-TSAP',name:'AI Skills & Workforce Development',icon:'\uD83C\uDF93',desc:'Mass digital/AI literacy \u2014 public servants, practitioners, population-scale. Partner-delivered.',partner:true},
+  {code:'L1.2-TSAP',name:'Startup & Innovation Ecosystem',  icon:'\uD83D\uDE80',desc:'Incubator, accelerator, seed funding framework, anchor tenant attraction. Partner-delivered.',partner:true},
+  {code:'L1.3-TSAP',name:'Data Governance & Sovereign Data',icon:'\uD83D\uDDC4\uFE0F',desc:'Territory data catalogue, data sharing frameworks, DPDP compliance. Often a prerequisite for compute.',partner:true},
+  {code:'L1.4-TSAP',name:'Research & Academic Partnership', icon:'\uD83D\uDD2C',desc:'IIT/IIIT/university MoUs, research grants, PhD fellowships. Long-term talent pipeline.',partner:true},
+  {code:'L1.5-TSAP',name:'AI Policy, Regulation & Governance',icon:'\u2696\uFE0F',desc:'Territory AI policy framework, oversight authority, ethical AI guidelines, procurement policy. Legal partner-led.',partner:true},
+]
+
+var FINANCING_OPTS_DEF = [
+  {type:'self_funded',label:'Self-Funded (State / Internal Budget)'},
+  {type:'central_grant',label:'Central Government Grant (PM-DevINE, IndiaAI etc.)'},
+  {type:'domestic_debt',label:'Domestic Borrowing (DFI / Bonds / NABARD)'},
+  {type:'multilateral',label:'Multilateral Agency (World Bank / ADB / AIIB)'},
+  {type:'bilateral',label:'Bilateral Country Financing (Low-Interest Credit Line)'},
+  {type:'ppp',label:'PPP (Private Anchor Tenant + Govt Land/Grant)'},
+  {type:'mixed',label:'Mixed / Blended Finance'},
+]
+
+function openL1Config(engId){
+  CURRENT_TSAP_ENG_ID = engId
+  switchTsapTab('territory')
+  openModal('tsapModal')
+}
+
+function switchTsapTab(tab){
+  var tabs = document.querySelectorAll('#tsapTabBar .tab')
+  var names = ['territory','objectives','blocks','financial']
+  tabs.forEach(function(t,i){ t.className='tab'+(names[i]===tab?' active':'') })
+  saveTsapCurrentData()
+  var content = ''
+
+  if(tab==='territory'){
+    content = '<div class="form-grid">'
+      +'<div><label>Territory Name</label><input type="text" id="tsap-name" value="'+esc(TSAP_CFG.territory.name)+'" placeholder="e.g. Himachal Pradesh, Northeast India Cluster"></div>'
+      +'<div><label>Territory Type</label><select id="tsap-type">'
+      +'<option value="country"'+(TSAP_CFG.territory.type==='country'?' selected':'')+'>Country</option>'
+      +'<option value="state"'+(TSAP_CFG.territory.type==='state'?' selected':'')+'>State</option>'
+      +'<option value="city"'+(TSAP_CFG.territory.type==='city'?' selected':'')+'>City</option>'
+      +'<option value="region"'+(TSAP_CFG.territory.type==='region'?' selected':'')+'>Region</option>'
+      +'<option value="cluster"'+(TSAP_CFG.territory.type==='cluster'?' selected':'')+'>Cluster</option>'
+      +'</select></div></div>'
+      +'<div class="form-grid">'
+      +'<div><label>Governance Model</label><select id="tsap-gov">'
+      +'<option value="central"'+(TSAP_CFG.territory.governance==='central'?' selected':'')+'>Central</option>'
+      +'<option value="federated"'+(TSAP_CFG.territory.governance==='federated'?' selected':'')+'>Federated</option>'
+      +'<option value="distributed"'+(TSAP_CFG.territory.governance==='distributed'?' selected':'')+'>Distributed</option>'
+      +'</select></div>'
+      +'<div><label>Security Classification</label><select id="tsap-sec">'
+      +'<option value="civilian"'+(TSAP_CFG.territory.security==='civilian'?' selected':'')+'>Civilian</option>'
+      +'<option value="restricted"'+(TSAP_CFG.territory.security==='restricted'?' selected':'')+'>Restricted</option>'
+      +'<option value="classified"'+(TSAP_CFG.territory.security==='classified'?' selected':'')+'>Classified</option>'
+      +'<option value="air_gapped"'+(TSAP_CFG.territory.security==='air_gapped'?' selected':'')+'>Air-Gapped</option>'
+      +'</select></div></div>'
+      +'<div class="form-grid">'
+      +'<div><label>Ownership Model</label><select id="tsap-own">'
+      +'<option value="government"'+(TSAP_CFG.territory.ownership==='government'?' selected':'')+'>Government</option>'
+      +'<option value="ppp"'+(TSAP_CFG.territory.ownership==='ppp'?' selected':'')+'>PPP</option>'
+      +'<option value="private"'+(TSAP_CFG.territory.ownership==='private'?' selected':'')+'>Private</option>'
+      +'</select></div>'
+      +'<div><label>Population / Scale</label><input type="text" id="tsap-scale" value="'+esc(TSAP_CFG.territory.scale)+'" placeholder="e.g. 7M people, 12 districts"></div></div>'
+      +'<div style="margin-top:14px;padding:12px;background:rgba(0,40,112,0.04);border-radius:var(--r);border:1px dashed #d0d0d8;text-align:center;font-size:11px;color:var(--mid)">'
+      +'\uD83D\uDDFA\uFE0F Territory map (GeoJSON boundary visualisation) \u2014 next build</div>'
+  }
+
+  if(tab==='objectives'){
+    content = '<label>Core Objective *</label>'
+      +'<textarea id="tsap-obj" placeholder="What problem does this programme solve?" style="min-height:64px">'+esc(TSAP_CFG.objectives.core_objective)+'</textarea>'
+      +'<label>Vision (5-10 year horizon)</label>'
+      +'<textarea id="tsap-vis" placeholder="What does this territory look like when the programme succeeds?" style="min-height:64px">'+esc(TSAP_CFG.objectives.vision)+'</textarea>'
+      +'<label>Justification (Why now, why here, why us?)</label>'
+      +'<textarea id="tsap-just" placeholder="Economic case, political mandate, existing assets, strategic window..." style="min-height:64px">'+esc(TSAP_CFG.objectives.justification)+'</textarea>'
+      +'<label>Uniqueness vs Other Centres</label>'
+      +'<textarea id="tsap-uniq" placeholder="What makes this centre distinctive?" style="min-height:64px">'+esc(TSAP_CFG.objectives.uniqueness)+'</textarea>'
+      +'<div class="form-grid-3" style="margin-top:4px">'
+      +'<div><label>Jobs (target)</label><input type="text" id="tsap-jobs" value="'+esc(TSAP_CFG.objectives.success_metrics.jobs)+'" placeholder="e.g. 5,000"></div>'
+      +'<div><label>Startups Enabled</label><input type="text" id="tsap-startups" value="'+esc(TSAP_CFG.objectives.success_metrics.startups)+'" placeholder="e.g. 200"></div>'
+      +'<div><label>Compute Capacity</label><input type="text" id="tsap-compute" value="'+esc(TSAP_CFG.objectives.success_metrics.compute)+'" placeholder="e.g. 10 PFlops"></div>'
+      +'</div>'
+      +'<div style="margin-top:14px;display:flex;gap:10px;align-items:center">'
+      +'<button class="btn btn-outline btn-sm" onclick="aiEnrichTsap()">\uD83E\uDD16 AI Enrich \u2014 Research this territory</button>'
+      +'<span style="font-size:10px;color:var(--mid)">Uses AI + web search to suggest uniqueness, UCs, economic case.</span>'
+      +'</div>'
+      +'<div id="tsap-enrich" style="display:none;margin-top:12px;padding:12px;background:rgba(0,178,144,0.05);border:1px solid rgba(0,178,144,0.2);border-radius:var(--r);font-size:11px;line-height:1.6"></div>'
+  }
+
+  if(tab==='blocks'){
+    content = '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">L2 Technical Building Blocks</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Select compute and infrastructure nodes to deploy within this territory.</div>'
+      +'<div id="tsap-blocks-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px"></div>'
+      +'<div id="tsap-blocks-config"></div>'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin:16px 0 6px">L1.x Programme Components</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Programme-level initiatives that sit alongside the technical infrastructure. Typically partner-delivered.</div>'
+      +'<div id="tsap-l1x-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"></div>'
+  }
+
+  if(tab==='financial'){
+    content = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+      +'<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">\u00A0 Side A \u2014 Financing Model</div>'
+      +'<div style="font-size:10px;color:var(--mid);margin-bottom:8px">How the programme will be funded. Multiple models can be combined.</div>'
+      +'<div id="tsap-fin-models"></div></div>'
+      +'<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">\uD83D\uDCB0 Side B \u2014 Build Cost</div>'
+      +'<div id="tsap-fin-costs"></div>'
+      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%;margin-top:4px">\u2211 Calculate Gap</button>'
+      +'<div id="tsap-gap" style="font-size:11px;color:var(--navy);margin-top:8px;padding:8px;background:var(--light);border-radius:var(--r)">Enter costs and calculate.</div>'
+      +'</div></div>'
+  }
+
+  document.getElementById('tsapTabContent').innerHTML = content
+  if(tab==='financial'){
+    var modelsDiv = document.getElementById('tsap-fin-models')
+    var costsDiv = document.getElementById('tsap-fin-costs')
+    if(modelsDiv){
+      modelsDiv.innerHTML = FINANCING_OPTS_DEF.map(function(f,i){
+        var sel = TSAP_CFG.financial.financing_models.some(function(m){return m.type===f.type})
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--light)">'
+          +'<input type="checkbox" id="fin-chk-'+i+'"'+(sel?' checked':'')+'>'
+          +'<label for="fin-chk-'+i+'" style="font-size:11px;margin:0;text-transform:none;letter-spacing:0;font-weight:400;cursor:pointer">'+f.label+'</label>'
+          +'</div>'
+      }).join('')
+      FINANCING_OPTS_DEF.forEach(function(f,i){
+        var el = document.getElementById('fin-chk-'+i)
+        if(el) el.onchange = function(){ toggleTsapFinancing(f.type, f.label) }
+      })
+    }
+    if(costsDiv){
+      var costFields = [['infra_cost','Infrastructure / Civil'],['hardware_cost','L2 Hardware'],['software_cost','Software Stack'],['services_cost','L3 Services'],['opex_cost','Year 1 Operations']]
+      costsDiv.innerHTML = costFields.map(function(f){
+        return '<div style="margin-bottom:8px"><label style="font-size:10px;text-transform:none;letter-spacing:0;font-weight:600">'+f[1]+'</label>'
+          +'<input type="text" id="tsap-fin-'+f[0]+'" value="'+(TSAP_CFG.financial[f[0]]||'')+'" placeholder="e.g. INR 50 Cr" style="padding:6px 10px;font-size:11px"></div>'
+      }).join('')
+    }
+    var gapEl = document.getElementById('tsap-gap')
+    if(gapEl) gapEl.textContent = TSAP_CFG.financial.financing_gap || 'Enter costs and calculate.'
+  }
+  if(tab==='blocks'){
+    var grid = document.getElementById('tsap-blocks-grid')
+    if(grid){
+      grid.innerHTML = L2_BLOCKS_DEF.map(function(b,i){
+        var sel = TSAP_CFG.blocks.some(function(s){return s.code===b.code})
+        return '<div id="tsap-blk-'+i+'" style="border:2px solid '+(sel?'var(--teal)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(0,178,144,0.04)':'var(--white)')+'">'
+          +'<div style="font-size:18px;margin-bottom:4px">'+b.icon+'</div>'
+          +'<div style="font-size:12px;font-weight:600">'+b.name+'</div>'
+          +'<div style="font-size:10px;color:var(--mid)">'+b.desc+'</div>'
+          +(sel?'<span style="font-size:9px;font-weight:700;color:var(--teal)">\u2713 Selected</span>':'')
+          +'</div>'
+      }).join('')
+      grid.querySelectorAll('div[id^="tsap-blk-"]').forEach(function(el,i){
+        el.onclick = function(){ toggleTsapBlock(L2_BLOCKS_DEF[i].code) }
+      })
+      // Render config for selected blocks
+      var configDiv = document.getElementById('tsap-blocks-config')
+      if(configDiv && TSAP_CFG.blocks.length){
+        configDiv.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px">Configure selected blocks:</div>'
+          + TSAP_CFG.blocks.map(function(b,bi){
+            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--light)">'
+              +'<span style="font-size:12px;font-weight:600;min-width:140px">'+b.icon+' '+b.name+'</span>'
+              +'<input type="text" id="blk-loc-'+bi+'" value="'+(b.location||'')+'" placeholder="Location in territory" style="flex:1;padding:4px 8px;font-size:11px">'
+              +'<input type="number" id="blk-cnt-'+bi+'" value="'+(b.count||1)+'" min="1" max="20" style="width:60px;padding:4px 8px;font-size:11px">'
+              +'<span style="font-size:10px;color:var(--mid)">units</span>'
+              +'</div>'
+          }).join('')
+        TSAP_CFG.blocks.forEach(function(b,bi){
+          var locEl = document.getElementById('blk-loc-'+bi)
+          var cntEl = document.getElementById('blk-cnt-'+bi)
+          if(locEl) locEl.oninput = function(){ b.location = this.value }
+          if(cntEl) cntEl.oninput = function(){ b.count = parseInt(this.value)||1 }
+        })
+      } else if(configDiv){
+        configDiv.innerHTML = '<div style="font-size:11px;color:var(--mid);margin-top:8px">Select blocks above to configure.</div>'
+      }
+      // Render L1.x programme components
+      var l1xGrid = document.getElementById('tsap-l1x-grid')
+      if(l1xGrid){
+        l1xGrid.innerHTML = L1X_COMPONENTS_DEF.map(function(c,ci){
+          var sel = TSAP_CFG.blocks.some(function(s){return s.code===c.code})
+          return '<div id="tsap-l1x-'+ci+'" style="border:2px solid '+(sel?'var(--orange)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(255,85,57,0.04)':'var(--white)')+'">'
+            +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+            +'<span style="font-size:16px">'+c.icon+'</span>'
+            +(c.partner?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(0,40,112,0.08);color:var(--navy)">PARTNER</span>':'')
+            +'</div>'
+            +'<div style="font-size:12px;font-weight:600">'+c.name+'</div>'
+            +'<div style="font-size:10px;color:var(--mid);margin-top:2px">'+c.desc+'</div>'
+            +(sel?'<span style="font-size:9px;font-weight:700;color:var(--orange)">\u2713 Selected</span>':'')
+            +'</div>'
+        }).join('')
+        L1X_COMPONENTS_DEF.forEach(function(c,ci){
+          var el = document.getElementById('tsap-l1x-'+ci)
+          if(el) el.onclick = function(){ toggleTsapBlock(c.code) }
+        })
+      }
+    }
+  }
+}
+
+function saveTsapCurrentData(){
+  if(document.getElementById('tsap-name')) TSAP_CFG.territory.name = document.getElementById('tsap-name').value||''
+  if(document.getElementById('tsap-type')) TSAP_CFG.territory.type = document.getElementById('tsap-type').value||'state'
+  if(document.getElementById('tsap-gov')) TSAP_CFG.territory.governance = document.getElementById('tsap-gov').value||'central'
+  if(document.getElementById('tsap-sec')) TSAP_CFG.territory.security = document.getElementById('tsap-sec').value||'civilian'
+  if(document.getElementById('tsap-own')) TSAP_CFG.territory.ownership = document.getElementById('tsap-own').value||'government'
+  if(document.getElementById('tsap-scale')) TSAP_CFG.territory.scale = document.getElementById('tsap-scale').value||''
+  if(document.getElementById('tsap-obj')) TSAP_CFG.objectives.core_objective = document.getElementById('tsap-obj').value||''
+  if(document.getElementById('tsap-vis')) TSAP_CFG.objectives.vision = document.getElementById('tsap-vis').value||''
+  if(document.getElementById('tsap-just')) TSAP_CFG.objectives.justification = document.getElementById('tsap-just').value||''
+  if(document.getElementById('tsap-uniq')) TSAP_CFG.objectives.uniqueness = document.getElementById('tsap-uniq').value||''
+  if(document.getElementById('tsap-jobs')) TSAP_CFG.objectives.success_metrics.jobs = document.getElementById('tsap-jobs').value||''
+  if(document.getElementById('tsap-startups')) TSAP_CFG.objectives.success_metrics.startups = document.getElementById('tsap-startups').value||''
+  if(document.getElementById('tsap-compute')) TSAP_CFG.objectives.success_metrics.compute = document.getElementById('tsap-compute').value||''
+  var costFields = ['infra_cost','hardware_cost','software_cost','services_cost','opex_cost']
+  costFields.forEach(function(k){var el=document.getElementById('tsap-fin-'+k);if(el)TSAP_CFG.financial[k]=el.value||''})
+}
+
+function toggleTsapBlock(code){
+  var idx=TSAP_CFG.blocks.findIndex(function(b){return b.code===code})
+  var def=L2_BLOCKS_DEF.find(function(b){return b.code===code})
+  if(idx>=0) TSAP_CFG.blocks.splice(idx,1)
+  else if(def) TSAP_CFG.blocks.push({code:code,name:def.name,icon:def.icon,count:1,location:''})
+  switchTsapTab('blocks')
+}
+
+function updateTsapBlock(code,field,val){
+  var b=TSAP_CFG.blocks.find(function(b){return b.code===code})
+  if(b) b[field] = field==='count'?parseInt(val)||1:val
+}
+
+function toggleTsapFinancing(type,label){
+  var idx=TSAP_CFG.financial.financing_models.findIndex(function(m){return m.type===type})
+  if(idx>=0) TSAP_CFG.financial.financing_models.splice(idx,1)
+  else TSAP_CFG.financial.financing_models.push({type:type,label:label,amount:'',notes:''})
+}
+
+function calcTsapGap(){
+  saveTsapCurrentData()
+  var costs=['infra_cost','hardware_cost','software_cost','services_cost','opex_cost']
+  var total=0,hasVal=false
+  costs.forEach(function(k){var v=TSAP_CFG.financial[k];if(v){var n=parseFloat(String(v).replace(/[^0-9.]/g,''));if(!isNaN(n)){total+=n;hasVal=true}}})
+  var finCount=TSAP_CFG.financial.financing_models.length
+  TSAP_CFG.financial.financing_gap = hasVal
+    ? 'Total build cost: ~'+total.toFixed(1)+' (same currency). '+finCount+' financing model'+(finCount===1?'':'s')+' selected.'
+    : 'Enter cost estimates to calculate.'
+  document.getElementById('tsap-gap').textContent=TSAP_CFG.financial.financing_gap
+}
+
+async function aiEnrichTsap(){
+  saveTsapCurrentData()
+  var territory=TSAP_CFG.territory.name||'this territory'
+  var objective=TSAP_CFG.objectives.core_objective||'AI and digital transformation'
+  var model=atlasGetTaskModel('pei')
+  var key=atlasGetKeyForModel(model)
+  if(!key){alert('Configure AI keys in ATLAS Settings.');return}
+  var el=document.getElementById('tsap-enrich')
+  el.style.display='block';el.textContent='Researching '+territory+'...'
+  var prompt='Strategic consultant for Territory Sovereign AI Programme. Territory: '+territory+'. Objective: '+objective+'.'
+    +' Provide: (1) 3-4 unique assets/strengths of this territory for AI programme, (2) 5 most relevant AI use cases given sector profile, (3) 3 economic justification points, (4) 2 comparable AI programme references from other regions.'
+    +' JSON: {uniqueness:[string],use_cases:[{name,rationale}],economic_case:[string],comparables:[{region,programme,lesson}]}'
+    +' Start { end }. No markdown.'
+  try{
+    var text=await atlasCallModel(model,prompt,null,2000)
+    var first=text.indexOf('{'),last=text.lastIndexOf('}')
+    if(first<0) throw new Error('No JSON')
+    var r=JSON.parse(text.slice(first,last+1))
+    var html=''
+    if(r.uniqueness&&r.uniqueness.length) html+='<b>Unique Strengths:</b><br>'+r.uniqueness.map(function(u){return '\u2022 '+esc(u)}).join('<br>')+'<br><br>'
+    if(r.use_cases&&r.use_cases.length) html+='<b>Suggested Use Cases:</b><br>'+r.use_cases.map(function(u){return '\u2022 <b>'+esc(u.name)+'</b> \u2014 '+esc(u.rationale)}).join('<br>')+'<br><br>'
+    if(r.economic_case&&r.economic_case.length) html+='<b>Economic Case:</b><br>'+r.economic_case.map(function(e){return '\u2022 '+esc(e)}).join('<br>')+'<br><br>'
+    if(r.comparables&&r.comparables.length) html+='<b>Comparable Programmes:</b><br>'+r.comparables.map(function(c){return '\u2022 <b>'+esc(c.region)+'</b>: '+esc(c.programme)+' \u2014 '+esc(c.lesson)}).join('<br>')
+    el.innerHTML=html||'No structured result. Try again.'
+    if(!TSAP_CFG.objectives.uniqueness&&r.uniqueness){
+      var uEl=document.getElementById('tsap-uniq')
+      if(uEl) uEl.value=r.uniqueness.join('. ')
+    }
+  }catch(e){el.textContent='Error: '+e.message}
+}
+
+async function saveTsapConfig(){
+  saveTsapCurrentData()
+  var docketId=CURRENT_DOCKET_ID
+  if(!docketId){alert('Open an engagement first.');return}
+  var l2Count = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2')===0 && b.code.indexOf('.')===2}).length
+  var l2xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2.')===0}).length
+  var l1xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L1.')===0}).length
+  var item={id:genId('DI'),docket_id:docketId,item_type:'solution',title:'TSAP Config \u2014 '+esc(TSAP_CFG.territory.name||'Territory'),content:TSAP_CFG,status:'in_progress',notes:'Territory: '+esc(TSAP_CFG.territory.name)+'. L2 blocks: '+l2Count+'. Specialised factories: '+l2xCount+'. L1.x programmes: '+l1xCount+'. Financing models: '+TSAP_CFG.financial.financing_models.length+'.',created_by:'ATLAS TSAP'}
+  var ok=await sbInsert('docket_items',item)
+  if(ok){CURRENT_ITEMS.push(item);closeModal('tsapModal');renderItems('all');alert('TSAP configuration saved to docket.')}
+  else alert('Failed to save.')
+}
+
+async function generateVisionDoc(){
+  saveTsapCurrentData()
+  var territory=TSAP_CFG.territory.name
+  if(!territory){alert('Enter territory name first.');return}
+  if(!TSAP_CFG.objectives.core_objective){alert('Enter core objective first.');return}
+  var model=atlasGetTaskModel('documents')
+  var key=atlasGetKeyForModel(model)
+  if(!key){alert('Configure Documents model key in ATLAS Settings.');return}
+  closeModal('tsapModal')
+  var main=document.getElementById('mainPanel')
+  var genDiv=document.createElement('div')
+  genDiv.className='rec-card'
+  genDiv.innerHTML='<div class="rec-title">\uD83D\uDCC4 Generating Vision Document for '+esc(territory)+'...</div>'
+  main.insertBefore(genDiv,main.firstChild)
+  var blocks=TSAP_CFG.blocks.map(function(b){return b.name+(b.count>1?' (x'+b.count+')':'')+(b.location?' at '+b.location:'')}).join(', ')
+  var financing=TSAP_CFG.financial.financing_models.map(function(f){return f.label}).join(', ')
+  var prompt='Write an executive Vision Document for the '+territory+' Territory Sovereign AI Programme.'
+    +' Core objective: '+TSAP_CFG.objectives.core_objective+'.'
+    +' Vision: '+TSAP_CFG.objectives.vision+'.'
+    +' Justification: '+TSAP_CFG.objectives.justification+'.'
+    +' Uniqueness: '+TSAP_CFG.objectives.uniqueness+'.'
+    +' Building blocks: '+(blocks||'AI Factory, Inferencing Factory')+'.'
+    +' Financing: '+(financing||'TBD')+'.'
+    +' Target: '+(TSAP_CFG.objectives.success_metrics.jobs||'TBD')+' jobs, '+(TSAP_CFG.objectives.success_metrics.startups||'TBD')+' startups.'
+    +' Structure: Executive Summary, Territory Context, Programme Vision, Proposed Architecture, Expected Impact, Implementation Approach, Call to Action.'
+    +' Audience: Chief Minister or Minister level. Confident, strategic, territory-specific. 800-1000 words.'
+  try{
+    var text=await atlasCallModel(model,prompt,null,4096)
+    var docketId=CURRENT_DOCKET_ID
+    if(docketId){
+      var item={id:genId('DI'),docket_id:docketId,item_type:'exec_doc',title:territory+' \u2014 TSAP Vision Document',content:{vision_doc_text:text,territory:territory},status:'done',notes:text.slice(0,200)+'...',created_by:'ATLAS Vision Doc'}
+      await sbInsert('docket_items',item)
+      CURRENT_ITEMS.push(item)
+      renderItems('all')
+    }
+    genDiv.innerHTML='<div class="rec-title">\uD83D\uDCC4 Vision Document Generated \u2014 saved to docket</div>'
+      +'<div style="max-height:300px;overflow-y:auto;font-size:12px;line-height:1.7;white-space:pre-wrap;border:1px solid #e0e0e8;border-radius:var(--r);padding:12px;background:var(--white);margin-top:8px">'+esc(text)+'</div>'
+  }catch(e){genDiv.innerHTML='<div style="color:#DC2626">\u274C Error: '+esc(e.message)+'</div>'}
+}
 
 // \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 window.addEventListener('DOMContentLoaded', function(){
