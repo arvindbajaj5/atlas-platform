@@ -97,32 +97,17 @@ input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
   <!-- Configuration Card -->
   <div class="card">
     <div class="card-title">&#9881; Configuration</div>
-    <div class="card-sub">Settings are saved in your browser. Gemini API key is sent only to Google's API. Supabase credentials are used only to query your internal intelligence database.</div>
-
-    <div class="form-grid">
-      <div>
-        <label>Gemini API Key</label>
-        <input type="password" id="apiKey" placeholder="AIza... (saved locally)">
-        <div class="field-hint">From aistudio.google.com &#8594; Get API Key</div>
-      </div>
-      <div>
-        <label>Gemini Model</label>
-        <select id="modelSelect">
-          <option value="">Loading models...</option>
-        </select>
-      </div>
+    <div class="card-sub">API keys and Supabase credentials are read from ATLAS Global Settings. No need to enter them here.</div>
+    <div id="peiSettingsStatus" style="padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:10px;background:var(--light)">Checking settings...</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <a href="../../index.html" class="btn btn-outline btn-sm">&#9881; Open ATLAS Settings</a>
+      <button class="btn btn-ghost btn-sm" onclick="checkPEISettings()">&#8635; Refresh</button>
     </div>
-
-    <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px;margin-top:4px">&#128202; Intelligence Database (Supabase)</div>
-    <div class="form-grid">
-      <div>
-        <label>Supabase URL</label>
-        <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co">
-      </div>
-      <div>
-        <label>Supabase Anon Key</label>
-        <input type="password" id="sbKey" placeholder="eyJ...">
-      </div>
+    <div style="margin-top:12px">
+      <label>Model (auto-selected from settings)</label>
+      <select id="modelSelect" style="max-width:300px">
+        <option value="">Loading configured models...</option>
+      </select>
     </div>
     <div style="display:flex;align-items:center;gap:12px">
       <button class="btn btn-primary btn-sm" onclick="saveConfig()">&#10003; Save Config</button>
@@ -352,6 +337,24 @@ input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
 </div>
 
 <script>
+function checkPEISettings(){
+  var g = atlasGetGlobal ? atlasGetGlobal() : {}
+  var el = document.getElementById('peiSettingsStatus')
+  if(!el) return
+  var ok = [], warn = []
+  var hasGemini = !!(g.key_gemini || localStorage.getItem('atlas_gemini_key'))
+  var hasAnthropic = !!(g.key_anthropic)
+  var hasOpenAI = !!(g.key_openai)
+  var hasSB = !!(g.sbUrl && g.sbKey)
+  if(hasGemini||hasAnthropic||hasOpenAI) ok.push('AI key configured')
+  else warn.push('No AI key \u2014 configure in ATLAS Settings')
+  if(hasSB) ok.push('Supabase connected')
+  else warn.push('Supabase not configured \u2014 intelligence enrichment unavailable')
+  el.innerHTML = ok.concat(warn).join(' &nbsp;&middot;&nbsp; ')
+  el.style.background = warn.length ? 'rgba(255,182,0,0.1)' : 'rgba(0,178,144,0.08)'
+  el.style.color = warn.length ? '#9a7000' : 'var(--teal)'
+}
+
 var PEI_DATA = null
 
 // \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -424,17 +427,18 @@ function getEffectiveCfg(){
   }
 }
 function saveConfig(){
-  var key = document.getElementById('apiKey').value.trim()
-  var sbUrl = document.getElementById('sbUrl').value.trim()
-  var sbKey = document.getElementById('sbKey').value.trim()
   var model = document.getElementById('modelSelect').value
-  if(!key){ alert('Please enter your Gemini API key.'); return }
-  localStorage.setItem('atlas_pei_cfg', JSON.stringify({key:key, sbUrl:sbUrl, sbKey:sbKey, model:model}))
-  var savedEl = document.getElementById('configSaved')
-  savedEl.style.display = 'inline'
-  setTimeout(function(){ savedEl.style.display = 'none' }, 3000)
+  if(model){
+    var cfg = {}
+    try{ cfg = JSON.parse(localStorage.getItem('atlas_pei_cfg')||'{}') }catch(e){}
+    cfg.model = model
+    localStorage.setItem('atlas_pei_cfg', JSON.stringify(cfg))
+  }
+  var saved = document.getElementById('configSaved')
+  if(saved){ saved.style.display='inline'; setTimeout(function(){ saved.style.display='none' }, 2000) }
 }
 
+window.addEventListener('DOMContentLoaded', function(){ setTimeout(checkPEISettings, 500) })
 window.addEventListener('DOMContentLoaded', function(){
   // Populate model selector from configured providers
   var sel = document.getElementById('modelSelect')
@@ -445,10 +449,7 @@ window.addEventListener('DOMContentLoaded', function(){
   }
 
   var cfg = getEffectiveCfg()
-  if(cfg.key) document.getElementById('apiKey').value = cfg.key
-  if(cfg.sbUrl) document.getElementById('sbUrl').value = cfg.sbUrl
-  if(cfg.sbKey) document.getElementById('sbKey').value = cfg.sbKey
-  var modelToSet = cfg.model || getTaskModel('pei')
+  if(cfg.key)   var modelToSet = cfg.model || getTaskModel('pei')
   if(modelToSet){
     var sel = document.getElementById('modelSelect')
     // Try to set saved model, fall back to task default
