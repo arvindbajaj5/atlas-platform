@@ -34,8 +34,8 @@ body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);m
 .sb-add{margin:8px 16px;padding:7px 12px;background:var(--orange);color:var(--white);border:none;border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer;width:calc(100% - 32px);font-family:inherit;}
 .sb-add:hover{background:#e6421f;}
 .sb-search{margin:8px 16px 4px;position:relative;}
-.sb-search input{width:100%;padding:7px 10px 7px 28px;border:1px solid #e0e0e8;border-radius:var(--r-sm);font-size:12px;background:var(--light);font-family:inherit;}
-.sb-search:before{content:'\uD83D\uDD0D';position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;}
+.sb-search input{width:100%;padding:7px 10px;border:1px solid #e0e0e8;border-radius:var(--r-sm);font-size:12px;background:var(--light);font-family:inherit;}
+.sb-search:before{content:'';display:none;}
 /* Cards */
 .card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
 .card-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px;}
@@ -402,7 +402,7 @@ textarea{resize:vertical;min-height:72px;}
   <div class="modal modal-lg">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <div class="modal-title" style="margin-bottom:0">Portfolio Map</div>
-      <button class="btn btn-ghost btn-xs" onclick="closeModal('portfolioMapModal')">×</button>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal('portfolioMapModal')">x</button>
     </div>
     <div style="font-size:11px;color:var(--mid);margin-bottom:16px" id="portfolioMapDesc">Select portfolio items for this engagement. AI-recommended items are pre-selected.</div>
     <div id="portfolioMapContent"></div>
@@ -769,12 +769,17 @@ function genId(prefix){ return prefix+'-'+new Date().toISOString().slice(0,10).r
 function initials(name){ return (name||'?').split(' ').slice(0,2).map(function(w){ return w[0] }).join('').toUpperCase() }
 
 var ITEM_TYPES = {
-  action:  {icon:'\u26A1',label:'Action'},intel:{icon:'\uD83D\uDCCA',label:'Intelligence'},
-  pei:     {icon:'\uD83D\uDD0D',label:'PEI Brief'},uc:{icon:'\uD83D\uDCA1',label:'Use Case'},
-  rfp:     {icon:'\uD83D\uDCC4',label:'RFP'},pitch:{icon:'\uD83D\uDCCA',label:'Pitch'},
-  solution:{icon:'\u2699\uFE0F',label:'Solution'},bom:{icon:'\uD83D\uDCDC',label:'BOM'},
-  proposal:{icon:'\uD83D\uDCC4',label:'Proposal'},pricing:{icon:'\uD83D\uDCB0',label:'Pricing'},
-  exec_doc:{icon:'\uD83C\uDF93',label:'Exec Doc'}
+  action:  {icon:'',label:'Action'},
+  intel:   {icon:'',label:'Intelligence'},
+  pei:     {icon:'',label:'PEI Brief'},
+  uc:      {icon:'',label:'Use Case'},
+  rfp:     {icon:'',label:'RFP'},
+  pitch:   {icon:'',label:'Pitch'},
+  solution:{icon:'',label:'Solution'},
+  bom:     {icon:'',label:'BOM'},
+  proposal:{icon:'',label:'Proposal'},
+  pricing: {icon:'',label:'Pricing'},
+  exec_doc:{icon:'',label:'Exec Doc'}
 }
 
 // \u2500\u2500 Load \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -812,7 +817,7 @@ function renderSidebar(){
 
   document.getElementById('sbMyDocket').innerHTML =
     '<div class="sb-item" onclick="openMyActions()">'
-    +'<span style="font-size:14px">\uD83D\uDCCB</span>'
+    +'<span style="font-size:14px"></span>'
     +'<span class="sb-item-name">My Action Docket</span>'
     +'</div>'
 }
@@ -839,10 +844,9 @@ function renderDashboard(){
   }).join('')
 
   document.getElementById('mainPanel').innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">'
-    +'<div><div class="card-title" style="font-size:18px">Engagement Overview</div>'
-    +'<div style="font-size:12px;color:var(--mid)">Customers, engagements, dockets and portfolio</div></div>'
-    +'<button class="btn btn-primary" onclick="openModal(\'newCustomerModal\')">+ New Customer</button>'
+    '<div style="margin-bottom:20px">'
+    +'<div class="card-title" style="font-size:18px">Engagement Overview</div>'
+    +'<div style="font-size:12px;color:var(--mid)">Select a customer from the sidebar or add a new one using the button above.</div>'
     +'</div>'
     +'<div class="stat-grid">'
     +'<div class="stat"><div class="stat-val">'+ALL_CUSTOMERS.length+'</div><div class="stat-lbl">Total Customers</div></div>'
@@ -852,7 +856,7 @@ function renderDashboard(){
     +'</div>'
     +(recentEngs
       ? '<div class="card-title" style="margin-bottom:12px">Recent Engagements</div>'+recentEngs
-      : '<div class="empty"><div class="empty-icon">\uD83D\uDCC1</div><div class="empty-title">No engagements yet</div><div class="empty-sub">Add a customer to get started.</div></div>'
+      : '<div class="empty"><div class="empty-icon">&#128193;</div><div class="empty-title">No engagements yet</div><div class="empty-sub">Add a customer to get started.</div></div>'
     )
   renderSidebar()
 }
@@ -891,7 +895,7 @@ async function openCustomer(custId){
   if(isTransactional){
     html += '<div class="elevate-banner">'
       +'<div class="elevate-text">\u26A1 This is a transactional customer. Elevate to strategic to create an Engagement Docket and unlock the full engagement lifecycle.</div>'
-      +'<button class="btn btn-navy btn-sm" onclick="elevateCustomer(\''+custId+'\')">\u2191 Elevate to Strategic</button>'
+      +'<button class="btn btn-navy btn-sm" onclick="elevateCustomer(\''+custId+'\')">Elevate to Strategic</button>'
       +'</div>'
   }
 
@@ -1027,9 +1031,9 @@ async function openEngagement(engId){
     +'</div></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">'
     +'<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+docket.id+'\')">+ Add Item</button>'
-    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="openPortfolioMap(\''+engId+'\',\''+docket.id+'\')">\uD83D\uDDFA\uFE0F Portfolio</button>'
-    +(isL1?'<button class="btn btn-sm" style="background:rgba(255,182,0,0.2);color:var(--amber)" onclick="openL1Config(\''+engId+'\')">L1 Configure</button>':'')
-    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="runRecommendationEngine(\''+engId+'\')">\uD83E\uDD16 Recommend</button>'
+    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="openPortfolioMap(\''+engId+'\',\''+docket.id+'\')">Portfolio Map</button>'
+    +(isL1?'<button class="btn btn-sm" style="background:rgba(255,182,0,0.2);color:var(--amber)" onclick="openL1Config(\''+engId+'\')">TSAP Configure</button>':'')
+    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="runRecommendationEngine(\''+engId+'\')">Recommend</button>'
     +'<select onchange="changeEngStatus(\''+engId+'\',this.value)" style="padding:4px 8px;font-size:11px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:var(--white);font-family:inherit">'
     +'<option value="active"'+(eng.status==='active'?' selected':'')+'>Active</option>'
     +'<option value="paused"'+(eng.status==='paused'?' selected':'')+'>Paused</option>'
@@ -1077,9 +1081,9 @@ function renderItem(item){
     +'<div class="item-meta">'+(item.assigned_to?'\uD83D\uDC64 '+esc(item.assigned_to)+' \u00B7 ':'')+(item.due_date?'\uD83D\uDCC5 '+fmtDate(item.due_date)+' \u00B7 ':'')+'Added '+fmtDate(item.created_at)+'</div>'
     +(preview?'<div style="font-size:11px;color:#555;margin-top:4px;line-height:1.5">'+esc(preview.slice(0,120))+(preview.length>120?'\u2026':'')+'</div>':'')
     +'<div style="display:flex;gap:6px;margin-top:6px">'
-    +(item.status==='pending'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">\u25B6 Start</button>':'')
-    +(item.status==='in_progress'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">\u2713 Done</button>':'')
-    +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteItem(this.dataset.id)">\u00D7</button>'
+    +(item.status==='pending'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">Start</button>':'')
+    +(item.status==='in_progress'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">Done</button>':'')
+    +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteItem(this.dataset.id)">x</button>'
     +'</div></div></div>'
 }
 
@@ -1130,7 +1134,7 @@ async function runRecommendationEngine(engId){
     recDiv.innerHTML = recHtml
     window._lastRecommendations = recs.concat(upsells).map(function(r){ return r.code })
   }catch(e){
-    recDiv.innerHTML = '<div class="rec-title">\uD83E\uDD16 Recommendation Engine</div>'
+    recDiv.innerHTML = '<div class="rec-title">Recommendation Engine</div>'
       +'<div style="font-size:11px;color:#DC2626">Error: '+esc(e.message)+'</div>'
   }
 }
@@ -1500,7 +1504,7 @@ function switchTsapTab(tab){
       +'<div><label>Compute Capacity</label><input type="text" id="tsap-compute" value="'+esc(TSAP_CFG.objectives.success_metrics.compute)+'" placeholder="e.g. 10 PFlops"></div>'
       +'</div>'
       +'<div style="margin-top:14px;display:flex;gap:10px;align-items:center">'
-      +'<button class="btn btn-outline btn-sm" onclick="aiEnrichTsap()">\uD83E\uDD16 AI Enrich \u2014 Research this territory</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="aiEnrichTsap()">AI Enrich — Research territory</button>'
       +'<span style="font-size:10px;color:var(--mid)">Uses AI + web search to suggest uniqueness, UCs, economic case.</span>'
       +'</div>'
       +'<div id="tsap-enrich" style="display:none;margin-top:12px;padding:12px;background:rgba(0,178,144,0.05);border:1px solid rgba(0,178,144,0.2);border-radius:var(--r);font-size:11px;line-height:1.6"></div>'
@@ -1523,7 +1527,7 @@ function switchTsapTab(tab){
       +'<div id="tsap-fin-models"></div></div>'
       +'<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">\uD83D\uDCB0 Side B \u2014 Build Cost</div>'
       +'<div id="tsap-fin-costs"></div>'
-      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%;margin-top:4px">\u2211 Calculate Gap</button>'
+      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%;margin-top:4px">Calculate Gap</button>'
       +'<div id="tsap-gap" style="font-size:11px;color:var(--navy);margin-top:8px;padding:8px;background:var(--light);border-radius:var(--r)">Enter costs and calculate.</div>'
       +'</div></div>'
   }
