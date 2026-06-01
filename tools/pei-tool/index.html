@@ -376,7 +376,7 @@ async function callProvider(model, prompt, keyOverride){
     var key = keyOverride || g['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
     if(!key) throw new Error('Gemini API key not configured.')
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+key
-    var body = {contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:8192,thinkingConfig:{thinkingBudget:0}}}
+    var body = {contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:8192}}
     var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     if(!r.ok){var e=await r.json();throw new Error(e.error?.message||'Gemini error '+r.status)}
     var d = await r.json()
@@ -982,7 +982,7 @@ async function atlasCallModel(modelId, prompt, systemPrompt, maxTokens){
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+modelId+':generateContent?key='+key
     var body = {
       contents:[{parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.2, maxOutputTokens:maxTokens, thinkingConfig:{thinkingBudget:0}}
+      generationConfig:{temperature:0.2, maxOutputTokens:maxTokens, }
     }
     if(systemPrompt) body.system_instruction = {parts:[{text:systemPrompt}]}
     var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
