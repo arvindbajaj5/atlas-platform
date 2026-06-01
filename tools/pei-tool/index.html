@@ -249,6 +249,7 @@ input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
       <button class="btn btn-outline btn-sm" onclick="downloadJSON()">&#8615; JSON</button>
       <button class="btn btn-sm" style="background:var(--navy);color:var(--white)" onclick="downloadWord()">&#128196; Word (.docx)</button>
       <button class="btn btn-primary btn-sm" onclick="downloadPPTX()">&#128202; PPTX</button>
+      <button class="btn btn-outline btn-sm" id="addToDocketBtn" onclick="addPEIToDocket()" style="display:none">+ Add to Docket</button>
       <button class="btn btn-teal btn-sm" onclick="clearOutput()">&#8635; New Brief</button>
     </div>
 
@@ -598,6 +599,7 @@ async function generatePEI(){
     document.getElementById('errorText').innerHTML = '<strong>Error:</strong> ' + err.message
   } finally {
     document.getElementById('generateBtn').disabled = false
+  var docketBtn = document.getElementById('addToDocketBtn'); if(docketBtn) docketBtn.style.display='inline-flex'
     document.getElementById('dbStatus').textContent = ''
   }
 }
@@ -760,6 +762,29 @@ function dl(content,type,fname){
 function downloadWord(){
   if(!PEI_DATA) return
   alert('Word export: feature identical to v0.1 - coming in next update.')
+}
+
+function addPEIToDocket(){
+  var orgName = document.getElementById('orgName') ? document.getElementById('orgName').value.trim() : ''
+  if(!orgName){ alert('Generate a PEI brief first.'); return }
+  var summary = document.getElementById('out-exec-summary') ? document.getElementById('out-exec-summary').textContent : ''
+  var positioning = document.getElementById('out-positioning') ? document.getElementById('out-positioning').textContent : ''
+  var nextActions = document.getElementById('out-next-actions') ? document.getElementById('out-next-actions').textContent : ''
+  var item = {
+    type: 'pei',
+    title: 'PEI Brief - ' + orgName,
+    content: {
+      organisation_summary: summary.slice(0,500),
+      our_positioning: positioning.slice(0,500),
+      next_actions: nextActions.slice(0,300),
+    },
+    notes: summary.slice(0,200),
+    source_id: null
+  }
+  localStorage.setItem('atlas_pending_docket_item', JSON.stringify(item))
+  // Open docket in new tab
+  var docketUrl = window.location.href.replace(/tools\/pei-tool.*/, 'tools/engagement-docket/?addItem=1')
+  window.open(docketUrl, '_blank')
 }
 
 function downloadPPTX(){
