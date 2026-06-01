@@ -520,7 +520,6 @@ async function generatePEI(){
     var g = atlasGetGlobal()
     apiKey = g.key_gemini || g.key_anthropic || g.key_openai || ''
   }
-  if(!apiKey) apiKey = document.getElementById('apiKey').value.trim()
   // Also ensure model matches the key we found
   if(!atlasGetKeyForModel(model) && apiKey){
     // Find which model matches the key we have
@@ -1137,9 +1136,6 @@ function getEffectiveCfg(){
   }
 }
 function saveConfig(){
-  var key = document.getElementById('apiKey').value.trim()
-  var sbUrl = document.getElementById('sbUrl').value.trim()
-  var sbKey = document.getElementById('sbKey').value.trim()
   var model = document.getElementById('modelSelect').value
   if(!key){ alert('Please enter your Gemini API key.'); return }
   localStorage.setItem('atlas_pei_cfg', JSON.stringify({key:key, sbUrl:sbUrl, sbKey:sbKey, model:model}))
@@ -1150,9 +1146,6 @@ function saveConfig(){
 
 window.addEventListener('DOMContentLoaded', function(){
   var cfg = getEffectiveCfg()
-  if(cfg.key) document.getElementById('apiKey').value = cfg.key
-  if(cfg.sbUrl) document.getElementById('sbUrl').value = cfg.sbUrl
-  if(cfg.sbKey) document.getElementById('sbKey').value = cfg.sbKey
   var modelToSet = cfg.model || getTaskModel('pei')
   if(modelToSet){
     var sel = document.getElementById('modelSelect')
@@ -1227,7 +1220,6 @@ async function generatePEI(){
     : isClaude ? (g['key_anthropic']||'')
     : isMistral ? (g['key_mistral']||'')
     : (cfg.key||'')
-  var apiKey = providerKey || document.getElementById('apiKey').value.trim()
   var orgName = document.getElementById('orgName').value.trim()
   var country = document.getElementById('orgCountry').value
   var ownership = document.getElementById('orgOwnership').value
