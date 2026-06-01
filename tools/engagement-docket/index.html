@@ -1034,6 +1034,7 @@ async function openEngagement(engId){
     +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="openPortfolioMap(\''+engId+'\',\''+docket.id+'\')">Portfolio Map</button>'
     +(isL1?'<button class="btn btn-sm" style="background:rgba(255,182,0,0.2);color:var(--amber)" onclick="openL1Config(\''+engId+'\')">TSAP Configure</button>':'')
     +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="runRecommendationEngine(\''+engId+'\')">Recommend</button>'
+    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="exportWordDoc(\''+docket.id+'\')\">'+'Export</button>'
     +'<select onchange="changeEngStatus(\''+engId+'\',this.value)" style="padding:4px 8px;font-size:11px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:var(--white);font-family:inherit">'
     +'<option value="active"'+(eng.status==='active'?' selected':'')+'>Active</option>'
     +'<option value="paused"'+(eng.status==='paused'?' selected':'')+'>Paused</option>'
@@ -1504,7 +1505,7 @@ function switchTsapTab(tab){
       +'<div><label>Compute Capacity</label><input type="text" id="tsap-compute" value="'+esc(TSAP_CFG.objectives.success_metrics.compute)+'" placeholder="e.g. 10 PFlops"></div>'
       +'</div>'
       +'<div style="margin-top:14px;display:flex;gap:10px;align-items:center">'
-      +'<button class="btn btn-outline btn-sm" onclick="aiEnrichTsap()">AI Enrich — Research territory</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="aiEnrichTsap()">AI Enrich \u2014 Research territory</button>'
       +'<span style="font-size:10px;color:var(--mid)">Uses AI + web search to suggest uniqueness, UCs, economic case.</span>'
       +'</div>'
       +'<div id="tsap-enrich" style="display:none;margin-top:12px;padding:12px;background:rgba(0,178,144,0.05);border:1px solid rgba(0,178,144,0.2);border-radius:var(--r);font-size:11px;line-height:1.6"></div>'
@@ -1752,16 +1753,281 @@ async function generateVisionDoc(){
   }catch(e){genDiv.innerHTML='<div style="color:#DC2626">\u274C Error: '+esc(e.message)+'</div>'}
 }
 
+
+// \u2500\u2500 Contact Management \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var EDIT_CUSTOMER_ID = null
+
+function addContact(custId){
+  EDIT_CUSTOMER_ID = custId
+  var modal = document.getElementById('contactModal')
+  if(!modal){
+    var m = document.createElement('div')
+    m.id = 'contactModal'
+    m.className = 'modal-overlay'
+    m.innerHTML = '<div class="modal" style="max-width:440px">'
+      +'<div class="modal-title">Add Contact</div>'
+      +'<label>Name *</label><input type="text" id="ct-name" placeholder="Full name">'
+      +'<label>Role / Title</label><input type="text" id="ct-role" placeholder="e.g. Director AI, CTO">'
+      +'<div class="form-grid">'
+      +'<div><label>Seniority</label><select id="ct-seniority">'
+      +'<option value="">Unknown</option>'
+      +'<option value="c_suite">C-Suite / Secretary</option>'
+      +'<option value="director">Director / Jt Secretary</option>'
+      +'<option value="manager">Manager / Deputy</option>'
+      +'<option value="technical">Technical / Specialist</option>'
+      +'</select></div>'
+      +'<div><label>Influence</label><select id="ct-influence">'
+      +'<option value="">Unknown</option>'
+      +'<option value="decision_maker">Decision Maker</option>'
+      +'<option value="influencer">Influencer</option>'
+      +'<option value="champion">Champion</option>'
+      +'<option value="blocker">Blocker</option>'
+      +'</select></div>'
+      +'</div>'
+      +'<label>Email</label><input type="email" id="ct-email" placeholder="email@org.gov.in">'
+      +'<label>Phone</label><input type="text" id="ct-phone" placeholder="+91 98...">'
+      +'<div class="modal-actions">'
+      +'<button class="btn btn-ghost" onclick="closeContactModal()">Cancel</button>'
+      +'<button class="btn btn-primary" onclick="saveContact()">Add Contact</button>'
+      +'</div></div>'
+    document.body.appendChild(m)
+  }
+  document.getElementById('ct-name').value=''
+  document.getElementById('ct-role').value=''
+  document.getElementById('ct-email').value=''
+  document.getElementById('ct-phone').value=''
+  document.getElementById('ct-seniority').value=''
+  document.getElementById('ct-influence').value=''
+  document.getElementById('contactModal').classList.add('open')
+}
+
+function closeContactModal(){
+  var m = document.getElementById('contactModal')
+  if(m) m.classList.remove('open')
+}
+
+async function saveContact(){
+  var name = document.getElementById('ct-name').value.trim()
+  if(!name){ alert('Name required.'); return }
+  var contact = {
+    id: 'ct-'+Date.now(),
+    name: name,
+    role: document.getElementById('ct-role').value.trim(),
+    seniority: document.getElementById('ct-seniority').value,
+    influence: document.getElementById('ct-influence').value,
+    email: document.getElementById('ct-email').value.trim(),
+    phone: document.getElementById('ct-phone').value.trim(),
+  }
+  var cust = ALL_CUSTOMERS.find(function(c){return c.id===EDIT_CUSTOMER_ID})
+  if(!cust) return
+  var contacts = Array.isArray(cust.contacts) ? cust.contacts : []
+  contacts.push(contact)
+  var ok = await sbPatch('customers','id=eq.'+EDIT_CUSTOMER_ID,{contacts:JSON.stringify(contacts)})
+  if(ok){
+    cust.contacts = contacts
+    window._cust = cust
+    closeContactModal()
+    switchCustTab('profile')
+  } else alert('Failed to save contact.')
+}
+
+// \u2500\u2500 My Action Docket \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var MY_ACTIONS = []
+var MY_OWNER_NAME = ''
+
+async function openMyActions(){
+  CURRENT_VIEW = 'my_actions'
+  CURRENT_CUSTOMER_ID = null
+  CURRENT_ENGAGEMENT_ID = null
+
+  var g = atlasGetGlobal()
+  MY_OWNER_NAME = g.owner_name || 'My'
+
+  // Find or create salesperson docket
+  var spDocket = ALL_DOCKETS ? ALL_DOCKETS.find(function(d){return d.type==='salesperson'}) : null
+  if(!spDocket){
+    var dockets = await sbFetch('engagement_dockets','type=eq.salesperson',1)
+    spDocket = dockets[0]
+  }
+
+  if(!spDocket){
+    // Auto-create
+    var id = 'SP-'+Date.now()
+    await sbInsert('engagement_dockets',{id:id,type:'salesperson',name:MY_OWNER_NAME,status:'active',metadata:{}})
+    spDocket = {id:id,type:'salesperson',name:MY_OWNER_NAME,status:'active'}
+  }
+
+  MY_ACTIONS = await sbFetch('docket_items','docket_id=eq.'+spDocket.id+'&order=created_at.desc',200)
+
+  var open_count = MY_ACTIONS.filter(function(a){return a.status!=='closed'}).length
+  var done_count = MY_ACTIONS.filter(function(a){return a.status==='done'||a.status==='closed'}).length
+
+  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">'
+    +'<div><div class="card-title" style="font-size:18px">My Action Docket</div>'
+    +'<div style="font-size:12px;color:var(--mid)">Personal action list sourced from intelligence items and engagements</div></div>'
+    +'<button class="btn btn-primary" onclick="addMyAction(\''+spDocket.id+'\')">+ Add Action</button>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">'
+    +'<div class="stat"><div class="stat-val" style="color:var(--teal)">'+open_count+'</div><div class="stat-lbl">Open Actions</div></div>'
+    +'<div class="stat"><div class="stat-val" style="color:var(--mid)">'+done_count+'</div><div class="stat-lbl">Completed</div></div>'
+    +'<div class="stat"><div class="stat-val">'+MY_ACTIONS.length+'</div><div class="stat-lbl">Total</div></div>'
+    +'</div>'
+
+  // Filter tabs
+  html += '<div style="display:flex;gap:6px;margin-bottom:14px">'
+    +'<button class="btn btn-ghost btn-sm" style="background:var(--navy);color:var(--white)" onclick="renderMyActions(\'all\')">All ('+MY_ACTIONS.length+')</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="renderMyActions(\'open\')">Open ('+open_count+')</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="renderMyActions(\'done\')">Done ('+done_count+')</button>'
+    +'</div>'
+    +'<div id="my-actions-list"></div>'
+
+  document.getElementById('mainPanel').innerHTML = html
+  window._spDocketId = spDocket.id
+  renderMyActions('open')
+  renderSidebar()
+}
+
+function renderMyActions(filter){
+  var items = filter==='all' ? MY_ACTIONS
+    : filter==='open' ? MY_ACTIONS.filter(function(a){return a.status==='pending'||a.status==='in_progress'})
+    : MY_ACTIONS.filter(function(a){return a.status==='done'||a.status==='closed'})
+
+  var html = items.length ? items.map(function(item){
+    var content = item.content||{}
+    return '<div class="docket-item" style="'+(item.status==='done'||item.status==='closed'?'opacity:0.6':'')+'">'
+      +'<div class="item-body">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+      +'<div class="item-title">'+esc(item.title)+'</div>'
+      +'<span class="item-status is-'+item.status+'">'+item.status.replace('_',' ')+'</span>'
+      +'</div>'
+      +(content.domain_code?'<span style="font-size:10px;background:rgba(0,40,112,0.08);color:var(--navy);padding:1px 6px;border-radius:4px;margin-right:6px">'+esc(content.domain_code)+'</span>':'')
+      +(item.due_date?'<span style="font-size:10px;color:var(--mid)">Due: '+fmtDate(item.due_date)+'</span>':'')
+      +(item.notes?'<div style="font-size:11px;color:#555;margin-top:4px">'+esc(item.notes.slice(0,100))+'</div>':'')
+      +'<div style="display:flex;gap:6px;margin-top:6px">'
+      +(item.status==='pending'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">Start</button>':'')
+      +(item.status==='in_progress'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">Done</button>':'')
+      +(item.status==='done'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'closed\')">Close</button>':'')
+      +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteMyAction(this.dataset.id)">x</button>'
+      +'</div></div></div>'
+  }).join('')
+  : '<div class="empty" style="padding:32px"><div class="empty-title">No '+filter+' actions</div>'
+    +'<div class="empty-sub">Actions sourced from intelligence items in Second Brain will appear here.</div></div>'
+
+  document.getElementById('my-actions-list').innerHTML = html
+}
+
+function addMyAction(docketId){
+  openAddItemModal(docketId)
+  document.getElementById('ai-type').value = 'action'
+  updateItemHint()
+}
+
+async function deleteMyAction(itemId){
+  if(!confirm('Delete this action?')) return
+  var ok = await sbDelete('docket_items','id=eq.'+itemId)
+  if(ok){
+    MY_ACTIONS = MY_ACTIONS.filter(function(a){return a.id!==itemId})
+    renderMyActions('all')
+  }
+}
+
+// Override setItemStatus to work for my actions too
+var _origSetItemStatus = setItemStatus
+setItemStatus = async function(itemId, status){
+  var ok = await sbPatch('docket_items','id=eq.'+itemId,{status:status})
+  if(ok){
+    // Update in CURRENT_ITEMS
+    var item = CURRENT_ITEMS.find(function(i){return i.id===itemId})
+    if(item) item.status = status
+    // Also update in MY_ACTIONS
+    var myItem = MY_ACTIONS.find(function(i){return i.id===itemId})
+    if(myItem) myItem.status = status
+    // Re-render appropriately
+    if(CURRENT_VIEW==='my_actions') renderMyActions('all')
+    else {
+      var docket = ALL_ENGAGEMENTS.find(function(e){return e.id===CURRENT_ENGAGEMENT_ID})
+      if(docket) renderItems('all')
+    }
+  }
+}
+
+// \u2500\u2500 Word Export (docx via client-side generation) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function exportWordDoc(docketId){
+  var docket = null
+  var eng = ALL_ENGAGEMENTS.find(function(e){return e.id===CURRENT_ENGAGEMENT_ID})
+  var cust = ALL_CUSTOMERS.find(function(c){return c.id===(eng&&eng.customer_id)})
+
+  var items = CURRENT_ITEMS.length > 0 ? CURRENT_ITEMS
+    : await sbFetch('docket_items','docket_id=eq.'+docketId+'&order=item_type.asc,created_at.asc',200)
+
+  // Build document content as structured text
+  var lines = []
+  lines.push('ATLAS ENGAGEMENT DOCKET')
+  lines.push('=' .repeat(60))
+  lines.push('')
+  if(cust) lines.push('Customer: '+cust.name+(cust.sector?' | '+cust.sector:'')+(cust.country?' | '+cust.country:''))
+  if(eng){
+    lines.push('Engagement: '+eng.name)
+    lines.push('ID: '+eng.id+' | Phase: '+eng.phase+' | Status: '+eng.status)
+    if(eng.value) lines.push('Estimated Value: '+eng.value+' '+eng.currency)
+  }
+  lines.push('Exported: '+new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}))
+  lines.push('')
+
+  // Group by type
+  var typeOrder = ['intel','pei','uc','rfp','solution','bom','pricing','proposal','pitch','exec_doc','action']
+  var typeLabels = {intel:'Intelligence',pei:'PEI Brief',uc:'Use Cases',rfp:'RFP / Tender',
+    solution:'Technical Solution',bom:'Bill of Materials',pricing:'Pricing',proposal:'Proposal',
+    pitch:'Pitch',exec_doc:'Executive Documents',action:'Actions'}
+
+  typeOrder.forEach(function(t){
+    var group = items.filter(function(i){return i.item_type===t})
+    if(!group.length) return
+    lines.push('')
+    lines.push((typeLabels[t]||t).toUpperCase()+' ('+group.length+')')
+    lines.push('-'.repeat(40))
+    group.forEach(function(item){
+      lines.push('')
+      lines.push(item.title)
+      var meta = []
+      if(item.status) meta.push('Status: '+item.status)
+      if(item.assigned_to) meta.push('Assigned: '+item.assigned_to)
+      if(item.due_date) meta.push('Due: '+fmtDate(item.due_date))
+      if(meta.length) lines.push(meta.join(' | '))
+      if(item.notes) lines.push(item.notes)
+      var c = item.content||{}
+      if(c.vision_doc_text) lines.push(c.vision_doc_text)
+      if(c.organisation_summary) lines.push('Summary: '+c.organisation_summary)
+      if(c.our_positioning) lines.push('Positioning: '+c.our_positioning)
+      if(c.portfolio_codes) lines.push('Portfolio: '+c.portfolio_codes.join(', '))
+    })
+  })
+
+  var blob = new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'})
+  var url = URL.createObjectURL(blob)
+  var a = document.createElement('a')
+  a.href = url
+  a.download = 'Docket-'+(cust?cust.name.replace(/\s+/g,'-'):'Engagement')+'-'+new Date().toISOString().slice(0,10)+'.txt'
+  a.click()
+  URL.revokeObjectURL(url)
+  // Note: Full .docx via docx-js requires server-side or service worker \u2014 txt export for now
+}
+
+// \u2500\u2500 Add to Docket from PEI (called from PEI tool via localStorage) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function checkPendingDocketItem(){
+  try{
+    var pending = JSON.parse(localStorage.getItem('atlas_pending_docket_item')||'null')
+    if(pending){
+      localStorage.removeItem('atlas_pending_docket_item')
+      atlasAddToDocket(pending)
+    }
+  }catch(e){}
+}
+
 // \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 window.addEventListener('DOMContentLoaded', function(){
   loadAll().then(function(){
-    var params = new URLSearchParams(window.location.search)
-    if(params.get('addItem')==='1'){
-      try{
-        var pending=JSON.parse(localStorage.getItem('atlas_pending_docket_item')||'null')
-        if(pending){ localStorage.removeItem('atlas_pending_docket_item'); atlasAddToDocket(pending) }
-      }catch(e){}
-    }
+    checkPendingDocketItem()
   })
 })
 </script>
