@@ -720,8 +720,10 @@ function getSB(){
 async function sbFetch(table, params, limit){
   var sb = getSB(); if(!sb.url) return []
   var url = sb.url+'/rest/v1/'+table+'?'+params+(limit?'&limit='+limit:'')
-  var r = await fetch(url,{headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}})
-  return r.ok ? await r.json() : []
+  try{
+    var r = await fetch(url,{headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}})
+    return r.ok ? await r.json() : []
+  }catch(e){ return [] }
 }
 async function sbInsert(table, data){
   var sb = getSB(); if(!sb.url) return false
@@ -1397,8 +1399,9 @@ async function atlasAddToDocket(item){
     }
   }
 
+  // Show new-fields immediately if only __new__ option exists (no engagements)
   var nf = document.getElementById('trigger-new')
-  if(nf) nf.style.display = 'none'
+  if(nf) nf.style.display = (engs.length === 0) ? 'block' : 'none'
   modal.classList.add('open')
 }
 
@@ -2019,54 +2022,44 @@ async function confirmAddToDocket(){
   var sel = document.getElementById('trigger-sel')
   var selVal = sel ? sel.value : '__new__'
   var item = PENDING_TRIGGER_ITEM
-  if(!item){ alert('No item pending. Please try again.'); return }
+  if(!item){ alert('No pending item. Please try again.'); return }
 
   var engagementId = null
 
   if(selVal === '__new__'){
-    var custName = (document.getElementById('trigger-cust')||{}).value||''
-    var engName = (document.getElementById('trigger-eng')||{}).value||''
-    custName = custName.trim()
-    engName = engName.trim()
+    var custName = ((document.getElementById('trigger-cust')||{}).value||'').trim()
+    var engName = ((document.getElementById('trigger-eng')||{}).value||'').trim()
     if(!custName||!engName){ alert('Please enter both customer name and engagement name.'); return }
 
-    // Create customer with all required fields
-    var custId = 'CUST-'+Date.now()
+    // Create customer \u2014 match exact schema
+    var custId = genId('CUST')
     var custOk = await sbInsert('customers',{
-      id: custId,
-      name: custName,
-      tier: 'strategic',
-      ownership: 'government',
-      country: 'India',
-      status: 'active',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      id: custId, name: custName, tier: 'strategic',
+      ownership: null, sector: null, country: 'India',
+      state: null, ai_maturity: null, short_name: null,
+      notes: null, contacts: [], divisions: []
     })
-    if(!custOk){ alert('Failed to create customer. Check Supabase connection.'); return }
+    if(!custOk){ alert('Failed to create customer \u2014 check Supabase connection.'); return }
 
-    // Create engagement
-    engagementId = 'ENG-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+Math.floor(Math.random()*9999)
+    // Create engagement \u2014 match exact schema
+    var year = new Date().getFullYear()
+    engagementId = 'ENG-'+year+'-GEN-'+Math.floor(Math.random()*9000+1000)
     var engOk = await sbInsert('engagements',{
-      id: engagementId,
-      customer_id: custId,
-      name: engName,
-      archetype: 'govt_sectorial',
-      phase: 'discover',
-      status: 'active',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      id: engagementId, customer_id: custId, name: engName,
+      archetype: 'govt_sectorial', type: 'new',
+      phase: 'strategy', status: 'active',
+      domain: 'GEN', currency: 'INR',
+      value: null, notes: null, owner: ''
     })
-    if(!engOk){ alert('Failed to create engagement. Check Supabase connection.'); return }
+    if(!engOk){ alert('Failed to create engagement \u2014 check Supabase connection.'); return }
 
-    // Refresh globals
-    ALL_CUSTOMERS = await sbFetch('customers','order=updated_at.desc',500)
+    ALL_CUSTOMERS = await sbFetch('customers','order=name.asc',500)
     ALL_ENGAGEMENTS = await sbFetch('engagements','order=updated_at.desc',500)
-
   } else {
     engagementId = selVal
   }
 
-  // Get or create engagement docket
+  // Get or create the engagement docket
   var dockets = await sbFetch('engagement_dockets','engagement_id=eq.'+engagementId,1)
   var docketId
   if(dockets && dockets.length > 0){
@@ -2075,19 +2068,17 @@ async function confirmAddToDocket(){
     var eng = (ALL_ENGAGEMENTS||[]).find(function(e){ return e.id===engagementId })
     docketId = 'DOC-'+Date.now()
     var docOk = await sbInsert('engagement_dockets',{
-      id: docketId,
-      engagement_id: engagementId,
+      id: docketId, engagement_id: engagementId,
       customer_id: eng ? eng.customer_id : null,
-      name: eng ? (eng.name||'Docket') : 'Docket',
-      status: 'active',
-      metadata: {}
+      name: eng ? eng.name : 'Docket',
+      status: 'active', metadata: {}
     })
-    if(!docOk){ alert('Failed to create docket. Check Supabase connection.'); return }
+    if(!docOk){ alert('Failed to create docket \u2014 check Supabase connection.'); return }
   }
 
   // Insert the docket item
   var newItem = {
-    id: 'DI-'+Date.now()+'-'+Math.floor(Math.random()*9999),
+    id: genId('DI'),
     docket_id: docketId,
     item_type: item.type || 'intel',
     title: item.title,
@@ -2101,183 +2092,14 @@ async function confirmAddToDocket(){
   if(ok){
     closeModal('triggerModal')
     PENDING_TRIGGER_ITEM = null
-    // Reload data and navigate to the engagement
     ALL_ENGAGEMENTS = await sbFetch('engagements','order=updated_at.desc',500)
     renderSidebar()
     openEngagement(engagementId)
   } else {
-    alert('Failed to add item to docket. Check Supabase connection.')
+    alert('Failed to add item to docket \u2014 check Supabase connection.')
   }
 }
 
-
-// Read task model from global settings
-// \u2500\u2500 End ATLAS Model Registry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-
-// \u2500\u2500 Supabase \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-// \u2500\u2500 State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var ALL_CUSTOMERS = []
-var ALL_ENGAGEMENTS = []
-var PORTFOLIO_CATALOGUE = []
-var CURRENT_CUSTOMER_ID = null
-var CURRENT_ENGAGEMENT_ID = null
-var CURRENT_VIEW = 'dashboard'  // dashboard|customer|engagement|docket
-var CURRENT_DOCKET_ID = null
-var CURRENT_ITEMS = []
-var PORTFOLIO_SELECTION = []
-var PENDING_TRIGGER_ITEM = null
-
-// \u2500\u2500 Utils \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-var ITEM_TYPES = {
-  action:  {icon:'',label:'Action'},
-  intel:   {icon:'',label:'Intelligence'},
-  pei:     {icon:'',label:'PEI Brief'},
-  uc:      {icon:'',label:'Use Case'},
-  rfp:     {icon:'',label:'RFP'},
-  pitch:   {icon:'',label:'Pitch'},
-  solution:{icon:'',label:'Solution'},
-  bom:     {icon:'',label:'BOM'},
-  proposal:{icon:'',label:'Proposal'},
-  pricing: {icon:'',label:'Pricing'},
-  exec_doc:{icon:'',label:'Exec Doc'}
-}
-
-// \u2500\u2500 Load \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-// \u2500\u2500 Sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-// \u2500\u2500 Dashboard \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-// \u2500\u2500 Customer View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-
-// \u2500\u2500 Engagement View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-
-
-// \u2500\u2500 Recommendation Engine \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-// \u2500\u2500 Portfolio Map \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-
-
-
-// \u2500\u2500 Create customer / engagement \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-
-// \u2500\u2500 Elevation \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-// \u2500\u2500 CRUD helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-
-
-
-
-
-
-
-
-
-
-// \u2500\u2500 Add to Docket trigger (from other tools) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-
-// \u2500\u2500 Modals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-
-// TSAP L1 Configuration
-var TSAP_CFG = {territory:{name:'',type:'state',governance:'central',security:'civilian',ownership:'government',scale:''},objectives:{core_objective:'',vision:'',justification:'',uniqueness:'',success_metrics:{jobs:'',startups:'',compute:''}},blocks:[],financial:{financing_models:[],infra_cost:'',hardware_cost:'',software_cost:'',services_cost:'',opex_cost:'',financing_gap:''}}
-var CURRENT_TSAP_ENG_ID = null
-
-var L2_BLOCKS_DEF = [
-  {code:'L2-AIF',  name:'AI Factory',                  icon:'\uD83C\uDFED', desc:'General-purpose GPU compute \u2014 training + inference'},
-  {code:'L2-INF',  name:'Inferencing Factory',          icon:'\u26A1',        desc:'High-throughput production inference (generic baseline)'},
-  {code:'L2.1-INF',name:'GeoAI Inferencing Factory',    icon:'\uD83D\uDEF0\uFE0F',desc:'Pre-configured for geospatial/EO workloads \u2014 EO pipeline, imagery AI, GIS'},
-  {code:'L2.2-INF',name:'Defence AI Inferencing Factory',icon:'\uD83D\uDEF1', desc:'Air-gapped, MIL-SPEC, ISR pipeline, classified network integration'},
-  {code:'L2.3-INF',name:'Health AI Inferencing Factory', icon:'\uD83C\uDFE5', desc:'DICOM/FHIR, medical imaging AI, clinical compliance stack'},
-  {code:'L2.4-INF',name:'FinAI Inferencing Factory',     icon:'\uD83C\uDFE6', desc:'Fraud detection, credit risk, AML/KYC, RBI/SEBI compliance'},
-  {code:'L2-TRC',  name:'Training Cluster',              icon:'\uD83E\uDDE0', desc:'HPC-class large-scale model training'},
-  {code:'L2-HPC',  name:'HPC Cluster',                   icon:'\uD83D\uDCCA', desc:'Scientific compute \u2014 simulation and modelling'},
-  {code:'L2-EDG',  name:'Edge AI Node',                  icon:'\uD83D\uDCF6', desc:'Field-deployed, air-gappable inference'},
-  {code:'L2-MDC',  name:'Modular Datacenter',            icon:'\uD83C\uDFD7\uFE0F', desc:'Houses any L2 building block \u2014 rapid deployment'},
-]
-
-var L1X_COMPONENTS_DEF = [
-  {code:'L1.1-TSAP',name:'AI Skills & Workforce Development',icon:'\uD83C\uDF93',desc:'Mass digital/AI literacy \u2014 public servants, practitioners, population-scale. Partner-delivered.',partner:true},
-  {code:'L1.2-TSAP',name:'Startup & Innovation Ecosystem',  icon:'\uD83D\uDE80',desc:'Incubator, accelerator, seed funding framework, anchor tenant attraction. Partner-delivered.',partner:true},
-  {code:'L1.3-TSAP',name:'Data Governance & Sovereign Data',icon:'\uD83D\uDDC4\uFE0F',desc:'Territory data catalogue, data sharing frameworks, DPDP compliance. Often a prerequisite for compute.',partner:true},
-  {code:'L1.4-TSAP',name:'Research & Academic Partnership', icon:'\uD83D\uDD2C',desc:'IIT/IIIT/university MoUs, research grants, PhD fellowships. Long-term talent pipeline.',partner:true},
-  {code:'L1.5-TSAP',name:'AI Policy, Regulation & Governance',icon:'\u2696\uFE0F',desc:'Territory AI policy framework, oversight authority, ethical AI guidelines, procurement policy. Legal partner-led.',partner:true},
-]
-
-var FINANCING_OPTS_DEF = [
-  {type:'self_funded',label:'Self-Funded (State / Internal Budget)'},
-  {type:'central_grant',label:'Central Government Grant (PM-DevINE, IndiaAI etc.)'},
-  {type:'domestic_debt',label:'Domestic Borrowing (DFI / Bonds / NABARD)'},
-  {type:'multilateral',label:'Multilateral Agency (World Bank / ADB / AIIB)'},
-  {type:'bilateral',label:'Bilateral Country Financing (Low-Interest Credit Line)'},
-  {type:'ppp',label:'PPP (Private Anchor Tenant + Govt Land/Grant)'},
-  {type:'mixed',label:'Mixed / Blended Finance'},
-]
-
-
-
-
-
-
-
-
-
-
-
-
-// \u2500\u2500 Contact Management \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var EDIT_CUSTOMER_ID = null
-
-
-
-
-// \u2500\u2500 My Action Docket \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var MY_ACTIONS = []
-var MY_OWNER_NAME = ''
-
-
-
-
-
-// Override setItemStatus to work for my actions too
-var _origSetItemStatus = setItemStatus
-setItemStatus = async function(itemId, status){
-  var ok = await sbPatch('docket_items','id=eq.'+itemId,{status:status})
-  if(ok){
-    // Update in CURRENT_ITEMS
-    var item = CURRENT_ITEMS.find(function(i){return i.id===itemId})
-    if(item) item.status = status
-    // Also update in MY_ACTIONS
-    var myItem = MY_ACTIONS.find(function(i){return i.id===itemId})
-    if(myItem) myItem.status = status
-    // Re-render appropriately
-    if(CURRENT_VIEW==='my_actions') renderMyActions('all')
-    else {
-      var docket = ALL_ENGAGEMENTS.find(function(e){return e.id===CURRENT_ENGAGEMENT_ID})
-      if(docket) renderItems('all')
-    }
-  }
-}
-
-// \u2500\u2500 Word Export (docx via client-side generation) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-// \u2500\u2500 Add to Docket from PEI (called from PEI tool via localStorage) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-// \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-window.addEventListener('DOMContentLoaded', function(){
-  loadAll().then(function(){
-    checkPendingDocketItem()
-  })
-})
 </script>
 
 <!-- Add to Docket Trigger Modal (called from Second Brain, PEI etc.) -->
