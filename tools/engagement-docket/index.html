@@ -1013,82 +1013,100 @@ async function openEngagement(engId){
   CURRENT_ENGAGEMENT_ID = engId
   CURRENT_VIEW = 'engagement'
   var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
+  if(!eng){
+    ALL_ENGAGEMENTS = await sbFetch('engagements','order=updated_at.desc',500)
+    eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
+  }
   if(!eng) return
   var cust = ALL_CUSTOMERS.find(function(c){ return c.id===eng.customer_id })
 
-  // Get or create docket for this engagement
   var dockets = await sbFetch('engagement_dockets','engagement_id=eq.'+engId,1)
   var docket = dockets[0]
   if(!docket){
-    // Auto-create docket for this engagement
     var newDocket = {
-      id: genId('ENG'),
-      type: 'customer',
+      id: genId('DOC'), type: 'customer',
       name: (cust?cust.name+' \u2014 ':'')+eng.name,
       customer_name: cust?cust.name:'',
       customer_id: eng.customer_id,
       engagement_id: engId,
-      owner: '',
-      status: 'active',
-      sector: eng.domain||'',
-      metadata: {}
+      owner: '', status: 'active',
+      sector: eng.domain||'', metadata: {}
     }
     await sbInsert('engagement_dockets', newDocket)
     docket = newDocket
   }
 
   CURRENT_DOCKET_ID = docket.id
+  window._currentDocketId = docket.id
   CURRENT_ITEMS = await sbFetch('docket_items','docket_id=eq.'+docket.id+'&order=created_at.asc',200)
 
-  var isL1 = eng.archetype === 'tsap' || eng.type === 'new' && eng.domain === 'REG-AIP'
+  // Docket pill counts
+  var intelC = CURRENT_ITEMS.filter(function(i){ return i.item_type==='intel' }).length
+  var ucC    = CURRENT_ITEMS.filter(function(i){ return i.item_type==='uc' }).length
+  var peiC   = CURRENT_ITEMS.filter(function(i){ return i.item_type==='pei' }).length
+  var parts  = []
+  if(intelC) parts.push(intelC+' intel')
+  if(ucC)    parts.push(ucC+' UC')
+  if(peiC)   parts.push(peiC+' PEI')
+  if(!parts.length && CURRENT_ITEMS.length) parts.push(CURRENT_ITEMS.length+' items')
+  var docketPill = parts.length ? parts.join(' \u00B7 ') : '0 items'
 
-  var html = '<div style="background:var(--navy);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;color:var(--white)">'
-    +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-    +'<div>'
-    +'<div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">'+(cust?esc(cust.name)+' \u00B7 ':'')+'<span id="eng-id-badge">'+esc(eng.id)+'</span></div>'
-    +'<div style="font-size:20px;font-weight:700">'+esc(eng.name)+'</div>'
-    +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'
-    +'<span class="pill pill-'+eng.status+'">'+eng.status+'</span>'
-    +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.phase)+'</span>'
-    +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.archetype||'')+'</span>'
-    +(eng.value?'<span class="pill" style="background:rgba(0,178,144,0.2);color:var(--teal)">\uD83D\uDCB0 '+esc(eng.value)+' '+esc(eng.currency||'')+'</span>':'')
-    +'</div></div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">'
-    +'<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+docket.id+'\')">+ Add Item</button>'
-    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="openPortfolioMap(\''+engId+'\',\''+docket.id+'\')">Portfolio Map</button>'
-    +(isL1?'<button class="btn btn-sm" style="background:rgba(255,182,0,0.2);color:var(--amber)" onclick="openL1Config(\''+engId+'\')">TSAP Configure</button>':'')
-    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="runRecommendationEngine(\''+engId+'\')">Recommend</button>'
-    +'<select onchange="changeEngStatus(\''+engId+'\',this.value)" style="padding:4px 8px;font-size:11px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:var(--white);font-family:inherit">'
-    +'<option value="active"'+(eng.status==='active'?' selected':'')+'>Active</option>'
-    +'<option value="paused"'+(eng.status==='paused'?' selected':'')+'>Paused</option>'
-    +'<option value="won"'+(eng.status==='won'?' selected':'')+'>Won</option>'
-    +'<option value="lost"'+(eng.status==='lost'?' selected':'')+'>Lost</option>'
-    +'</select>'
-    +'</div></div></div>'
+  var isL1 = eng.archetype==='tsap' || eng.archetype==='territory_coe'
+  var eId = engId, dId = docket.id
 
-  // Action row \u2014 export and add item
+  var html = ''
+  html += '<div style="background:var(--navy);border-radius:var(--r-lg);padding:18px 22px;margin-bottom:12px;color:var(--white)">'
+  html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+  html += '<div>'
+  html += '<div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:3px">'+(cust?esc(cust.name)+' \u00B7 ':'')+esc(eng.id)+'</div>'
+  html += '<div style="font-size:20px;font-weight:700">'+esc(eng.name)+'</div>'
+  html += '</div>'
+  html += '<select onchange="changeEngStatus(\''+eId+'\',this.value)" style="padding:3px 8px;font-size:11px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:var(--white);font-family:inherit">'
+  html += '<option value="active"'+(eng.status==='active'?' selected':'')+'>Active</option>'
+  html += '<option value="paused"'+(eng.status==='paused'?' selected':'')+'>Paused</option>'
+  html += '<option value="won"'+(eng.status==='won'?' selected':'')+'>Won</option>'
+  html += '<option value="lost"'+(eng.status==='lost'?' selected':'')+'>Lost</option>'
+  html += '</select>'
+  html += '</div>'
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+  html += '<span class="pill pill-'+eng.status+'">'+eng.status+'</span>'
+  html += '<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.phase)+'</span>'
+  html += '<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.archetype||'')+'</span>'
+  if(eng.value) html += '<span class="pill" style="background:rgba(0,178,144,0.2);color:var(--teal)">\uD83D\uDCB0 '+esc(eng.value)+' '+esc(eng.currency||'')+'</span>'
+  html += '<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);font-size:10px">\uD83D\uDCCB '+esc(docketPill)+'</span>'
+  html += '</div>'
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+  html += '<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+dId+'\')">+ Add Item</button>'
+  html += '<button class="btn btn-sm" style="background:rgba(255,255,255,0.12);color:var(--white);border:0.5px solid rgba(255,255,255,0.25)" onclick="openPortfolioMap(\''+eId+'\',\''+dId+'\')">Portfolio Map</button>'
+  if(isL1) html += '<button class="btn btn-sm" style="background:rgba(255,182,0,0.25);color:#ffd060;border:0.5px solid rgba(255,182,0,0.3)" onclick="openL1Config(\''+eId+'\')">TSAP Configure</button>'
+  html += '<button class="btn btn-sm" style="background:var(--orange);color:var(--white)" onclick="runRecommendationEngine(\''+eId+'\')">&#9889; Recommend</button>'
+  html += '</div></div>'
   html += '<div style="padding:10px 0 14px;display:flex;gap:8px;flex-wrap:wrap">'
-    +'<button class="btn btn-outline btn-sm" onclick="exportWordDoc(\''+docket.id+'\')\">'+'Export (.txt)</button>'
-    +'<button class="btn btn-primary btn-sm" onclick="openAddItemModal(\''+docket.id+'\')\">'+'+ Add Item</button>'
-    +'</div>'
+  html += '<button class="btn btn-outline btn-sm" onclick="exportWordDoc(\''+dId+'\')">Export (.txt)</button>'
+  html += '<button class="btn btn-ghost btn-sm" onclick="openAddItemModal(\''+dId+'\')">+ Add Item</button>'
+  html += '</div>'
+  html += '<div id="rec-panel"></div>'
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'
+  html += '<button class="btn btn-ghost btn-xs" style="background:var(--navy);color:var(--white)" onclick="renderItems(\'all\')">All ('+CURRENT_ITEMS.length+')</button>'
 
-  // Docket items
   var itemsByType = {}
   CURRENT_ITEMS.forEach(function(item){ if(!itemsByType[item.item_type]) itemsByType[item.item_type]=0; itemsByType[item.item_type]++ })
-
-  // Filter bar
-  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'
-    +'<button class="btn btn-ghost btn-xs" style="background:var(--navy);color:var(--white)" onclick="renderItems(\'all\')">All ('+CURRENT_ITEMS.length+')</button>'
   Object.keys(ITEM_TYPES).forEach(function(t){
-    if(itemsByType[t]) html += '<button class="btn btn-ghost btn-xs" onclick="renderItems(\''+t+'\')">'+(ITEM_TYPES[t].icon)+' '+ITEM_TYPES[t].label+' ('+itemsByType[t]+')</button>'
+    if(itemsByType[t]) html += '<button class="btn btn-ghost btn-xs" onclick="renderItems(\''+t+'\')">'+ITEM_TYPES[t].icon+' '+ITEM_TYPES[t].label+' ('+itemsByType[t]+')</button>'
   })
-  html += '</div><div id="docket-items-container"></div>'
+  html += '</div>'
+  html += '<div id="docket-items-container"></div>'
 
   document.getElementById('mainPanel').innerHTML = html
   window._currentEng = eng
   renderItems('all')
   renderSidebar()
+
+  // Auto-run recommendation if docket has intel/uc/pei signals
+  var hasSignals = CURRENT_ITEMS.some(function(i){ return ['intel','uc','pei','rfp'].indexOf(i.item_type)>=0 })
+  if(hasSignals) runRecommendationEngine(engId)
 }
+
 
 function renderItems(filterType){
   var items = filterType==='all' ? CURRENT_ITEMS : CURRENT_ITEMS.filter(function(i){ return i.item_type===filterType })
@@ -1123,22 +1141,54 @@ async function runRecommendationEngine(engId){
   var cust = ALL_CUSTOMERS.find(function(c){ return c.id===(eng&&eng.customer_id) })
   if(!eng) return
 
-  var model = atlasGetTaskModel('pei')
+  var model = atlasGetTaskModel('pei') || 'gemini-3.1-flash-lite'
   var key = atlasGetKeyForModel(model)
-  if(!key){ alert('Configure AI keys in ATLAS Settings to use the Recommendation Engine.'); return }
+  var recPanel = document.getElementById('rec-panel')
+  if(!recPanel) return
 
-  var panel = document.getElementById('mainPanel')
-  var recDiv = document.createElement('div')
-  recDiv.className = 'rec-card'
-  recDiv.innerHTML = '<div class="rec-title">\uD83E\uDD16 Running Recommendation Engine...</div>'
-  panel.insertBefore(recDiv, panel.firstChild.nextSibling.nextSibling)
+  if(!key){
+    recPanel.innerHTML = '<div class="card" style="margin-bottom:12px;padding:12px 16px;border-left:3px solid var(--amber)"><div style="font-size:12px;color:var(--dark)">Configure AI keys in Settings to use the Recommendation Engine.</div></div>'
+    return
+  }
 
-  var prompt = 'You are an AI business development assistant for an on-premises AI hardware and software OEM.'
-    +' Analyse this engagement and recommend the most relevant portfolio items.'
-    +' Customer: '+JSON.stringify({name:cust&&cust.name,sector:cust&&cust.sector,ownership:cust&&cust.ownership,country:cust&&cust.country,ai_maturity:cust&&cust.ai_maturity})+''
-    +' Engagement: '+JSON.stringify({name:eng.name,archetype:eng.archetype,type:eng.type,phase:eng.phase,domain:eng.domain,value:eng.value})+''
-    +' Portfolio: '+JSON.stringify(PORTFOLIO_CATALOGUE.map(function(p){ return {code:p.code,name:p.name,level:p.level,category:p.category} }))+''
-    +' Respond with JSON: {recommendations:[{code,reason,priority(high|medium|low)}], upsell:[{code,reason}], summary(2 sentences)}'
+  recPanel.innerHTML = '<div class="card" style="margin-bottom:12px;padding:14px 18px"><div style="font-size:12px;color:var(--mid)">&#9889; Running recommendation engine\u2026</div></div>'
+
+  var docketItems = CURRENT_ITEMS || []
+  var intelItems = docketItems.filter(function(i){ return i.item_type==='intel' })
+  var ucItems    = docketItems.filter(function(i){ return i.item_type==='uc' })
+  var peiItems   = docketItems.filter(function(i){ return i.item_type==='pei' })
+  var rfpItems   = docketItems.filter(function(i){ return i.item_type==='rfp' })
+
+  var signalParts = []
+  if(intelItems.length) signalParts.push(intelItems.length+' intel item'+(intelItems.length>1?'s':''))
+  if(ucItems.length)    signalParts.push(ucItems.length+' UC'+(ucItems.length>1?'s':''))
+  if(peiItems.length)   signalParts.push(peiItems.length+' PEI brief'+(peiItems.length>1?'s':''))
+  if(rfpItems.length)   signalParts.push(rfpItems.length+' RFP'+(rfpItems.length>1?'s':''))
+
+  var archetype = eng.archetype || 'govt_sectorial'
+  var scopeNote = ''
+  var portfolioScope = PORTFOLIO_CATALOGUE
+  if(archetype==='tsap'||archetype==='territory_coe'){
+    scopeNote = 'Full TSAP: L1 territory programme + L1.x components + L2 building blocks + L3 services'
+  } else if(archetype==='defence'){
+    portfolioScope = PORTFOLIO_CATALOGUE.filter(function(p){ return p.code==='L2.2-INF'||p.code==='L2-EDG'||p.code==='L2-HPC'||p.level===3||p.code==='L2-MDC' })
+    scopeNote = 'Defence: L2.2-INF air-gapped + edge nodes + L3'
+  } else {
+    portfolioScope = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level>=2 })
+    scopeNote = 'L2 building blocks + L3 services'
+  }
+
+  var prompt = 'You are a presales AI assistant for an on-premises AI hardware/software OEM in India.'
+    +' Recommend portfolio items for this engagement.'
+    +' ARCHETYPE: '+archetype+' ('+scopeNote+')'
+    +' CUSTOMER: '+JSON.stringify({name:cust&&cust.name,sector:cust&&cust.sector,ownership:cust&&cust.ownership,ai_maturity:cust&&cust.ai_maturity})
+    +' ENGAGEMENT: '+JSON.stringify({name:eng.name,archetype:eng.archetype,phase:eng.phase,domain:eng.domain,value:eng.value})
+    +(intelItems.length?' INTEL: '+JSON.stringify(intelItems.slice(0,3).map(function(i){ return {title:i.title,notes:i.notes} })):'')
+    +(ucItems.length?' UCS: '+JSON.stringify(ucItems.slice(0,5).map(function(i){ return i.title })):'')
+    +(peiItems.length?' PEI: '+JSON.stringify(peiItems.slice(0,1).map(function(i){ return {title:i.title,notes:i.notes} })):'')
+    +' PORTFOLIO: '+JSON.stringify(portfolioScope.map(function(p){ return {code:p.code,name:p.name,level:p.level} }))
+    +' Respond ONLY with JSON: {recommendations:[{code,name,reason,priority}],upsell:[{code,name,reason}],summary}'
+    +' priority=high|medium|low. code must exactly match portfolio. reason max 15 words. summary max 2 sentences.'
     +' Start { end }. No markdown.'
 
   try{
@@ -1146,30 +1196,65 @@ async function runRecommendationEngine(engId){
     var first = text.indexOf('{'), last = text.lastIndexOf('}')
     if(first<0) throw new Error('No JSON in response')
     var result = JSON.parse(text.slice(first,last+1))
-    var recs = result.recommendations||[]
+    var recs    = result.recommendations||[]
     var upsells = result.upsell||[]
-    var recHtml = '<div class="rec-title">\uD83E\uDD16 Portfolio Recommendations</div>'
-      +(result.summary?'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">'+esc(result.summary)+'</div>':'')
-      +'<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;margin-bottom:6px">Recommended</div>'
-      +recs.map(function(r){
-        return '<div class="rec-item"><span class="pill pill-l'+(r.code&&r.code[1]||'3')+'" style="flex-shrink:0">'+esc(r.code)+'</span>'
-          +'<span style="flex:1">'+esc(r.reason)+'</span>'
-          +'<span class="pill" style="background:rgba(255,85,57,0.1);color:var(--orange)">'+esc(r.priority)+'</span></div>'
-      }).join('')
-      +(upsells.length?'<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;margin:10px 0 6px">Upsell / Cross-sell</div>'
-        +upsells.map(function(r){
-          return '<div class="rec-item"><span class="pill pill-l'+(r.code&&r.code[1]||'3')+'" style="flex-shrink:0">'+esc(r.code)+'</span>'
-            +'<span>'+esc(r.reason)+'</span></div>'
-        }).join('') : '')
-    recDiv.innerHTML = recHtml
     window._lastRecommendations = recs.concat(upsells).map(function(r){ return r.code })
+
+    var priStyle = {
+      high:   'background:rgba(220,38,38,0.1);color:#991b1b;border:0.5px solid rgba(220,38,38,0.2)',
+      medium: 'background:rgba(255,182,0,0.1);color:#9a6800;border:0.5px solid rgba(255,182,0,0.2)',
+      low:    'background:rgba(40,40,50,0.06);color:var(--mid);border:0.5px solid var(--light)'
+    }
+
+    var h = '<div class="card" style="margin-bottom:14px;border-left:3px solid var(--orange)">'
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    h += '<div><div style="font-size:13px;font-weight:700;color:var(--navy)">&#9889; AI Recommendation</div>'
+    if(signalParts.length) h += '<div style="font-size:10px;color:var(--mid);margin-top:2px">Based on '+signalParts.join(' \u00B7 ')+' \u00B7 '+esc(archetype)+'</div>'
+    h += '</div>'
+    h += '<div style="display:flex;gap:6px">'
+    h += '<button class="btn btn-teal btn-xs" onclick="applyRecommendationsToPortfolio()">Apply to Portfolio Map</button>'
+    h += '<button class="btn btn-ghost btn-xs" onclick="document.getElementById(\'rec-panel\').innerHTML=\'\'">Dismiss</button>'
+    h += '</div></div>'
+    if(result.summary) h += '<div style="font-size:11px;color:var(--dark);margin-bottom:10px;padding:8px 10px;background:var(--light);border-radius:var(--r-sm);line-height:1.5">'+esc(result.summary)+'</div>'
+    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--navy);letter-spacing:.5px;margin-bottom:6px">Recommendations</div>'
+    recs.forEach(function(r){
+      var ps = priStyle[r.priority]||priStyle.low
+      h += '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--light)">'
+      h += '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;background:rgba(0,40,112,0.08);color:var(--navy)">'+esc(r.code)+'</span>'
+      h += '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--dark)">'+esc(r.name||r.code)+'</div>'
+      h += '<div style="font-size:11px;color:var(--mid);margin-top:1px">'+esc(r.reason)+'</div></div>'
+      h += '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;'+ps+'">'+esc((r.priority||'').toUpperCase())+'</span>'
+      h += '</div>'
+    })
+    if(upsells.length){
+      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--navy);letter-spacing:.5px;margin:10px 0 6px">Upsell / Cross-sell</div>'
+      upsells.forEach(function(r){
+        h += '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--light)">'
+        h += '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(0,178,144,0.1);color:var(--teal)">'+esc(r.code)+'</span>'
+        h += '<div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--dark)">'+esc(r.name||r.code)+'</div>'
+        h += '<div style="font-size:11px;color:var(--mid)">'+esc(r.reason)+'</div></div>'
+        h += '</div>'
+      })
+    }
+    h += '</div>'
+    recPanel.innerHTML = h
+
   }catch(e){
-    recDiv.innerHTML = '<div class="rec-title">Recommendation Engine</div>'
-      +'<div style="font-size:11px;color:#DC2626">Error: '+esc(e.message)+'</div>'
+    recPanel.innerHTML = '<div class="card" style="margin-bottom:12px;padding:12px 16px;border-left:3px solid #DC2626">'
+      +'<div style="font-size:12px;font-weight:600;color:#991b1b">Recommendation engine error</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-top:4px">'+esc(e.message)+'</div>'
+      +'</div>'
   }
 }
 
-// \u2500\u2500 Portfolio Map \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function applyRecommendationsToPortfolio(){
+  var recs = window._lastRecommendations || []
+  if(!recs.length){ alert('No recommendations to apply.'); return }
+  PORTFOLIO_SELECTION = recs.slice()
+  openPortfolioMap(CURRENT_ENGAGEMENT_ID, window._currentDocketId || CURRENT_DOCKET_ID)
+}
+
+
 function openPortfolioMap(engId, docketId){
   var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
   window._portfolioEngId = engId
