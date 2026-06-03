@@ -632,7 +632,7 @@ async function atlasCallModel(modelId, prompt, systemPrompt, maxTokens){
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+modelId+':generateContent?key='+key
     var body = {
       contents:[{parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.2, maxOutputTokens:maxTokens, thinkingConfig:{thinkingBudget:0}}
+      generationConfig:{temperature:0.2, maxOutputTokens:maxTokens}
     }
     if(systemPrompt) body.system_instruction = {parts:[{text:systemPrompt}]}
     var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
@@ -1042,11 +1042,10 @@ async function openEngagement(engId){
     +'</select>'
     +'</div></div></div>'
 
-  // Export row
-  html += '<div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">'
-    +'<span style="font-size:11px;color:var(--mid)">Actions:</span>'
-    +'<button class="btn btn-ghost btn-sm" onclick="exportWordDoc(\''+docket.id+'\')\">'+'Export Docket (.txt)</button>'
-    +'<button class="btn btn-ghost btn-sm" onclick="openAddItemModal(\''+docket.id+'\')\">'+'+ Add Item</button>'
+  // Action row \u2014 export and add item
+  html += '<div style="padding:10px 0 14px;display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button class="btn btn-outline btn-sm" onclick="exportWordDoc(\''+docket.id+'\')\">'+'Export (.txt)</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="openAddItemModal(\''+docket.id+'\')\">'+'+ Add Item</button>'
     +'</div>'
 
   // Docket items
@@ -1765,39 +1764,6 @@ var EDIT_CUSTOMER_ID = null
 
 function addContact(custId){
   EDIT_CUSTOMER_ID = custId
-  var modal = document.getElementById('contactModal')
-  if(!modal){
-    var m = document.createElement('div')
-    m.id = 'contactModal'
-    m.className = 'modal-overlay'
-    m.innerHTML = '<div class="modal" style="max-width:440px">'
-      +'<div class="modal-title">Add Contact</div>'
-      +'<label>Name *</label><input type="text" id="ct-name" placeholder="Full name">'
-      +'<label>Role / Title</label><input type="text" id="ct-role" placeholder="e.g. Director AI, CTO">'
-      +'<div class="form-grid">'
-      +'<div><label>Seniority</label><select id="ct-seniority">'
-      +'<option value="">Unknown</option>'
-      +'<option value="c_suite">C-Suite / Secretary</option>'
-      +'<option value="director">Director / Jt Secretary</option>'
-      +'<option value="manager">Manager / Deputy</option>'
-      +'<option value="technical">Technical / Specialist</option>'
-      +'</select></div>'
-      +'<div><label>Influence</label><select id="ct-influence">'
-      +'<option value="">Unknown</option>'
-      +'<option value="decision_maker">Decision Maker</option>'
-      +'<option value="influencer">Influencer</option>'
-      +'<option value="champion">Champion</option>'
-      +'<option value="blocker">Blocker</option>'
-      +'</select></div>'
-      +'</div>'
-      +'<label>Email</label><input type="email" id="ct-email" placeholder="email@org.gov.in">'
-      +'<label>Phone</label><input type="text" id="ct-phone" placeholder="+91 98...">'
-      +'<div class="modal-actions">'
-      +'<button class="btn btn-ghost" onclick="closeContactModal()">Cancel</button>'
-      +'<button class="btn btn-primary" onclick="saveContact()">Add Contact</button>'
-      +'</div></div>'
-    document.body.appendChild(m)
-  }
   document.getElementById('ct-name').value=''
   document.getElementById('ct-role').value=''
   document.getElementById('ct-email').value=''
@@ -2037,5 +2003,60 @@ window.addEventListener('DOMContentLoaded', function(){
   })
 })
 </script>
+
+<!-- Contact Modal -->
+<div class="modal-overlay" id="contactModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title">Add Contact</div>
+    <label>Name *</label><input type="text" id="ct-name" placeholder="Full name">
+    <label>Role / Title</label><input type="text" id="ct-role" placeholder="e.g. Director AI, CTO">
+    <div class="form-grid">
+      <div><label>Seniority</label><select id="ct-seniority">
+        <option value="">Unknown</option>
+        <option value="c_suite">C-Suite / Secretary</option>
+        <option value="director">Director / Jt Secretary</option>
+        <option value="manager">Manager / Deputy</option>
+        <option value="technical">Technical / Specialist</option>
+      </select></div>
+      <div><label>Influence</label><select id="ct-influence">
+        <option value="">Unknown</option>
+        <option value="decision_maker">Decision Maker</option>
+        <option value="influencer">Influencer</option>
+        <option value="champion">Champion</option>
+        <option value="blocker">Blocker</option>
+      </select></div>
+    </div>
+    <label>Email</label><input type="email" id="ct-email" placeholder="email@org.gov.in">
+    <label>Phone</label><input type="text" id="ct-phone" placeholder="+91 98...">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeContactModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveContact()">Add Contact</button>
+    </div>
+  </div>
+</div>
+
+<!-- TSAP Configuration Modal -->
+<div class="modal-overlay" id="tsapModal">
+  <div class="modal modal-lg">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div class="modal-title" style="margin-bottom:0">Territory Sovereign AI Programme</div>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal('tsapModal')">x</button>
+    </div>
+    <div style="font-size:11px;color:var(--mid);margin-bottom:14px">Configure territory, objectives, building blocks and financial model.</div>
+    <div class="tab-bar" id="tsapTabBar">
+      <div class="tab active" onclick="switchTsapTab('territory')">1. Territory</div>
+      <div class="tab" onclick="switchTsapTab('objectives')">2. Objectives</div>
+      <div class="tab" onclick="switchTsapTab('blocks')">3. Building Blocks</div>
+      <div class="tab" onclick="switchTsapTab('financial')">4. Financial Model</div>
+    </div>
+    <div id="tsapTabContent" style="min-height:300px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('tsapModal')">Cancel</button>
+      <button class="btn btn-outline" onclick="generateVisionDoc()">Generate Vision Doc</button>
+      <button class="btn btn-primary" onclick="saveTsapConfig()">Save Configuration</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
