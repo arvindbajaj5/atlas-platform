@@ -2,20 +2,27 @@ name: Intelligence Scraper
 
 on:
   schedule:
-    # Run daily at 2:00 AM IST (20:30 UTC previous day)
-    - cron: '30 20 * * *'
+    - cron: '30 20 * * *'   # 2:00 AM IST daily
   workflow_dispatch:
     inputs:
       domains:
-        description: 'Comma-separated domain codes to scrape (leave empty for all)'
+        description: 'Comma-separated domain codes (leave empty for all)'
         required: false
         default: ''
       items_per_domain:
-        description: 'Items per domain (default: 5)'
+        description: 'Items per domain (default: 3)'
         required: false
-        default: '5'
-      run_enrichment:
-        description: 'Run enrichment phase (true/false)'
+        default: '3'
+      geographies:
+        description: 'Geographies (default: India)'
+        required: false
+        default: 'India'
+      run_rss:
+        description: 'Run RSS feeds (true/false)'
+        required: false
+        default: 'true'
+      run_search:
+        description: 'Run search grounding (true/false)'
         required: false
         default: 'true'
 
@@ -26,7 +33,6 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,14 +43,17 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm install node-fetch@3
+        run: npm install node-fetch@3 xml2js
 
       - name: Run Intelligence Scraper
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_URL:     ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:     ${{ secrets.SUPABASE_KEY }}
+          SARVAM_API_KEY:   ${{ secrets.SARVAM_API_KEY }}
           DOMAINS_OVERRIDE: ${{ github.event.inputs.domains }}
-          ITEMS_PER_DOMAIN: ${{ github.event.inputs.items_per_domain || '5' }}
-          RUN_ENRICHMENT: ${{ github.event.inputs.run_enrichment || 'true' }}
+          ITEMS_PER_DOMAIN: ${{ github.event.inputs.items_per_domain || '3' }}
+          GEOGRAPHIES:      ${{ github.event.inputs.geographies || 'India' }}
+          RUN_RSS:          ${{ github.event.inputs.run_rss || 'true' }}
+          RUN_SEARCH:       ${{ github.event.inputs.run_search || 'true' }}
         run: node scripts/scrape-intelligence.js
