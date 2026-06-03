@@ -512,19 +512,16 @@ async function queryIntelligenceDB(sector, country, ownership){
 
 // \u2500\u2500 Main generate function \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function generatePEI(){
-  var model = document.getElementById('modelSelect').value || atlasGetTaskModel('pei')
-  // Robust key resolution: model key \u2192 any global key \u2192 local input
-  var apiKey = atlasGetKeyForModel(model)
-  if(!apiKey){
-    // Try getting key from global settings directly
-    var g = atlasGetGlobal()
-    apiKey = g.key_gemini || g.key_anthropic || g.key_openai || ''
-  }
-  // Also ensure model matches the key we found
+  var g = atlasGetGlobal()
+  // Model: from selector, or task default, or fallback to gemini-3.1-flash-lite
+  var model = (document.getElementById('modelSelect') && document.getElementById('modelSelect').value)
+    || atlasGetTaskModel('pei') || 'gemini-3.1-flash-lite'
+  // Key: from model registry, or global Gemini, or global Anthropic
+  var apiKey = atlasGetKeyForModel(model) || g.key_gemini || g.key_anthropic || g.key_openai || ''
+  // If model key missing but we have a key, pick the matching model
   if(!atlasGetKeyForModel(model) && apiKey){
-    // Find which model matches the key we have
-    if(apiKey === (atlasGetGlobal().key_gemini||'')) model = atlasGetTaskModel('pei') || 'gemini-3.5-flash'
-    else if(apiKey === (atlasGetGlobal().key_anthropic||'')) model = 'claude-haiku-4-5-20251001'
+    if(g.key_gemini) model = 'gemini-3.1-flash-lite'
+    else if(g.key_anthropic) model = 'claude-haiku-4-5-20251001'
   }
   var orgName = document.getElementById('orgName').value.trim()
   var country = document.getElementById('orgCountry').value
@@ -532,7 +529,7 @@ async function generatePEI(){
   var sector = document.getElementById('orgSector').value
   var division = document.getElementById('orgDivision').value.trim()
   var context = document.getElementById('orgContext').value.trim()
-  var model = document.getElementById('modelSelect').value
+  // model already set above with fallback logic \u2014 don't override
 
   if(!apiKey){ alert('No API key found for '+model+'. Configure it in ATLAS Settings \u2192 AI Model Registry.'); return }
   if(!orgName){ alert('Please enter an organisation name.'); return }
@@ -780,7 +777,7 @@ function downloadWord(){
 function addPEIToDocket(){
   var orgName = document.getElementById('orgName') ? document.getElementById('orgName').value.trim() : ''
   if(!orgName){ alert('Generate a PEI brief first.'); return }
-  var summary = document.getElementById('out-exec-summary') ? document.getElementById('out-exec-summary').textContent : ''
+  var summary = document.getElementById('out-summary') ? document.getElementById('out-exec-summary').textContent : ''
   var positioning = document.getElementById('out-positioning') ? document.getElementById('out-positioning').textContent : ''
   var nextActions = document.getElementById('out-next-actions') ? document.getElementById('out-next-actions').textContent : ''
   var item = {
@@ -1085,7 +1082,7 @@ async function callProvider(model, prompt, keyOverride){
     var key = keyOverride || g['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
     if(!key) throw new Error('Gemini API key not configured.')
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+key
-    var body = {contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:8192,thinkingConfig:{thinkingBudget:0}}}
+    var body = {contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:8192}}
     var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     if(!r.ok){var e=await r.json();throw new Error(e.error?.message||'Gemini error '+r.status)}
     var d = await r.json()
