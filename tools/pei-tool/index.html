@@ -210,6 +210,7 @@ input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
 
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <button class="btn btn-primary" id="generateBtn" onclick="generatePEI()">&#128269; Generate Intelligence Brief</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadJSON()" title="Load a previously saved PEI JSON to skip generation">&#128193; Load Saved Brief</button>
       <div id="dbStatus" style="font-size:11px;color:var(--mid)"></div>
     </div>
   </div>
@@ -228,7 +229,7 @@ input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
   </div>
 
   <!-- PEI Output -->
-  <div class="pei-output" id="peiOutput">
+  <div class="pei-output" id="peiOutput" style="display:none">
     <div class="actions-bar">
       <button class="btn btn-outline btn-sm" onclick="copyJSON()">&#128203; Copy JSON</button>
       <button class="btn btn-outline btn-sm" onclick="downloadJSON()">&#8615; JSON</button>
@@ -615,7 +616,9 @@ async function generatePEI(){
 }
 
 function renderPEI(pei, target, ownership, sector, country, dbItems){
-  // Show Add to Docket button on successful render
+  // Show output panel and Add to Docket button
+  var outPanel = document.getElementById('peiOutput')
+  if(outPanel) outPanel.style.display = 'block'
   var docketBtn = document.getElementById('addToDocketBtn')
   if(docketBtn) docketBtn.style.display = 'inline-flex'
   document.getElementById('loadingPanel').style.display = 'none'
