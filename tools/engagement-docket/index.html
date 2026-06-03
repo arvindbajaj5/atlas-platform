@@ -2,363 +2,459 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ATLAS &mdash; Second Brain</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ATLAS &mdash; Engagement Docket</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--shadow:0 2px 8px rgba(0,0,0,0.08);}
+:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--r-sm:6px;--r-lg:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;display:flex;flex-direction:column;}
-.hdr{background:var(--navy);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+/* Header */
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);position:sticky;top:0;z-index:200;}
 .hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
 .hdr-brand span{color:var(--orange);}
-.hdr-right{display:flex;align-items:center;gap:8px;}
 .hdr-badge{background:rgba(255,85,57,0.2);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;}
-.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+/* Layout */
+.layout{display:flex;flex:1;min-height:0;}
+.sidebar{width:260px;flex-shrink:0;background:var(--white);border-right:1px solid #e0e0e8;display:flex;flex-direction:column;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;}
+.main{flex:1;padding:24px;overflow-y:auto;max-width:900px;}
+/* Sidebar nav */
+.sb-section{padding:10px 16px 4px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.5px;display:flex;justify-content:space-between;align-items:center;}
+.sb-item{padding:8px 16px;cursor:pointer;font-size:13px;color:var(--dark);display:flex;align-items:center;gap:8px;border-left:3px solid transparent;transition:all 0.15s;}
+.sb-item:hover{background:var(--light);}
+.sb-item.active{background:rgba(0,40,112,0.06);border-left-color:var(--orange);font-weight:600;color:var(--navy);}
+.sb-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
+.sb-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dot-strategic{background:var(--blue);}
+.dot-transactional{background:var(--mid);}
+.dot-active{background:var(--teal);}
+.dot-won{background:var(--blue);}
+.dot-lost{background:#DC2626;}
+.dot-paused{background:var(--amber);}
+.sb-add{margin:8px 16px;padding:7px 12px;background:var(--orange);color:var(--white);border:none;border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer;width:calc(100% - 32px);font-family:inherit;}
+.sb-add:hover{background:#e6421f;}
+.sb-search{margin:8px 16px 4px;position:relative;}
+.sb-search input{width:100%;padding:7px 10px;border:1px solid #e0e0e8;border-radius:var(--r-sm);font-size:12px;background:var(--light);font-family:inherit;}
+.sb-search:before{content:'';display:none;}
+/* Cards */
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:14px;line-height:1.6;}
+/* Forms */
+label{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;margin-top:14px;}
+label:first-child{margin-top:0;}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+textarea{resize:vertical;min-height:72px;}
+.form-hint{font-size:10px;color:var(--mid);margin-top:4px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;text-decoration:none;}
 .btn-primary{background:var(--orange);color:var(--white);}
 .btn-primary:hover{background:#e6421f;}
-.btn-ghost{background:rgba(255,255,255,0.15);color:var(--white);border:1px solid rgba(255,255,255,0.3);}
-.btn-ghost:hover{background:rgba(255,255,255,0.25);}
-.btn-outline{background:transparent;color:var(--navy);border:1px solid #d0d0d8;}
-.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-navy{background:var(--navy);color:var(--white);}
+.btn-navy:hover{background:#001d5c;}
 .btn-teal{background:var(--teal);color:var(--white);}
-.btn-teal:hover{background:#009a7c;}
-.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:var(--navy);color:var(--white);}
+.btn-ghost{background:var(--light);color:var(--dark);border:1px solid #e0e0e8;}
+.btn-ghost:hover{border-color:var(--navy);color:var(--navy);}
+.btn-danger{background:rgba(220,38,38,0.08);color:#DC2626;border:1px solid rgba(220,38,38,0.2);}
+.btn-sm{padding:5px 12px;font-size:11px;}
 .btn-xs{padding:3px 8px;font-size:10px;}
-.btn-danger{background:transparent;color:#DC2626;border:1px solid #DC2626;}
-.btn-danger:hover{background:#DC2626;color:var(--white);}
-.shell{display:flex;flex:1;overflow:hidden;}
-/* Sidebar */
-.sidebar{width:230px;background:var(--navy);overflow-y:auto;flex-shrink:0;padding:8px 0;}
-.sb-section{font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;padding:14px 16px 4px;}
-.sb-item{display:flex;align-items:center;justify-content:space-between;padding:7px 16px;font-size:12px;color:rgba(255,255,255,0.65);cursor:pointer;transition:all 0.15s;border-left:3px solid transparent;}
-.sb-item:hover,.sb-item.active{color:var(--white);background:rgba(255,255,255,0.08);border-left-color:var(--orange);}
-.sb-item-label{display:flex;align-items:center;gap:7px;flex:1;}
-.sb-count{font-size:10px;font-weight:700;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:8px;color:rgba(255,255,255,0.4);flex-shrink:0;}
-.sb-count.live{background:rgba(0,178,144,0.2);color:var(--teal);}
-/* DEF umbrella */
-.sb-cluster{padding:5px 16px 2px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;cursor:pointer;}
-.sb-cluster:hover{color:rgba(255,255,255,0.6);}
-.sb-sub{padding-left:12px;}
-.sb-sub .sb-item{font-size:11px;padding:5px 16px 5px 28px;color:rgba(255,255,255,0.5);}
-.sb-sub .sb-item:hover,.sb-sub .sb-item.active{color:var(--white);}
-/* Main */
-.main{flex:1;overflow-y:auto;}
-.domain-hdr{padding:20px 24px 0;border-bottom:1px solid #e0e0e8;background:var(--white);position:sticky;top:0;z-index:10;}
-.domain-title{font-size:20px;font-weight:700;color:var(--navy);margin-bottom:2px;}
-.domain-sub{font-size:12px;color:var(--mid);margin-bottom:14px;}
-.tabs{display:flex;gap:0;}
-.tab{padding:10px 20px;font-size:13px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;}
-.tab:hover{color:var(--navy);}
+/* Tabs */
+.tab-bar{display:flex;gap:2px;border-bottom:2px solid #e0e0e8;margin-bottom:20px;}
+.tab{padding:8px 16px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
+.tab:hover{color:var(--dark);}
 .tab.active{color:var(--navy);border-bottom-color:var(--orange);}
-.tab-content{padding:20px 24px;display:none;}
-.tab-content.active{display:block;}
-/* Filter bar */
-.filter-bar{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
-.filter-btn{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #d0d0d8;background:var(--white);color:var(--mid);cursor:pointer;transition:all 0.15s;}
-.filter-btn:hover{border-color:var(--navy);color:var(--navy);}
-.filter-btn.active{background:var(--navy);color:var(--white);border-color:var(--navy);}
-.filter-btn.mp.active{background:var(--orange);border-color:var(--orange);}
-.filter-btn.di.active{background:var(--navy);border-color:var(--navy);}
-.filter-btn.tw.active{background:var(--teal);border-color:var(--teal);}
-/* Intel cards */
-.intel-grid{display:flex;flex-direction:column;gap:10px;}
-.intel-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);}
-.intel-card:hover{border-color:#c0c0cc;}
-.intel-card-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
-.intel-title{font-size:13px;font-weight:700;color:var(--dark);line-height:1.4;flex:1;}
-.intel-badges{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
-.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;text-transform:uppercase;letter-spacing:0.3px;display:inline-block;}
-.badge-mp{background:rgba(255,85,57,0.1);color:var(--orange);}
-.badge-di{background:rgba(0,40,112,0.08);color:var(--navy);}
-.badge-tw{background:rgba(0,178,144,0.1);color:var(--teal);}
-.badge-high{background:rgba(255,85,57,0.1);color:var(--orange);}
-.badge-medium{background:rgba(255,182,0,0.1);color:#9a7000;}
-.badge-low{background:rgba(180,180,190,0.15);color:var(--mid);}
-.badge-depth{background:rgba(28,56,245,0.08);color:var(--blue);}
-.intel-summary{font-size:12px;color:#555;line-height:1.6;margin-bottom:6px;}
-.intel-expanded{display:none;border-top:1px solid #f0f0f5;margin-top:8px;padding-top:8px;}
-.intel-expanded.open{display:block;}
-.intel-field{margin-bottom:8px;}
-.intel-field-label{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:2px;}
-.intel-field-val{font-size:12px;color:var(--dark);line-height:1.5;}
-.intel-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
-.tag{font-size:10px;padding:2px 6px;border-radius:4px;background:var(--light);color:var(--mid);}
-.tag-opp{background:rgba(0,178,144,0.08);color:var(--teal);}
-.tag-comp{background:rgba(255,85,57,0.08);color:var(--orange);}
-.intel-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
-/* UC cards */
-.uc-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px;}
-.uc-name{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:2px;}
-.uc-cluster{font-size:11px;color:var(--mid);margin-bottom:6px;}
-.uc-rationale{font-size:12px;color:#555;line-height:1.5;margin-bottom:8px;}
-.uc-status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;}
-.uc-status.pending{background:rgba(255,182,0,0.15);color:#9a7000;}
-.uc-status.accepted{background:rgba(0,178,144,0.15);color:var(--teal);}
-.uc-status.rejected{background:rgba(180,180,190,0.2);color:var(--mid);}
-/* Action cards */
-.action-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px;border-left:4px solid var(--mid);}
-.action-card.new{border-left-color:var(--blue);}
-.action-card.in_progress{border-left-color:var(--amber);}
-.action-card.converted{border-left-color:var(--teal);}
-.action-card.closed{opacity:0.6;}
-.action-title{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:2px;}
-.action-meta{font-size:11px;color:var(--mid);margin-bottom:6px;}
-.action-status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;}
-.action-status.new{background:rgba(28,56,245,0.1);color:var(--blue);}
-.action-status.in_progress{background:rgba(255,182,0,0.15);color:#9a7000;}
-.action-status.converted{background:rgba(0,178,144,0.15);color:var(--teal);}
-.action-status.closed{background:rgba(180,180,190,0.2);color:var(--mid);}
-/* Empty state */
-.empty-state{text-align:center;padding:60px 24px;color:var(--mid);}
-.empty-state .icon{font-size:36px;margin-bottom:12px;}
-.empty-state h3{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:6px;}
-.empty-state p{font-size:12px;line-height:1.6;}
-/* Modals */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;}
+/* Pills */
+.pill{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase;}
+.pill-strategic{background:rgba(28,56,245,0.1);color:var(--blue);}
+.pill-transactional{background:rgba(180,180,190,0.15);color:var(--mid);}
+.pill-active{background:rgba(0,178,144,0.12);color:var(--teal);}
+.pill-won{background:rgba(28,56,245,0.12);color:var(--blue);}
+.pill-lost{background:rgba(220,38,38,0.1);color:#DC2626;}
+.pill-paused{background:rgba(255,182,0,0.12);color:#9a7000;}
+.pill-l1{background:rgba(255,85,57,0.1);color:var(--orange);}
+.pill-l2{background:rgba(0,40,112,0.08);color:var(--navy);}
+.pill-l3{background:rgba(0,178,144,0.08);color:var(--teal);}
+/* Dashboard stats */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:14px 16px;}
+.stat-val{font-size:26px;font-weight:700;color:var(--navy);}
+.stat-lbl{font-size:10px;color:var(--mid);margin-top:2px;}
+/* Customer cards */
+.cust-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color 0.15s;}
+.cust-card:hover{border-color:var(--teal);}
+.cust-avatar{width:36px;height:36px;border-radius:var(--r-sm);background:var(--navy);color:var(--white);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+.cust-body{flex:1;min-width:0;}
+.cust-name{font-size:13px;font-weight:600;color:var(--dark);}
+.cust-meta{font-size:10px;color:var(--mid);margin-top:2px;}
+/* Engagement cards */
+.eng-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;border-left:4px solid var(--light);}
+.eng-card:hover{border-color:var(--teal);}
+.eng-card.phase-strategy{border-left-color:var(--amber);}
+.eng-card.phase-presales{border-left-color:var(--blue);}
+.eng-card.phase-proposal{border-left-color:var(--orange);}
+.eng-card.phase-delivery{border-left-color:var(--teal);}
+.eng-card.phase-live{border-left-color:#22c55e;}
+/* Docket items */
+.docket-item{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;transition:border-color 0.15s;}
+.docket-item:hover{border-color:var(--teal);}
+.item-icon{width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.icon-action{background:rgba(255,182,0,0.1);}
+.icon-intel{background:rgba(0,40,112,0.08);}
+.icon-pei{background:rgba(28,56,245,0.08);}
+.icon-uc{background:rgba(0,178,144,0.1);}
+.icon-rfp{background:rgba(220,38,38,0.08);}
+.icon-pitch{background:rgba(255,85,57,0.1);}
+.icon-solution{background:rgba(0,40,112,0.1);}
+.icon-bom{background:rgba(40,40,50,0.06);}
+.icon-proposal{background:rgba(28,56,245,0.1);}
+.icon-pricing{background:rgba(0,178,144,0.08);}
+.icon-exec_doc{background:rgba(255,85,57,0.08);}
+.item-body{flex:1;min-width:0;}
+.item-title{font-size:12px;font-weight:600;color:var(--dark);}
+.item-meta{font-size:10px;color:var(--mid);margin-top:2px;}
+.item-status{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;}
+.is-pending{background:rgba(180,180,190,0.15);color:var(--mid);}
+.is-in_progress{background:rgba(255,182,0,0.12);color:#9a7000;}
+.is-done{background:rgba(0,178,144,0.12);color:var(--teal);}
+.is-closed{background:rgba(40,40,50,0.08);color:var(--mid);}
+/* Portfolio map */
+.portfolio-map{display:grid;grid-template-rows:auto auto auto;gap:12px;}
+.portfolio-section-label{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.portfolio-items-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;}
+.portfolio-item{border:2px solid #e0e0e8;border-radius:var(--r);padding:10px 12px;cursor:pointer;transition:all 0.15s;background:var(--white);text-align:left;}
+.portfolio-item:hover{border-color:var(--navy);}
+.portfolio-item.selected{border-color:var(--teal);background:rgba(0,178,144,0.05);}
+.portfolio-item.recommended{border-color:var(--orange);background:rgba(255,85,57,0.04);}
+.portfolio-item.recommended.selected{border-color:var(--teal);background:rgba(0,178,144,0.05);}
+.pi-code{font-size:9px;font-family:Roboto Mono,monospace;color:var(--mid);margin-bottom:4px;}
+.pi-name{font-size:11px;font-weight:600;color:var(--dark);}
+.pi-cat{font-size:10px;color:var(--mid);}
+.pi-badge{display:inline-block;font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;margin-top:4px;}
+.pi-badge.rec{background:rgba(255,85,57,0.12);color:var(--orange);}
+.pi-badge.sel{background:rgba(0,178,144,0.12);color:var(--teal);}
+/* Rec engine */
+.rec-card{background:rgba(0,178,144,0.05);border:1px solid rgba(0,178,144,0.2);border-radius:var(--r);padding:14px;margin-bottom:12px;}
+.rec-title{font-size:12px;font-weight:700;color:var(--teal);margin-bottom:8px;}
+.rec-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,178,144,0.1);font-size:11px;}
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--white);border-radius:12px;padding:24px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;}
-.modal-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:16px;}
-label.lbl{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px;margin-top:10px;}
-input,select,textarea{width:100%;padding:8px 12px;border:1px solid #d0d0d8;border-radius:6px;font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;}
-input:focus,select:focus,textarea:focus{border-color:var(--blue);}
-textarea{resize:vertical;min-height:70px;}
-.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
-/* Config card */
-.config-card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r);padding:16px 24px;margin:0;border-bottom:1px solid #e0e0e8;}
-.config-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;}
-.config-field{flex:1;min-width:160px;}
-/* Loading */
-.loading{display:flex;align-items:center;gap:8px;color:var(--mid);font-size:13px;padding:40px 24px;}
-.spin{width:16px;height:16px;border:2px solid #e0e0e8;border-top-color:var(--orange);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;}
-@keyframes spin{to{transform:rotate(360deg)}}
-/* Welcome */
-.welcome{padding:40px 24px;max-width:600px;}
-.welcome h2{font-size:22px;font-weight:700;color:var(--navy);margin-bottom:8px;}
-.welcome p{font-size:13px;color:#555;line-height:1.7;margin-bottom:16px;}
+.modal{background:var(--white);border-radius:var(--r-lg);padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.modal-lg{max-width:780px;}
+.modal-title{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:16px;}
+.modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end;}
+/* L2 blocks */
+.l2-block{border:1px solid #e0e0e8;border-radius:var(--r);padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;}
+.l2-icon{width:32px;height:32px;border-radius:var(--r-sm);background:var(--navy);color:var(--white);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+/* Financing rows */
+.fin-row{border:1px solid #e0e0e8;border-radius:var(--r);padding:12px;margin-bottom:8px;}
+.fin-row-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+/* Empty state */
+.empty{text-align:center;padding:48px 24px;color:var(--mid);}
+.empty-icon{font-size:40px;margin-bottom:12px;}
+.empty-title{font-size:15px;font-weight:600;color:var(--navy);margin-bottom:6px;}
+.empty-sub{font-size:12px;line-height:1.6;}
+/* Elevate banner */
+.elevate-banner{background:rgba(255,182,0,0.1);border:1px solid rgba(255,182,0,0.3);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.elevate-text{font-size:12px;color:#9a7000;}
 </style>
 </head>
 <body>
+
 <div class="hdr">
-  <div class="hdr-brand">ATL<span>A</span>S &mdash; Second Brain</div>
-  <div class="hdr-right">
-    <span class="hdr-badge">v2.2</span>
-    <button class="btn btn-ghost btn-sm" onclick="toggleConfig()">&#9881; Config</button>
-    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">&#8592; Portal</button>
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.5)">Engagement Docket v2.0</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="hdr-badge">ED v2.0</span>
+    <button class="btn btn-ghost btn-sm" style="color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.3)" onclick="history.back()">← Portal</button>
   </div>
 </div>
 
-<div id="configCard" class="config-card" style="display:none">
-  <div class="config-row">
-    <div class="config-field">
-      <label class="lbl" style="margin-top:0">Supabase URL</label>
-      <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co">
-    </div>
-    <div class="config-field" style="flex:2">
-      <label class="lbl" style="margin-top:0">Supabase Anon Key</label>
-      <input type="password" id="sbKey" placeholder="eyJ...">
-    </div>
-    <div class="config-field">
-      <label class="lbl" style="margin-top:0">Gemini API Key</label>
-      <input type="password" id="geminiKey" placeholder="AIza...">
-    </div>
-    <div>
-      <button class="btn btn-primary btn-sm" onclick="saveConfig()">Save &amp; Connect</button>
-    </div>
+<div class="layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sb-search"><input type="text" id="sbSearch" placeholder="Search customers..." oninput="renderSidebar()"></div>
+    <button class="sb-add" onclick="openModal('newCustomerModal')">+ New Customer</button>
+    <div class="sb-section"><span>Strategic</span><span id="sbStrategicCount" style="font-size:10px;color:var(--mid)">0</span></div>
+    <div id="sbStrategicList"></div>
+    <div class="sb-section" style="margin-top:8px"><span>Transactional</span><span id="sbTransactionalCount" style="font-size:10px;color:var(--mid)">0</span></div>
+    <div id="sbTransactionalList"></div>
+    <div class="sb-section" style="margin-top:8px"><span>My Actions</span></div>
+    <div id="sbMyDocket"></div>
   </div>
+
+  <!-- Main panel -->
+  <div class="main" id="mainPanel"></div>
 </div>
 
-<div class="shell">
-  <div class="sidebar" id="sidebar"></div>
-  <div class="main" id="main">
-    <div class="welcome" id="welcome">
-      <h2>&#129504; Second Brain v2.1</h2>
-      <p>Configure your Supabase connection to explore intelligence across 17 domains and 5 market news topics. Select a domain from the sidebar to begin.</p>
-    </div>
-  </div>
-</div>
-
-<!-- Create Action Modal -->
-<div class="modal-overlay" id="actionModal">
+<!-- New Customer Modal -->
+<div class="modal-overlay" id="newCustomerModal">
   <div class="modal">
-    <div class="modal-title">&#9889; Create Sales Action</div>
-    <input type="hidden" id="actIntelId">
-    <input type="hidden" id="actIntelTitle">
-    <input type="hidden" id="actDomain">
-    <label class="lbl">Action Title *</label>
-    <input type="text" id="actTitle" placeholder="e.g. Follow up on DRDO edge AI RFP">
-    <label class="lbl">Description</label>
-    <textarea id="actDesc" placeholder="What needs to be done..."></textarea>
-    <label class="lbl">Suggested Approach</label>
-    <input type="text" id="actApproach" placeholder="e.g. Schedule demo, send white paper">
-    <label class="lbl">Assign To</label>
-    <input type="text" id="actAssignee" placeholder="Salesperson name" list="teamDL">
-    <datalist id="teamDL"></datalist>
-    <div style="display:flex;gap:12px;margin-top:4px">
-      <div style="flex:1">
-        <label class="lbl">Priority</label>
-        <select id="actPriority">
-          <option value="high">High</option>
-          <option value="medium" selected>Medium</option>
-          <option value="low">Low</option>
+    <div class="modal-title">New Customer</div>
+    <label>Customer Name *</label>
+    <input type="text" id="nc-name" placeholder="e.g. Indian Army, NTPC, Pixxel">
+    <label>Short Name</label>
+    <input type="text" id="nc-short" placeholder="e.g. IA, NTPC">
+    <div class="form-grid">
+      <div>
+        <label>Tier *</label>
+        <select id="nc-tier">
+          <option value="transactional">Transactional (one-off)</option>
+          <option value="strategic">Strategic (major account)</option>
         </select>
       </div>
-      <div style="flex:1">
-        <label class="lbl">Due Date</label>
-        <input type="date" id="actDue">
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline btn-sm" onclick="closeModal('actionModal')">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveAction()">Create Action</button>
-    </div>
-  </div>
-</div>
-
-<!-- Enrich UC Modal -->
-<div class="modal-overlay" id="enrichModal">
-  <div class="modal" style="max-width:600px">
-    <div class="modal-title">&#128161; Enrich Use Case</div>
-    <input type="hidden" id="enrichUCId">
-    <input type="hidden" id="enrichQueueId">
-    <div style="background:var(--light);border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--mid)" id="enrichSourceInfo"></div>
-    <div style="margin-bottom:14px">
-      <button class="btn btn-primary" id="aiEnrichBtn" onclick="aiEnrichUC()" style="width:100%">&#129504; Auto-Enrich with Gemini</button>
-      <div id="aiEnrichStatus" style="font-size:11px;color:var(--mid);margin-top:6px;text-align:center;display:none"></div>
-    </div>
-    <label class="lbl">UC Name *</label>
-    <input type="text" id="enrichName" placeholder="Specific, actionable use case name">
-    <label class="lbl">Cluster / Category</label>
-    <input type="text" id="enrichCluster" placeholder="e.g. Border Surveillance, Crop Analytics">
-    <div style="display:flex;gap:12px">
-      <div style="flex:1">
-        <label class="lbl">Domain Codes</label>
-        <input type="text" id="enrichDomains" placeholder="e.g. DEF-MIL, GEO-SPA">
-      </div>
-      <div style="flex:1">
-        <label class="lbl">Maturity</label>
-        <select id="enrichMaturity">
-          <option value="theoretical">Theoretical</option>
-          <option value="emerging" selected>Emerging</option>
-          <option value="piloted">Piloted</option>
-          <option value="proven">Proven</option>
+      <div>
+        <label>Ownership</label>
+        <select id="nc-ownership">
+          <option value="">-- Select --</option>
+          <option value="GOV">Government (GOV)</option>
+          <option value="MIL">Military / Defence (MIL)</option>
+          <option value="PSU">Public Sector Undertaking (PSU)</option>
+          <option value="PVT">Private (PVT)</option>
+          <option value="INT">International (INT)</option>
+          <option value="PPP">Public-Private Partnership (PPP)</option>
         </select>
       </div>
     </div>
-    <label class="lbl">Problem Statement</label>
-    <textarea id="enrichProblem" placeholder="What specific problem does this solve?"></textarea>
-    <label class="lbl">Benefit</label>
-    <input type="text" id="enrichBenefit" placeholder="Quantified benefit if known (cost saving, efficiency gain...)">
-    <label class="lbl">How It Works</label>
-    <textarea id="enrichDescription" placeholder="Plain language description of the AI approach"></textarea>
-    <label class="lbl">Process Steps (one per line)</label>
-    <textarea id="enrichSteps" placeholder="1. Ingest satellite imagery&#10;2. Run change detection model&#10;3. Flag anomalies for review"></textarea>
-    <label class="lbl">Key Actors</label>
-    <input type="text" id="enrichActors" placeholder="e.g. DRDO, Indian Army, ISRO (comma separated)">
-    <label class="lbl">Data Requirements</label>
-    <textarea id="enrichData" placeholder="What data is needed, format, volume, frequency"></textarea>
-    <label class="lbl">Technical Requirements</label>
-    <textarea id="enrichTech" placeholder="Compute, connectivity, latency, air-gap requirements"></textarea>
-    <div style="display:flex;gap:12px">
-      <div style="flex:1">
-        <label class="lbl">Model Type</label>
-        <input type="text" id="enrichModelType" placeholder="e.g. Vision, NLP, Multimodal">
+    <div class="form-grid">
+      <div>
+        <label>Sector</label>
+        <select id="nc-sector">
+          <option value="">-- Select --</option>
+          <option>Defence &amp; Armed Forces</option>
+          <option>Government &amp; Governance</option>
+          <option>Intelligence &amp; Signals</option>
+          <option>Homeland Security</option>
+          <option>Geospatial &amp; Earth Observation</option>
+          <option>Space &amp; Aerospace</option>
+          <option>Critical Infrastructure</option>
+          <option>Natural Resources</option>
+          <option>Energy &amp; Utilities</option>
+          <option>Telecom &amp; Networks</option>
+          <option>Banking &amp; Financial Services</option>
+          <option>Health &amp; Life Sciences</option>
+          <option>Manufacturing &amp; Industry</option>
+          <option>Regional AI Programmes</option>
+          <option>Technology</option>
+          <option>Media &amp; Broadcast</option>
+        </select>
       </div>
-      <div style="flex:1">
-        <label class="lbl">Hardware Profile</label>
-        <input type="text" id="enrichHardware" placeholder="e.g. Edge GPU, Air-gapped cluster">
+      <div>
+        <label>Country</label>
+        <select id="nc-country">
+          <option value="India" selected>India</option>
+          <option value="UAE">UAE</option>
+          <option value="Saudi Arabia">Saudi Arabia</option>
+          <option value="Qatar">Qatar</option>
+          <option value="Singapore">Singapore</option>
+          <option value="Malaysia">Malaysia</option>
+          <option value="Australia">Australia</option>
+          <option value="United Kingdom">United Kingdom</option>
+          <option value="France">France</option>
+          <option value="United States">United States</option>
+        </select>
       </div>
     </div>
-    <label class="lbl">Regulatory / Compliance Notes</label>
-    <input type="text" id="enrichRegulatory" placeholder="e.g. MoD clearance, DPDP Act, data sovereignty">
-    <label class="lbl">Reference Deployments</label>
-    <input type="text" id="enrichRefs" placeholder="Where has this been done? (comma separated)">
-    <label class="lbl">Estimated Effort</label>
-    <input type="text" id="enrichEffort" placeholder="e.g. 3-6 months, Medium complexity">
+    <label>State / Province</label>
+    <input type="text" id="nc-state" placeholder="e.g. Himachal Pradesh">
+    <label>AI Maturity</label>
+    <select id="nc-maturity">
+      <option value="">Unknown</option>
+      <option value="none">None</option>
+      <option value="exploring">Exploring</option>
+      <option value="piloting">Piloting</option>
+      <option value="scaling">Scaling</option>
+      <option value="advanced">Advanced</option>
+    </select>
+    <label>Notes</label>
+    <textarea id="nc-notes" placeholder="Key context about this customer..."></textarea>
     <div class="modal-actions">
-      <button class="btn btn-outline btn-sm" onclick="closeModal('enrichModal')">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveEnrichedUC()">Save to UC Library</button>
+      <button class="btn btn-ghost" onclick="closeModal('newCustomerModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createCustomer()">Create Customer</button>
     </div>
   </div>
 </div>
 
-<!-- Intel Detail Modal -->
-<div class="modal-overlay" id="intelModal">
-  <div class="modal" style="max-width:640px;max-height:85vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-      <div class="modal-title" style="margin-bottom:0" id="im-title">Intelligence Item</div>
-      <button class="btn btn-outline btn-xs" onclick="closeModal('intelModal')">&#10005;</button>
-    </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="im-badges"></div>
-    <div style="font-size:12px;line-height:1.7;color:var(--dark);margin-bottom:14px" id="im-summary"></div>
-    <div id="im-fields"></div>
-    <div style="margin-top:14px;display:flex;gap:8px">
-      <button class="btn btn-primary btn-sm" id="im-action-btn" onclick="createActionFromIntel()">&#9889; Create Sales Action</button>
-      <button class="btn btn-outline btn-sm" onclick="closeModal('intelModal')">Close</button>
-    </div>
-  </div>
-</div>
-
-<!-- Convert to Engagement Modal --><!-- Convert to Engagement Modal -->
-<div class="modal-overlay" id="engModal">
+<!-- New Engagement Modal -->
+<div class="modal-overlay" id="newEngagementModal">
   <div class="modal">
-    <div class="modal-title">&#128640; Convert to Engagement</div>
-    <input type="hidden" id="engActId">
-    <label class="lbl">Engagement ID</label>
-    <input type="text" id="engId" placeholder="ENG-2026-DEF-001">
-    <label class="lbl">Notes</label>
-    <textarea id="engNotes" placeholder="Context for the engagement team..."></textarea>
+    <div class="modal-title">New Engagement</div>
+    <input type="hidden" id="ne-customer-id">
+    <label>Engagement Name *</label>
+    <input type="text" id="ne-name" placeholder="e.g. Border Surveillance AI Platform">
+    <div class="form-grid">
+      <div>
+        <label>Archetype</label>
+        <select id="ne-archetype">
+          <option value="territory_coe">Territory / AI CoE</option>
+          <option value="govt_sectorial">Govt Sectorial</option>
+          <option value="enterprise">Enterprise</option>
+          <option value="defence">Defence</option>
+        </select>
+      </div>
+      <div>
+        <label>Type</label>
+        <select id="ne-type">
+          <option value="new">New</option>
+          <option value="expansion">Expansion</option>
+          <option value="renewal">Renewal</option>
+          <option value="rfp">RFP / Tender</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div>
+        <label>Phase</label>
+        <select id="ne-phase">
+          <option value="strategy">Strategy</option>
+          <option value="presales">Presales</option>
+          <option value="proposal">Proposal</option>
+          <option value="delivery">Delivery</option>
+          <option value="live">Live</option>
+        </select>
+      </div>
+      <div>
+        <label>Domain</label>
+        <select id="ne-domain">
+          <option value="">-- Select --</option>
+          <option value="GOV-GOV">Government &amp; Governance</option>
+          <option value="DEF-MIL">Defence — Armed Forces</option>
+          <option value="DEF-SPC">Defence — Space</option>
+          <option value="DEF-HLS">Homeland Security</option>
+          <option value="GEO-SPA">Geospatial &amp; EO</option>
+          <option value="FIN-BFS">Banking &amp; Finance</option>
+          <option value="TEC-GEN">Technology</option>
+          <option value="REG-AIP">Regional AI Programme</option>
+          <option value="ENR-UTL">Energy &amp; Utilities</option>
+          <option value="HLT-LIF">Healthcare</option>
+          <option value="MFG-IND">Manufacturing</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div>
+        <label>Estimated Value</label>
+        <input type="text" id="ne-value" placeholder="e.g. 500 Cr, USD 50M">
+      </div>
+      <div>
+        <label>Currency</label>
+        <select id="ne-currency">
+          <option value="INR">INR</option>
+          <option value="USD">USD</option>
+          <option value="AED">AED</option>
+          <option value="EUR">EUR</option>
+          <option value="GBP">GBP</option>
+          <option value="SGD">SGD</option>
+        </select>
+      </div>
+    </div>
+    <label>Notes</label>
+    <textarea id="ne-notes" placeholder="Key context, source of opportunity..."></textarea>
     <div class="modal-actions">
-      <button class="btn btn-outline btn-sm" onclick="closeModal('engModal')">Cancel</button>
-      <button class="btn btn-teal btn-sm" onclick="convertToEng()">Convert</button>
+      <button class="btn btn-ghost" onclick="closeModal('newEngagementModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createEngagement()">Create Engagement</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add to Docket Modal -->
+<div class="modal-overlay" id="addItemModal">
+  <div class="modal">
+    <div class="modal-title" id="addItemTitle">+ Add Item to Docket</div>
+    <input type="hidden" id="ai-docket-id">
+    <label>Item Type</label>
+    <select id="ai-type" onchange="updateItemHint()">
+      <option value="action">Action</option>
+      <option value="intel">Intelligence</option>
+      <option value="pei">PEI Brief</option>
+      <option value="uc">Use Case</option>
+      <option value="rfp">RFP / Tender</option>
+      <option value="pitch">Pitch Report</option>
+      <option value="solution">Technical Solution</option>
+      <option value="bom">Bill of Materials</option>
+      <option value="proposal">Proposal</option>
+      <option value="pricing">Pricing</option>
+      <option value="exec_doc">Executive Document</option>
+    </select>
+    <label>Title *</label>
+    <input type="text" id="ai-title" placeholder="Descriptive title for this item">
+    <label>Notes / Summary</label>
+    <textarea id="ai-notes" placeholder="Key details, decisions, context..."></textarea>
+    <div class="form-grid">
+      <div><label>Assigned To</label><input type="text" id="ai-assigned" placeholder="Name or team"></div>
+      <div><label>Due Date</label><input type="date" id="ai-due"></div>
+    </div>
+    <div id="ai-hint" style="font-size:11px;color:var(--mid);margin-top:10px;padding:8px 12px;background:var(--light);border-radius:var(--r-sm);display:none"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('addItemModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveItem()">Add to Docket</button>
+    </div>
+  </div>
+</div>
+
+<!-- Portfolio Map Modal -->
+<div class="modal-overlay" id="portfolioMapModal">
+  <div class="modal modal-lg">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div class="modal-title" style="margin-bottom:0">Portfolio Map</div>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal('portfolioMapModal')">x</button>
+    </div>
+    <div style="font-size:11px;color:var(--mid);margin-bottom:16px" id="portfolioMapDesc">Select portfolio items for this engagement. AI-recommended items are pre-selected.</div>
+    <div id="portfolioMapContent"></div>
+    <div style="margin-top:16px;padding:12px;background:var(--light);border-radius:var(--r);font-size:11px;color:var(--mid)" id="portfolioMapSummary"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('portfolioMapModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePortfolioSelection()">Save Selection</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal-overlay" id="newTxnModal">
+  <div class="modal">
+    <div class="modal-title">Record Transaction</div>
+    <input type="hidden" id="txn-customer-id">
+    <label>Product / Service *</label>
+    <input type="text" id="txn-product" placeholder="e.g. GenAI-in-a-Box, Inferencing Factory PoC">
+    <div class="form-grid">
+      <div><label>Value</label><input type="text" id="txn-value" placeholder="e.g. 2.5 Cr"></div>
+      <div>
+        <label>Currency</label>
+        <select id="txn-currency">
+          <option value="INR">INR</option>
+          <option value="USD">USD</option>
+          <option value="AED">AED</option>
+          <option value="EUR">EUR</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div><label>Date</label><input type="date" id="txn-date"></div>
+      <div>
+        <label>Channel</label>
+        <select id="txn-channel">
+          <option value="direct">Direct</option>
+          <option value="tender">Tender / RFP</option>
+          <option value="partner">Partner</option>
+          <option value="referral">Referral</option>
+        </select>
+      </div>
+    </div>
+    <label>Notes</label>
+    <textarea id="txn-notes" placeholder="Key details about this transaction..."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('newTxnModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTransaction()">Save Transaction</button>
     </div>
   </div>
 </div>
 
 <script charset="utf-8">
-// \u2500\u2500 Domain taxonomy \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var DOMAINS = [
-  {code:'GOV-GOV', name:'Government & Governance',        icon:'&#127963;', cluster:'standalone'},
-  {code:'DEF-MIL', name:'Armed Forces',                   icon:'&#128737;', cluster:'DEF'},
-  {code:'DEF-SPC', name:'Space & Satellite',              icon:'&#128752;', cluster:'DEF'},
-  {code:'DEF-HLS', name:'Homeland Security',              icon:'&#128274;', cluster:'DEF'},
-  {code:'DEF-INT', name:'Intelligence & Signals',         icon:'&#128065;', cluster:'DEF'},
-  {code:'GEO-SPA', name:'Geospatial & Earth Observation', icon:'&#127758;', cluster:'standalone'},
-  {code:'INF-CIV', name:'Critical Infrastructure',        icon:'&#9992;',   cluster:'standalone'},
-  {code:'RES-NAT', name:'Natural Resources',              icon:'&#127795;', cluster:'standalone'},
-  {code:'TEL-NET', name:'Telecom & Networks',             icon:'&#128225;', cluster:'standalone'},
-  {code:'TEC-GEN', name:'Technology',                     icon:'&#128187;', cluster:'standalone'},
-  {code:'MED-BRD', name:'Media & Broadcast',              icon:'&#127916;', cluster:'standalone'},
-  {code:'FIN-BFS', name:'Banking & Financial Services',   icon:'&#127981;', cluster:'standalone'},
-  {code:'MFG-IND', name:'Manufacturing & Industry',       icon:'&#9881;',   cluster:'standalone'},
-  {code:'ENR-UTL', name:'Energy & Utilities',             icon:'&#9889;',   cluster:'standalone'},
-  {code:'REG-AIP', name:'Regional AI Programmes',         icon:'&#127960;', cluster:'standalone'},
-  {code:'LAB-AIR', name:'AI Labs & Research',             icon:'&#128300;', cluster:'standalone'},
-  {code:'HLT-LIF', name:'Healthcare & Life Sciences',     icon:'&#127973;', cluster:'standalone'},
-]
-
-var NEWS_TOPICS = [
-  {code:'MKT-HPC', name:'AI & HPC in India',           icon:'&#128204;'},
-  {code:'MKT-COM', name:'Competitor & Vendor Activity', icon:'&#127942;'},
-  {code:'MKT-TND', name:'Government AI Tenders',        icon:'&#128196;'},
-  {code:'MKT-DEF', name:'Defence Technology News',      icon:'&#128737;'},
-  {code:'MKT-SOV', name:'Sovereign AI & Policy',        icon:'&#127963;'},
-]
-
-// \u2500\u2500 State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var currentEntry = null
-var currentTab = 'intel'
-var currentFilter = 'all'
-var cachedIntel = []
-var cachedUC = []
-var cachedActions = []
-var showAllAges = false
-var counts = {}
-
-// \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function getCfg(){ try{ return JSON.parse(localStorage.getItem('atlas_sb2_cfg')||'{}') }catch(e){ return {} } }
-
-// \u2500\u2500 ATLAS Model Registry (embedded) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 // \u2500\u2500 ATLAS Model Registry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 // Central utility \u2014 reads atlas_global_cfg, returns only configured providers
@@ -615,1092 +711,1352 @@ function atlasGetTaskModel(taskId){
 }
 // \u2500\u2500 End ATLAS Model Registry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-// Wrappers for backward compatibility
-function getGlobal(){ return atlasGetGlobal() }
-function getTaskModel(taskId){ return atlasGetTaskModel(taskId) }
-function getSupabase(){
-  var local = getCfg(), g = atlasGetGlobal()
-  return { url: local.url||g.sbUrl||'', key: local.key||g.sbKey||'' }
+
+// \u2500\u2500 Supabase \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function getSB(){
+  var g = atlasGetGlobal()
+  return {url: g.sbUrl||'', key: g.sbKey||''}
 }
-async function callModel(prompt, modelId, systemPrompt){
-  return atlasCallModel(modelId || getTaskModel('enrichment'), prompt, systemPrompt)
-}
-
-// \u2500\u2500 Add enrichment JS functions \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var DOMAINS = [
-  {code:'GOV-GOV', name:'Government & Governance',        icon:'&#127963;', cluster:'standalone'},
-  {code:'DEF-MIL', name:'Armed Forces',                   icon:'&#128737;', cluster:'DEF'},
-  {code:'DEF-SPC', name:'Space & Satellite',              icon:'&#128752;', cluster:'DEF'},
-  {code:'DEF-HLS', name:'Homeland Security',              icon:'&#128274;', cluster:'DEF'},
-  {code:'DEF-INT', name:'Intelligence & Signals',         icon:'&#128065;', cluster:'DEF'},
-  {code:'GEO-SPA', name:'Geospatial & Earth Observation', icon:'&#127758;', cluster:'standalone'},
-  {code:'INF-CIV', name:'Critical Infrastructure',        icon:'&#9992;',   cluster:'standalone'},
-  {code:'RES-NAT', name:'Natural Resources',              icon:'&#127795;', cluster:'standalone'},
-  {code:'TEL-NET', name:'Telecom & Networks',             icon:'&#128225;', cluster:'standalone'},
-  {code:'TEC-GEN', name:'Technology',                     icon:'&#128187;', cluster:'standalone'},
-  {code:'MED-BRD', name:'Media & Broadcast',              icon:'&#127916;', cluster:'standalone'},
-  {code:'FIN-BFS', name:'Banking & Financial Services',   icon:'&#127981;', cluster:'standalone'},
-  {code:'MFG-IND', name:'Manufacturing & Industry',       icon:'&#9881;',   cluster:'standalone'},
-  {code:'ENR-UTL', name:'Energy & Utilities',             icon:'&#9889;',   cluster:'standalone'},
-  {code:'REG-AIP', name:'Regional AI Programmes',         icon:'&#127960;', cluster:'standalone'},
-  {code:'LAB-AIR', name:'AI Labs & Research',             icon:'&#128300;', cluster:'standalone'},
-  {code:'HLT-LIF', name:'Healthcare & Life Sciences',     icon:'&#127973;', cluster:'standalone'},
-]
-
-var NEWS_TOPICS = [
-  {code:'MKT-HPC', name:'AI & HPC in India',           icon:'&#128204;'},
-  {code:'MKT-COM', name:'Competitor & Vendor Activity', icon:'&#127942;'},
-  {code:'MKT-TND', name:'Government AI Tenders',        icon:'&#128196;'},
-  {code:'MKT-DEF', name:'Defence Technology News',      icon:'&#128737;'},
-  {code:'MKT-SOV', name:'Sovereign AI & Policy',        icon:'&#127963;'},
-]
-
-// \u2500\u2500 State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var currentEntry = null
-var currentTab = 'intel'
-var currentFilter = 'all'
-var cachedIntel = []
-var cachedUC = []
-var cachedActions = []
-var showAllAges = false
-var counts = {}
-
-// \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function getCfg(){ try{ return JSON.parse(localStorage.getItem('atlas_sb2_cfg')||'{}') }catch(e){ return {} } }
-
-// Read from global ATLAS settings, fall back to local config
-function getGlobal(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } }
-function getTaskModel(taskId){
-  var g = getGlobal()
-  var DEFAULTS={scraping:'gemini-3.1-flash-lite',enrichment:'gemini-3.1-flash-lite',uc_enrich:'gemini-3.5-flash',pei:'claude-haiku-4-5-20251001',documents:'claude-haiku-4-5-20251001',specialist:'sarvam-m',airgap:'llama3.3'}
-  return (g.model_tiers&&g.model_tiers[taskId]) || localStorage.getItem('atlas_default_model') || DEFAULTS[taskId] || 'gemini-3.1-flash-lite'
-}
-function getSupabase(){
-  var local = getCfg(), global = getGlobal()
-  return { url: local.url||global.sbUrl||'', key: local.key||global.sbKey||'' }
-}
-function getDefaultModel(){
-  return localStorage.getItem('atlas_default_model') || 'gemini-3.1-flash-lite'
-}
-function getModelKey(providerId){
-  var global = getGlobal()
-  var local = getCfg()
-  if(providerId === 'gemini') return local.geminiKey || global['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
-  return global['key_'+providerId] || ''
-}
-
-// Universal model call \u2014 handles Gemini, OpenAI-compatible, Anthropic, Sarvam
-async function callModel(prompt, modelId, systemPrompt){
-  modelId = modelId || getDefaultModel()
-  var PROVIDERS = {
-    gemini: {test: function(m){ return m.indexOf('gemini') >= 0 }},
-    openai: {test: function(m){ return m.indexOf('gpt') >= 0 }},
-    anthropic: {test: function(m){ return m.indexOf('claude') >= 0 }},
-    mistral: {test: function(m){ return m.indexOf('mistral') >= 0 || m.indexOf('magistral') >= 0 }},
-    qwen: {test: function(m){ return m.indexOf('qwen') >= 0 }},
-    sarvam: {test: function(m){ return m.indexOf('sarvam') >= 0 }},
-    ollama: {test: function(m){ return m.indexOf('llama') >= 0 || m.indexOf('gemma') >= 0 || m.indexOf('nemo') >= 0 }},
-  }
-  var provider = 'gemini'
-  for(var pid in PROVIDERS){ if(PROVIDERS[pid].test(modelId)){ provider = pid; break } }
-
-  var global = getGlobal()
-  var localCfg = getCfg()
-
-  if(provider === 'gemini'){
-    var key = localCfg.geminiKey || global['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
-    if(!key) throw new Error('Gemini API key not configured. Open ATLAS Settings.')
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+modelId+':generateContent?key='+key
-    var body = {
-      contents:[{role:'user',parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.1, maxOutputTokens:1024}
-    }
-    if(systemPrompt) body.system_instruction = {parts:[{text:systemPrompt}]}
-    var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    if(!r.ok) throw new Error('Gemini error '+r.status)
-    var d = await r.json()
-    return d.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  }
-
-  // OpenAI-compatible (Mistral, Qwen, Sarvam, Ollama, OpenAI)
-  var endpoints = {
-    openai: 'https://api.openai.com/v1/chat/completions',
-    mistral: 'https://api.mistral.ai/v1/chat/completions',
-    qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
-    sarvam: 'https://api.sarvam.ai/v1/chat/completions',
-    ollama: (global['endpoint_ollama'] || 'http://localhost:11434/v1/chat/completions'),
-    anthropic: 'https://api.anthropic.com/v1/messages',
-  }
-
-  var endpoint = endpoints[provider]
-  var apiKey = global['key_'+provider] || ''
-  var messages = []
-  if(systemPrompt) messages.push({role:'system',content:systemPrompt})
-  messages.push({role:'user',content:prompt})
-
-  if(provider === 'anthropic'){
-    if(!apiKey) throw new Error('Anthropic API key not configured. Open ATLAS Settings.')
-    var body = {model:modelId, max_tokens:1024, messages:messages}
-    var r = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)})
-    if(!r.ok) throw new Error('Anthropic error '+r.status)
-    var d = await r.json()
-    return d.content?.[0]?.text || ''
-  }
-
-  var headers = {'Content-Type':'application/json'}
-  if(provider === 'sarvam') headers['api-subscription-key'] = apiKey
-  else if(provider !== 'ollama' && apiKey) headers['Authorization'] = 'Bearer '+apiKey
-  var body = {model:modelId, messages:messages, max_tokens:1024, temperature:0.1}
-  var r = await fetch(endpoint,{method:'POST',headers:headers,body:JSON.stringify(body)})
-  if(!r.ok) throw new Error(provider+' error '+r.status)
-  var d = await r.json()
-  return d.choices?.[0]?.message?.content || ''
-}
-function setCfg(c){ localStorage.setItem('atlas_sb2_cfg', JSON.stringify(c)) }
-function getTeam(){ try{ return JSON.parse(localStorage.getItem('atlas_sb2_team')||'[]') }catch(e){ return [] } }
-
-function saveConfig(){
-  var url = document.getElementById('sbUrl').value.trim()
-  var key = document.getElementById('sbKey').value.trim()
-  if(!url||!key){ alert('Enter both Supabase URL and key.'); return }
-  var gemKey = document.getElementById('geminiKey').value.trim()
-  setCfg({url:url, key:key, geminiKey:gemKey})
-  document.getElementById('configCard').style.display = 'none'
-  init()
-}
-
-function toggleConfig(){
-  var el = document.getElementById('configCard')
-  el.style.display = el.style.display === 'none' ? 'block' : 'none'
-  var cfg = getCfg()
-  if(cfg.url) document.getElementById('sbUrl').value = cfg.url
-  if(cfg.key) document.getElementById('sbKey').value = cfg.key
-  if(cfg.geminiKey) document.getElementById('geminiKey').value = cfg.geminiKey
-}
-
-// \u2500\u2500 Supabase helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function sbFetch(table, params, limit){
-  var cfg = getSupabase()
-  if(!cfg.url||!cfg.key){ console.warn('SB fetch: no config'); return [] }
-  var url = cfg.url+'/rest/v1/'+table+'?'+params+'&limit='+(limit||100)
-  console.log('SB fetch:', url.slice(0,80))
-  try{
-    var r = await fetch(url, {headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key}})
-    if(r.ok){
-      var data = await r.json()
-      console.log('SB fetch ok:', data.length, 'rows from', table)
-      return data
-    } else {
-      var t = await r.text()
-      console.error('SB fetch error '+r.status+': '+t.slice(0,200))
-      return []
-    }
-  }catch(e){ console.error('SB fetch exception:',e); return [] }
+  var sb = getSB(); if(!sb.url) return []
+  var url = sb.url+'/rest/v1/'+table+'?'+params+(limit?'&limit='+limit:'')
+  var r = await fetch(url,{headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}})
+  return r.ok ? await r.json() : []
 }
-
-async function sbCount(table, filter){
-  var cfg = getCfg()
-  if(!cfg.url||!cfg.key){ console.warn('SB: no config'); return 0 }
-  try{
-    var r = await fetch(cfg.url+'/rest/v1/'+table+'?'+filter+'&limit=1', {
-      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Prefer':'count=exact'}
-    })
-    if(r.ok){
-      var cr = r.headers.get('content-range')
-      if(cr) return parseInt(cr.split('/')[1])||0
-      return 0
-    } else {
-      var t = await r.text()
-      console.error('SB count error '+r.status+': '+t.slice(0,200))
-      return 0
-    }
-  }catch(e){ console.error('SB count exception:',e); return 0 }
-}
-
-async function sbPatch(table, filter, data){
-  var cfg = getCfg()
-  if(!cfg.url||!cfg.key) return false
-  try{
-    var r = await fetch(cfg.url+'/rest/v1/'+table+'?'+filter, {
-      method:'PATCH',
-      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify(data)
-    })
-    return r.ok
-  }catch(e){ return false }
-}
-
 async function sbInsert(table, data){
-  var cfg = getCfg()
-  if(!cfg.url||!cfg.key) return false
-  try{
-    var r = await fetch(cfg.url+'/rest/v1/'+table, {
-      method:'POST',
-      headers:{'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=minimal'},
-      body:JSON.stringify(data)
-    })
-    return r.ok
-  }catch(e){ return false }
-}
-
-// \u2500\u2500 Init & Sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function init(){
-  var cfg = getCfg()
-  if(!cfg.url||!cfg.key){
-    document.getElementById('welcome').innerHTML = '<div class="welcome"><h2>&#9888; Config Required</h2><p>Click the Config button above and enter your Supabase URL and anon key, then click Save &amp; Connect.</p></div>'
-    return
-  }
-  console.log('SB init with url:', cfg.url.slice(0,40))
-  document.getElementById('welcome').innerHTML = '<div class="loading"><div class="spin"></div> Loading domain counts...</div>'
-  // Load counts for all domains + news
-  var allCodes = DOMAINS.map(function(d){return d.code}).concat(NEWS_TOPICS.map(function(t){return t.code}))
-  for(var i=0; i<allCodes.length; i++){
-    counts[allCodes[i]] = await sbCount('intelligence_items','domain_code=eq.'+allCodes[i])
-  }
-  var totalItems = Object.values(counts).reduce(function(s,c){return s+c},0)
-  console.log('SB init complete. Total counts:', counts)
-  renderSidebar()
-  document.getElementById('welcome').innerHTML = '<div class="welcome"><h2>&#129504; Second Brain v2.1</h2><p>'+totalItems+' intelligence items across all domains. Select a domain from the sidebar to explore.</p>'+(totalItems===0?'<p style="color:var(--orange);margin-top:8px">&#9888; No items found. Check your Supabase connection or run the Intelligence Scraper first.</p>':'')+'</div>'
-}
-
-function renderSidebar(){
-  var html = ''
-
-  // GOV-GOV standalone
-  html += '<div class="sb-section">Intelligence Domains</div>'
-  html += sidebarItem(DOMAINS[0])
-
-  // DEF umbrella
-  html += '<div class="sb-cluster" onclick="toggleDef()">&#128737; Defence <span style="font-size:9px;opacity:0.5;margin-left:4px" id="defArrow">&#9660;</span></div>'
-  html += '<div id="defSubs" class="sb-sub">'
-  DOMAINS.filter(function(d){return d.cluster==='DEF'}).forEach(function(d){ html += sidebarItem(d) })
-  html += '</div>'
-
-  // Rest of standalone domains
-  DOMAINS.filter(function(d){return d.cluster==='standalone' && d.code!=='GOV-GOV'}).forEach(function(d){
-    html += sidebarItem(d)
+  var sb = getSB(); if(!sb.url) return false
+  var r = await fetch(sb.url+'/rest/v1/'+table,{
+    method:'POST',
+    headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=minimal'},
+    body:JSON.stringify(data)
   })
-
-  // News topics
-  html += '<div class="sb-section" style="margin-top:8px">Market News</div>'
-  NEWS_TOPICS.forEach(function(t){ html += sidebarItem(t, true) })
-
-  document.getElementById('sidebar').innerHTML = html
+  return r.ok
 }
-
-function sidebarItem(entry, isNews){
-  var c = counts[entry.code]||0
-  var isActive = currentEntry && currentEntry.code === entry.code
-  return '<div class="sb-item'+(isActive?' active':'')+'" data-code="'+entry.code+'" onclick="selectEntry(this.dataset.code)">'
-    +'<div class="sb-item-label">'+entry.icon+' '+entry.name+'</div>'
-    +'<span class="sb-count'+(c>0?' live':'')+'">'+c+'</span>'
-    +'</div>'
-}
-
-var defOpen = true
-function toggleDef(){
-  defOpen = !defOpen
-  var subs = document.getElementById('defSubs')
-  var arrow = document.getElementById('defArrow')
-  if(subs) subs.style.display = defOpen ? 'block' : 'none'
-  if(arrow) arrow.innerHTML = defOpen ? '&#9660;' : '&#9654;'
-}
-
-async function selectEntry(code){
-  var entry = DOMAINS.find(function(d){return d.code===code}) || NEWS_TOPICS.find(function(t){return t.code===code})
-  if(!entry) return
-  currentEntry = entry
-  currentTab = 'intel'
-  currentFilter = 'all'
-  cachedIntel = []; cachedUC = []; cachedActions = []; showAllAges = false
-  document.querySelectorAll('.sb-item').forEach(function(el){el.classList.remove('active')})
-  document.querySelectorAll('.sb-item[data-code="'+code+'"]').forEach(function(el){el.classList.add('active')})
-  await renderDomainView()
-}
-
-// \u2500\u2500 Domain View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function renderDomainView(){
-  var e = currentEntry
-  var intelCount = counts[e.code]||0
-  var ucCount = await sbCount('uc_queue','domain_code=eq.'+e.code+'&status=eq.pending')
-  var actionCount = await sbCount('sales_actions','domain_code=eq.'+e.code+'&status=neq.closed')
-
-  document.getElementById('main').innerHTML =
-    '<div class="domain-hdr">'
-    +'<div class="domain-title">'+e.icon+' '+e.name+'</div>'
-    +'<div class="domain-sub" id="domSub">'+intelCount+' intelligence items</div>'
-    +'<div class="tabs">'
-    +'<div class="tab'+(currentTab==='intel'?' active':'')+'" data-tab="intel" onclick="switchTab(this.dataset.tab)">Intelligence <span style="font-size:10px;opacity:0.6">('+intelCount+')</span></div>'
-    +'<div class="tab'+(currentTab==='uc'?' active':'')+'" data-tab="uc" onclick="switchTab(this.dataset.tab)">Use Cases <span style="font-size:10px;opacity:0.6">('+ucCount+')</span></div>'
-    +'<div class="tab'+(currentTab==='actions'?' active':'')+'" data-tab="actions" onclick="switchTab(this.dataset.tab)">Sales Actions <span style="font-size:10px;opacity:0.6">('+actionCount+')</span></div>'
-    +'</div></div>'
-    +'<div id="tabIntel" class="tab-content'+(currentTab==='intel'?' active':'')+'">'
-    +'<div class="loading"><div class="spin"></div> Loading intelligence...</div>'
-    +'</div>'
-    +'<div id="tabUc" class="tab-content'+(currentTab==='uc'?' active':'')+'">'
-    +'<div class="loading"><div class="spin"></div> Loading use cases...</div>'
-    +'</div>'
-    +'<div id="tabActions" class="tab-content'+(currentTab==='actions'?' active':'')+'">'
-    +'<div class="loading"><div class="spin"></div> Loading actions...</div>'
-    +'</div>'
-
-  if(currentTab==='intel') await loadIntel()
-  else if(currentTab==='uc') await loadUC()
-  else await loadActions()
-}
-
-function switchTab(tab){
-  currentTab = tab
-  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')})
-  document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active')})
-  var tabEl = document.querySelector('.tab[data-tab="'+tab+'"]')
-  var contentEl = document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1))
-  if(tabEl) tabEl.classList.add('active')
-  if(contentEl) contentEl.classList.add('active')
-  var needsLoad = !contentEl || contentEl.innerHTML.indexOf('Loading') >= 0 || contentEl.innerHTML.trim() === ''
-  if(needsLoad){
-    if(tab==='intel') loadIntel()
-    else if(tab==='uc') loadUC()
-    else loadActions()
-  }
-}
-
-// \u2500\u2500 Intelligence Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function loadIntel(){
-  var e = currentEntry
-  var el = document.getElementById('tabIntel')
-  if(!el) return
-  if(cachedIntel.length === 0){
-    // Default: last 18 months only
-    var cutoff = new Date()
-    cutoff.setMonth(cutoff.getMonth() - 18)
-    var cutoffStr = cutoff.toISOString()
-    var params = 'domain_code=eq.'+e.code+'&order=scraped_at.desc'
-    if(!showAllAges) params += '&scraped_at=gte.'+cutoffStr
-    cachedIntel = await sbFetch('intelligence_items', params, 100)
-  }
-  renderIntelTab()
-}
-
-function renderIntelTab(){
-  var el = document.getElementById('tabIntel')
-  if(!el) return
-  var all = cachedIntel
-  var items = currentFilter==='all' ? all : all.filter(function(i){return i.intelligence_stream===currentFilter})
-  var mp = all.filter(function(i){return i.intelligence_stream==='market_pulse'}).length
-  var di = all.filter(function(i){return i.intelligence_stream==='domain_intel'}).length
-  var tw = all.filter(function(i){return i.intelligence_stream==='tech_watch'}).length
-
-  var ageLabel = showAllAges ? 'All time' : 'Last 18 months'
-  el.innerHTML = '<div class="filter-bar" id="intelFilterBar">'
-    +'<span style="font-size:11px;color:var(--mid);font-weight:600">Filter:</span>'
-    +'<button class="filter-btn'+(currentFilter==='all'?' active':'')+'" data-filter="all" onclick="setFilter(this.dataset.filter)">All ('+all.length+')</button>'
-    +'<button class="filter-btn mp'+(currentFilter==='market_pulse'?' active':'')+'" data-filter="market_pulse" onclick="setFilter(this.dataset.filter)">Market Pulse ('+mp+')</button>'
-    +'<button class="filter-btn di'+(currentFilter==='domain_intel'?' active':'')+'" data-filter="domain_intel" onclick="setFilter(this.dataset.filter)">Domain Intel ('+di+')</button>'
-    +'<button class="filter-btn tw'+(currentFilter==='tech_watch'?' active':'')+'" data-filter="tech_watch" onclick="setFilter(this.dataset.filter)">Tech Watch ('+tw+')</button>'
-    +'<button class="filter-btn" style="margin-left:auto;font-size:10px;opacity:0.7" onclick="toggleAge()">&#128337; '+ageLabel+'</button>'
-    +'</div><div id="intelItems"></div>'
-
-  renderIntelItems(items)
-}
-
-function toggleAge(){
-  showAllAges = !showAllAges
-  cachedIntel = []
-  loadIntel()
-}
-
-function setFilter(f){
-  currentFilter = f
-  document.querySelectorAll('#intelFilterBar .filter-btn').forEach(function(b){
-    b.classList.toggle('active', b.dataset.filter===f)
+async function sbPatch(table, filter, data){
+  var sb = getSB(); if(!sb.url) return false
+  var r = await fetch(sb.url+'/rest/v1/'+table+'?'+filter,{
+    method:'PATCH',
+    headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify(data)
   })
-  var items = f==='all' ? cachedIntel : cachedIntel.filter(function(i){return i.intelligence_stream===f})
-  renderIntelItems(items)
+  return r.ok
 }
-
-function renderIntelItems(items){
-  var c = document.getElementById('intelItems')
-  if(!c) return
-  if(!items.length){
-    c.innerHTML = '<div class="empty-state"><div class="icon">&#128270;</div><h3>No items</h3><p>No intelligence items for this filter.</p></div>'
-    return
-  }
-  c.innerHTML = '<div class="intel-grid">'+items.map(function(item){
-    var sc = item.intelligence_stream==='market_pulse'?'badge-mp':item.intelligence_stream==='domain_intel'?'badge-di':'badge-tw'
-    var sl = item.intelligence_stream ? item.intelligence_stream.replace(/_/g,' ') : ''
-    var vc = 'badge-'+(item.intelligence_value||'medium')
-    var exp = ''
-    if(item.problem_statement) exp+='<div class="intel-field"><div class="intel-field-label">Problem Statement</div><div class="intel-field-val">'+esc(item.problem_statement)+'</div></div>'
-    if(item.technical_context) exp+='<div class="intel-field"><div class="intel-field-label">Technical Context</div><div class="intel-field-val">'+esc(item.technical_context)+'</div></div>'
-    if(item.opportunity) exp+='<div class="intel-field"><div class="intel-field-label">Opportunity</div><div class="intel-field-val"><span class="tag tag-opp">'+esc(item.opportunity)+'</span></div></div>'
-    if(item.competitor_signals) exp+='<div class="intel-field"><div class="intel-field-label">Competitor Signals</div><div class="intel-field-val"><span class="tag tag-comp">'+esc(item.competitor_signals)+'</span></div></div>'
-    var infra = Array.isArray(item.infrastructure_signals)?item.infrastructure_signals:[]
-    if(infra.length) exp+='<div class="intel-field"><div class="intel-field-label">Infrastructure</div><div class="intel-tags">'+infra.map(function(s){return '<span class="tag">'+esc(s)+'</span>'}).join('')+'</div></div>'
-    var uc = item.uc_extracted||{}
-    if(uc.uc_name) exp+='<div class="intel-field"><div class="intel-field-label">UC Signal</div><div class="intel-field-val" style="color:var(--teal);font-weight:600">'+esc(uc.uc_name)+'</div></div>'
-    var tags = Array.isArray(item.tags)?item.tags:[]
-    var th = tags.slice(0,4).map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join('')
-    return '<div class="intel-card" style="cursor:pointer" data-id="'+item.id+'" onclick="openIntelDetail(this.dataset.id)">'
-      +'<div class="intel-card-hdr"><div class="intel-title">'+esc(item.title||'')+'</div>'
-      +'<div class="intel-badges">'+(sl?'<span class="badge '+sc+'">'+sl+'</span> ':'')+'<span class="badge '+vc+'">'+(item.intelligence_value||'medium')+'</span>'+(item.depth_score?'<span class="badge badge-depth"> d'+item.depth_score+'</span>':'')+'</div></div>'
-      +'<div class="intel-summary">'+esc(item.summary||'')+'</div>'
-      +(th?'<div class="intel-tags">'+th+'</div>':'')
-      +(exp?'<div class="intel-expanded" id="exp-'+item.id+'">'+exp+'</div>':'')
-      +'<div class="intel-actions">'
-      +(exp?'<button class="btn btn-outline btn-xs" data-eid="'+item.id+'" onclick="toggleExp(this.dataset.eid)" id="expbtn-'+item.id+'">&#9660; More</button>':'')
-      +'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" data-title="'+(item.title||'').replace(/"/g,'&quot;')+'" data-domain="'+(item.domain_code||'')+'" onclick="openActionModal(this.dataset.id,this.dataset.title,this.dataset.domain)">&#9889; Action</button>'
-      +'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" onclick="addIntelToDocket(this.dataset.id)">+ Docket</button>'
-      +'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" onclick="addIntelToDocket(this.dataset.id)">+ Docket</button>'
-      +'</div></div>'
-  }).join('')+'</div>'
-}
-
-function toggleExp(id){
-  var el = document.getElementById('exp-'+id)
-  var btn = document.getElementById('expbtn-'+id)
-  if(!el) return
-  el.classList.toggle('open')
-  btn.innerHTML = el.classList.contains('open') ? '&#9650; Less' : '&#9660; More'
-}
-
-// \u2500\u2500 Use Cases Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function loadUC(){
-  var e = currentEntry
-  var el = document.getElementById('tabUc')
-  if(!el) return
-  if(cachedUC.length === 0){
-    // Fetch from both uc_queue (auto-suggested) and uc_library (curated)
-    var queueItems = await sbFetch('uc_queue','domain_code=eq.'+e.code+'&order=suggested_at.desc')
-    // Fetch all library items and filter client-side (avoids complex jsonb query)
-    var allLibraryItems = await sbFetch('uc_library','order=created_at.desc',200)
-    var libraryItems = allLibraryItems.filter(function(i){
-      var codes = Array.isArray(i.domain_codes) ? i.domain_codes : []
-      return codes.indexOf(e.code) >= 0 || codes.length === 0
-    })
-    // Tag source type for rendering
-    queueItems.forEach(function(i){ i._source = 'queue' })
-    libraryItems.forEach(function(i){ i._source = 'library' })
-    cachedUC = libraryItems.concat(queueItems)
-  }
-  renderUCItems()
-}
-
-function renderUCItems(){
-  var el = document.getElementById('tabUc')
-  if(!el) return
-  var items = cachedUC
-  var libraryItems = items.filter(function(i){return i._source==='library'})
-  var queueItems = items.filter(function(i){return i._source==='queue'})
-  // Add UC + manual button header
-  var headerHtml = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
-    +'<div style="font-size:13px;font-weight:700;color:var(--navy)">Use Cases &mdash; '+currentEntry.name+'</div>'
-    +'<button class="btn btn-primary btn-sm" onclick="openManualUC()">+ Add UC Manually</button>'
-    +'</div>'
-
-  if(!items.length){
-    el.innerHTML = headerHtml + '<div class="empty-state"><div class="icon">&#128161;</div><h3>No Use Cases Yet</h3><p>Use cases are suggested automatically during enrichment, or can be added manually using the button above.</p></div>'
-    return
-  }
-  var html = headerHtml
-  if(libraryItems.length){
-    html += '<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">&#128218; UC Library ('+libraryItems.length+')</div>'
-    html += libraryItems.map(function(item){
-      var matBadge = item.maturity ? '<span class="badge" style="background:rgba(0,178,144,0.1);color:var(--teal)">'+item.maturity+'</span>' : ''
-      var hwBadge = item.hardware_profile ? '<span class="badge badge-di">'+esc(item.hardware_profile.slice(0,30))+'</span>' : ''
-      var expanded = ''
-      // Always show source domain + AI model + processing if available (imported UCs)
-      if(item.source_domain) expanded += '<div class="intel-field"><div class="intel-field-label">Source Domain</div><div class="intel-field-val">'+esc(item.source_domain)+'</div></div>'
-      if(item.ai_model) expanded += '<div class="intel-field"><div class="intel-field-label">AI Model</div><div class="intel-field-val">'+esc(item.ai_model)+'</div></div>'
-      if(item.processing_type) expanded += '<div class="intel-field"><div class="intel-field-label">Processing Type</div><div class="intel-field-val">'+esc(item.processing_type)+'</div></div>'
-      if(item.hardware_profile) expanded += '<div class="intel-field"><div class="intel-field-label">Hardware Profile</div><div class="intel-field-val">'+esc(item.hardware_profile)+'</div></div>'
-      if(item.problem_statement) expanded += '<div class="intel-field"><div class="intel-field-label">Problem</div><div class="intel-field-val">'+esc(item.problem_statement)+'</div></div>'
-      if(item.benefit) expanded += '<div class="intel-field"><div class="intel-field-label">Benefit</div><div class="intel-field-val">'+esc(item.benefit)+'</div></div>'
-      if(item.description) expanded += '<div class="intel-field"><div class="intel-field-label">How It Works</div><div class="intel-field-val">'+esc(item.description)+'</div></div>'
-      var steps = Array.isArray(item.process_steps) ? item.process_steps : []
-      if(steps.length) expanded += '<div class="intel-field"><div class="intel-field-label">Process</div><div class="intel-field-val">'+steps.map(function(s,i){return (i+1)+'. '+esc(s)}).join('<br>')+'</div></div>'
-      var actors = Array.isArray(item.key_actors) ? item.key_actors : []
-      if(actors.length) expanded += '<div class="intel-field"><div class="intel-field-label">Key Actors</div><div class="intel-field-val">'+actors.map(esc).join(' &middot; ')+'</div></div>'
-      if(item.data_requirements) expanded += '<div class="intel-field"><div class="intel-field-label">Data Requirements</div><div class="intel-field-val">'+esc(item.data_requirements)+'</div></div>'
-      if(item.technical_requirements) expanded += '<div class="intel-field"><div class="intel-field-label">Technical Requirements</div><div class="intel-field-val">'+esc(item.technical_requirements)+'</div></div>'
-      if(item.model_type) expanded += '<div class="intel-field"><div class="intel-field-label">Model Type</div><div class="intel-field-val">'+esc(item.model_type)+'</div></div>'
-      if(item.regulatory) expanded += '<div class="intel-field"><div class="intel-field-label">Regulatory</div><div class="intel-field-val">'+esc(item.regulatory)+'</div></div>'
-      var refs = Array.isArray(item.reference_deployments) ? item.reference_deployments : []
-      if(refs.length) expanded += '<div class="intel-field"><div class="intel-field-label">Reference Deployments</div><div class="intel-field-val">'+refs.map(esc).join(', ')+'</div></div>'
-      if(item.estimated_effort) expanded += '<div class="intel-field"><div class="intel-field-label">Estimated Effort</div><div class="intel-field-val">'+esc(item.estimated_effort)+'</div></div>'
-      return '<div class="uc-card">'
-        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px">'
-        +'<div><div class="uc-name">'+esc(item.uc_name||'')+'</div>'
-        +'<div class="uc-cluster" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">'+esc(item.cluster||'')+(matBadge?' '+matBadge:'')+(hwBadge?' '+hwBadge:'')+'</div></div>'
-        +'<span class="uc-status accepted">library</span>'
-        +'</div>'
-        +(item.problem_statement?'<div style="font-size:12px;color:#555;line-height:1.5;margin-bottom:8px">'+esc(item.problem_statement.slice(0,120))+'</div>':'')
-        +'<div class="intel-expanded" id="ucexp-'+item.id+'">'+(expanded||'<em style="font-size:11px;color:var(--mid)">Basic entry &#8212; click Enrich to add full details.</em>')+'</div>'
-        +'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'
-        +'<button class="btn btn-outline btn-xs" data-eid="ucexp-'+item.id+'" onclick="toggleExpLib(this.dataset.eid)">&#9660; Details</button>'
-        +'<button class="btn btn-primary btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'').replace(/"/g,'&quot;')+'" data-domain="'+(Array.isArray(item.domain_codes)&&item.domain_codes.length?item.domain_codes[0]:'')+'" onclick="openEnrichLibUC(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9999; Enrich</button>'
-        +'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" onclick="addUCToDocket(this.dataset.id,&apos;library&apos;)">+ Docket</button>'
-        +'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'').replace(/"/g,'&quot;')+'" data-domain="'+(currentEntry.code||'')+'" onclick="openActionModal(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9889; Use in Engagement</button>'
-        +'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" onclick="addUCToDocket(this.dataset.id,&apos;queue&apos;)">+ Docket</button>'
-        +'</div></div>'
-    }).join('')
-  }
-  if(queueItems.length){
-    html += '<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin:'+(libraryItems.length?'20px':'0')+'px 0 10px">&#128161; Suggested from Intelligence ('+queueItems.length+')</div>'
-    html += queueItems.map(function(item){
-      return '<div class="uc-card">'
-        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px">'
-        +'<div><div class="uc-name">'+esc(item.uc_name||'')+'</div>'
-        +'<div class="uc-cluster">'+esc(item.cluster||'Auto-suggested')+'</div></div>'
-        +'<span class="uc-status '+(item.status||'pending')+'">'+( item.status||'pending')+'</span>'
-        +'</div>'
-        +'<div class="uc-rationale">'+esc(item.rationale||'')+'</div>'
-        +(item.source_title?'<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Source: '+esc(item.source_title.slice(0,60))+'</div>':'')
-        +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-        +(item.status==='pending'?'<button class="btn btn-primary btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'').replace(/"/g,'&quot;')+'" data-rationale="'+(item.rationale||'').replace(/"/g,'&quot;').slice(0,80)+'" data-source="'+(item.source_title||'').replace(/"/g,'&quot;').slice(0,60)+'" data-intel="'+(item.source_intel_id||'')+'" data-domain="'+(item.domain_code||'')+'" onclick="openEnrichModal(this.dataset.id,this.dataset.name,this.dataset.rationale,this.dataset.source,this.dataset.intel,this.dataset.domain)">&#9999; Enrich &rarr; Library</button>':'')
-        +(item.status==='pending'?'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" data-status="rejected" onclick="updateUC(this.dataset.id,this.dataset.status)">&#10007; Reject</button>':'')
-        +(item.status==='accepted'?'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'').replace(/"/g,'&quot;')+'" data-domain="'+(currentEntry.code||'')+'" onclick="openActionModal(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9889; Action</button>':'')
-        +'</div></div>'
-    }).join('')
-  }
-  el.innerHTML = html
-}
-
-function toggleExpLib(id){
-  var el = document.getElementById(id)
-  if(!el) return
-  el.classList.toggle('open')
-  var isOpen = el.classList.contains('open')
-  // Find the button that triggered this
-  var btn = document.querySelector('[data-eid="'+id+'"]')
-  if(btn) btn.innerHTML = isOpen ? '\u25B2 Hide' : '\u25BC Details'
-}
-
-function openEnrichModal(queueId, ucName, rationale, sourceTitle, sourceIntelId, domainCode){
-  document.getElementById('enrichUCId').value = ''
-  document.getElementById('enrichQueueId').value = queueId||''
-  document.getElementById('enrichName').value = ucName||''
-  document.getElementById('enrichCluster').value = ''
-  document.getElementById('enrichDomains').value = domainCode||''
-  document.getElementById('enrichMaturity').value = 'emerging'
-  document.getElementById('enrichProblem').value = ''
-  document.getElementById('enrichBenefit').value = ''
-  document.getElementById('enrichDescription').value = ''
-  document.getElementById('enrichSteps').value = ''
-  document.getElementById('enrichActors').value = ''
-  document.getElementById('enrichData').value = ''
-  document.getElementById('enrichTech').value = ''
-  document.getElementById('enrichModelType').value = ''
-  document.getElementById('enrichHardware').value = ''
-  document.getElementById('enrichRegulatory').value = ''
-  document.getElementById('enrichRefs').value = ''
-  document.getElementById('enrichEffort').value = ''
-  // Show source context
-  var info = ''
-  if(sourceTitle) info += '<strong>Source:</strong> ' + esc(sourceTitle.slice(0,80))
-  if(rationale) info += '<br><strong>Rationale:</strong> ' + esc(rationale.slice(0,120))
-  document.getElementById('enrichSourceInfo').innerHTML = info || 'Manual entry'
-  // If we have a source intel item, try to pre-fill from its enrichment
-  if(sourceIntelId) prefillFromIntel(sourceIntelId)
-  document.getElementById('enrichModal').classList.add('open')
-}
-
-async function aiEnrichUC(){
-  var ucName = document.getElementById('enrichName').value.trim()
-  if(!ucName){ alert('Enter a UC Name first so Gemini knows what to enrich.'); return }
-  
-  // Get config for Gemini key
-  var cfg = getCfg()
-  // Also check dedicated gemini key storage
-  if(!cfg.geminiKey) cfg.geminiKey = localStorage.getItem('atlas_gemini_key')||''
-  if(!cfg.geminiKey){
-    var k = prompt('Enter your Gemini API key (will be saved):')
-    if(!k){ alert('Gemini API key is required for auto-enrichment.'); return }
-    cfg.geminiKey = k
-    localStorage.setItem('atlas_gemini_key', k)
-    setCfg(cfg)
-  }
-  
-  // Gather context from form
-  var domainCode = document.getElementById('enrichDomains').value.trim() || (currentEntry ? currentEntry.name : '')
-  var sourceInfo = document.getElementById('enrichSourceInfo').textContent || ''
-  
-  var btn = document.getElementById('aiEnrichBtn')
-  var status = document.getElementById('aiEnrichStatus')
-  btn.disabled = true
-  btn.textContent = 'Enriching...'
-  status.style.display = 'block'
-  status.style.color = 'var(--mid)'
-  status.textContent = 'Calling Gemini...'
-  console.log('aiEnrichUC: calling with key', cfg.geminiKey ? 'present' : 'MISSING', 'ucName:', ucName)
-  
-  var prompt = 'You are a senior AI solutions expert. Generate a complete structured use case definition for the following AI use case.'
-    + ' UC NAME: ' + ucName + '.'
-    + ' DOMAIN: ' + domainCode + '.'
-    + ' CONTEXT: ' + sourceInfo.slice(0,300) + '.'
-    + ' Respond with a SINGLE JSON object using ONLY these exact fields:'
-    + ' problem_statement (2-3 sentences: what problem this solves and why it matters),'
-    + ' benefit (quantified benefit: cost saving, efficiency gain, risk reduction),'
-    + ' description (3-4 sentences: how the AI works, what approach is used),'
-    + ' process_steps (array of 5-7 strings: step-by-step implementation process),'
-    + ' key_actors (array of 4-6 strings: organisations/roles who use, benefit, approve),'
-    + ' data_requirements (what data is needed, format, volume, frequency, sources),'
-    + ' technical_requirements (compute needs, connectivity, latency, deployment constraints),'
-    + ' model_type (e.g. Computer Vision, NLP, Time Series, Multimodal, Reinforcement Learning),'
-    + ' hardware_profile (e.g. Edge GPU node, Central GPU cluster, Air-gapped, DLC rack),'
-    + ' regulatory (compliance, data sovereignty, clearance requirements if any),'
-    + ' reference_deployments (array of 2-4 strings: where similar systems exist globally),'
-    + ' estimated_effort (implementation complexity: e.g. 3-6 months, High complexity).'
-    + ' Start with { end with }. No markdown. No backticks.'
-  
-  try{
-    var model = getTaskModel('uc_enrich')
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+cfg.geminiKey
-    var body = {
-      contents:[{role:'user',parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.2, maxOutputTokens:2048}
-    }
-    var resp = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
-    if(!resp.ok) throw new Error('Gemini error: ' + resp.status)
-    var data = await resp.json()
-    var raw = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    
-    // Parse JSON
-    var first = raw.indexOf('{')
-    if(first >= 0) raw = raw.slice(first)
-    var last = raw.lastIndexOf('}')
-    if(last >= 0) raw = raw.slice(0, last+1)
-    var enriched = JSON.parse(raw)
-    
-    // Populate form fields
-    if(enriched.problem_statement) document.getElementById('enrichProblem').value = enriched.problem_statement
-    if(enriched.benefit) document.getElementById('enrichBenefit').value = enriched.benefit
-    if(enriched.description) document.getElementById('enrichDescription').value = enriched.description
-    if(Array.isArray(enriched.process_steps)) document.getElementById('enrichSteps').value = enriched.process_steps.join('\n')
-    if(Array.isArray(enriched.key_actors)) document.getElementById('enrichActors').value = enriched.key_actors.join(', ')
-    if(enriched.data_requirements) document.getElementById('enrichData').value = enriched.data_requirements
-    if(enriched.technical_requirements) document.getElementById('enrichTech').value = enriched.technical_requirements
-    if(enriched.model_type) document.getElementById('enrichModelType').value = enriched.model_type
-    if(enriched.hardware_profile) document.getElementById('enrichHardware').value = enriched.hardware_profile
-    if(enriched.regulatory) document.getElementById('enrichRegulatory').value = enriched.regulatory
-    if(Array.isArray(enriched.reference_deployments)) document.getElementById('enrichRefs').value = enriched.reference_deployments.join(', ')
-    if(enriched.estimated_effort) document.getElementById('enrichEffort').value = enriched.estimated_effort
-    
-    status.textContent = '\u2705 Enriched by Gemini \u2014 review and edit before saving'
-    status.style.color = 'var(--teal)'
-    btn.textContent = '\u21BA Re-Enrich with Gemini'
-  }catch(e){
-    var errMsg = e.message || String(e)
-    status.textContent = '\u274C ' + errMsg.slice(0,120)
-    status.style.color = 'var(--orange)'
-    btn.textContent = '\u21BA Retry Auto-Enrich'
-    console.error('aiEnrichUC error:', e)
-    alert('Enrichment error: ' + errMsg.slice(0,200))
-  }
-  btn.disabled = false
-}
-
-async function prefillFromIntel(intelId){
-  var items = await sbFetch('intelligence_items','id=eq.'+intelId,1)
-  if(!items.length) return
-  var item = items[0]
-  if(item.problem_statement && !document.getElementById('enrichProblem').value)
-    document.getElementById('enrichProblem').value = item.problem_statement
-  if(item.technical_context && !document.getElementById('enrichTech').value)
-    document.getElementById('enrichTech').value = item.technical_context
-  var infra = Array.isArray(item.infrastructure_signals) ? item.infrastructure_signals : []
-  if(infra.length && !document.getElementById('enrichHardware').value)
-    document.getElementById('enrichHardware').value = infra.join(', ')
-}
-
-async function openEnrichLibUC(libId, ucName, domainCode){
-  // Fetch full item from uc_library
-  var items = await sbFetch('uc_library','id=eq.'+libId,1)
-  if(!items.length){ alert('Could not load UC.'); return }
-  var item = items[0]
-  
-  document.getElementById('enrichUCId').value = libId
-  document.getElementById('enrichQueueId').value = ''
-  document.getElementById('enrichName').value = item.uc_name||''
-  document.getElementById('enrichCluster').value = item.cluster||''
-  var codes = Array.isArray(item.domain_codes) ? item.domain_codes : []
-  document.getElementById('enrichDomains').value = codes.join(', ')
-  document.getElementById('enrichMaturity').value = item.maturity||'emerging'
-  document.getElementById('enrichProblem').value = item.problem_statement||''
-  document.getElementById('enrichBenefit').value = item.benefit||''
-  document.getElementById('enrichDescription').value = item.description||''
-  var steps = Array.isArray(item.process_steps) ? item.process_steps : []
-  document.getElementById('enrichSteps').value = steps.join('\n')
-  var actors = Array.isArray(item.key_actors) ? item.key_actors : []
-  document.getElementById('enrichActors').value = actors.join(', ')
-  document.getElementById('enrichData').value = item.data_requirements||''
-  document.getElementById('enrichTech').value = item.technical_requirements||''
-  document.getElementById('enrichModelType').value = item.model_type||item.ai_model||''
-  document.getElementById('enrichHardware').value = item.hardware_profile||''
-  document.getElementById('enrichRegulatory').value = item.regulatory||''
-  var refs = Array.isArray(item.reference_deployments) ? item.reference_deployments : []
-  document.getElementById('enrichRefs').value = refs.join(', ')
-  document.getElementById('enrichEffort').value = item.estimated_effort||''
-  document.getElementById('enrichSourceInfo').innerHTML = '<strong>Editing library UC:</strong> '+esc(item.uc_name||'')+(item.source_domain?' | Source: '+esc(item.source_domain):'')
-  document.getElementById('enrichModal').classList.add('open')
-}
-
-async function saveEnrichedUC(){
-  var name = document.getElementById('enrichName').value.trim()
-  if(!name){ alert('UC Name is required.'); return }
-  
-  var domainsRaw = document.getElementById('enrichDomains').value.trim()
-  var domainCodes = domainsRaw ? domainsRaw.split(',').map(function(s){return s.trim()}).filter(Boolean) : []
-  
-  var stepsRaw = document.getElementById('enrichSteps').value.trim()
-  var steps = stepsRaw ? stepsRaw.split('\n').map(function(s){return s.replace(/^\d+\.\s*/,'').trim()}).filter(Boolean) : []
-  
-  var actorsRaw = document.getElementById('enrichActors').value.trim()
-  var actors = actorsRaw ? actorsRaw.split(',').map(function(s){return s.trim()}).filter(Boolean) : []
-  
-  var refsRaw = document.getElementById('enrichRefs').value.trim()
-  var refs = refsRaw ? refsRaw.split(',').map(function(s){return s.trim()}).filter(Boolean) : []
-  
-  var queueId = document.getElementById('enrichQueueId').value
-  var ucId = 'uclib-' + Date.now() + '-' + Math.floor(Math.random()*9999)
-  
-  var ucRow = {
-    id: ucId,
-    uc_name: name,
-    cluster: document.getElementById('enrichCluster').value.trim()||null,
-    domain_codes: domainCodes,
-    source: queueId ? 'enriched_from_queue' : 'manual',
-    status: 'active',
-    problem_statement: document.getElementById('enrichProblem').value.trim()||null,
-    benefit: document.getElementById('enrichBenefit').value.trim()||null,
-    description: document.getElementById('enrichDescription').value.trim()||null,
-    process_steps: steps,
-    key_actors: actors,
-    data_requirements: document.getElementById('enrichData').value.trim()||null,
-    technical_requirements: document.getElementById('enrichTech').value.trim()||null,
-    model_type: document.getElementById('enrichModelType').value.trim()||null,
-    hardware_profile: document.getElementById('enrichHardware').value.trim()||null,
-    regulatory: document.getElementById('enrichRegulatory').value.trim()||null,
-    reference_deployments: refs,
-    estimated_effort: document.getElementById('enrichEffort').value.trim()||null,
-    maturity: document.getElementById('enrichMaturity').value,
-    created_by: 'ATLAS',
-    created_at: new Date().toISOString(),
-    source_intel_id: null
-  }
-  
-  var libId = document.getElementById('enrichUCId').value
-  var ok = false
-  if(libId){
-    // Update existing library item
-    ok = await sbPatch('uc_library','id=eq.'+libId, ucRow)
-  } else {
-    // Insert new library item
-    ok = await sbInsert('uc_library', ucRow)
-    if(ok && queueId) await sbPatch('uc_queue','id=eq.'+queueId,{status:'accepted'})
-  }
-  if(ok){
-    closeModal('enrichModal')
-    cachedUC = []
-    await loadUC()
-  } else {
-    alert('Failed to save. Check Supabase connection.')
-  }
-}
-
-async function openManualUC(){
-  openEnrichModal('','','','','', currentEntry ? currentEntry.code : '')
-}
-
-async function updateUC(id, status){
-  await sbPatch('uc_queue','id=eq.'+id,{status:status})
-  cachedUC = []; loadUC()
-}
-
-// \u2500\u2500 Sales Actions Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-async function loadActions(){
-  var e = currentEntry
-  var el = document.getElementById('tabActions')
-  if(!el) return
-  if(cachedActions.length === 0)
-    cachedActions = await sbFetch('sales_actions','domain_code=eq.'+e.code+'&order=created_at.desc')
-  renderActionItems()
-}
-
-function renderActionItems(){
-  var el = document.getElementById('tabActions')
-  if(!el) return
-  var items = cachedActions
-  var newBtn = '<div style="display:flex;justify-content:flex-end;margin-bottom:14px">'
-    +'<button class="btn btn-primary btn-sm" data-domain="'+(currentEntry.code||'')+'" onclick="newAction(this.dataset.domain)">+ New Action</button>'
-    +'</div>'
-  if(!items.length){
-    el.innerHTML = newBtn+'<div class="empty-state"><div class="icon">&#9889;</div><h3>No Actions Yet</h3><p>Create actions from intelligence items or use cases, or click New Action above.</p></div>'
-    return
-  }
-  el.innerHTML = newBtn + items.map(function(item){
-    var st = item.status||'new'
-    var assigned = item.assigned_to ? 'Assigned to: <strong>'+esc(item.assigned_to)+'</strong>' : 'Unassigned'
-    var due = item.due_date ? ' &middot; Due: '+item.due_date : ''
-    return '<div class="action-card '+st+'">'
-      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px">'
-      +'<div><div class="action-title">'+esc(item.action_title||'')+'</div>'
-      +'<div class="action-meta">'+assigned+due+'</div></div>'
-      +'<span class="action-status '+st+'">'+st.replace('_',' ')+'</span>'
-      +'</div>'
-      +(item.action_description?'<div style="font-size:12px;color:#555;margin-bottom:8px;line-height:1.5">'+esc(item.action_description)+'</div>':'')
-      +(item.source_title?'<div style="font-size:11px;color:var(--mid);margin-bottom:8px">From: '+esc(item.source_title.slice(0,60))+'</div>':'')
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(st==='new'?'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" data-status="in_progress" onclick="updateAction(this.dataset.id,this.dataset.status)">Start</button>':'')
-      +(st==='in_progress'?'<button class="btn btn-teal btn-xs" data-aid="'+item.id+'" onclick="openEngModal(this.dataset.aid)">&#128640; Convert to Engagement</button>':'')
-      +(st!=='closed'&&st!=='converted'?'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" data-status="closed" onclick="updateAction(this.dataset.id,this.dataset.status)">Close</button>':'')
-      +'</div></div>'
-  }).join('')
-}
-
-async function updateAction(id, status){
-  await sbPatch('sales_actions','id=eq.'+id,{status:status})
-  cachedActions = []; loadActions()
-}
-
-// \u2500\u2500 Modals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function newAction(dc){ openActionModal('','',dc) }
-
-function openActionModal(intelId, intelTitle, domainCode){
-  document.getElementById('actIntelId').value = intelId||''
-  document.getElementById('actIntelTitle').value = intelTitle||''
-  document.getElementById('actDomain').value = domainCode||''
-  document.getElementById('actTitle').value = ''
-  document.getElementById('actDesc').value = ''
-  document.getElementById('actApproach').value = ''
-  document.getElementById('actAssignee').value = ''
-  document.getElementById('actPriority').value = 'medium'
-  document.getElementById('actDue').value = ''
-  var team = getTeam()
-  document.getElementById('teamDL').innerHTML = team.map(function(m){return '<option value="'+m+'">'}).join('')
-  document.getElementById('actionModal').classList.add('open')
-}
-
-async function saveAction(){
-  var title = document.getElementById('actTitle').value.trim()
-  if(!title){ alert('Enter an action title.'); return }
-  var ok = await sbInsert('sales_actions',{
-    id: 'act-'+Date.now()+'-'+Math.floor(Math.random()*9999),
-    source_intel_id: document.getElementById('actIntelId').value||null,
-    source_title: document.getElementById('actIntelTitle').value||null,
-    domain_code: document.getElementById('actDomain').value||null,
-    action_title: title,
-    action_description: document.getElementById('actDesc').value.trim()||null,
-    suggested_approach: document.getElementById('actApproach').value.trim()||null,
-    assigned_to: document.getElementById('actAssignee').value.trim()||null,
-    priority: document.getElementById('actPriority').value,
-    status: 'new',
-    created_at: new Date().toISOString(),
-    created_by: 'ATLAS'
+async function sbDelete(table, filter){
+  var sb = getSB(); if(!sb.url) return false
+  var r = await fetch(sb.url+'/rest/v1/'+table+'?'+filter,{
+    method:'DELETE',
+    headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
   })
-  if(ok){
-    closeModal('actionModal')
-    cachedActions = []
-    await loadActions()
-    if(currentTab!=='actions') switchTab('actions')
-    // Offer Add to Docket
-    var title = document.getElementById('actTitle').value.trim()
-    var desc = document.getElementById('actDesc').value.trim()
-    var intelTitle = document.getElementById('actIntelTitle').value||''
-    var domain = document.getElementById('actDomain').value||''
-    offerAddToDocket({
-      type:'action',
-      title: title,
-      notes: desc || (intelTitle?'From intel: '+intelTitle:''),
-      content:{domain_code:domain, source_intel_title:intelTitle},
-      source_id: document.getElementById('actIntelId').value||null
-    })
-  } else {
-    alert('Failed to save. Check Supabase connection.')
-  }
+  return r.ok
 }
 
-
-// \u2500\u2500 Sprint 1: Intelligence \u2192 Docket \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function addIntelToDocket(itemId){
-  var item = cachedIntel.find(function(i){return i.id===itemId})
-  if(!item){
-    // Try fetching from all cached
-    var allIntel = []
-    try{ allIntel = JSON.parse(sessionStorage.getItem('atlas_intel_cache')||'[]') }catch(e){}
-    item = allIntel.find(function(i){return i.id===itemId})
-  }
-  if(!item){ alert('Item not found.'); return }
-  var docketItem = {
-    type: 'intel',
-    title: item.title || item.headline || 'Intelligence Item',
-    content: {
-      headline: item.title || item.headline || '',
-      problem_statement: item.problem_statement || '',
-      opportunity: item.opportunity_angle || '',
-      our_play: item.our_play || '',
-      intelligence_stream: item.intelligence_stream || '',
-      intelligence_value: item.intelligence_value || '',
-      domain_code: item.domain_code || '',
-      source_url: item.source_url || '',
-      geography: item.geography || '',
-    },
-    notes: item.problem_statement || item.opportunity_angle || '',
-    source_id: item.id
-  }
-  try{ localStorage.setItem('atlas_pending_docket_item', JSON.stringify(docketItem)) }catch(e){}
-  window.open('../engagement-docket/index.html?addItem=1','_blank')
-}
-
-// \u2500\u2500 Sprint 1: UC \u2192 Docket \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function addUCToDocket(ucId, source){
-  var allUC = cachedUC || []
-  var item = allUC.find(function(u){return u.id===ucId})
-  if(!item){ alert('UC not found.'); return }
-  var docketItem = {
-    type: 'uc',
-    title: item.name || item.title || 'Use Case',
-    content: {
-      uc_id: item.id,
-      name: item.name || item.title || '',
-      domain: item.domain_code || (currentEntry && currentEntry.code) || '',
-      category: item.category || item.cat || '',
-      model_type: item.model_type || item.model || '',
-      priority: item.priority || 'medium',
-      rationale: item.rationale || item.description || '',
-      source: source || 'second_brain',
-    },
-    notes: item.rationale || item.description || '',
-    source_id: item.id
-  }
-  try{ localStorage.setItem('atlas_pending_docket_item', JSON.stringify(docketItem)) }catch(e){}
-  window.open('../engagement-docket/index.html?addItem=1','_blank')
-}
-
-// \u2500\u2500 Sprint 1: Enhance offerAddToDocket (replace confirm with clean flow) \u2500\u2500\u2500\u2500\u2500
-function offerAddToDocket(item){
-  try{ localStorage.setItem('atlas_pending_docket_item', JSON.stringify(item)) }catch(e){}
-  window.open('../engagement-docket/index.html?addItem=1','_blank')
-}
-
-
-function openEngModal(actionId){
-  document.getElementById('engActId').value = actionId
-  document.getElementById('engId').value = ''
-  document.getElementById('engNotes').value = ''
-  document.getElementById('engModal').classList.add('open')
-}
-
-async function convertToEng(){
-  var id = document.getElementById('engActId').value
-  var engId = document.getElementById('engId').value.trim()
-  if(!engId){ alert('Enter an Engagement ID.'); return }
-  await sbPatch('sales_actions','id=eq.'+id,{
-    status:'converted',
-    converted_to_eng_id: engId,
-    converted_at: new Date().toISOString(),
-    notes: document.getElementById('engNotes').value.trim()
-  })
-  closeModal('engModal')
-  cachedActions = []; loadActions()
-}
-
-function closeModal(id){ document.getElementById(id).classList.remove('open') }
+// \u2500\u2500 State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var ALL_CUSTOMERS = []
+var ALL_ENGAGEMENTS = []
+var PORTFOLIO_CATALOGUE = []
+var CURRENT_CUSTOMER_ID = null
+var CURRENT_ENGAGEMENT_ID = null
+var CURRENT_VIEW = 'dashboard'  // dashboard|customer|engagement|docket
+var CURRENT_DOCKET_ID = null
+var CURRENT_ITEMS = []
+var PORTFOLIO_SELECTION = []
+var PENDING_TRIGGER_ITEM = null
 
 // \u2500\u2500 Utils \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function esc(s){
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function fmtDate(d){ if(!d) return ''; try{ return new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) }catch(e){ return d } }
+function genId(prefix){ return prefix+'-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+Math.floor(Math.random()*9999) }
+function initials(name){ return (name||'?').split(' ').slice(0,2).map(function(w){ return w[0] }).join('').toUpperCase() }
+
+var ITEM_TYPES = {
+  action:  {icon:'',label:'Action'},
+  intel:   {icon:'',label:'Intelligence'},
+  pei:     {icon:'',label:'PEI Brief'},
+  uc:      {icon:'',label:'Use Case'},
+  rfp:     {icon:'',label:'RFP'},
+  pitch:   {icon:'',label:'Pitch'},
+  solution:{icon:'',label:'Solution'},
+  bom:     {icon:'',label:'BOM'},
+  proposal:{icon:'',label:'Proposal'},
+  pricing: {icon:'',label:'Pricing'},
+  exec_doc:{icon:'',label:'Exec Doc'}
 }
 
-// \u2500\u2500 Boot \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-window.addEventListener('DOMContentLoaded', function(){
-  var cfg = getCfg()
-  if(cfg.url && cfg.key){
-    init()
-  }
-})
-
-var CURRENT_INTEL_ITEM = null
-
-async function openIntelDetail(itemId){
-  var items = await sbFetch('intelligence_items','id=eq.'+itemId,1)
-  if(!items.length){ return }
-  var item = items[0]
-  CURRENT_INTEL_ITEM = item
-
-  document.getElementById('im-title').textContent = item.title || 'Intelligence Item'
-
-  var streamLabel = (item.intelligence_stream||'').replace(/_/g,' ')
-  var streamClass = item.intelligence_stream==='market_pulse'?'badge-mp':item.intelligence_stream==='domain_intel'?'badge-di':'badge-tw'
-  var badges = streamLabel?('<span class="badge '+streamClass+'">'+esc(streamLabel)+'</span>'):''
-  if(item.domain_name) badges += ' <span class="badge" style="background:var(--light);color:var(--mid)">'+esc(item.domain_name)+'</span>'
-  if(item.depth_score) badges += ' <span class="badge" style="background:rgba(28,56,245,0.08);color:var(--blue)">depth '+item.depth_score+'</span>'
-  if(item.scraped_at) badges += ' <span class="badge" style="background:var(--light);color:var(--mid)">'+new Date(item.scraped_at).toLocaleDateString('en-IN')+'</span>'
-  document.getElementById('im-badges').innerHTML = badges
-  document.getElementById('im-summary').textContent = item.summary || ''
-
-  function field(label, val){
-    if(!val) return ''
-    return '<div class="intel-field"><div class="intel-field-label">'+label+'</div><div class="intel-field-val">'+esc(String(val))+'</div></div>'
-  }
-  var fields = ''
-  if(item.problem_statement) fields += field('Problem Statement', item.problem_statement)
-  if(item.technical_context) fields += field('Technical Context', item.technical_context)
-  var infra = Array.isArray(item.infrastructure_signals) ? item.infrastructure_signals : []
-  if(infra.length) fields += field('Infrastructure Signals', infra.join(' | '))
-  if(item.opportunity) fields += field('Opportunity Signal', item.opportunity)
-  if(item.competitor_signals) fields += field('Competitor Signals', item.competitor_signals)
-  if(item.uc_suggest) fields += field('UC Suggestion', item.uc_suggest)
-  var orgs = Array.isArray(item.organisations) ? item.organisations : []
-  if(orgs.length) fields += field('Organisations', orgs.join(', '))
-  if(!item.problem_statement && !item.technical_context){
-    var eid = 'enrich-'+itemId
-    fields += '<div style="margin-top:10px"><button class="btn btn-outline btn-sm" data-eid="'+itemId+'" onclick="enrichIntelItem(this.dataset.eid)">&#9999; Auto-Enrich</button></div>'
-  }
-  document.getElementById('im-fields').innerHTML = fields || '<div style="font-size:12px;color:var(--mid)">No enrichment data yet \u2014 click Auto-Enrich.</div>'
-
-  var btn = document.getElementById('im-action-btn')
-  btn.dataset.id = itemId
-  btn.dataset.title = item.title || ''
-  btn.dataset.domain = item.domain_code || ''
-  document.getElementById('intelModal').classList.add('open')
+// \u2500\u2500 Load \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function loadAll(){
+  ALL_CUSTOMERS = await sbFetch('customers','order=updated_at.desc',500)
+  ALL_ENGAGEMENTS = await sbFetch('engagements','order=updated_at.desc',500)
+  PORTFOLIO_CATALOGUE = await sbFetch('portfolio_catalogue','order=level.asc,code.asc',100)
+  renderSidebar()
+  renderDashboard()
 }
 
-async function enrichIntelItem(itemId){
-  var cfg = getCfg()
-  var global = getGlobal()
-  var gemKey = cfg.geminiKey || global['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
-  if(!gemKey){ alert('Configure Gemini API key in ATLAS Settings.'); return }
-  var item = CURRENT_INTEL_ITEM
-  if(!item) return
-  var prompt = 'Enrich this intelligence item for an AI/HPC OEM. TITLE: '+(item.title||'').slice(0,100)+' SUMMARY: '+(item.summary||'').slice(0,200)+' DOMAIN: '+(item.domain_name||'')+'. Respond JSON only: problem_statement, technical_context, infrastructure_signals (array 3-5), opportunity, competitor_signals, uc_suggest, depth_score (1-10).'
-  document.getElementById('im-fields').innerHTML = '<div style="font-size:12px;color:var(--mid)">Enriching with AI...</div>'
+// \u2500\u2500 Sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function renderSidebar(){
+  var q = (document.getElementById('sbSearch').value||'').toLowerCase()
+  var strategic = ALL_CUSTOMERS.filter(function(c){ return c.tier==='strategic' && (!q||c.name.toLowerCase().includes(q)) })
+  var transact = ALL_CUSTOMERS.filter(function(c){ return c.tier==='transactional' && (!q||c.name.toLowerCase().includes(q)) })
+
+  document.getElementById('sbStrategicCount').textContent = strategic.length
+  document.getElementById('sbTransactionalCount').textContent = transact.length
+
+  function custItem(c){
+    return '<div class="sb-item'+(CURRENT_CUSTOMER_ID===c.id?' active':'')+'" onclick="openCustomer(\''+c.id+'\')">'
+      +'<span class="sb-dot dot-'+(c.tier||'transactional')+'"></span>'
+      +'<span class="sb-item-name" title="'+esc(c.name)+'">'+esc(c.name)+'</span>'
+      +'<span style="font-size:9px;color:var(--mid)">'+esc(c.ownership||'')+'</span>'
+      +'</div>'
+  }
+
+  document.getElementById('sbStrategicList').innerHTML = strategic.length
+    ? strategic.map(custItem).join('')
+    : '<div style="padding:6px 16px;font-size:11px;color:var(--mid)">None yet</div>'
+  document.getElementById('sbTransactionalList').innerHTML = transact.length
+    ? transact.map(custItem).join('')
+    : '<div style="padding:6px 16px;font-size:11px;color:var(--mid)">None yet</div>'
+
+  document.getElementById('sbMyDocket').innerHTML =
+    '<div class="sb-item" onclick="openMyActions()">'
+    +'<span style="font-size:14px"></span>'
+    +'<span class="sb-item-name">My Action Docket</span>'
+    +'</div>'
+}
+
+// \u2500\u2500 Dashboard \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function renderDashboard(){
+  CURRENT_VIEW='dashboard'; CURRENT_CUSTOMER_ID=null; CURRENT_ENGAGEMENT_ID=null
+  var strat = ALL_CUSTOMERS.filter(function(c){ return c.type==='strategic' }).length
+  var active = ALL_ENGAGEMENTS.filter(function(e){ return e.status==='active' }).length
+  var won = ALL_ENGAGEMENTS.filter(function(e){ return e.status==='won' }).length
+
+  var recentEngs = ALL_ENGAGEMENTS.slice(0,6).map(function(e){
+    var cust = ALL_CUSTOMERS.find(function(c){ return c.id===e.customer_id })
+    return '<div class="eng-card phase-'+e.phase+'" onclick="openEngagement(\''+e.id+'\')">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+      +'<div style="font-size:13px;font-weight:600;color:var(--dark)">'+esc(e.name)+'</div>'
+      +'<span class="pill pill-'+e.status+'">'+e.status+'</span>'
+      +'</div>'
+      +'<div style="font-size:10px;color:var(--mid)">'
+      +(cust?esc(cust.name)+' \u00B7 ':'')
+      +esc(e.phase)+' \u00B7 '+esc(e.domain||'')+' \u00B7 '+fmtDate(e.updated_at)
+      +'</div>'
+      +'</div>'
+  }).join('')
+
+  document.getElementById('mainPanel').innerHTML =
+    '<div style="margin-bottom:20px">'
+    +'<div class="card-title" style="font-size:18px">Engagement Overview</div>'
+    +'<div style="font-size:12px;color:var(--mid)">Select a customer from the sidebar or add a new one using the button above.</div>'
+    +'</div>'
+    +'<div class="stat-grid">'
+    +'<div class="stat"><div class="stat-val">'+ALL_CUSTOMERS.length+'</div><div class="stat-lbl">Total Customers</div></div>'
+    +'<div class="stat"><div class="stat-val" style="color:var(--blue)">'+ALL_CUSTOMERS.filter(function(c){return c.tier==='strategic'}).length+'</div><div class="stat-lbl">Strategic</div></div>'
+    +'<div class="stat"><div class="stat-val" style="color:var(--teal)">'+active+'</div><div class="stat-lbl">Active Engagements</div></div>'
+    +'<div class="stat"><div class="stat-val" style="color:var(--orange)">'+won+'</div><div class="stat-lbl">Won</div></div>'
+    +'</div>'
+    +(recentEngs
+      ? '<div class="card-title" style="margin-bottom:12px">Recent Engagements</div>'+recentEngs
+      : '<div class="empty"><div class="empty-icon">&#128193;</div><div class="empty-title">No engagements yet</div><div class="empty-sub">Add a customer to get started.</div></div>'
+    )
+  renderSidebar()
+}
+
+// \u2500\u2500 Customer View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function openCustomer(custId){
+  CURRENT_CUSTOMER_ID = custId
+  CURRENT_ENGAGEMENT_ID = null
+  CURRENT_VIEW = 'customer'
+  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===custId })
+  if(!cust) return
+
+  var custEngs = ALL_ENGAGEMENTS.filter(function(e){ return e.customer_id===custId })
+  var txns = await sbFetch('transactions','customer_id=eq.'+custId+'&order=txn_date.desc',50)
+
+  var isTransactional = cust.tier === 'transactional'
+  var contacts = Array.isArray(cust.contacts) ? cust.contacts : []
+  var divisions = Array.isArray(cust.divisions) ? cust.divisions : []
+
+  var html = '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">'
+    +'<div style="display:flex;align-items:center;gap:12px">'
+    +'<div class="cust-avatar" style="width:48px;height:48px;font-size:18px">'+initials(cust.name)+'</div>'
+    +'<div>'
+    +'<div style="font-size:20px;font-weight:700;color:var(--navy)">'+esc(cust.name)+'</div>'
+    +'<div style="font-size:11px;color:var(--mid);margin-top:2px">'
+    +[cust.ownership,cust.sector,cust.country,cust.state].filter(Boolean).map(esc).join(' \u00B7 ')
+    +'</div>'
+    +'</div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<span class="pill pill-'+(cust.tier||'transactional')+'">'+esc(cust.tier||'transactional')+'</span>'
+    +(cust.ai_maturity?'<span class="pill" style="background:rgba(0,40,112,0.08);color:var(--navy)">AI: '+esc(cust.ai_maturity)+'</span>':'')
+    +'</div>'
+    +'</div>'
+
+  // Elevation banner for transactional customers
+  if(isTransactional){
+    html += '<div class="elevate-banner">'
+      +'<div class="elevate-text">\u26A1 This is a transactional customer. Elevate to strategic to create an Engagement Docket and unlock the full engagement lifecycle.</div>'
+      +'<button class="btn btn-navy btn-sm" onclick="elevateCustomer(\''+custId+'\')">Elevate to Strategic</button>'
+      +'</div>'
+  }
+
+  // Tabs
+  html += '<div class="tab-bar">'
+    +'<div class="tab active" id="tab-profile" onclick="switchCustTab(\'profile\')">Profile</div>'
+    +'<div class="tab" id="tab-engagements" onclick="switchCustTab(\'engagements\')">Engagements ('+custEngs.length+')</div>'
+    +'<div class="tab" id="tab-transactions" onclick="switchCustTab(\'transactions\')">Transactions ('+txns.length+')</div>'
+    +'</div>'
+    +'<div id="cust-tab-content"></div>'
+
+  document.getElementById('mainPanel').innerHTML = html
+  window._custEngs = custEngs
+  window._txns = txns
+  window._cust = cust
+  switchCustTab('profile')
+  renderSidebar()
+}
+
+function switchCustTab(tab){
+  ['profile','engagements','transactions'].forEach(function(t){
+    var el = document.getElementById('tab-'+t)
+    if(el) el.className = 'tab'+(t===tab?' active':'')
+  })
+  var cust = window._cust
+  var custEngs = window._custEngs || []
+  var txns = window._txns || []
+  var content = ''
+
+  if(tab === 'profile'){
+    var contacts = Array.isArray(cust.contacts) ? cust.contacts : []
+    var divisions = Array.isArray(cust.divisions) ? cust.divisions : []
+    content = '<div class="card"><div class="card-title">Organisation Details</div>'
+      +'<div class="form-grid">'
+      +'<div><label>Parent Organisation</label><div style="font-size:13px">'+esc(cust.parent_org||'\u2014')+'</div></div>'
+      +'<div><label>Org Type</label><div style="font-size:13px">'+esc(cust.org_type||'\u2014')+'</div></div>'
+      +'</div>'
+      +(cust.notes?'<div style="margin-top:12px;font-size:12px;color:var(--mid);line-height:1.6">'+esc(cust.notes)+'</div>':'')
+      +'</div>'
+    // Contacts
+    content += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      +'<div class="card-title" style="margin:0">Key Contacts</div>'
+      +'<button class="btn btn-ghost btn-xs" onclick="addContact(\''+cust.id+'\')">+ Add</button>'
+      +'</div>'
+      +(contacts.length ? contacts.map(function(c){
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--light)">'
+          +'<div style="flex:1"><div style="font-size:12px;font-weight:600">'+esc(c.name)+'</div>'
+          +'<div style="font-size:10px;color:var(--mid)">'+esc(c.role||'')+(c.seniority?' \u00B7 '+esc(c.seniority):'')+'</div></div>'
+          +(c.influence?'<span class="pill" style="background:rgba(0,178,144,0.1);color:var(--teal)">'+esc(c.influence)+'</span>':'')
+          +'</div>'
+      }).join('') : '<div style="font-size:11px;color:var(--mid);padding:8px 0">No contacts added yet</div>')
+      +'</div>'
+  }
+
+  if(tab === 'engagements'){
+    content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      +(cust.tier==='strategic'
+        ? '<button class="btn btn-primary" onclick="openModal(\'newEngagementModal\'); document.getElementById(\'ne-customer-id\').value=\''+cust.id+'\'">+ New Engagement</button>'
+        : '<div style="font-size:11px;color:var(--mid)">Elevate to strategic to create engagements</div>')
+      +'</div>'
+    content += custEngs.length ? custEngs.map(function(e){
+      return '<div class="eng-card phase-'+e.phase+'" onclick="openEngagement(\''+e.id+'\')">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+        +'<div style="font-size:13px;font-weight:600">'+esc(e.name)+'</div>'
+        +'<span class="pill pill-'+e.status+'">'+e.status+'</span></div>'
+        +'<div style="font-size:10px;color:var(--mid)">'+esc(e.phase)+' \u00B7 '+esc(e.archetype||'')+' \u00B7 '+esc(e.value||'')+' '+esc(e.currency||'')+'</div>'
+        +'</div>'
+    }).join('') : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCBC</div><div class="empty-title">No engagements</div></div>'
+  }
+
+  if(tab === 'transactions'){
+    content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      +'<button class="btn btn-ghost btn-sm" onclick="openModal(\'newTxnModal\'); document.getElementById(\'txn-customer-id\').value=\''+cust.id+'\'">+ Record Transaction</button>'
+      +'</div>'
+    content += txns.length ? txns.map(function(t){
+      return '<div class="card" style="padding:12px 14px">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between">'
+        +'<div style="font-size:13px;font-weight:600">'+esc(t.product_name)+'</div>'
+        +'<div style="font-size:12px;font-weight:600;color:var(--teal)">'+esc(t.value||'')+' '+esc(t.currency||'')+'</div></div>'
+        +'<div style="font-size:10px;color:var(--mid);margin-top:4px">'+fmtDate(t.txn_date)+' \u00B7 '+esc(t.channel||'')+' \u00B7 '+esc(t.product_code||'')+'</div>'
+        +(t.notes?'<div style="font-size:11px;color:var(--mid);margin-top:4px">'+esc(t.notes)+'</div>':'')
+        +'</div>'
+    }).join('') : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCB3</div><div class="empty-title">No transactions</div></div>'
+  }
+
+  document.getElementById('cust-tab-content').innerHTML = content
+}
+
+// \u2500\u2500 Engagement View \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function openEngagement(engId){
+  CURRENT_ENGAGEMENT_ID = engId
+  CURRENT_VIEW = 'engagement'
+  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
+  if(!eng) return
+  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===eng.customer_id })
+
+  // Get or create docket for this engagement
+  var dockets = await sbFetch('engagement_dockets','engagement_id=eq.'+engId,1)
+  var docket = dockets[0]
+  if(!docket){
+    // Auto-create docket for this engagement
+    var newDocket = {
+      id: genId('ENG'),
+      type: 'customer',
+      name: (cust?cust.name+' \u2014 ':'')+eng.name,
+      customer_name: cust?cust.name:'',
+      customer_id: eng.customer_id,
+      engagement_id: engId,
+      owner: '',
+      status: 'active',
+      sector: eng.domain||'',
+      metadata: {}
+    }
+    await sbInsert('engagement_dockets', newDocket)
+    docket = newDocket
+  }
+
+  CURRENT_DOCKET_ID = docket.id
+  CURRENT_ITEMS = await sbFetch('docket_items','docket_id=eq.'+docket.id+'&order=created_at.asc',200)
+
+  var isL1 = eng.archetype === 'tsap' || eng.type === 'new' && eng.domain === 'REG-AIP'
+
+  var html = '<div style="background:var(--navy);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;color:var(--white)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+    +'<div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">'+(cust?esc(cust.name)+' \u00B7 ':'')+'<span id="eng-id-badge">'+esc(eng.id)+'</span></div>'
+    +'<div style="font-size:20px;font-weight:700">'+esc(eng.name)+'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'
+    +'<span class="pill pill-'+eng.status+'">'+eng.status+'</span>'
+    +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.phase)+'</span>'
+    +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.archetype||'')+'</span>'
+    +(eng.value?'<span class="pill" style="background:rgba(0,178,144,0.2);color:var(--teal)">\uD83D\uDCB0 '+esc(eng.value)+' '+esc(eng.currency||'')+'</span>':'')
+    +'</div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">'
+    +'<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+docket.id+'\')">+ Add Item</button>'
+    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="openPortfolioMap(\''+engId+'\',\''+docket.id+'\')">Portfolio Map</button>'
+    +(isL1?'<button class="btn btn-sm" style="background:rgba(255,182,0,0.2);color:var(--amber)" onclick="openL1Config(\''+engId+'\')">TSAP Configure</button>':'')
+    +'<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:var(--white)" onclick="runRecommendationEngine(\''+engId+'\')">Recommend</button>'
+    +'<select onchange="changeEngStatus(\''+engId+'\',this.value)" style="padding:4px 8px;font-size:11px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:var(--white);font-family:inherit">'
+    +'<option value="active"'+(eng.status==='active'?' selected':'')+'>Active</option>'
+    +'<option value="paused"'+(eng.status==='paused'?' selected':'')+'>Paused</option>'
+    +'<option value="won"'+(eng.status==='won'?' selected':'')+'>Won</option>'
+    +'<option value="lost"'+(eng.status==='lost'?' selected':'')+'>Lost</option>'
+    +'</select>'
+    +'</div></div></div>'
+
+  // Action row \u2014 export and add item
+  html += '<div style="padding:10px 0 14px;display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button class="btn btn-outline btn-sm" onclick="exportWordDoc(\''+docket.id+'\')\">'+'Export (.txt)</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="openAddItemModal(\''+docket.id+'\')\">'+'+ Add Item</button>'
+    +'</div>'
+
+  // Docket items
+  var itemsByType = {}
+  CURRENT_ITEMS.forEach(function(item){ if(!itemsByType[item.item_type]) itemsByType[item.item_type]=0; itemsByType[item.item_type]++ })
+
+  // Filter bar
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'
+    +'<button class="btn btn-ghost btn-xs" style="background:var(--navy);color:var(--white)" onclick="renderItems(\'all\')">All ('+CURRENT_ITEMS.length+')</button>'
+  Object.keys(ITEM_TYPES).forEach(function(t){
+    if(itemsByType[t]) html += '<button class="btn btn-ghost btn-xs" onclick="renderItems(\''+t+'\')">'+(ITEM_TYPES[t].icon)+' '+ITEM_TYPES[t].label+' ('+itemsByType[t]+')</button>'
+  })
+  html += '</div><div id="docket-items-container"></div>'
+
+  document.getElementById('mainPanel').innerHTML = html
+  window._currentEng = eng
+  renderItems('all')
+  renderSidebar()
+}
+
+function renderItems(filterType){
+  var items = filterType==='all' ? CURRENT_ITEMS : CURRENT_ITEMS.filter(function(i){ return i.item_type===filterType })
+  var html = items.length ? items.map(renderItem).join('')
+    : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCCB</div><div class="empty-title">No items yet</div><div class="empty-sub">Add intelligence, PEI, UCs, or actions to this docket.</div></div>'
+  document.getElementById('docket-items-container').innerHTML = html
+}
+
+function renderItem(item){
+  var tc = ITEM_TYPES[item.item_type]||{icon:'\uD83D\uDCCC',label:item.item_type}
+  var content = item.content||{}
+  var preview = item.notes || content.summary || content.problem_statement || ''
+  return '<div class="docket-item">'
+    +'<div class="item-icon icon-'+item.item_type+'">'+tc.icon+'</div>'
+    +'<div class="item-body">'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
+    +'<div class="item-title">'+esc(item.title)+'</div>'
+    +'<span class="item-status is-'+item.status+'">'+item.status.replace('_',' ')+'</span>'
+    +'</div>'
+    +'<div class="item-meta">'+(item.assigned_to?'\uD83D\uDC64 '+esc(item.assigned_to)+' \u00B7 ':'')+(item.due_date?'\uD83D\uDCC5 '+fmtDate(item.due_date)+' \u00B7 ':'')+'Added '+fmtDate(item.created_at)+'</div>'
+    +(preview?'<div style="font-size:11px;color:#555;margin-top:4px;line-height:1.5">'+esc(preview.slice(0,120))+(preview.length>120?'\u2026':'')+'</div>':'')
+    +'<div style="display:flex;gap:6px;margin-top:6px">'
+    +(item.status==='pending'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">Start</button>':'')
+    +(item.status==='in_progress'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">Done</button>':'')
+    +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteItem(this.dataset.id)">x</button>'
+    +'</div></div></div>'
+}
+
+// \u2500\u2500 Recommendation Engine \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function runRecommendationEngine(engId){
+  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
+  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===(eng&&eng.customer_id) })
+  if(!eng) return
+
+  var model = atlasGetTaskModel('pei')
+  var key = atlasGetKeyForModel(model)
+  if(!key){ alert('Configure AI keys in ATLAS Settings to use the Recommendation Engine.'); return }
+
+  var panel = document.getElementById('mainPanel')
+  var recDiv = document.createElement('div')
+  recDiv.className = 'rec-card'
+  recDiv.innerHTML = '<div class="rec-title">\uD83E\uDD16 Running Recommendation Engine...</div>'
+  panel.insertBefore(recDiv, panel.firstChild.nextSibling.nextSibling)
+
+  var prompt = 'You are an AI business development assistant for an on-premises AI hardware and software OEM.'
+    +' Analyse this engagement and recommend the most relevant portfolio items.'
+    +' Customer: '+JSON.stringify({name:cust&&cust.name,sector:cust&&cust.sector,ownership:cust&&cust.ownership,country:cust&&cust.country,ai_maturity:cust&&cust.ai_maturity})+''
+    +' Engagement: '+JSON.stringify({name:eng.name,archetype:eng.archetype,type:eng.type,phase:eng.phase,domain:eng.domain,value:eng.value})+''
+    +' Portfolio: '+JSON.stringify(PORTFOLIO_CATALOGUE.map(function(p){ return {code:p.code,name:p.name,level:p.level,category:p.category} }))+''
+    +' Respond with JSON: {recommendations:[{code,reason,priority(high|medium|low)}], upsell:[{code,reason}], summary(2 sentences)}'
+    +' Start { end }. No markdown.'
+
   try{
-    var model = getTaskModel('enrichment')
-    var text = await callModel(prompt, model)
+    var text = await atlasCallModel(model, prompt, null, 1500)
     var first = text.indexOf('{'), last = text.lastIndexOf('}')
-    if(first < 0) throw new Error('No JSON in response')
-    var enriched = JSON.parse(text.slice(first, last+1))
-    await sbPatch('intelligence_items', 'id=eq.'+itemId, {
-      problem_statement: enriched.problem_statement||null,
-      technical_context: enriched.technical_context||null,
-      infrastructure_signals: Array.isArray(enriched.infrastructure_signals)?enriched.infrastructure_signals:[],
-      opportunity: enriched.opportunity||null,
-      competitor_signals: enriched.competitor_signals||null,
-      uc_suggest: enriched.uc_suggest||null,
-      depth_score: parseInt(enriched.depth_score)||5,
-      enriched_at: new Date().toISOString()
-    })
-    await openIntelDetail(itemId)
+    if(first<0) throw new Error('No JSON in response')
+    var result = JSON.parse(text.slice(first,last+1))
+    var recs = result.recommendations||[]
+    var upsells = result.upsell||[]
+    var recHtml = '<div class="rec-title">\uD83E\uDD16 Portfolio Recommendations</div>'
+      +(result.summary?'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">'+esc(result.summary)+'</div>':'')
+      +'<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;margin-bottom:6px">Recommended</div>'
+      +recs.map(function(r){
+        return '<div class="rec-item"><span class="pill pill-l'+(r.code&&r.code[1]||'3')+'" style="flex-shrink:0">'+esc(r.code)+'</span>'
+          +'<span style="flex:1">'+esc(r.reason)+'</span>'
+          +'<span class="pill" style="background:rgba(255,85,57,0.1);color:var(--orange)">'+esc(r.priority)+'</span></div>'
+      }).join('')
+      +(upsells.length?'<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;margin:10px 0 6px">Upsell / Cross-sell</div>'
+        +upsells.map(function(r){
+          return '<div class="rec-item"><span class="pill pill-l'+(r.code&&r.code[1]||'3')+'" style="flex-shrink:0">'+esc(r.code)+'</span>'
+            +'<span>'+esc(r.reason)+'</span></div>'
+        }).join('') : '')
+    recDiv.innerHTML = recHtml
+    window._lastRecommendations = recs.concat(upsells).map(function(r){ return r.code })
   }catch(e){
-    document.getElementById('im-fields').innerHTML = '<div style="color:var(--orange)">Error: '+esc(e.message)+'</div>'
+    recDiv.innerHTML = '<div class="rec-title">Recommendation Engine</div>'
+      +'<div style="font-size:11px;color:#DC2626">Error: '+esc(e.message)+'</div>'
   }
 }
 
-function createActionFromIntel(){
-  var btn = document.getElementById('im-action-btn')
-  closeModal('intelModal')
-  openActionModal(btn.dataset.id, btn.dataset.title, btn.dataset.domain)
-}</script>
+// \u2500\u2500 Portfolio Map \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function openPortfolioMap(engId, docketId){
+  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
+  window._portfolioEngId = engId
+  window._portfolioDocketId = docketId
+  var recommended = window._lastRecommendations || []
+
+  var l1 = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level===1 })
+  var l2 = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level===2 })
+  var l3 = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level===3 })
+
+  function renderGroup(items, label, levelClass){
+    return '<div style="margin-bottom:16px">'
+      +'<div class="portfolio-section-label"><span class="pill '+levelClass+'">'+levelClass.replace('pill-','L').toUpperCase()+'</span>'+label+'</div>'
+      +'<div class="portfolio-items-grid">'
+      +items.map(function(p){
+        var isRec = recommended.indexOf(p.code)>=0
+        var isSel = PORTFOLIO_SELECTION.indexOf(p.code)>=0 || isRec
+        return '<div class="portfolio-item'+(isSel?' selected':'')+(isRec?' recommended':'')+'" data-code="'+p.code+'" onclick="togglePortfolioItem(this,\''+p.code+'\')">'
+          +'<div class="pi-code">'+esc(p.code)+'</div>'
+          +'<div class="pi-name">'+esc(p.name)+'</div>'
+          +'<div class="pi-cat">'+esc(p.category||p.deal_size||'')+'</div>'
+          +(isRec?'<span class="pi-badge rec">\u2605 Recommended</span>':'')
+          +(isSel&&!isRec?'<span class="pi-badge sel">\u2713 Selected</span>':'')
+          +'</div>'
+      }).join('')
+      +'</div></div>'
+  }
+
+  var mapHtml = renderGroup(l1,'Strategic Offering','pill-l1')
+    + renderGroup(l2,'Technical Building Blocks','pill-l2')
+    + renderGroup(l3,'Lifecycle Services (select relevant)','pill-l3')
+
+  document.getElementById('portfolioMapContent').innerHTML = mapHtml
+  updatePortfolioSummary()
+  openModal('portfolioMapModal')
+}
+
+function togglePortfolioItem(el, code){
+  el.classList.toggle('selected')
+  var idx = PORTFOLIO_SELECTION.indexOf(code)
+  if(idx>=0) PORTFOLIO_SELECTION.splice(idx,1)
+  else PORTFOLIO_SELECTION.push(code)
+  var badge = el.querySelector('.pi-badge.sel')
+  if(el.classList.contains('selected') && !el.classList.contains('recommended')){
+    if(!badge){ var b=document.createElement('span'); b.className='pi-badge sel'; b.textContent='\u2713 Selected'; el.appendChild(b) }
+  } else {
+    if(badge && !el.classList.contains('recommended')) badge.remove()
+  }
+  updatePortfolioSummary()
+}
+
+function updatePortfolioSummary(){
+  var selected = document.querySelectorAll('.portfolio-item.selected')
+  document.getElementById('portfolioMapSummary').textContent = selected.length+' items selected. Click Save to add as a Solution item in the docket.'
+}
+
+async function savePortfolioSelection(){
+  var items = Array.from(document.querySelectorAll('.portfolio-item.selected'))
+  var codes = items.map(function(el){ return el.dataset.code })
+  if(!codes.length){ closeModal('portfolioMapModal'); return }
+
+  var selectedItems = PORTFOLIO_CATALOGUE.filter(function(p){ return codes.indexOf(p.code)>=0 })
+  var summary = 'Portfolio selection: '+codes.join(', ')
+  var newItem = {
+    id: genId('DI'),
+    docket_id: window._portfolioDocketId,
+    item_type: 'solution',
+    title: 'Portfolio Selection \u2014 '+new Date().toLocaleDateString('en-IN'),
+    content: {portfolio_codes: codes, portfolio_items: selectedItems.map(function(p){ return {code:p.code,name:p.name,level:p.level} })},
+    source_id: null, status: 'pending',
+    notes: summary,
+    created_by: 'ATLAS Portfolio Map',
+    assigned_to: null, due_date: null
+  }
+  var ok = await sbInsert('docket_items', newItem)
+  if(ok){
+    CURRENT_ITEMS.push(newItem)
+    closeModal('portfolioMapModal')
+    renderItems('all')
+    PORTFOLIO_SELECTION = []
+  } else { alert('Failed to save. Check Supabase connection.') }
+}
+
+// \u2500\u2500 Create customer / engagement \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function createCustomer(){
+  var name = document.getElementById('nc-name').value.trim()
+  if(!name){ alert('Customer name is required.'); return }
+  var cust = {
+    id: genId('CUST'),
+    name: name,
+    short_name: document.getElementById('nc-short').value.trim()||null,
+    tier: document.getElementById('nc-tier').value,
+    ownership: document.getElementById('nc-ownership').value||null,
+    sector: document.getElementById('nc-sector').value||null,
+    country: document.getElementById('nc-country').value||'India',
+    state: document.getElementById('nc-state').value.trim()||null,
+    ai_maturity: document.getElementById('nc-maturity').value||null,
+    notes: document.getElementById('nc-notes').value.trim()||null,
+    contacts: [], divisions: []
+  }
+  var ok = await sbInsert('customers', cust)
+  if(ok){
+    ALL_CUSTOMERS.unshift(cust)
+    closeModal('newCustomerModal')
+    renderSidebar()
+    openCustomer(cust.id)
+  } else { alert('Failed to create customer. Check Supabase connection.') }
+}
+
+async function createEngagement(){
+  var custId = document.getElementById('ne-customer-id').value
+  var name = document.getElementById('ne-name').value.trim()
+  if(!name){ alert('Engagement name is required.'); return }
+  var cust = ALL_CUSTOMERS.find(function(c){ return c.id===custId })
+  var year = new Date().getFullYear()
+  var domain = document.getElementById('ne-domain').value||'GEN'
+  var seq = String(Math.floor(Math.random()*9000)+1000)
+  var engId = 'ENG-'+year+'-'+domain.replace('-','').slice(0,3)+'-'+seq
+  var eng = {
+    id: engId,
+    customer_id: custId,
+    name: name,
+    archetype: document.getElementById('ne-archetype').value,
+    type: document.getElementById('ne-type').value,
+    phase: document.getElementById('ne-phase').value,
+    status: 'active',
+    domain: domain,
+    currency: document.getElementById('ne-currency').value,
+    value: document.getElementById('ne-value').value.trim()||null,
+    notes: document.getElementById('ne-notes').value.trim()||null,
+    owner: ''
+  }
+  var ok = await sbInsert('engagements', eng)
+  if(ok){
+    ALL_ENGAGEMENTS.unshift(eng)
+    closeModal('newEngagementModal')
+    openEngagement(engId)
+  } else { alert('Failed to create engagement.') }
+}
+
+// \u2500\u2500 Elevation \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function elevateCustomer(custId){
+  if(!confirm('Elevate this customer to Strategic? This will enable full engagement dockets and retrofit all transactions.')) return
+  var ok = await sbPatch('customers','id=eq.'+custId,{tier:'strategic',elevated_at:new Date().toISOString(),elevated_by:'Business Head'})
+  if(ok){
+    var cust = ALL_CUSTOMERS.find(function(c){ return c.id===custId })
+    if(cust){ cust.tier='strategic'; cust.elevated_at=new Date().toISOString() }
+    // Retrofit transactions as docket items (create a docket first)
+    var txns = await sbFetch('transactions','customer_id=eq.'+custId,100)
+    if(txns.length > 0){
+      var docketId = genId('ENG')
+      var docket = {id:docketId,type:'customer',name:(cust?cust.name:'')+' \u2014 Elevated Account',customer_id:custId,customer_name:cust?cust.name:'',owner:'',status:'active',metadata:{elevated:true}}
+      await sbInsert('engagement_dockets',docket)
+      for(var i=0;i<txns.length;i++){
+        var t=txns[i]
+        await sbInsert('docket_items',{id:genId('DI'),docket_id:docketId,item_type:'action',title:'Transaction: '+t.product_name,content:{product_code:t.product_code,value:t.value,currency:t.currency,channel:t.channel},source_id:t.id,status:'closed',notes:t.notes,created_at:t.created_at,created_by:'Elevation Retrofit'})
+      }
+    }
+    renderSidebar()
+    openCustomer(custId)
+  } else { alert('Elevation failed.') }
+}
+
+// \u2500\u2500 CRUD helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function openAddItemModal(docketId){
+  document.getElementById('ai-docket-id').value=docketId
+  document.getElementById('ai-title').value=''
+  document.getElementById('ai-notes').value=''
+  document.getElementById('ai-assigned').value=''
+  document.getElementById('ai-due').value=''
+  document.getElementById('ai-type').value='action'
+  updateItemHint()
+  openModal('addItemModal')
+}
+
+function updateItemHint(){
+  var hints={action:'A specific task or follow-up for this engagement.',intel:'An intelligence item from Second Brain.',pei:'Customer intelligence brief from PEI tool.',uc:'A validated use case from the UC Library.',rfp:'An RFP or tender document.',solution:'Technical architecture or solution design.',bom:'Bill of materials.',proposal:'Formal proposal document.',pricing:'Pricing model.',exec_doc:'Executive summary or board brief.'}
+  var t=document.getElementById('ai-type').value
+  var el=document.getElementById('ai-hint')
+  if(hints[t]){el.textContent=hints[t];el.style.display='block'}else el.style.display='none'
+}
+
+async function saveItem(){
+  var docketId=document.getElementById('ai-docket-id').value
+  var title=document.getElementById('ai-title').value.trim()
+  if(!title){alert('Title required.');return}
+  var item={id:genId('DI'),docket_id:docketId,item_type:document.getElementById('ai-type').value,title:title,content:{},source_id:null,status:'pending',assigned_to:document.getElementById('ai-assigned').value.trim()||null,due_date:document.getElementById('ai-due').value||null,notes:document.getElementById('ai-notes').value.trim()||null,created_by:'ATLAS'}
+  var ok=await sbInsert('docket_items',item)
+  if(ok){closeModal('addItemModal');CURRENT_ITEMS.push(item);renderItems('all')}
+  else alert('Failed to save item.')
+}
+
+async function setItemStatus(itemId,status){
+  var ok=await sbPatch('docket_items','id=eq.'+itemId,{status:status})
+  if(ok){var item=CURRENT_ITEMS.find(function(i){return i.id===itemId});if(item)item.status=status;renderItems('all')}
+}
+
+async function deleteItem(itemId){
+  if(!confirm('Delete this item?'))return
+  var ok=await sbDelete('docket_items','id=eq.'+itemId)
+  if(ok){CURRENT_ITEMS=CURRENT_ITEMS.filter(function(i){return i.id!==itemId});renderItems('all')}
+}
+
+async function changeEngStatus(engId,status){
+  var ok=await sbPatch('engagements','id=eq.'+engId,{status:status})
+  if(ok){var eng=ALL_ENGAGEMENTS.find(function(e){return e.id===engId});if(eng)eng.status=status}
+}
+
+async function saveTransaction(){
+  var custId=document.getElementById('txn-customer-id').value
+  var product=document.getElementById('txn-product').value.trim()
+  if(!product){alert('Product name required.');return}
+  var txn={id:genId('TXN'),customer_id:custId,product_name:product,value:document.getElementById('txn-value').value.trim()||null,currency:document.getElementById('txn-currency').value,txn_date:document.getElementById('txn-date').value||null,channel:document.getElementById('txn-channel').value,notes:document.getElementById('txn-notes').value.trim()||null}
+  var ok=await sbInsert('transactions',txn)
+  if(ok){closeModal('newTxnModal');if(window._cust&&window._cust.id===custId){window._txns=window._txns||[];window._txns.unshift(txn);switchCustTab('transactions')}}
+  else alert('Failed to save transaction.')
+}
+
+
+
+
+
+// \u2500\u2500 Add to Docket trigger (from other tools) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function atlasAddToDocket(item){
+  PENDING_TRIGGER_ITEM = item
+  var modal = document.createElement('div')
+  modal.id = 'triggerModal'
+  modal.className = 'modal-overlay open'
+  var dockets = await sbFetch('engagement_dockets','type=eq.customer&status=eq.active&order=updated_at.desc',20)
+  var opts = '<option value="__new__">+ Create New Docketket</option>'
+  dockets.forEach(function(d){ opts+='<option value="'+d.id+'">'+esc(d.name)+'</option>' })
+  modal.innerHTML = '<div class="modal" style="max-width:440px"><div class="modal-title">\uD83D\uDCC1 Add to Docket</div>'
+    +'<div style="font-size:12px;color:var(--mid);margin-bottom:12px">Adding: "'+esc(item.title)+'" ('+esc(item.type)+')</div>'
+    +'<label>Select Docket</label><select id="trigger-sel">'+opts+'</select>'
+    +'<div id="trigger-new" style="display:none"><label>Customer Name</label><input type="text" id="trigger-cust" placeholder="Customer name"><label>Engagement Name</label><input type="text" id="trigger-eng" placeholder="Engagement name"></div>'
+    +'<div class="modal-actions"><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button><button class="btn btn-primary" onclick="confirmTrigger()">Add</button></div>'
+    +'</div>'
+  document.body.appendChild(modal)
+  document.getElementById('trigger-sel').onchange = function(){
+    document.getElementById('trigger-new').style.display = this.value==='__new__'?'block':'none'
+  }
+}
+
+async function confirmTrigger(){
+  var sel = document.getElementById('trigger-sel').value
+  var item = PENDING_TRIGGER_ITEM
+  if(!item) return
+  var docketId = sel
+  if(sel==='__new__'){
+    var cname=document.getElementById('trigger-cust').value.trim()
+    var ename=document.getElementById('trigger-eng').value.trim()
+    if(!cname||!ename){alert('Enter customer and engagement name.');return}
+    var did=genId('ENG')
+    await sbInsert('engagement_dockets',{id:did,type:'customer',name:cname+' \u2014 '+ename,customer_name:cname,owner:'',status:'active',metadata:{source:item.type}})
+    docketId=did
+  }
+  var newItem={id:genId('DI'),docket_id:docketId,item_type:item.type||'action',title:item.title,content:item.content||{},source_id:item.source_id||null,status:'pending',notes:item.notes||null,created_by:'ATLAS'}
+  await sbInsert('docket_items',newItem)
+  document.getElementById('triggerModal').remove()
+  PENDING_TRIGGER_ITEM=null
+  await loadAll()
+}
+
+// \u2500\u2500 Modals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function openModal(id){ document.getElementById(id).classList.add('open') }
+function closeModal(id){ document.getElementById(id).classList.remove('open') }
+
+
+// TSAP L1 Configuration
+var TSAP_CFG = {territory:{name:'',type:'state',governance:'central',security:'civilian',ownership:'government',scale:''},objectives:{core_objective:'',vision:'',justification:'',uniqueness:'',success_metrics:{jobs:'',startups:'',compute:''}},blocks:[],financial:{financing_models:[],infra_cost:'',hardware_cost:'',software_cost:'',services_cost:'',opex_cost:'',financing_gap:''}}
+var CURRENT_TSAP_ENG_ID = null
+
+var L2_BLOCKS_DEF = [
+  {code:'L2-AIF',  name:'AI Factory',                  icon:'\uD83C\uDFED', desc:'General-purpose GPU compute \u2014 training + inference'},
+  {code:'L2-INF',  name:'Inferencing Factory',          icon:'\u26A1',        desc:'High-throughput production inference (generic baseline)'},
+  {code:'L2.1-INF',name:'GeoAI Inferencing Factory',    icon:'\uD83D\uDEF0\uFE0F',desc:'Pre-configured for geospatial/EO workloads \u2014 EO pipeline, imagery AI, GIS'},
+  {code:'L2.2-INF',name:'Defence AI Inferencing Factory',icon:'\uD83D\uDEF1', desc:'Air-gapped, MIL-SPEC, ISR pipeline, classified network integration'},
+  {code:'L2.3-INF',name:'Health AI Inferencing Factory', icon:'\uD83C\uDFE5', desc:'DICOM/FHIR, medical imaging AI, clinical compliance stack'},
+  {code:'L2.4-INF',name:'FinAI Inferencing Factory',     icon:'\uD83C\uDFE6', desc:'Fraud detection, credit risk, AML/KYC, RBI/SEBI compliance'},
+  {code:'L2-TRC',  name:'Training Cluster',              icon:'\uD83E\uDDE0', desc:'HPC-class large-scale model training'},
+  {code:'L2-HPC',  name:'HPC Cluster',                   icon:'\uD83D\uDCCA', desc:'Scientific compute \u2014 simulation and modelling'},
+  {code:'L2-EDG',  name:'Edge AI Node',                  icon:'\uD83D\uDCF6', desc:'Field-deployed, air-gappable inference'},
+  {code:'L2-MDC',  name:'Modular Datacenter',            icon:'\uD83C\uDFD7\uFE0F', desc:'Houses any L2 building block \u2014 rapid deployment'},
+]
+
+var L1X_COMPONENTS_DEF = [
+  {code:'L1.1-TSAP',name:'AI Skills & Workforce Development',icon:'\uD83C\uDF93',desc:'Mass digital/AI literacy \u2014 public servants, practitioners, population-scale. Partner-delivered.',partner:true},
+  {code:'L1.2-TSAP',name:'Startup & Innovation Ecosystem',  icon:'\uD83D\uDE80',desc:'Incubator, accelerator, seed funding framework, anchor tenant attraction. Partner-delivered.',partner:true},
+  {code:'L1.3-TSAP',name:'Data Governance & Sovereign Data',icon:'\uD83D\uDDC4\uFE0F',desc:'Territory data catalogue, data sharing frameworks, DPDP compliance. Often a prerequisite for compute.',partner:true},
+  {code:'L1.4-TSAP',name:'Research & Academic Partnership', icon:'\uD83D\uDD2C',desc:'IIT/IIIT/university MoUs, research grants, PhD fellowships. Long-term talent pipeline.',partner:true},
+  {code:'L1.5-TSAP',name:'AI Policy, Regulation & Governance',icon:'\u2696\uFE0F',desc:'Territory AI policy framework, oversight authority, ethical AI guidelines, procurement policy. Legal partner-led.',partner:true},
+]
+
+var FINANCING_OPTS_DEF = [
+  {type:'self_funded',label:'Self-Funded (State / Internal Budget)'},
+  {type:'central_grant',label:'Central Government Grant (PM-DevINE, IndiaAI etc.)'},
+  {type:'domestic_debt',label:'Domestic Borrowing (DFI / Bonds / NABARD)'},
+  {type:'multilateral',label:'Multilateral Agency (World Bank / ADB / AIIB)'},
+  {type:'bilateral',label:'Bilateral Country Financing (Low-Interest Credit Line)'},
+  {type:'ppp',label:'PPP (Private Anchor Tenant + Govt Land/Grant)'},
+  {type:'mixed',label:'Mixed / Blended Finance'},
+]
+
+function openL1Config(engId){
+  CURRENT_TSAP_ENG_ID = engId
+  switchTsapTab('territory')
+  openModal('tsapModal')
+}
+
+function switchTsapTab(tab){
+  var tabs = document.querySelectorAll('#tsapTabBar .tab')
+  var names = ['territory','objectives','blocks','financial']
+  tabs.forEach(function(t,i){ t.className='tab'+(names[i]===tab?' active':'') })
+  saveTsapCurrentData()
+  var content = ''
+
+  if(tab==='territory'){
+    content = '<div class="form-grid">'
+      +'<div><label>Territory Name</label><input type="text" id="tsap-name" value="'+esc(TSAP_CFG.territory.name)+'" placeholder="e.g. Himachal Pradesh, Northeast India Cluster"></div>'
+      +'<div><label>Territory Type</label><select id="tsap-type">'
+      +'<option value="country"'+(TSAP_CFG.territory.type==='country'?' selected':'')+'>Country</option>'
+      +'<option value="state"'+(TSAP_CFG.territory.type==='state'?' selected':'')+'>State</option>'
+      +'<option value="city"'+(TSAP_CFG.territory.type==='city'?' selected':'')+'>City</option>'
+      +'<option value="region"'+(TSAP_CFG.territory.type==='region'?' selected':'')+'>Region</option>'
+      +'<option value="cluster"'+(TSAP_CFG.territory.type==='cluster'?' selected':'')+'>Cluster</option>'
+      +'</select></div></div>'
+      +'<div class="form-grid">'
+      +'<div><label>Governance Model</label><select id="tsap-gov">'
+      +'<option value="central"'+(TSAP_CFG.territory.governance==='central'?' selected':'')+'>Central</option>'
+      +'<option value="federated"'+(TSAP_CFG.territory.governance==='federated'?' selected':'')+'>Federated</option>'
+      +'<option value="distributed"'+(TSAP_CFG.territory.governance==='distributed'?' selected':'')+'>Distributed</option>'
+      +'</select></div>'
+      +'<div><label>Security Classification</label><select id="tsap-sec">'
+      +'<option value="civilian"'+(TSAP_CFG.territory.security==='civilian'?' selected':'')+'>Civilian</option>'
+      +'<option value="restricted"'+(TSAP_CFG.territory.security==='restricted'?' selected':'')+'>Restricted</option>'
+      +'<option value="classified"'+(TSAP_CFG.territory.security==='classified'?' selected':'')+'>Classified</option>'
+      +'<option value="air_gapped"'+(TSAP_CFG.territory.security==='air_gapped'?' selected':'')+'>Air-Gapped</option>'
+      +'</select></div></div>'
+      +'<div class="form-grid">'
+      +'<div><label>Ownership Model</label><select id="tsap-own">'
+      +'<option value="government"'+(TSAP_CFG.territory.ownership==='government'?' selected':'')+'>Government</option>'
+      +'<option value="ppp"'+(TSAP_CFG.territory.ownership==='ppp'?' selected':'')+'>PPP</option>'
+      +'<option value="private"'+(TSAP_CFG.territory.ownership==='private'?' selected':'')+'>Private</option>'
+      +'</select></div>'
+      +'<div><label>Population / Scale</label><input type="text" id="tsap-scale" value="'+esc(TSAP_CFG.territory.scale)+'" placeholder="e.g. 7M people, 12 districts"></div></div>'
+      +'<div style="margin-top:14px;padding:12px;background:rgba(0,40,112,0.04);border-radius:var(--r);border:1px dashed #d0d0d8;text-align:center;font-size:11px;color:var(--mid)">'
+      +'\uD83D\uDDFA\uFE0F Territory map (GeoJSON boundary visualisation) \u2014 next build</div>'
+  }
+
+  if(tab==='objectives'){
+    content = '<label>Core Objective *</label>'
+      +'<textarea id="tsap-obj" placeholder="What problem does this programme solve?" style="min-height:64px">'+esc(TSAP_CFG.objectives.core_objective)+'</textarea>'
+      +'<label>Vision (5-10 year horizon)</label>'
+      +'<textarea id="tsap-vis" placeholder="What does this territory look like when the programme succeeds?" style="min-height:64px">'+esc(TSAP_CFG.objectives.vision)+'</textarea>'
+      +'<label>Justification (Why now, why here, why us?)</label>'
+      +'<textarea id="tsap-just" placeholder="Economic case, political mandate, existing assets, strategic window..." style="min-height:64px">'+esc(TSAP_CFG.objectives.justification)+'</textarea>'
+      +'<label>Uniqueness vs Other Centres</label>'
+      +'<textarea id="tsap-uniq" placeholder="What makes this centre distinctive?" style="min-height:64px">'+esc(TSAP_CFG.objectives.uniqueness)+'</textarea>'
+      +'<div class="form-grid-3" style="margin-top:4px">'
+      +'<div><label>Jobs (target)</label><input type="text" id="tsap-jobs" value="'+esc(TSAP_CFG.objectives.success_metrics.jobs)+'" placeholder="e.g. 5,000"></div>'
+      +'<div><label>Startups Enabled</label><input type="text" id="tsap-startups" value="'+esc(TSAP_CFG.objectives.success_metrics.startups)+'" placeholder="e.g. 200"></div>'
+      +'<div><label>Compute Capacity</label><input type="text" id="tsap-compute" value="'+esc(TSAP_CFG.objectives.success_metrics.compute)+'" placeholder="e.g. 10 PFlops"></div>'
+      +'</div>'
+      +'<div style="margin-top:14px;display:flex;gap:10px;align-items:center">'
+      +'<button class="btn btn-outline btn-sm" onclick="aiEnrichTsap()">AI Enrich \u2014 Research territory</button>'
+      +'<span style="font-size:10px;color:var(--mid)">Uses AI + web search to suggest uniqueness, UCs, economic case.</span>'
+      +'</div>'
+      +'<div id="tsap-enrich" style="display:none;margin-top:12px;padding:12px;background:rgba(0,178,144,0.05);border:1px solid rgba(0,178,144,0.2);border-radius:var(--r);font-size:11px;line-height:1.6"></div>'
+  }
+
+  if(tab==='blocks'){
+    content = '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">L2 Technical Building Blocks</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Select compute and infrastructure nodes to deploy within this territory.</div>'
+      +'<div id="tsap-blocks-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px"></div>'
+      +'<div id="tsap-blocks-config"></div>'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin:16px 0 6px">L1.x Programme Components</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Programme-level initiatives that sit alongside the technical infrastructure. Typically partner-delivered.</div>'
+      +'<div id="tsap-l1x-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"></div>'
+  }
+
+  if(tab==='financial'){
+    content = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+      +'<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">\u00A0 Side A \u2014 Financing Model</div>'
+      +'<div style="font-size:10px;color:var(--mid);margin-bottom:8px">How the programme will be funded. Multiple models can be combined.</div>'
+      +'<div id="tsap-fin-models"></div></div>'
+      +'<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">\uD83D\uDCB0 Side B \u2014 Build Cost</div>'
+      +'<div id="tsap-fin-costs"></div>'
+      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%;margin-top:4px">Calculate Gap</button>'
+      +'<div id="tsap-gap" style="font-size:11px;color:var(--navy);margin-top:8px;padding:8px;background:var(--light);border-radius:var(--r)">Enter costs and calculate.</div>'
+      +'</div></div>'
+  }
+
+  document.getElementById('tsapTabContent').innerHTML = content
+  if(tab==='financial'){
+    var modelsDiv = document.getElementById('tsap-fin-models')
+    var costsDiv = document.getElementById('tsap-fin-costs')
+    if(modelsDiv){
+      modelsDiv.innerHTML = FINANCING_OPTS_DEF.map(function(f,i){
+        var sel = TSAP_CFG.financial.financing_models.some(function(m){return m.type===f.type})
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--light)">'
+          +'<input type="checkbox" id="fin-chk-'+i+'"'+(sel?' checked':'')+'>'
+          +'<label for="fin-chk-'+i+'" style="font-size:11px;margin:0;text-transform:none;letter-spacing:0;font-weight:400;cursor:pointer">'+f.label+'</label>'
+          +'</div>'
+      }).join('')
+      FINANCING_OPTS_DEF.forEach(function(f,i){
+        var el = document.getElementById('fin-chk-'+i)
+        if(el) el.onchange = function(){ toggleTsapFinancing(f.type, f.label) }
+      })
+    }
+    if(costsDiv){
+      var costFields = [['infra_cost','Infrastructure / Civil'],['hardware_cost','L2 Hardware'],['software_cost','Software Stack'],['services_cost','L3 Services'],['opex_cost','Year 1 Operations']]
+      costsDiv.innerHTML = costFields.map(function(f){
+        return '<div style="margin-bottom:8px"><label style="font-size:10px;text-transform:none;letter-spacing:0;font-weight:600">'+f[1]+'</label>'
+          +'<input type="text" id="tsap-fin-'+f[0]+'" value="'+(TSAP_CFG.financial[f[0]]||'')+'" placeholder="e.g. INR 50 Cr" style="padding:6px 10px;font-size:11px"></div>'
+      }).join('')
+    }
+    var gapEl = document.getElementById('tsap-gap')
+    if(gapEl) gapEl.textContent = TSAP_CFG.financial.financing_gap || 'Enter costs and calculate.'
+  }
+  if(tab==='blocks'){
+    var grid = document.getElementById('tsap-blocks-grid')
+    if(grid){
+      grid.innerHTML = L2_BLOCKS_DEF.map(function(b,i){
+        var sel = TSAP_CFG.blocks.some(function(s){return s.code===b.code})
+        return '<div id="tsap-blk-'+i+'" style="border:2px solid '+(sel?'var(--teal)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(0,178,144,0.04)':'var(--white)')+'">'
+          +'<div style="font-size:18px;margin-bottom:4px">'+b.icon+'</div>'
+          +'<div style="font-size:12px;font-weight:600">'+b.name+'</div>'
+          +'<div style="font-size:10px;color:var(--mid)">'+b.desc+'</div>'
+          +(sel?'<span style="font-size:9px;font-weight:700;color:var(--teal)">\u2713 Selected</span>':'')
+          +'</div>'
+      }).join('')
+      grid.querySelectorAll('div[id^="tsap-blk-"]').forEach(function(el,i){
+        el.onclick = function(){ toggleTsapBlock(L2_BLOCKS_DEF[i].code) }
+      })
+      // Render config for selected blocks
+      var configDiv = document.getElementById('tsap-blocks-config')
+      if(configDiv && TSAP_CFG.blocks.length){
+        configDiv.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px">Configure selected blocks:</div>'
+          + TSAP_CFG.blocks.map(function(b,bi){
+            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--light)">'
+              +'<span style="font-size:12px;font-weight:600;min-width:140px">'+b.icon+' '+b.name+'</span>'
+              +'<input type="text" id="blk-loc-'+bi+'" value="'+(b.location||'')+'" placeholder="Location in territory" style="flex:1;padding:4px 8px;font-size:11px">'
+              +'<input type="number" id="blk-cnt-'+bi+'" value="'+(b.count||1)+'" min="1" max="20" style="width:60px;padding:4px 8px;font-size:11px">'
+              +'<span style="font-size:10px;color:var(--mid)">units</span>'
+              +'</div>'
+          }).join('')
+        TSAP_CFG.blocks.forEach(function(b,bi){
+          var locEl = document.getElementById('blk-loc-'+bi)
+          var cntEl = document.getElementById('blk-cnt-'+bi)
+          if(locEl) locEl.oninput = function(){ b.location = this.value }
+          if(cntEl) cntEl.oninput = function(){ b.count = parseInt(this.value)||1 }
+        })
+      } else if(configDiv){
+        configDiv.innerHTML = '<div style="font-size:11px;color:var(--mid);margin-top:8px">Select blocks above to configure.</div>'
+      }
+      // Render L1.x programme components
+      var l1xGrid = document.getElementById('tsap-l1x-grid')
+      if(l1xGrid){
+        l1xGrid.innerHTML = L1X_COMPONENTS_DEF.map(function(c,ci){
+          var sel = TSAP_CFG.blocks.some(function(s){return s.code===c.code})
+          return '<div id="tsap-l1x-'+ci+'" style="border:2px solid '+(sel?'var(--orange)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(255,85,57,0.04)':'var(--white)')+'">'
+            +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+            +'<span style="font-size:16px">'+c.icon+'</span>'
+            +(c.partner?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(0,40,112,0.08);color:var(--navy)">PARTNER</span>':'')
+            +'</div>'
+            +'<div style="font-size:12px;font-weight:600">'+c.name+'</div>'
+            +'<div style="font-size:10px;color:var(--mid);margin-top:2px">'+c.desc+'</div>'
+            +(sel?'<span style="font-size:9px;font-weight:700;color:var(--orange)">\u2713 Selected</span>':'')
+            +'</div>'
+        }).join('')
+        L1X_COMPONENTS_DEF.forEach(function(c,ci){
+          var el = document.getElementById('tsap-l1x-'+ci)
+          if(el) el.onclick = function(){ toggleTsapBlock(c.code) }
+        })
+      }
+    }
+  }
+}
+
+function saveTsapCurrentData(){
+  if(document.getElementById('tsap-name')) TSAP_CFG.territory.name = document.getElementById('tsap-name').value||''
+  if(document.getElementById('tsap-type')) TSAP_CFG.territory.type = document.getElementById('tsap-type').value||'state'
+  if(document.getElementById('tsap-gov')) TSAP_CFG.territory.governance = document.getElementById('tsap-gov').value||'central'
+  if(document.getElementById('tsap-sec')) TSAP_CFG.territory.security = document.getElementById('tsap-sec').value||'civilian'
+  if(document.getElementById('tsap-own')) TSAP_CFG.territory.ownership = document.getElementById('tsap-own').value||'government'
+  if(document.getElementById('tsap-scale')) TSAP_CFG.territory.scale = document.getElementById('tsap-scale').value||''
+  if(document.getElementById('tsap-obj')) TSAP_CFG.objectives.core_objective = document.getElementById('tsap-obj').value||''
+  if(document.getElementById('tsap-vis')) TSAP_CFG.objectives.vision = document.getElementById('tsap-vis').value||''
+  if(document.getElementById('tsap-just')) TSAP_CFG.objectives.justification = document.getElementById('tsap-just').value||''
+  if(document.getElementById('tsap-uniq')) TSAP_CFG.objectives.uniqueness = document.getElementById('tsap-uniq').value||''
+  if(document.getElementById('tsap-jobs')) TSAP_CFG.objectives.success_metrics.jobs = document.getElementById('tsap-jobs').value||''
+  if(document.getElementById('tsap-startups')) TSAP_CFG.objectives.success_metrics.startups = document.getElementById('tsap-startups').value||''
+  if(document.getElementById('tsap-compute')) TSAP_CFG.objectives.success_metrics.compute = document.getElementById('tsap-compute').value||''
+  var costFields = ['infra_cost','hardware_cost','software_cost','services_cost','opex_cost']
+  costFields.forEach(function(k){var el=document.getElementById('tsap-fin-'+k);if(el)TSAP_CFG.financial[k]=el.value||''})
+}
+
+function toggleTsapBlock(code){
+  var idx=TSAP_CFG.blocks.findIndex(function(b){return b.code===code})
+  var def=L2_BLOCKS_DEF.find(function(b){return b.code===code})
+  if(idx>=0) TSAP_CFG.blocks.splice(idx,1)
+  else if(def) TSAP_CFG.blocks.push({code:code,name:def.name,icon:def.icon,count:1,location:''})
+  switchTsapTab('blocks')
+}
+
+function updateTsapBlock(code,field,val){
+  var b=TSAP_CFG.blocks.find(function(b){return b.code===code})
+  if(b) b[field] = field==='count'?parseInt(val)||1:val
+}
+
+function toggleTsapFinancing(type,label){
+  var idx=TSAP_CFG.financial.financing_models.findIndex(function(m){return m.type===type})
+  if(idx>=0) TSAP_CFG.financial.financing_models.splice(idx,1)
+  else TSAP_CFG.financial.financing_models.push({type:type,label:label,amount:'',notes:''})
+}
+
+function calcTsapGap(){
+  saveTsapCurrentData()
+  var costs=['infra_cost','hardware_cost','software_cost','services_cost','opex_cost']
+  var total=0,hasVal=false
+  costs.forEach(function(k){var v=TSAP_CFG.financial[k];if(v){var n=parseFloat(String(v).replace(/[^0-9.]/g,''));if(!isNaN(n)){total+=n;hasVal=true}}})
+  var finCount=TSAP_CFG.financial.financing_models.length
+  TSAP_CFG.financial.financing_gap = hasVal
+    ? 'Total build cost: ~'+total.toFixed(1)+' (same currency). '+finCount+' financing model'+(finCount===1?'':'s')+' selected.'
+    : 'Enter cost estimates to calculate.'
+  document.getElementById('tsap-gap').textContent=TSAP_CFG.financial.financing_gap
+}
+
+async function aiEnrichTsap(){
+  saveTsapCurrentData()
+  var territory=TSAP_CFG.territory.name||'this territory'
+  var objective=TSAP_CFG.objectives.core_objective||'AI and digital transformation'
+  var model=atlasGetTaskModel('pei')
+  var key=atlasGetKeyForModel(model)
+  if(!key){alert('Configure AI keys in ATLAS Settings.');return}
+  var el=document.getElementById('tsap-enrich')
+  el.style.display='block';el.textContent='Researching '+territory+'...'
+  var prompt='Strategic consultant for Territory Sovereign AI Programme. Territory: '+territory+'. Objective: '+objective+'.'
+    +' Provide: (1) 3-4 unique assets/strengths of this territory for AI programme, (2) 5 most relevant AI use cases given sector profile, (3) 3 economic justification points, (4) 2 comparable AI programme references from other regions.'
+    +' JSON: {uniqueness:[string],use_cases:[{name,rationale}],economic_case:[string],comparables:[{region,programme,lesson}]}'
+    +' Start { end }. No markdown.'
+  try{
+    var text=await atlasCallModel(model,prompt,null,2000)
+    var first=text.indexOf('{'),last=text.lastIndexOf('}')
+    if(first<0) throw new Error('No JSON')
+    var r=JSON.parse(text.slice(first,last+1))
+    var html=''
+    if(r.uniqueness&&r.uniqueness.length) html+='<b>Unique Strengths:</b><br>'+r.uniqueness.map(function(u){return '\u2022 '+esc(u)}).join('<br>')+'<br><br>'
+    if(r.use_cases&&r.use_cases.length) html+='<b>Suggested Use Cases:</b><br>'+r.use_cases.map(function(u){return '\u2022 <b>'+esc(u.name)+'</b> \u2014 '+esc(u.rationale)}).join('<br>')+'<br><br>'
+    if(r.economic_case&&r.economic_case.length) html+='<b>Economic Case:</b><br>'+r.economic_case.map(function(e){return '\u2022 '+esc(e)}).join('<br>')+'<br><br>'
+    if(r.comparables&&r.comparables.length) html+='<b>Comparable Programmes:</b><br>'+r.comparables.map(function(c){return '\u2022 <b>'+esc(c.region)+'</b>: '+esc(c.programme)+' \u2014 '+esc(c.lesson)}).join('<br>')
+    el.innerHTML=html||'No structured result. Try again.'
+    if(!TSAP_CFG.objectives.uniqueness&&r.uniqueness){
+      var uEl=document.getElementById('tsap-uniq')
+      if(uEl) uEl.value=r.uniqueness.join('. ')
+    }
+  }catch(e){el.textContent='Error: '+e.message}
+}
+
+async function saveTsapConfig(){
+  saveTsapCurrentData()
+  var docketId=CURRENT_DOCKET_ID
+  if(!docketId){alert('Open an engagement first.');return}
+  var l2Count = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2')===0 && b.code.indexOf('.')===2}).length
+  var l2xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2.')===0}).length
+  var l1xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L1.')===0}).length
+  var item={id:genId('DI'),docket_id:docketId,item_type:'solution',title:'TSAP Config \u2014 '+esc(TSAP_CFG.territory.name||'Territory'),content:TSAP_CFG,status:'in_progress',notes:'Territory: '+esc(TSAP_CFG.territory.name)+'. L2 blocks: '+l2Count+'. Specialised factories: '+l2xCount+'. L1.x programmes: '+l1xCount+'. Financing models: '+TSAP_CFG.financial.financing_models.length+'.',created_by:'ATLAS TSAP'}
+  var ok=await sbInsert('docket_items',item)
+  if(ok){CURRENT_ITEMS.push(item);closeModal('tsapModal');renderItems('all');alert('TSAP configuration saved to docket.')}
+  else alert('Failed to save.')
+}
+
+async function generateVisionDoc(){
+  saveTsapCurrentData()
+  var territory=TSAP_CFG.territory.name
+  if(!territory){alert('Enter territory name first.');return}
+  if(!TSAP_CFG.objectives.core_objective){alert('Enter core objective first.');return}
+  var model=atlasGetTaskModel('documents')
+  var key=atlasGetKeyForModel(model)
+  if(!key){alert('Configure Documents model key in ATLAS Settings.');return}
+  closeModal('tsapModal')
+  var main=document.getElementById('mainPanel')
+  var genDiv=document.createElement('div')
+  genDiv.className='rec-card'
+  genDiv.innerHTML='<div class="rec-title">\uD83D\uDCC4 Generating Vision Document for '+esc(territory)+'...</div>'
+  main.insertBefore(genDiv,main.firstChild)
+  var blocks=TSAP_CFG.blocks.map(function(b){return b.name+(b.count>1?' (x'+b.count+')':'')+(b.location?' at '+b.location:'')}).join(', ')
+  var financing=TSAP_CFG.financial.financing_models.map(function(f){return f.label}).join(', ')
+  var prompt='Write an executive Vision Document for the '+territory+' Territory Sovereign AI Programme.'
+    +' Core objective: '+TSAP_CFG.objectives.core_objective+'.'
+    +' Vision: '+TSAP_CFG.objectives.vision+'.'
+    +' Justification: '+TSAP_CFG.objectives.justification+'.'
+    +' Uniqueness: '+TSAP_CFG.objectives.uniqueness+'.'
+    +' Building blocks: '+(blocks||'AI Factory, Inferencing Factory')+'.'
+    +' Financing: '+(financing||'TBD')+'.'
+    +' Target: '+(TSAP_CFG.objectives.success_metrics.jobs||'TBD')+' jobs, '+(TSAP_CFG.objectives.success_metrics.startups||'TBD')+' startups.'
+    +' Structure: Executive Summary, Territory Context, Programme Vision, Proposed Architecture, Expected Impact, Implementation Approach, Call to Action.'
+    +' Audience: Chief Minister or Minister level. Confident, strategic, territory-specific. 800-1000 words.'
+  try{
+    var text=await atlasCallModel(model,prompt,null,4096)
+    var docketId=CURRENT_DOCKET_ID
+    if(docketId){
+      var item={id:genId('DI'),docket_id:docketId,item_type:'exec_doc',title:territory+' \u2014 TSAP Vision Document',content:{vision_doc_text:text,territory:territory},status:'done',notes:text.slice(0,200)+'...',created_by:'ATLAS Vision Doc'}
+      await sbInsert('docket_items',item)
+      CURRENT_ITEMS.push(item)
+      renderItems('all')
+    }
+    genDiv.innerHTML='<div class="rec-title">\uD83D\uDCC4 Vision Document Generated \u2014 saved to docket</div>'
+      +'<div style="max-height:300px;overflow-y:auto;font-size:12px;line-height:1.7;white-space:pre-wrap;border:1px solid #e0e0e8;border-radius:var(--r);padding:12px;background:var(--white);margin-top:8px">'+esc(text)+'</div>'
+  }catch(e){genDiv.innerHTML='<div style="color:#DC2626">\u274C Error: '+esc(e.message)+'</div>'}
+}
+
+
+// \u2500\u2500 Contact Management \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var EDIT_CUSTOMER_ID = null
+
+function addContact(custId){
+  EDIT_CUSTOMER_ID = custId
+  document.getElementById('ct-name').value=''
+  document.getElementById('ct-role').value=''
+  document.getElementById('ct-email').value=''
+  document.getElementById('ct-phone').value=''
+  document.getElementById('ct-seniority').value=''
+  document.getElementById('ct-influence').value=''
+  document.getElementById('contactModal').classList.add('open')
+}
+
+function closeContactModal(){
+  var m = document.getElementById('contactModal')
+  if(m) m.classList.remove('open')
+}
+
+async function saveContact(){
+  var name = document.getElementById('ct-name').value.trim()
+  if(!name){ alert('Name required.'); return }
+  var contact = {
+    id: 'ct-'+Date.now(),
+    name: name,
+    role: document.getElementById('ct-role').value.trim(),
+    seniority: document.getElementById('ct-seniority').value,
+    influence: document.getElementById('ct-influence').value,
+    email: document.getElementById('ct-email').value.trim(),
+    phone: document.getElementById('ct-phone').value.trim(),
+  }
+  var cust = ALL_CUSTOMERS.find(function(c){return c.id===EDIT_CUSTOMER_ID})
+  if(!cust) return
+  var contacts = Array.isArray(cust.contacts) ? cust.contacts : []
+  contacts.push(contact)
+  var ok = await sbPatch('customers','id=eq.'+EDIT_CUSTOMER_ID,{contacts:JSON.stringify(contacts)})
+  if(ok){
+    cust.contacts = contacts
+    window._cust = cust
+    closeContactModal()
+    switchCustTab('profile')
+  } else alert('Failed to save contact.')
+}
+
+// \u2500\u2500 My Action Docket \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var MY_ACTIONS = []
+var MY_OWNER_NAME = ''
+
+async function openMyActions(){
+  CURRENT_VIEW = 'my_actions'
+  CURRENT_CUSTOMER_ID = null
+  CURRENT_ENGAGEMENT_ID = null
+
+  var g = atlasGetGlobal()
+  MY_OWNER_NAME = g.owner_name || 'My'
+
+  // Find or create salesperson docket
+  var spDocket = null  // Will fetch from Supabase below
+  if(!spDocket){
+    var dockets = await sbFetch('engagement_dockets','type=eq.salesperson',1)
+    spDocket = dockets[0]
+  }
+
+  if(!spDocket){
+    // Auto-create
+    var id = 'SP-'+Date.now()
+    await sbInsert('engagement_dockets',{id:id,type:'salesperson',name:MY_OWNER_NAME,status:'active',metadata:{}})
+    spDocket = {id:id,type:'salesperson',name:MY_OWNER_NAME,status:'active'}
+  }
+
+  MY_ACTIONS = await sbFetch('docket_items','docket_id=eq.'+spDocket.id+'&order=created_at.desc',200)
+
+  var open_count = MY_ACTIONS.filter(function(a){return a.status!=='closed'}).length
+  var done_count = MY_ACTIONS.filter(function(a){return a.status==='done'||a.status==='closed'}).length
+
+  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">'
+    +'<div><div class="card-title" style="font-size:18px">My Action Docket</div>'
+    +'<div style="font-size:12px;color:var(--mid)">Personal action list sourced from intelligence items and engagements</div></div>'
+    +'<button class="btn btn-primary" onclick="addMyAction(\''+spDocket.id+'\')">+ Add Action</button>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">'
+    +'<div class="stat"><div class="stat-val" style="color:var(--teal)">'+open_count+'</div><div class="stat-lbl">Open Actions</div></div>'
+    +'<div class="stat"><div class="stat-val" style="color:var(--mid)">'+done_count+'</div><div class="stat-lbl">Completed</div></div>'
+    +'<div class="stat"><div class="stat-val">'+MY_ACTIONS.length+'</div><div class="stat-lbl">Total</div></div>'
+    +'</div>'
+
+  // Filter tabs
+  html += '<div style="display:flex;gap:6px;margin-bottom:14px">'
+    +'<button class="btn btn-ghost btn-sm" style="background:var(--navy);color:var(--white)" onclick="renderMyActions(\'all\')">All ('+MY_ACTIONS.length+')</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="renderMyActions(\'open\')">Open ('+open_count+')</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="renderMyActions(\'done\')">Done ('+done_count+')</button>'
+    +'</div>'
+    +'<div id="my-actions-list"></div>'
+
+  document.getElementById('mainPanel').innerHTML = html
+  window._spDocketId = spDocket.id
+  renderMyActions('open')
+  renderSidebar()
+}
+
+function renderMyActions(filter){
+  var items = filter==='all' ? MY_ACTIONS
+    : filter==='open' ? MY_ACTIONS.filter(function(a){return a.status==='pending'||a.status==='in_progress'})
+    : MY_ACTIONS.filter(function(a){return a.status==='done'||a.status==='closed'})
+
+  var html = items.length ? items.map(function(item){
+    var content = item.content||{}
+    return '<div class="docket-item" style="'+(item.status==='done'||item.status==='closed'?'opacity:0.6':'')+'">'
+      +'<div class="item-body">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+      +'<div class="item-title">'+esc(item.title)+'</div>'
+      +'<span class="item-status is-'+item.status+'">'+item.status.replace('_',' ')+'</span>'
+      +'</div>'
+      +(content.domain_code?'<span style="font-size:10px;background:rgba(0,40,112,0.08);color:var(--navy);padding:1px 6px;border-radius:4px;margin-right:6px">'+esc(content.domain_code)+'</span>':'')
+      +(item.due_date?'<span style="font-size:10px;color:var(--mid)">Due: '+fmtDate(item.due_date)+'</span>':'')
+      +(item.notes?'<div style="font-size:11px;color:#555;margin-top:4px">'+esc(item.notes.slice(0,100))+'</div>':'')
+      +'<div style="display:flex;gap:6px;margin-top:6px">'
+      +(item.status==='pending'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">Start</button>':'')
+      +(item.status==='in_progress'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">Done</button>':'')
+      +(item.status==='done'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'closed\')">Close</button>':'')
+      +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteMyAction(this.dataset.id)">x</button>'
+      +'</div></div></div>'
+  }).join('')
+  : '<div class="empty" style="padding:32px"><div class="empty-title">No '+filter+' actions</div>'
+    +'<div class="empty-sub">Actions sourced from intelligence items in Second Brain will appear here.</div></div>'
+
+  document.getElementById('my-actions-list').innerHTML = html
+}
+
+function addMyAction(docketId){
+  openAddItemModal(docketId)
+  document.getElementById('ai-type').value = 'action'
+  updateItemHint()
+}
+
+async function deleteMyAction(itemId){
+  if(!confirm('Delete this action?')) return
+  var ok = await sbDelete('docket_items','id=eq.'+itemId)
+  if(ok){
+    MY_ACTIONS = MY_ACTIONS.filter(function(a){return a.id!==itemId})
+    renderMyActions('all')
+  }
+}
+
+// Override setItemStatus to work for my actions too
+var _origSetItemStatus = setItemStatus
+setItemStatus = async function(itemId, status){
+  var ok = await sbPatch('docket_items','id=eq.'+itemId,{status:status})
+  if(ok){
+    // Update in CURRENT_ITEMS
+    var item = CURRENT_ITEMS.find(function(i){return i.id===itemId})
+    if(item) item.status = status
+    // Also update in MY_ACTIONS
+    var myItem = MY_ACTIONS.find(function(i){return i.id===itemId})
+    if(myItem) myItem.status = status
+    // Re-render appropriately
+    if(CURRENT_VIEW==='my_actions') renderMyActions('all')
+    else {
+      var docket = ALL_ENGAGEMENTS.find(function(e){return e.id===CURRENT_ENGAGEMENT_ID})
+      if(docket) renderItems('all')
+    }
+  }
+}
+
+// \u2500\u2500 Word Export (docx via client-side generation) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+async function exportWordDoc(docketId){
+  var docket = null
+  var eng = ALL_ENGAGEMENTS.find(function(e){return e.id===CURRENT_ENGAGEMENT_ID})
+  var cust = ALL_CUSTOMERS.find(function(c){return c.id===(eng&&eng.customer_id)})
+
+  var items = CURRENT_ITEMS.length > 0 ? CURRENT_ITEMS
+    : await sbFetch('docket_items','docket_id=eq.'+docketId+'&order=item_type.asc,created_at.asc',200)
+
+  // Build document content as structured text
+  var lines = []
+  lines.push('ATLAS ENGAGEMENT DOCKET')
+  lines.push('=' .repeat(60))
+  lines.push('')
+  if(cust) lines.push('Customer: '+cust.name+(cust.sector?' | '+cust.sector:'')+(cust.country?' | '+cust.country:''))
+  if(eng){
+    lines.push('Engagement: '+eng.name)
+    lines.push('ID: '+eng.id+' | Phase: '+eng.phase+' | Status: '+eng.status)
+    if(eng.value) lines.push('Estimated Value: '+eng.value+' '+eng.currency)
+  }
+  lines.push('Exported: '+new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}))
+  lines.push('')
+
+  // Group by type
+  var typeOrder = ['intel','pei','uc','rfp','solution','bom','pricing','proposal','pitch','exec_doc','action']
+  var typeLabels = {intel:'Intelligence',pei:'PEI Brief',uc:'Use Cases',rfp:'RFP / Tender',
+    solution:'Technical Solution',bom:'Bill of Materials',pricing:'Pricing',proposal:'Proposal',
+    pitch:'Pitch',exec_doc:'Executive Documents',action:'Actions'}
+
+  typeOrder.forEach(function(t){
+    var group = items.filter(function(i){return i.item_type===t})
+    if(!group.length) return
+    lines.push('')
+    lines.push((typeLabels[t]||t).toUpperCase()+' ('+group.length+')')
+    lines.push('-'.repeat(40))
+    group.forEach(function(item){
+      lines.push('')
+      lines.push(item.title)
+      var meta = []
+      if(item.status) meta.push('Status: '+item.status)
+      if(item.assigned_to) meta.push('Assigned: '+item.assigned_to)
+      if(item.due_date) meta.push('Due: '+fmtDate(item.due_date))
+      if(meta.length) lines.push(meta.join(' | '))
+      if(item.notes) lines.push(item.notes)
+      var c = item.content||{}
+      if(c.vision_doc_text) lines.push(c.vision_doc_text)
+      if(c.organisation_summary) lines.push('Summary: '+c.organisation_summary)
+      if(c.our_positioning) lines.push('Positioning: '+c.our_positioning)
+      if(c.portfolio_codes) lines.push('Portfolio: '+c.portfolio_codes.join(', '))
+    })
+  })
+
+  var blob = new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'})
+  var url = URL.createObjectURL(blob)
+  var a = document.createElement('a')
+  a.href = url
+  a.download = 'Docket-'+(cust?cust.name.replace(/\s+/g,'-'):'Engagement')+'-'+new Date().toISOString().slice(0,10)+'.txt'
+  a.click()
+  URL.revokeObjectURL(url)
+  // Note: Full .docx via docx-js requires server-side or service worker \u2014 txt export for now
+}
+
+// \u2500\u2500 Add to Docket from PEI (called from PEI tool via localStorage) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function checkPendingDocketItem(){
+  try{
+    var pending = JSON.parse(localStorage.getItem('atlas_pending_docket_item')||'null')
+    if(pending){
+      localStorage.removeItem('atlas_pending_docket_item')
+      atlasAddToDocket(pending)
+    }
+  }catch(e){}
+}
+
+// \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+window.addEventListener('DOMContentLoaded', function(){
+  loadAll().then(function(){
+    checkPendingDocketItem()
+  })
+})
+</script>
+
+<!-- Contact Modal -->
+<div class="modal-overlay" id="contactModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title">Add Contact</div>
+    <label>Name *</label><input type="text" id="ct-name" placeholder="Full name">
+    <label>Role / Title</label><input type="text" id="ct-role" placeholder="e.g. Director AI, CTO">
+    <div class="form-grid">
+      <div><label>Seniority</label><select id="ct-seniority">
+        <option value="">Unknown</option>
+        <option value="c_suite">C-Suite / Secretary</option>
+        <option value="director">Director / Jt Secretary</option>
+        <option value="manager">Manager / Deputy</option>
+        <option value="technical">Technical / Specialist</option>
+      </select></div>
+      <div><label>Influence</label><select id="ct-influence">
+        <option value="">Unknown</option>
+        <option value="decision_maker">Decision Maker</option>
+        <option value="influencer">Influencer</option>
+        <option value="champion">Champion</option>
+        <option value="blocker">Blocker</option>
+      </select></div>
+    </div>
+    <label>Email</label><input type="email" id="ct-email" placeholder="email@org.gov.in">
+    <label>Phone</label><input type="text" id="ct-phone" placeholder="+91 98...">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeContactModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveContact()">Add Contact</button>
+    </div>
+  </div>
+</div>
+
+<!-- TSAP Configuration Modal -->
+<div class="modal-overlay" id="tsapModal">
+  <div class="modal modal-lg">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div class="modal-title" style="margin-bottom:0">Territory Sovereign AI Programme</div>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal('tsapModal')">x</button>
+    </div>
+    <div style="font-size:11px;color:var(--mid);margin-bottom:14px">Configure territory, objectives, building blocks and financial model.</div>
+    <div class="tab-bar" id="tsapTabBar">
+      <div class="tab active" onclick="switchTsapTab('territory')">1. Territory</div>
+      <div class="tab" onclick="switchTsapTab('objectives')">2. Objectives</div>
+      <div class="tab" onclick="switchTsapTab('blocks')">3. Building Blocks</div>
+      <div class="tab" onclick="switchTsapTab('financial')">4. Financial Model</div>
+    </div>
+    <div id="tsapTabContent" style="min-height:300px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('tsapModal')">Cancel</button>
+      <button class="btn btn-outline" onclick="generateVisionDoc()">Generate Vision Doc</button>
+      <button class="btn btn-primary" onclick="saveTsapConfig()">Save Configuration</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
