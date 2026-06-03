@@ -1372,48 +1372,33 @@ async function saveTransaction(){
 async function atlasAddToDocket(item){
   PENDING_TRIGGER_ITEM = item
 
-  // Use existing static modal \u2014 do NOT create dynamically
   var modal = document.getElementById('triggerModal')
-  if(!modal){ console.error('triggerModal not found'); return }
+  if(!modal){ alert('Trigger modal not found. Please reload.'); return }
 
-  // Show item description
   var descEl = document.getElementById('trigger-item-desc')
-  if(descEl) descEl.textContent = 'Adding: "'+item.title+'" ('+item.type+')'
+  if(descEl) descEl.textContent = '"'+item.title+'" ('+item.type+')'
 
-  // Build docket dropdown from ALL_ENGAGEMENTS (loaded by loadAll)
+  // Always fetch fresh so we have latest customers/engagements
+  var engs = await sbFetch('engagements','status=eq.active&order=updated_at.desc',100)
+  var custs = await sbFetch('customers','order=name.asc',200)
+
   var sel = document.getElementById('trigger-sel')
-  if(!sel){
-    // fallback: search all select elements in modal
-    sel = modal.querySelector('select')
-  }
   if(sel){
-    var opts = '<option value="__new__">+ Create New Docket</option>'
-    // Use ALL_ENGAGEMENTS which is already loaded
-    var activeEngs = (ALL_ENGAGEMENTS||[]).filter(function(e){ return e.status==='active' || !e.status })
-    if(activeEngs.length === 0){
-      // Try fetching directly as fallback
-      var fetched = await sbFetch('engagements','status=eq.active&order=updated_at.desc',50)
-      activeEngs = fetched
-    }
-    activeEngs.forEach(function(e){
-      var custName = ''
-      if(ALL_CUSTOMERS){
-        var cust = ALL_CUSTOMERS.find(function(c){ return c.id===e.customer_id })
-        if(cust) custName = cust.name+' \u2014 '
-      }
-      opts += '<option value="'+e.id+'">'+esc(custName+(e.name||e.title||e.id))+'</option>'
+    var opts = '<option value="__new__">+ Create New Customer &amp; Engagement</option>'
+    engs.forEach(function(e){
+      var cust = custs.find(function(c){ return c.id===e.customer_id })
+      var label = (cust ? cust.name+' \u2014 ' : '') + (e.name||e.id)
+      opts += '<option value="'+e.id+'">'+esc(label)+'</option>'
     })
     sel.innerHTML = opts
     sel.onchange = function(){
-      var newFields = document.getElementById('trigger-new')
-      if(newFields) newFields.style.display = this.value==='__new__' ? 'block' : 'none'
+      var nf = document.getElementById('trigger-new')
+      if(nf) nf.style.display = this.value==='__new__' ? 'block' : 'none'
     }
   }
 
-  // Hide new fields initially
-  var newFields = document.getElementById('trigger-new')
-  if(newFields) newFields.style.display = 'none'
-
+  var nf = document.getElementById('trigger-new')
+  if(nf) nf.style.display = 'none'
   modal.classList.add('open')
 }
 
@@ -2032,50 +2017,72 @@ window.addEventListener('DOMContentLoaded', function(){
 })
 async function confirmAddToDocket(){
   var sel = document.getElementById('trigger-sel')
-  if(!sel) sel = document.getElementById('trigger-docket-select')
   var selVal = sel ? sel.value : '__new__'
   var item = PENDING_TRIGGER_ITEM
-  if(!item) return
+  if(!item){ alert('No item pending. Please try again.'); return }
 
   var engagementId = null
-  var docketId = null
 
   if(selVal === '__new__'){
-    // Create new customer + engagement
-    var custEl = document.getElementById('trigger-cust')
-    var engEl = document.getElementById('trigger-eng')
-    var custName = custEl ? custEl.value.trim() : ''
-    var engName = engEl ? engEl.value.trim() : ''
-    if(!custName||!engName){ alert('Please enter customer and engagement name.'); return }
-    // Create customer
+    var custName = (document.getElementById('trigger-cust')||{}).value||''
+    var engName = (document.getElementById('trigger-eng')||{}).value||''
+    custName = custName.trim()
+    engName = engName.trim()
+    if(!custName||!engName){ alert('Please enter both customer name and engagement name.'); return }
+
+    // Create customer with all required fields
     var custId = 'CUST-'+Date.now()
-    await sbInsert('customers',{id:custId,name:custName,tier:'strategic',status:'active',created_at:new Date().toISOString()})
+    var custOk = await sbInsert('customers',{
+      id: custId,
+      name: custName,
+      tier: 'strategic',
+      ownership: 'government',
+      country: 'India',
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    if(!custOk){ alert('Failed to create customer. Check Supabase connection.'); return }
+
     // Create engagement
-    engagementId = 'ENG-'+Date.now()
-    await sbInsert('engagements',{id:engagementId,customer_id:custId,name:engName,archetype:'govt_sectorial',phase:'discover',status:'active',created_at:new Date().toISOString()})
-    // Reload
+    engagementId = 'ENG-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+Math.floor(Math.random()*9999)
+    var engOk = await sbInsert('engagements',{
+      id: engagementId,
+      customer_id: custId,
+      name: engName,
+      archetype: 'govt_sectorial',
+      phase: 'discover',
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    if(!engOk){ alert('Failed to create engagement. Check Supabase connection.'); return }
+
+    // Refresh globals
     ALL_CUSTOMERS = await sbFetch('customers','order=updated_at.desc',500)
     ALL_ENGAGEMENTS = await sbFetch('engagements','order=updated_at.desc',500)
+
   } else {
     engagementId = selVal
   }
 
-  // Get or create the engagement docket
-  var dockets = await sbFetch('engagement_dockets','engagement_id=eq.'+engagementId+'&limit=1')
+  // Get or create engagement docket
+  var dockets = await sbFetch('engagement_dockets','engagement_id=eq.'+engagementId,1)
+  var docketId
   if(dockets && dockets.length > 0){
     docketId = dockets[0].id
   } else {
-    // Create docket for this engagement
     var eng = (ALL_ENGAGEMENTS||[]).find(function(e){ return e.id===engagementId })
     docketId = 'DOC-'+Date.now()
-    await sbInsert('engagement_dockets',{
+    var docOk = await sbInsert('engagement_dockets',{
       id: docketId,
       engagement_id: engagementId,
       customer_id: eng ? eng.customer_id : null,
-      name: eng ? (eng.name||'Engagement Docket') : 'Engagement Docket',
+      name: eng ? (eng.name||'Docket') : 'Docket',
       status: 'active',
       metadata: {}
     })
+    if(!docOk){ alert('Failed to create docket. Check Supabase connection.'); return }
   }
 
   // Insert the docket item
@@ -2090,20 +2097,16 @@ async function confirmAddToDocket(){
     notes: item.notes || null,
     created_by: 'ATLAS'
   }
-
   var ok = await sbInsert('docket_items', newItem)
   if(ok){
     closeModal('triggerModal')
     PENDING_TRIGGER_ITEM = null
-    alert('Added to docket: '+item.title.slice(0,40))
-    // If currently viewing this docket, refresh
-    if(CURRENT_DOCKET_ID === docketId){
-      openEngagement(engagementId)
-    } else {
-      renderSidebar()
-    }
+    // Reload data and navigate to the engagement
+    ALL_ENGAGEMENTS = await sbFetch('engagements','order=updated_at.desc',500)
+    renderSidebar()
+    openEngagement(engagementId)
   } else {
-    alert('Failed to add item. Check Supabase connection.')
+    alert('Failed to add item to docket. Check Supabase connection.')
   }
 }
 
