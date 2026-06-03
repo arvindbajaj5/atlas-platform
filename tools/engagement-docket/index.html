@@ -1141,26 +1141,13 @@ async function runRecommendationEngine(engId){
   var cust = ALL_CUSTOMERS.find(function(c){ return c.id===(eng&&eng.customer_id) })
   if(!eng) return
 
-  var recPanel = document.getElementById('rec-panel')
-  if(!recPanel){
-    // rec-panel not found \u2014 re-open engagement to rebuild UI
-    console.warn('rec-panel not found, re-rendering')
-    await openEngagement(engId)
-    return
-  }
-
-  // Robust model + key resolution \u2014 same pattern as generatePEI
-  var g = atlasGetGlobal()
   var model = atlasGetTaskModel('pei') || 'gemini-3.1-flash-lite'
-  var key = atlasGetKeyForModel(model) || g.key_gemini || g.key_anthropic || g.key_openai || ''
-  // If model key missing but we have a key, pick matching model
-  if(!atlasGetKeyForModel(model) && key){
-    if(g.key_gemini) model = 'gemini-3.1-flash-lite'
-    else if(g.key_anthropic) model = 'claude-haiku-4-5-20251001'
-  }
+  var key = atlasGetKeyForModel(model)
+  var recPanel = document.getElementById('rec-panel')
+  if(!recPanel) return
 
   if(!key){
-    recPanel.innerHTML = '<div class="card" style="margin-bottom:12px;padding:12px 16px;border-left:3px solid var(--amber)"><div style="font-size:12px;color:var(--dark)">No AI key configured. Go to ATLAS Settings and add a Gemini or Anthropic key.</div></div>'
+    recPanel.innerHTML = '<div class="card" style="margin-bottom:12px;padding:12px 16px;border-left:3px solid var(--amber)"><div style="font-size:12px;color:var(--dark)">Configure AI keys in Settings to use the Recommendation Engine.</div></div>'
     return
   }
 
@@ -1264,14 +1251,17 @@ function applyRecommendationsToPortfolio(){
   var recs = window._lastRecommendations || []
   if(!recs.length){ alert('No recommendations to apply.'); return }
   PORTFOLIO_SELECTION = recs.slice()
-  openPortfolioMap(CURRENT_ENGAGEMENT_ID, window._currentDocketId || CURRENT_DOCKET_ID)
+  var dId = window._currentDocketId || CURRENT_DOCKET_ID
+  if(!dId){ alert('No docket found. Please reload the engagement.'); return }
+  openPortfolioMap(CURRENT_ENGAGEMENT_ID, dId)
 }
 
 
 function openPortfolioMap(engId, docketId){
   var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
   window._portfolioEngId = engId
-  window._portfolioDocketId = docketId
+  // Use provided docketId, fall back to current docket
+  window._portfolioDocketId = docketId || window._currentDocketId || CURRENT_DOCKET_ID
   var recommended = window._lastRecommendations || []
 
   var l1 = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level===1 })
@@ -1342,13 +1332,19 @@ async function savePortfolioSelection(){
     created_by: 'ATLAS Portfolio Map',
     assigned_to: null, due_date: null
   }
+  // Guard \u2014 ensure docket_id is set
+  if(!newItem.docket_id){
+    alert('Cannot save \u2014 no docket ID. Please close and reopen the engagement.')
+    return
+  }
   var ok = await sbInsert('docket_items', newItem)
   if(ok){
     CURRENT_ITEMS.push(newItem)
     closeModal('portfolioMapModal')
-    renderItems('all')
+    // Refresh header pill counts
+    openEngagement(CURRENT_ENGAGEMENT_ID)
     PORTFOLIO_SELECTION = []
-  } else { alert('Failed to save. Check Supabase connection.') }
+  } else { alert('Failed to save portfolio selection. Check Supabase connection.') }
 }
 
 // \u2500\u2500 Create customer / engagement \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
