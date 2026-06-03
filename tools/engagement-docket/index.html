@@ -1380,16 +1380,21 @@ async function atlasAddToDocket(item){
   var descEl = document.getElementById('trigger-item-desc')
   if(descEl) descEl.textContent = '"'+item.title+'" ('+item.type+')'
 
-  // Always fetch fresh engagements and customers
+  // Fetch fresh engagements and customers
   var engs = await sbFetch('engagements','status=eq.active&order=updated_at.desc',100)
-  var custs = await sbFetch('customers','order=name.asc',200)
+  var custs = await sbFetch('customers','order=name.asc',500)
 
+  // Build customer lookup map
+  var custMap = {}
+  custs.forEach(function(c){ custMap[c.id] = c })
+
+  // Populate engagement dropdown
   var sel = document.getElementById('trigger-sel')
   if(sel){
-    var opts = '<option value="__new__">+ Create New Customer &amp; Engagement</option>'
+    var opts = '<option value="__new__">+ Create New Engagement</option>'
     engs.forEach(function(e){
-      var cust = custs.find(function(c){ return c.id===e.customer_id })
-      var label = (cust ? cust.name+' \u2014 ' : '') + (e.name||e.id)
+      var cust = custMap[e.customer_id]
+      var label = (cust ? cust.name+' \u2014 ' : '') + e.name
       opts += '<option value="'+e.id+'">'+esc(label)+'</option>'
     })
     sel.innerHTML = opts
@@ -1399,9 +1404,28 @@ async function atlasAddToDocket(item){
     }
   }
 
-  // Show new-fields immediately if only __new__ option exists (no engagements)
+  // Populate customer dropdown in "new engagement" section
+  var custSel = document.getElementById('trigger-cust-sel')
+  var noCusts = document.getElementById('trigger-no-custs')
+  if(custSel){
+    if(custs.length === 0){
+      custSel.style.display = 'none'
+      if(noCusts) noCusts.style.display = 'block'
+    } else {
+      custSel.style.display = 'block'
+      if(noCusts) noCusts.style.display = 'none'
+      var custOpts = '<option value="">&#8212; Select Customer &#8212;</option>'
+      custs.forEach(function(c){
+        custOpts += '<option value="'+c.id+'">'+esc(c.name)+'</option>'
+      })
+      custSel.innerHTML = custOpts
+    }
+  }
+
+  // Show/hide new section
   var nf = document.getElementById('trigger-new')
   if(nf) nf.style.display = (engs.length === 0) ? 'block' : 'none'
+
   modal.classList.add('open')
 }
 
@@ -2027,34 +2051,32 @@ async function confirmAddToDocket(){
   var engagementId = null
 
   if(selVal === '__new__'){
-    var custName = ((document.getElementById('trigger-cust')||{}).value||'').trim()
+    // Customer must be selected from dropdown \u2014 no free-text creation
+    var custSel = document.getElementById('trigger-cust-sel')
+    var custId = custSel ? custSel.value.trim() : ''
     var engName = ((document.getElementById('trigger-eng')||{}).value||'').trim()
-    if(!custName||!engName){ alert('Please enter both customer name and engagement name.'); return }
+    if(!custId){ alert('Please select a customer.'); return }
+    if(!engName){ alert('Please enter an engagement name.'); return }
 
-    // Create customer \u2014 match exact schema
-    var custId = genId('CUST')
-    var custOk = await sbInsert('customers',{
-      id: custId, name: custName, tier: 'strategic',
-      ownership: null, sector: null, country: 'India',
-      state: null, ai_maturity: null, short_name: null,
-      notes: null, contacts: [], divisions: []
-    })
-    if(!custOk){ alert('Failed to create customer \u2014 check Supabase connection.'); return }
-
-    // Create engagement \u2014 match exact schema
+    // Create engagement only \u2014 customer already exists
     var year = new Date().getFullYear()
     engagementId = 'ENG-'+year+'-GEN-'+Math.floor(Math.random()*9000+1000)
     var engOk = await sbInsert('engagements',{
-      id: engagementId, customer_id: custId, name: engName,
-      archetype: 'govt_sectorial', type: 'new',
-      phase: 'strategy', status: 'active',
-      domain: 'GEN', currency: 'INR',
-      value: null, notes: null, owner: ''
+      id: engagementId,
+      customer_id: custId,
+      name: engName,
+      archetype: 'govt_sectorial',
+      type: 'new',
+      phase: 'strategy',
+      status: 'active',
+      domain: 'GEN',
+      currency: 'INR',
+      owner: ''
     })
     if(!engOk){ alert('Failed to create engagement \u2014 check Supabase connection.'); return }
 
-    ALL_CUSTOMERS = await sbFetch('customers','order=name.asc',500)
     ALL_ENGAGEMENTS = await sbFetch('engagements','order=updated_at.desc',500)
+
   } else {
     engagementId = selVal
   }
@@ -2065,13 +2087,17 @@ async function confirmAddToDocket(){
   if(dockets && dockets.length > 0){
     docketId = dockets[0].id
   } else {
-    var eng = (ALL_ENGAGEMENTS||[]).find(function(e){ return e.id===engagementId })
+    var engRows = await sbFetch('engagements','id=eq.'+engagementId,1)
+    var eng = (engRows && engRows.length > 0) ? engRows[0]
+              : (ALL_ENGAGEMENTS||[]).find(function(e){ return e.id===engagementId })
     docketId = 'DOC-'+Date.now()
     var docOk = await sbInsert('engagement_dockets',{
-      id: docketId, engagement_id: engagementId,
+      id: docketId,
+      engagement_id: engagementId,
       customer_id: eng ? eng.customer_id : null,
       name: eng ? eng.name : 'Docket',
-      status: 'active', metadata: {}
+      status: 'active',
+      metadata: {}
     })
     if(!docOk){ alert('Failed to create docket \u2014 check Supabase connection.'); return }
   }
