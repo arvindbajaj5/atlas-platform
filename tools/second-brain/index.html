@@ -536,7 +536,7 @@ async function atlasCallModel(modelId, prompt, systemPrompt, maxTokens){
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+modelId+':generateContent?key='+key
     var body = {
       contents:[{parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.2, maxOutputTokens:maxTokens, thinkingConfig:{thinkingBudget:0}}
+      generationConfig:{temperature:0.2, maxOutputTokens:maxTokens}
     }
     if(systemPrompt) body.system_instruction = {parts:[{text:systemPrompt}]}
     var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
@@ -713,7 +713,7 @@ async function callModel(prompt, modelId, systemPrompt){
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+modelId+':generateContent?key='+key
     var body = {
       contents:[{role:'user',parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.1, maxOutputTokens:1024, thinkingConfig:{thinkingBudget:0}}
+      generationConfig:{temperature:0.1, maxOutputTokens:1024}
     }
     if(systemPrompt) body.system_instruction = {parts:[{text:systemPrompt}]}
     var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
@@ -1050,6 +1050,8 @@ function renderIntelItems(items){
       +'<div class="intel-actions">'
       +(exp?'<button class="btn btn-outline btn-xs" data-eid="'+item.id+'" onclick="toggleExp(this.dataset.eid)" id="expbtn-'+item.id+'">&#9660; More</button>':'')
       +'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" data-title="'+(item.title||'').replace(/"/g,'&quot;')+'" data-domain="'+(item.domain_code||'')+'" onclick="openActionModal(this.dataset.id,this.dataset.title,this.dataset.domain)">&#9889; Action</button>'
+      +'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" onclick="addIntelToDocket(this.dataset.id)">+ Docket</button>'
+      +'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" onclick="addIntelToDocket(this.dataset.id)">+ Docket</button>'
       +'</div></div>'
   }).join('')+'</div>'
 }
@@ -1137,7 +1139,9 @@ function renderUCItems(){
         +'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'
         +'<button class="btn btn-outline btn-xs" data-eid="ucexp-'+item.id+'" onclick="toggleExpLib(this.dataset.eid)">&#9660; Details</button>'
         +'<button class="btn btn-primary btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'').replace(/"/g,'&quot;')+'" data-domain="'+(Array.isArray(item.domain_codes)&&item.domain_codes.length?item.domain_codes[0]:'')+'" onclick="openEnrichLibUC(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9999; Enrich</button>'
+        +'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" onclick="addUCToDocket(this.dataset.id,&apos;library&apos;)">+ Docket</button>'
         +'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" data-name="'+(item.uc_name||'').replace(/"/g,'&quot;')+'" data-domain="'+(currentEntry.code||'')+'" onclick="openActionModal(this.dataset.id,this.dataset.name,this.dataset.domain)">&#9889; Use in Engagement</button>'
+        +'<button class="btn btn-outline btn-xs" data-id="'+item.id+'" onclick="addUCToDocket(this.dataset.id,&apos;queue&apos;)">+ Docket</button>'
         +'</div></div>'
     }).join('')
   }
@@ -1254,7 +1258,7 @@ async function aiEnrichUC(){
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+cfg.geminiKey
     var body = {
       contents:[{role:'user',parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.2, maxOutputTokens:2048, thinkingConfig:{thinkingBudget:0}}
+      generationConfig:{temperature:0.2, maxOutputTokens:2048}
     }
     var resp = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
     if(!resp.ok) throw new Error('Gemini error: ' + resp.status)
@@ -1516,15 +1520,69 @@ async function saveAction(){
   }
 }
 
-function offerAddToDocket(item){
-  // Simple confirm dialog \u2014 opens docket tool in new tab pre-loaded if confirmed
-  if(confirm('Action saved. Add "'+item.title+'" to an Engagement Docket?')){
-    // Store pending item for docket tool to pick up
-    try{ localStorage.setItem('atlas_pending_docket_item', JSON.stringify(item)) }catch(e){}
-    // Open docket tool \u2014 it will auto-trigger the modal
-    window.open('../engagement-docket/index.html?addItem=1','_blank')
+
+// \u2500\u2500 Sprint 1: Intelligence \u2192 Docket \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function addIntelToDocket(itemId){
+  var item = cachedIntel.find(function(i){return i.id===itemId})
+  if(!item){
+    // Try fetching from all cached
+    var allIntel = []
+    try{ allIntel = JSON.parse(sessionStorage.getItem('atlas_intel_cache')||'[]') }catch(e){}
+    item = allIntel.find(function(i){return i.id===itemId})
   }
+  if(!item){ alert('Item not found.'); return }
+  var docketItem = {
+    type: 'intel',
+    title: item.title || item.headline || 'Intelligence Item',
+    content: {
+      headline: item.title || item.headline || '',
+      problem_statement: item.problem_statement || '',
+      opportunity: item.opportunity_angle || '',
+      our_play: item.our_play || '',
+      intelligence_stream: item.intelligence_stream || '',
+      intelligence_value: item.intelligence_value || '',
+      domain_code: item.domain_code || '',
+      source_url: item.source_url || '',
+      geography: item.geography || '',
+    },
+    notes: item.problem_statement || item.opportunity_angle || '',
+    source_id: item.id
+  }
+  try{ localStorage.setItem('atlas_pending_docket_item', JSON.stringify(docketItem)) }catch(e){}
+  window.open('../engagement-docket/index.html?addItem=1','_blank')
 }
+
+// \u2500\u2500 Sprint 1: UC \u2192 Docket \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function addUCToDocket(ucId, source){
+  var allUC = cachedUC || []
+  var item = allUC.find(function(u){return u.id===ucId})
+  if(!item){ alert('UC not found.'); return }
+  var docketItem = {
+    type: 'uc',
+    title: item.name || item.title || 'Use Case',
+    content: {
+      uc_id: item.id,
+      name: item.name || item.title || '',
+      domain: item.domain_code || (currentEntry && currentEntry.code) || '',
+      category: item.category || item.cat || '',
+      model_type: item.model_type || item.model || '',
+      priority: item.priority || 'medium',
+      rationale: item.rationale || item.description || '',
+      source: source || 'second_brain',
+    },
+    notes: item.rationale || item.description || '',
+    source_id: item.id
+  }
+  try{ localStorage.setItem('atlas_pending_docket_item', JSON.stringify(docketItem)) }catch(e){}
+  window.open('../engagement-docket/index.html?addItem=1','_blank')
+}
+
+// \u2500\u2500 Sprint 1: Enhance offerAddToDocket (replace confirm with clean flow) \u2500\u2500\u2500\u2500\u2500
+function offerAddToDocket(item){
+  try{ localStorage.setItem('atlas_pending_docket_item', JSON.stringify(item)) }catch(e){}
+  window.open('../engagement-docket/index.html?addItem=1','_blank')
+}
+
 
 function openEngModal(actionId){
   document.getElementById('engActId').value = actionId
