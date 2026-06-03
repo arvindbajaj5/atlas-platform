@@ -2168,11 +2168,17 @@ async function confirmAddToDocket(){
     <select id="trigger-sel">
       <option value="__new__">+ Create New Engagement</option>
     </select>
-    <div id="trigger-new" style="display:none">
-      <label>Customer Name *</label>
-      <input type="text" id="trigger-cust" placeholder="e.g. Indian Army">
-      <label>Engagement Name *</label>
-      <input type="text" id="trigger-eng" placeholder="e.g. Border Surveillance AI 2026">
+    <div id="trigger-new" style="display:none;margin-top:12px;padding:12px;background:var(--light);border-radius:var(--r)">
+      <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">New Engagement</div>
+      <label>Customer *</label>
+      <select id="trigger-cust-sel">
+        <option value="">&#8212; Select Customer &#8212;</option>
+      </select>
+      <div id="trigger-no-custs" style="display:none;font-size:11px;color:var(--mid);margin-top:6px">
+        No customers yet. <a href="../engagement-docket/index.html" target="_blank" style="color:var(--blue)">Create a customer in the Docket first</a>, then try again.
+      </div>
+      <label style="margin-top:10px">Engagement Name *</label>
+      <input type="text" id="trigger-eng" placeholder="e.g. Sovereign AI Programme 2026">
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('triggerModal')">Cancel</button>
