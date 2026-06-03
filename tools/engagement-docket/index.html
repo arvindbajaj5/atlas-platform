@@ -2179,7 +2179,7 @@ async function confirmAddToDocket(){
       id: engagementId,
       customer_id: custId,
       name: engName,
-      archetype: 'govt_sectorial',
+      archetype: (document.getElementById('trigger-arch')||{value:'govt_sectorial'}).value,
       type: 'new',
       phase: 'strategy',
       status: 'active',
@@ -2267,6 +2267,13 @@ async function confirmAddToDocket(){
       </div>
       <label style="margin-top:10px">Engagement Name *</label>
       <input type="text" id="trigger-eng" placeholder="e.g. Sovereign AI Programme 2026">
+      <label style="margin-top:10px">Archetype</label>
+      <select id="trigger-arch">
+        <option value="territory_coe">Territory / AI CoE (TSAP)</option>
+        <option value="govt_sectorial" selected>Govt Sectorial</option>
+        <option value="enterprise">Enterprise</option>
+        <option value="defence">Defence</option>
+      </select>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('triggerModal')">Cancel</button>
