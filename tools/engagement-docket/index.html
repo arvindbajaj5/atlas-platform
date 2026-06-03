@@ -2093,11 +2093,14 @@ async function confirmAddToDocket(){
     docketId = 'DOC-'+Date.now()
     var docOk = await sbInsert('engagement_dockets',{
       id: docketId,
+      type: 'customer',
       engagement_id: engagementId,
       customer_id: eng ? eng.customer_id : null,
       name: eng ? eng.name : 'Docket',
       status: 'active',
-      metadata: {}
+      metadata: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     })
     if(!docOk){ alert('Failed to create docket \u2014 check Supabase connection.'); return }
   }
