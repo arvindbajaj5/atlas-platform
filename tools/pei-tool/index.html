@@ -232,6 +232,7 @@ input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
     <div class="actions-bar">
       <button class="btn btn-outline btn-sm" onclick="copyJSON()">&#128203; Copy JSON</button>
       <button class="btn btn-outline btn-sm" onclick="downloadJSON()">&#8615; JSON</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadJSON()">&#128193; Load JSON</button>
       <button class="btn btn-sm" style="background:var(--navy);color:var(--white)" onclick="downloadWord()">&#128196; Word (.docx)</button>
       <button class="btn btn-primary btn-sm" onclick="downloadPPTX()">&#128202; PPTX</button>
       <button class="btn btn-outline btn-sm" id="addToDocketBtn" onclick="addPEIToDocket()" style="display:none">+ Add to Docket</button>
@@ -608,13 +609,15 @@ async function generatePEI(){
     document.getElementById('errorPanel').style.display = 'block'
     document.getElementById('errorText').innerHTML = '<strong>Error:</strong> ' + err.message
   } finally {
-    document.getElementById('generateBtn').disabled = false
-  var docketBtn = document.getElementById('addToDocketBtn'); if(docketBtn) docketBtn.style.display='inline-flex'
-    document.getElementById('dbStatus').textContent = ''
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('dbStatus').textContent = '';
   }
 }
 
 function renderPEI(pei, target, ownership, sector, country, dbItems){
+  // Show Add to Docket button on successful render
+  var docketBtn = document.getElementById('addToDocketBtn')
+  if(docketBtn) docketBtn.style.display = 'inline-flex'
   document.getElementById('loadingPanel').style.display = 'none'
   var date = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
 
@@ -761,6 +764,42 @@ function downloadJSON(){
   dl(JSON.stringify(PEI_DATA,null,2),'application/json','PEI-'+org+'-'+new Date().toISOString().slice(0,10)+'.json')
 }
 
+function loadJSON(){
+  var input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json,application/json'
+  input.onchange = function(e){
+    var file = e.target.files[0]
+    if(!file) return
+    var reader = new FileReader()
+    reader.onload = function(ev){
+      try{
+        var data = JSON.parse(ev.target.result)
+        if(!data.meta){ alert('Invalid PEI JSON file.'); return }
+        PEI_DATA = data
+        // Restore form fields from meta
+        var m = data.meta
+        if(m.organisation && document.getElementById('orgName'))
+          document.getElementById('orgName').value = m.organisation
+        if(m.ownership_type && document.getElementById('orgOwnership'))
+          document.getElementById('orgOwnership').value = m.ownership_type
+        if(m.functional_sector && document.getElementById('orgSector'))
+          document.getElementById('orgSector').value = m.functional_sector
+        if(m.country && document.getElementById('orgCountry'))
+          document.getElementById('orgCountry').value = m.country
+        // Render
+        renderPEI(data, m.organisation||'', m.ownership_type||'', m.functional_sector||'', m.country||'India', [])
+        document.getElementById('loadingPanel').style.display = 'none'
+        document.getElementById('errorPanel').style.display = 'none'
+      }catch(err){
+        alert('Failed to load JSON: ' + err.message)
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
+}
+
 function dl(content,type,fname){
   var blob = new Blob([content],{type})
   var url = URL.createObjectURL(blob)
@@ -777,23 +816,26 @@ function downloadWord(){
 function addPEIToDocket(){
   var orgName = document.getElementById('orgName') ? document.getElementById('orgName').value.trim() : ''
   if(!orgName){ alert('Generate a PEI brief first.'); return }
-  var summary = document.getElementById('out-summary') ? document.getElementById('out-exec-summary').textContent : ''
-  var positioning = document.getElementById('out-positioning') ? document.getElementById('out-positioning').textContent : ''
-  var nextActions = document.getElementById('out-next-actions') ? document.getElementById('out-next-actions').textContent : ''
+  // Safe reads \u2014 check element exists before reading
+  function safeText(id){ var el = document.getElementById(id); return el ? el.textContent.trim() : '' }
+  var summary    = safeText('out-summary') || safeText('out-exec-summary')
+  var positioning = safeText('out-positioning')
+  var nextActions = safeText('out-next-actions')
   var item = {
     type: 'pei',
-    title: 'PEI Brief - ' + orgName,
+    title: 'PEI Brief \u2014 ' + orgName,
     content: {
       organisation_summary: summary.slice(0,500),
       our_positioning: positioning.slice(0,500),
-      next_actions: nextActions.slice(0,300),
+      next_actions: nextActions.slice(0,300)
     },
     notes: summary.slice(0,200),
     source_id: null
   }
-  localStorage.setItem('atlas_pending_docket_item', JSON.stringify(item))
-  // Open docket in new tab
-  var docketUrl = window.location.href.replace(/tools\/pei-tool.*/, 'tools/engagement-docket/?addItem=1')
+  try{
+    localStorage.setItem('atlas_pending_docket_item', JSON.stringify(item))
+  }catch(e){ alert('Could not store item: '+e.message); return }
+  var docketUrl = window.location.href.replace(/tools\/pei-tool.*/, 'tools/engagement-docket/index.html?addItem=1')
   window.open(docketUrl, '_blank')
 }
 
