@@ -2052,10 +2052,11 @@ function checkPendingDocketItem(){
   try{
     var pending = JSON.parse(localStorage.getItem('atlas_pending_docket_item')||'null')
     if(pending){
-      localStorage.removeItem('atlas_pending_docket_item')
+      // Don't remove yet \u2014 atlasAddToDocket will clear it on success via confirmAddToDocket
+      // If user cancels or it fails, item remains for retry
       atlasAddToDocket(pending)
     }
-  }catch(e){}
+  }catch(e){ console.error('checkPendingDocketItem error:', e) }
 }
 
 // \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -2147,13 +2148,15 @@ async function confirmAddToDocket(){
   }
   var ok = await sbInsert('docket_items', newItem)
   if(ok){
+    // Clear localStorage only after successful insert
+    localStorage.removeItem('atlas_pending_docket_item')
     closeModal('triggerModal')
     PENDING_TRIGGER_ITEM = null
     ALL_ENGAGEMENTS = await sbFetch('engagements','order=updated_at.desc',500)
     renderSidebar()
     openEngagement(engagementId)
   } else {
-    // sbInsert already showed the error
+    // sbInsert already showed the error \u2014 item stays in localStorage for retry
   }
 }
 
