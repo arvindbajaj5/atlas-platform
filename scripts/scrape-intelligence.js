@@ -145,11 +145,12 @@ async function callGeminiGrounded(prompt) {
 // ── Gemini plain (for RSS extraction) ────────────────────────────────────────
 async function callGemini(prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${EXTRACT_MODEL}:generateContent?key=${GEMINI_KEY}`
-  const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } } }
+  const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 1024 } }
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!r.ok) throw new Error(`Gemini ${r.status}`)
   const data = await r.json()
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const parts = data.candidates?.[0]?.content?.parts || []
+  return parts.filter(p => p.text && !p.thought).map(p => p.text).join('') || parts[0]?.text || ''
 }
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
