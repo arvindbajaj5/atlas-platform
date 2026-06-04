@@ -458,7 +458,171 @@ textarea{resize:vertical;min-height:72px;}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script charset="utf-8">// \u2500\u2500 Territory AI Programme Profiler \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+<script charset="utf-8">// \u2500\u2500 Financing Navigator \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+var FIN_NAV = {
+  models: [],
+  rules: [],
+  loaded: false
+}
+
+async function loadFinancingData(){
+  if(FIN_NAV.loaded) return true
+  try{
+    FIN_NAV.models = await sbFetch('financing_models','active=eq.true&order=sort_order.asc',20)
+    FIN_NAV.rules  = await sbFetch('financing_rules','order=priority.asc',50)
+    FIN_NAV.loaded = true
+    return true
+  }catch(e){ console.error('FinNav load error:', e); return false }
+}
+
+function finNavMatch(fiscal, mandate, ownership, archetypeCode, scale){
+  var rules = FIN_NAV.rules
+  // Find best matching rule \u2014 rules ordered by priority (lower = more specific)
+  var matched = null
+  for(var i=0; i<rules.length; i++){
+    var r = rules[i]
+    var ok = (r.fiscal==='any'     || r.fiscal===fiscal)
+          && (r.mandate==='any'    || r.mandate===mandate)
+          && (r.ownership==='any'  || r.ownership===ownership)
+          && (r.archetype_code==='any' || r.archetype_code===archetypeCode)
+          && (r.scale==='any'      || r.scale===scale)
+    if(ok){ matched=r; break }
+  }
+  if(!matched) return null
+  var primary  = FIN_NAV.models.find(function(m){ return m.code===matched.primary_model })
+  var fallback = FIN_NAV.models.find(function(m){ return m.code===matched.fallback_model })
+  return { primary: primary, fallback: fallback, rule: matched }
+}
+
+async function renderFinancingNavigator(containerEl, profileData){
+  if(!containerEl) return
+  containerEl.innerHTML = '<div style="padding:8px 0;font-size:12px;color:var(--mid)">Loading financing models\u2026</div>'
+
+  var ok = await loadFinancingData()
+  if(!ok){
+    containerEl.innerHTML = '<div style="padding:8px 0;font-size:12px;color:#991b1b">Failed to load financing data.</div>'
+    return
+  }
+
+  var fiscal      = profileData.fiscal      || 'moderate'
+  var mandate     = profileData.mandate     || 'central'
+  var ownership   = profileData.ownership   || 'full'
+  var archetype   = profileData.archetype   || 'any'
+  var scale       = profileData.scale       || 'any'
+
+  var result = finNavMatch(fiscal, mandate, ownership, archetype, scale)
+  if(!result || !result.primary){
+    containerEl.innerHTML = '<div style="padding:8px 0;font-size:12px;color:var(--mid)">No matching financing model found for this profile.</div>'
+    return
+  }
+
+  var p = result.primary
+  var f = result.fallback
+
+  var catColors = {
+    sovereign:    'background:rgba(0,40,112,0.08);color:#002870',
+    bilateral:    'background:rgba(0,178,144,0.1);color:#085041',
+    multilateral: 'background:rgba(40,160,40,0.1);color:#1a5c1a',
+    ppp:          'background:rgba(255,182,0,0.12);color:#9a6800',
+    debt:         'background:rgba(128,128,128,0.1);color:#444',
+    mixed:        'background:rgba(255,85,57,0.1);color:#c0341a'
+  }
+  var catStyle = catColors[p.category]||catColors.mixed
+
+  var html = '<div style="background:var(--white);border:0.5px solid var(--light-border);border-radius:var(--r-lg);padding:14px 16px;margin-top:4px">'
+
+  // Primary model
+  html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">'
+    +'<div>'
+    +'<div style="font-size:14px;font-weight:500;color:var(--dark);margin-bottom:3px">'+esc(p.name)+'</div>'
+    +'<div style="font-size:11px;color:var(--mid)">'+esc(p.tagline)+'</div>'
+    +'</div>'
+    +'<span style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:10px;white-space:nowrap;'+catStyle+'">'+esc(p.category)+'</span>'
+    +'</div>'
+
+  // Structure
+  html += '<div style="font-size:12px;color:var(--dark);line-height:1.6;margin-bottom:8px;padding:10px 12px;background:var(--light);border-radius:var(--r-sm)">'+esc(p.structure)+'</div>'
+
+  // Terms
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+  html += '<div style="background:var(--light);border-radius:var(--r-sm);padding:8px 10px">'
+    +'<div style="font-size:10px;font-weight:600;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Typical terms</div>'
+    +'<div style="font-size:11px;color:var(--dark);line-height:1.5">'+esc(p.typical_terms)+'</div>'
+    +'</div>'
+  html += '<div style="background:var(--light);border-radius:var(--r-sm);padding:8px 10px">'
+    +'<div style="font-size:10px;font-weight:600;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Approval timeline</div>'
+    +'<div style="font-size:11px;color:var(--dark)">~'+(p.timeline_months||12)+' months</div>'
+    +'</div>'
+  html += '</div>'
+
+  // Watch out
+  if(p.watchout){
+    html += '<div style="font-size:11px;color:#9a6800;background:rgba(255,182,0,0.1);border:0.5px solid rgba(255,182,0,.3);border-radius:var(--r-sm);padding:8px 10px;margin-bottom:8px">'
+      +'<strong style="font-size:11px">Watch out: </strong>'+esc(p.watchout)+'</div>'
+  }
+
+  // Fallback
+  if(f){
+    html += '<div style="font-size:10px;font-weight:600;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Fallback option</div>'
+    +'<div style="font-size:12px;color:var(--dark);padding:7px 10px;border:0.5px solid var(--light-border);border-radius:var(--r-sm)">'
+    +'<span style="font-weight:500">'+esc(f.name)+'</span>'
+    +' \u2014 '+esc(f.tagline||'')
+    +'</div>'
+    html += '<div style="font-size:12px;color:var(--dark);padding:7px 10px;border:0.5px solid var(--light-border);border-radius:var(--r-sm)">'
+      +'<span style="font-weight:500">'+esc(f.name)+'</span>'
+      +' \u2014 '+esc(f.tagline||'')
+      +'</div>'
+  }
+
+  // All models toggle
+  html += '<div style="margin-top:10px">'
+    +'<button class="btn btn-ghost btn-xs" onclick="toggleAllModels(this)" style="font-size:11px">'
+    +'Show all financing models \u25be</button>'
+    +'<div id="allModelsPanel" style="display:none;margin-top:8px">'
+    + FIN_NAV.models.map(function(m){
+        var cs = catColors[m.category]||catColors.mixed
+        var isMatch = m.code===p.code
+        return '<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--light)'+(isMatch?';opacity:1':';opacity:.6')+'">'
+          +'<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:8px;white-space:nowrap;flex-shrink:0;'+cs+'">'+esc(m.category)+'</span>'
+          +'<div style="flex:1">'
+          +'<div style="font-size:12px;font-weight:'+(isMatch?'600':'400')+';color:var(--dark)">'+esc(m.name)+(isMatch?' \u2713':'')+'</div>'
+          +'<div style="font-size:11px;color:var(--mid)">'+esc(m.tagline||'')+'</div>'
+          +'</div>'
+          +'<div style="font-size:11px;color:var(--mid);flex-shrink:0">~'+m.timeline_months+'m</div>'
+          +'</div>'
+      }).join('')
+    +'</div></div>'
+
+  html += '</div>'
+  containerEl.innerHTML = html
+}
+
+function toggleAllModels(btn){
+  var panel = document.getElementById('allModelsPanel')
+  if(!panel) return
+  var open = panel.style.display==='block'
+  panel.style.display = open ? 'none' : 'block'
+  btn.innerHTML = open ? 'Show all financing models \u25be' : 'Hide \u25b4'
+}
+
+// Called after profiler result renders \u2014 inject financing navigator
+async function injectFinancingNavigator(){
+  var container = document.getElementById('fin-nav-container')
+  if(!container) return
+  var profileData = {
+    fiscal:    PROFILER_STATE.answers.fiscal    || '',
+    mandate:   PROFILER_STATE.answers.mandate   || '',
+    ownership: PROFILER_STATE.answers.ownership || '',
+    scale:     PROFILER_STATE.answers.scale     || '',
+    archetype: PROFILER_STATE.result && PROFILER_STATE.result.matched
+               ? PROFILER_STATE.result.matched.code : 'any'
+  }
+  await renderFinancingNavigator(container, profileData)
+}
+
+
+// \u2500\u2500 Territory AI Programme Profiler \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 // Reads questions/options/archetypes from Supabase
 // Weighted cosine similarity matching
 // AI-generated actions + challenges
@@ -738,16 +902,9 @@ function renderProfilerResultHTML(matched, sims, ai){
       +'<div style="font-size:12px;color:var(--dark);line-height:1.5">'+esc(c)+'</div></div>'
   }).join('')
 
-  // Finance
-  var financeHtml = ''
-  if(ai.finance&&ai.finance.model){
-    financeHtml = '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--mid);letter-spacing:.4px;margin:12px 0 6px">Recommended financing</div>'
-      +'<div style="background:var(--white);border:0.5px solid var(--light-border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px">'
-      +'<div style="font-size:13px;font-weight:500;color:var(--dark);margin-bottom:5px">'+esc(ai.finance.model)+'</div>'
-      +'<div style="font-size:12px;color:var(--mid);line-height:1.5;margin-bottom:6px">'+esc(ai.finance.rationale)+'</div>'
-      +(ai.finance.watchout?'<div style="font-size:11px;color:#9a6800;background:rgba(255,182,0,0.1);border:0.5px solid rgba(255,182,0,.3);border-radius:var(--r-sm);padding:8px 10px"><strong>Watch out:</strong> '+esc(ai.finance.watchout)+'</div>':'')
-      +'</div>'
-  }
+  // Finance \u2014 container for Financing Navigator (populated async after render)
+  var financeHtml = '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--mid);letter-spacing:.4px;margin:12px 0 6px">Recommended financing</div>'
+    +'<div id="fin-nav-container"><div style="font-size:12px;color:var(--mid);padding:8px 0">Loading financing model\u2026</div></div>'
 
   content.innerHTML = '<div style="padding:4px 0 0">'
     +'<div style="background:var(--navy);border-radius:var(--r-lg);padding:16px 18px;color:var(--white);margin-bottom:12px">'
@@ -768,6 +925,7 @@ function renderProfilerResultHTML(matched, sims, ai){
 
   // Draw radar charts after DOM update
   setTimeout(function(){
+    injectFinancingNavigator()
     if(typeof Chart==='undefined') return
     archs.forEach(function(a){
       var ctx = document.getElementById('radar-'+a.code)
