@@ -709,7 +709,7 @@ async function openProfilerTab(){
   var content = document.getElementById('tsapTabContent')
   if(!content) return
 
-  content.innerHTML = '<div style="padding:20px;text-align:center;color:var(--mid);font-size:13px">Loading profiler data...</div>'
+  content.innerHTML = '<div style="padding:20px;text-align:center;color:var(--mid);font-size:13px">Loading profiler data\u2026</div>'
 
   var ok = await loadProfilerData()
   if(!ok){
@@ -717,6 +717,29 @@ async function openProfilerTab(){
     return
   }
 
+  // Check for previous run for this engagement
+  if(CURRENT_TSAP_ENG_ID){
+    var prev = await sbFetch('profiler_runs','engagement_id=eq.'+CURRENT_TSAP_ENG_ID+'&order=created_at.desc',1)
+    if(prev && prev.length>0){
+      var run = prev[0]
+      // Restore state from previous run
+      PROFILER_STATE.answers = run.answers||{}
+      PROFILER_STATE.scores  = run.scores||{}
+      PROFILER_STATE.step    = PROFILER_STATE.questions.length
+      // Find matched archetype
+      var matchedArch = PROFILER_STATE.archetypes.find(function(a){ return a.code===run.matched_archetype })
+      if(matchedArch){
+        PROFILER_STATE.result = { matched: matchedArch, similarities: run.similarity_scores||{} }
+        // Show result with retake option
+        renderProfilerResultHTML(matchedArch, run.similarity_scores||{}, {actions:[],challenges:[],finance:{model:'',rationale:'',watchout:''}})
+        // Reload AI content async
+        renderProfilerResult()
+        return
+      }
+    }
+  }
+
+  // No previous run \u2014 start fresh
   PROFILER_STATE.step = 0
   PROFILER_STATE.answers = {}
   PROFILER_STATE.scores = {}
@@ -994,10 +1017,9 @@ async function saveProfilerResult(){
   }
   var ok = await sbInsert('docket_items', item)
   if(ok){
-    CURRENT_ITEMS.push(item)
-    closeModal('tsapModal')
-    openEngagement(CURRENT_TSAP_ENG_ID)
-    alert('Profile saved to docket.')
+    if(!existing) CURRENT_ITEMS.push(item)
+    // Don't close modal \u2014 advance to Territory tab to continue configuration
+    switchTsapTab('territory')
   }
 }
 
@@ -2172,6 +2194,26 @@ function openL1Config(engId){
   openModal('tsapModal')
 }
 
+
+function toggleL1xBlock(ci){
+  var c = L1X_COMPONENTS_DEF[ci]
+  if(!c) return
+  var idx = TSAP_CFG.blocks.findIndex(function(b){ return b.code===c.code })
+  if(idx>=0) TSAP_CFG.blocks.splice(idx,1)
+  else TSAP_CFG.blocks.push({code:c.code, name:c.name, partner:c.partner||false})
+  // Re-render blocks tab
+  switchTsapTab('blocks')
+}
+
+function toggleL2Block(bi){
+  var b = L2_BLOCKS_DEF[bi]
+  if(!b) return
+  var idx = TSAP_CFG.blocks.findIndex(function(x){ return x.code===b.code })
+  if(idx>=0) TSAP_CFG.blocks.splice(idx,1)
+  else TSAP_CFG.blocks.push({code:b.code, name:b.name})
+  switchTsapTab('blocks')
+}
+
 function switchTsapTab(tab){
   var tabs = document.querySelectorAll('#tsapTabBar .tab')
   var names = ['profile','territory','objectives','blocks','financial']
@@ -2248,19 +2290,31 @@ function switchTsapTab(tab){
   }
 
   if(tab==='financial'){
-    content = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">\u00A0 Side A \u2014 Financing Model</div>'
-      +'<div style="font-size:10px;color:var(--mid);margin-bottom:8px">How the programme will be funded. Multiple models can be combined.</div>'
-      +'<div id="tsap-fin-models"></div></div>'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">\uD83D\uDCB0 Side B \u2014 Build Cost</div>'
-      +'<div id="tsap-fin-costs"></div>'
-      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%;margin-top:4px">Calculate Gap</button>'
-      +'<div id="tsap-gap" style="font-size:11px;color:var(--navy);margin-top:8px;padding:8px;background:var(--light);border-radius:var(--r)">Enter costs and calculate.</div>'
+    content = '<div>'
+      +'<div style="font-size:12px;color:var(--mid);margin-bottom:12px;line-height:1.5">Based on your territory profile. Complete the Profile tab first for the best recommendation.</div>'
+      +'<div id="tsap-fin-navigator"></div>'
+      +'<div style="margin-top:16px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Programme Build Cost (ROM)</div>'
+      +'<div id="tsap-fin-costs" style="margin-bottom:8px"></div>'
+      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%;margin-top:4px">Calculate Financing Gap</button>'
+      +'<div id="tsap-gap" style="font-size:11px;color:var(--navy);margin-top:8px;padding:8px;background:var(--light);border-radius:var(--r)">Enter estimated costs and calculate gap.</div>'
       +'</div></div>'
   }
 
   document.getElementById('tsapTabContent').innerHTML = content
   if(tab==='financial'){
+    // Populate Financing Navigator from profiler answers or TSAP_CFG
+    var finNavDiv = document.getElementById('tsap-fin-navigator')
+    if(finNavDiv){
+      var profileData = {
+        fiscal:    (PROFILER_STATE.answers&&PROFILER_STATE.answers.fiscal)    || TSAP_CFG.financial.fiscal_capacity || 'moderate',
+        mandate:   (PROFILER_STATE.answers&&PROFILER_STATE.answers.mandate)   || 'central',
+        ownership: (PROFILER_STATE.answers&&PROFILER_STATE.answers.ownership) || 'full',
+        scale:     (PROFILER_STATE.answers&&PROFILER_STATE.answers.scale)     || 'm',
+        archetype: PROFILER_STATE.result ? PROFILER_STATE.result.matched.code : 'any'
+      }
+      renderFinancingNavigator(finNavDiv, profileData)
+    }
     var modelsDiv = document.getElementById('tsap-fin-models')
     var costsDiv = document.getElementById('tsap-fin-costs')
     if(modelsDiv){
@@ -2327,7 +2381,7 @@ function switchTsapTab(tab){
       if(l1xGrid){
         l1xGrid.innerHTML = L1X_COMPONENTS_DEF.map(function(c,ci){
           var sel = TSAP_CFG.blocks.some(function(s){return s.code===c.code})
-          return '<div id="tsap-l1x-'+ci+'" style="border:2px solid '+(sel?'var(--orange)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(255,85,57,0.04)':'var(--white)')+'">'
+          return '<div id="tsap-l1x-'+ci+'" onclick="toggleL1xBlock('+ci+')" style="border:2px solid '+(sel?'var(--orange)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(255,85,57,0.04)':'var(--white)')+'">'
             +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
             +'<span style="font-size:16px">'+c.icon+'</span>'
             +(c.partner?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(0,40,112,0.08);color:var(--navy)">PARTNER</span>':'')
@@ -2399,8 +2453,10 @@ async function aiEnrichTsap(){
   saveTsapCurrentData()
   var territory=TSAP_CFG.territory.name||'this territory'
   var objective=TSAP_CFG.objectives.core_objective||'AI and digital transformation'
-  var model=atlasGetTaskModel('pei')
-  var key=atlasGetKeyForModel(model)
+  var g=atlasGetGlobal()
+  var model=atlasGetTaskModel('pei')||'gemini-3.1-flash-lite'
+  var key=atlasGetKeyForModel(model)||g.key_gemini||g.key_anthropic||g.key_openai||''
+  if(!atlasGetKeyForModel(model)&&key){ if(g.key_gemini) model='gemini-3.1-flash-lite' }
   if(!key){alert('Configure AI keys in ATLAS Settings.');return}
   var el=document.getElementById('tsap-enrich')
   el.style.display='block';el.textContent='Researching '+territory+'...'
@@ -2434,15 +2490,30 @@ async function saveTsapConfig(){
   var l2xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2.')===0}).length
   var l1xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L1.')===0}).length
   var item={id:genId('DI'),docket_id:docketId,item_type:'solution',title:'TSAP Config \u2014 '+esc(TSAP_CFG.territory.name||'Territory'),content:TSAP_CFG,status:'in_progress',notes:'Territory: '+esc(TSAP_CFG.territory.name)+'. L2 blocks: '+l2Count+'. Specialised factories: '+l2xCount+'. L1.x programmes: '+l1xCount+'. Financing models: '+TSAP_CFG.financial.financing_models.length+'.',created_by:'ATLAS TSAP'}
-  var ok=await sbInsert('docket_items',item)
-  if(ok){CURRENT_ITEMS.push(item);closeModal('tsapModal');renderItems('all');alert('TSAP configuration saved to docket.')}
+  // Upsert \u2014 update existing TSAP config if present
+  var existing = CURRENT_ITEMS.find(function(i){ return i.item_type==='solution' && i.title.indexOf('TSAP Config')===0 })
+  var ok = false
+  if(existing){
+    ok = await sbPatch('docket_items','id=eq.'+existing.id,{title:item.title,content:item.content,status:'pending'})
+    if(ok){ existing.title=item.title; existing.content=item.content }
+  } else {
+    ok = await sbInsert('docket_items',item)
+    if(ok) CURRENT_ITEMS.push(item)
+  }
+  if(ok){closeModal('tsapModal');openEngagement(CURRENT_TSAP_ENG_ID)}
   else alert('Failed to save.')
 }
 
 async function generateVisionDoc(){
   saveTsapCurrentData()
-  var territory=TSAP_CFG.territory.name
-  if(!territory){alert('Enter territory name first.');return}
+  // Fallback: use engagement name if territory not yet set
+  var territory = TSAP_CFG.territory.name
+  if(!territory){
+    var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===CURRENT_TSAP_ENG_ID })
+    territory = eng ? eng.name : ''
+    TSAP_CFG.territory.name = territory
+  }
+  if(!territory){alert('Enter territory name in the Territory tab first.');return}
   if(!TSAP_CFG.objectives.core_objective){alert('Enter core objective first.');return}
   var model=atlasGetTaskModel('documents')
   var key=atlasGetKeyForModel(model)
