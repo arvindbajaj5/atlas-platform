@@ -942,7 +942,7 @@ function renderProfilerResultHTML(matched, sims, ai){
     +(actionsHtml?'<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--mid);letter-spacing:.4px;margin:12px 0 6px">Priority actions</div>'+actionsHtml:'')
     +(challengesHtml?'<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--mid);letter-spacing:.4px;margin:12px 0 6px">Key challenges</div>'+challengesHtml:'')
     +'<div style="display:flex;gap:8px;margin-top:14px">'
-    +'<button class="btn btn-ghost btn-sm" onclick="openProfilerTab()">Retake</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="openProfilerTab()">&#8635; Edit answers</button>'
     +'<button class="btn btn-primary btn-sm" onclick="saveProfilerResult()">Save to docket</button>'
     +'</div></div>'
 
@@ -1686,7 +1686,7 @@ function renderItem(item){
   var tc = ITEM_TYPES[item.item_type]||{icon:'\uD83D\uDCCC',label:item.item_type}
   var content = item.content||{}
   var preview = item.notes || content.summary || content.problem_statement || ''
-  return '<div class="docket-item">'
+  return '<div class="docket-item" data-item-id="'+item.id+'" onclick="openDocketItem(\''+item.id+'\')" style="cursor:pointer">'
     +'<div class="item-icon icon-'+item.item_type+'">'+tc.icon+'</div>'
     +'<div class="item-body">'
     +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
@@ -2190,6 +2190,31 @@ var FINANCING_OPTS_DEF = [
 
 function openL1Config(engId){
   CURRENT_TSAP_ENG_ID = engId
+  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
+
+  // Reset TSAP_CFG to defaults first
+  TSAP_CFG = {
+    territory:{name:'',type:'state',governance:'central',security:'civilian',ownership:'government',scale:''},
+    objectives:{core_objective:'',vision:'',justification:'',uniqueness:'',success_metrics:{jobs:'',startups:'',compute:''}},
+    blocks:[],
+    financial:{financing_models:[],infra_cost:'',hardware_cost:'',software_cost:'',services_cost:'',opex_cost:'',fiscal_capacity:''}
+  }
+
+  // Pre-populate territory name from engagement
+  if(eng) TSAP_CFG.territory.name = eng.name||''
+
+  // Load existing TSAP config from docket if present
+  var existing = CURRENT_ITEMS.find(function(i){
+    return i.item_type==='solution' && i.title&&i.title.indexOf('TSAP Config')===0
+  })
+  if(existing && existing.content){
+    var c = existing.content
+    if(c.territory) TSAP_CFG.territory = Object.assign({}, TSAP_CFG.territory, c.territory)
+    if(c.objectives) TSAP_CFG.objectives = Object.assign({}, TSAP_CFG.objectives, c.objectives)
+    if(c.blocks) TSAP_CFG.blocks = c.blocks||[]
+    if(c.financial) TSAP_CFG.financial = Object.assign({}, TSAP_CFG.financial, c.financial)
+  }
+
   switchTsapTab('profile')
   openModal('tsapModal')
 }
@@ -2451,58 +2476,123 @@ function calcTsapGap(){
 
 async function aiEnrichTsap(){
   saveTsapCurrentData()
-  var territory=TSAP_CFG.territory.name||'this territory'
-  var objective=TSAP_CFG.objectives.core_objective||'AI and digital transformation'
-  var g=atlasGetGlobal()
-  var model=atlasGetTaskModel('pei')||'gemini-3.1-flash-lite'
-  var key=atlasGetKeyForModel(model)||g.key_gemini||g.key_anthropic||g.key_openai||''
+  var territory = TSAP_CFG.territory.name
+  var objective = TSAP_CFG.objectives.core_objective
+  if(!territory){ alert('Enter territory name in the Territory tab first.'); return }
+
+  var g = atlasGetGlobal()
+  var model = atlasGetTaskModel('pei')||'gemini-3.1-flash-lite'
+  var key = atlasGetKeyForModel(model)||g.key_gemini||g.key_anthropic||g.key_openai||''
   if(!atlasGetKeyForModel(model)&&key){ if(g.key_gemini) model='gemini-3.1-flash-lite' }
-  if(!key){alert('Configure AI keys in ATLAS Settings.');return}
-  var el=document.getElementById('tsap-enrich')
-  el.style.display='block';el.textContent='Researching '+territory+'...'
-  var prompt='Strategic consultant for Territory Sovereign AI Programme. Territory: '+territory+'. Objective: '+objective+'.'
-    +' Provide: (1) 3-4 unique assets/strengths of this territory for AI programme, (2) 5 most relevant AI use cases given sector profile, (3) 3 economic justification points, (4) 2 comparable AI programme references from other regions.'
-    +' JSON: {uniqueness:[string],use_cases:[{name,rationale}],economic_case:[string],comparables:[{region,programme,lesson}]}'
-    +' Start { end }. No markdown.'
+  if(!key){ alert('No AI key configured. Go to ATLAS Settings.'); return }
+
+  var enrichEl = document.getElementById('tsap-enrich')
+  if(enrichEl) enrichEl.innerHTML='<div style="font-size:12px;color:var(--mid);padding:8px">Analysing territory\u2026</div>'
+
+  // Tighter prompt \u2014 smaller response to avoid truncation
+  var prompt = 'Sovereign AI advisor. Territory: '+territory+'.'
+    +(objective?' Goal: '+objective+'.':'')
+    +' Return JSON only: {"strengths":["up to 3 unique territorial strengths for AI","concise max 10 words each"],'
+    +'"use_cases":["up to 4 relevant AI use cases for this territory","max 8 words each"],'
+    +'"economic_points":["up to 3 economic justification points","max 12 words each"]}'
+    +' Start { end }. Plain JSON. No markdown. No trailing commas.'
   try{
-    var text=await atlasCallModel(model,prompt,null,2000)
-    var first=text.indexOf('{'),last=text.lastIndexOf('}')
-    if(first<0) throw new Error('No JSON')
-    var r=JSON.parse(text.slice(first,last+1))
-    var html=''
-    if(r.uniqueness&&r.uniqueness.length) html+='<b>Unique Strengths:</b><br>'+r.uniqueness.map(function(u){return '\u2022 '+esc(u)}).join('<br>')+'<br><br>'
-    if(r.use_cases&&r.use_cases.length) html+='<b>Suggested Use Cases:</b><br>'+r.use_cases.map(function(u){return '\u2022 <b>'+esc(u.name)+'</b> \u2014 '+esc(u.rationale)}).join('<br>')+'<br><br>'
-    if(r.economic_case&&r.economic_case.length) html+='<b>Economic Case:</b><br>'+r.economic_case.map(function(e){return '\u2022 '+esc(e)}).join('<br>')+'<br><br>'
-    if(r.comparables&&r.comparables.length) html+='<b>Comparable Programmes:</b><br>'+r.comparables.map(function(c){return '\u2022 <b>'+esc(c.region)+'</b>: '+esc(c.programme)+' \u2014 '+esc(c.lesson)}).join('<br>')
-    el.innerHTML=html||'No structured result. Try again.'
-    if(!TSAP_CFG.objectives.uniqueness&&r.uniqueness){
-      var uEl=document.getElementById('tsap-uniq')
-      if(uEl) uEl.value=r.uniqueness.join('. ')
+    var text = await atlasCallModel(model, prompt, null, 800)
+    var first=text.indexOf('{'), last=text.lastIndexOf('}')
+    if(first<0) throw new Error('No JSON returned')
+    var clean = text.slice(first,last+1)
+      .replace(/,\s*([}\]])/g,'$1')   // remove trailing commas
+      .replace(/[\u0000-\u001F]/g,' ') // remove control chars
+    var r = JSON.parse(clean)
+    var html = ''
+    if(r.strengths&&r.strengths.length){
+      html += '<div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:4px">Territorial strengths</div>'
+      html += r.strengths.map(function(s){ return '<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--light)">'+esc(s)+'</div>' }).join('')
     }
-  }catch(e){el.textContent='Error: '+e.message}
+    if(r.use_cases&&r.use_cases.length){
+      html += '<div style="font-size:11px;font-weight:600;color:var(--navy);margin:10px 0 4px">Suggested use cases</div>'
+      html += r.use_cases.map(function(u){ return '<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--light)">'+esc(u)+'</div>' }).join('')
+    }
+    if(r.economic_points&&r.economic_points.length){
+      html += '<div style="font-size:11px;font-weight:600;color:var(--navy);margin:10px 0 4px">Economic justification</div>'
+      html += r.economic_points.map(function(p){ return '<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--light)">'+esc(p)+'</div>' }).join('')
+    }
+    html += '<div style="margin-top:8px;display:flex;gap:6px">'
+      +'<button class="btn btn-ghost btn-xs" onclick="applyEnrichToForm(window._enrichResult)">Apply to form</button>'
+      +'</div>'
+    window._enrichResult = r
+    if(enrichEl) enrichEl.innerHTML = html
+  }catch(e){
+    if(enrichEl) enrichEl.innerHTML='<div style="font-size:11px;color:#991b1b;padding:6px">Error: '+esc(e.message)+'</div>'
+    console.error('aiEnrichTsap error:', e, 'Raw text:', typeof text!=='undefined'?text.slice(0,200):'')
+  }
 }
+
+function applyEnrichToForm(r){
+  if(!r) return
+  if(r.strengths&&r.strengths.length){
+    var uniq = document.getElementById('tsap-uniq')
+    if(uniq) uniq.value = r.strengths.join('\n')
+  }
+  if(r.use_cases&&r.use_cases.length){
+    var vis = document.getElementById('tsap-vis')
+    if(vis && !vis.value) vis.value = r.use_cases.join(', ')
+  }
+}
+
 
 async function saveTsapConfig(){
   saveTsapCurrentData()
-  var docketId=CURRENT_DOCKET_ID
-  if(!docketId){alert('Open an engagement first.');return}
-  var l2Count = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2')===0 && b.code.indexOf('.')===2}).length
-  var l2xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L2.')===0}).length
-  var l1xCount = TSAP_CFG.blocks.filter(function(b){return b.code.indexOf('L1.')===0}).length
-  var item={id:genId('DI'),docket_id:docketId,item_type:'solution',title:'TSAP Config \u2014 '+esc(TSAP_CFG.territory.name||'Territory'),content:TSAP_CFG,status:'in_progress',notes:'Territory: '+esc(TSAP_CFG.territory.name)+'. L2 blocks: '+l2Count+'. Specialised factories: '+l2xCount+'. L1.x programmes: '+l1xCount+'. Financing models: '+TSAP_CFG.financial.financing_models.length+'.',created_by:'ATLAS TSAP'}
-  // Upsert \u2014 update existing TSAP config if present
-  var existing = CURRENT_ITEMS.find(function(i){ return i.item_type==='solution' && i.title.indexOf('TSAP Config')===0 })
+  var docketId = CURRENT_DOCKET_ID
+  if(!docketId){ alert('Open an engagement first.'); return }
+
+  var l2Count  = TSAP_CFG.blocks.filter(function(b){ return b.code.indexOf('L2')===0 && b.code.indexOf('.')===2 }).length
+  var l2xCount = TSAP_CFG.blocks.filter(function(b){ return b.code.indexOf('L2.')===0 }).length
+  var l1xCount = TSAP_CFG.blocks.filter(function(b){ return b.code.indexOf('L1.')===0 }).length
+
+  var item = {
+    id: genId('DI'),
+    docket_id: docketId,
+    item_type: 'solution',
+    title: 'TSAP Config \u2014 '+(TSAP_CFG.territory.name||'Territory'),
+    content: {
+      territory: TSAP_CFG.territory,
+      objectives: TSAP_CFG.objectives,
+      blocks: TSAP_CFG.blocks,
+      financial: TSAP_CFG.financial,
+      summary: {l2_count: l2Count, l2x_count: l2xCount, l1x_count: l1xCount}
+    },
+    status: 'pending',
+    notes: TSAP_CFG.objectives.core_objective||TSAP_CFG.territory.name||'TSAP Configuration',
+    created_by: 'ATLAS'
+  }
+
+  // Upsert \u2014 update if exists
+  var existing = CURRENT_ITEMS.find(function(i){
+    return i.item_type==='solution' && i.title&&i.title.indexOf('TSAP Config')===0
+  })
   var ok = false
   if(existing){
-    ok = await sbPatch('docket_items','id=eq.'+existing.id,{title:item.title,content:item.content,status:'pending'})
+    ok = await sbPatch('docket_items','id=eq.'+existing.id,{
+      title: item.title, content: item.content, notes: item.notes, status:'pending'
+    })
     if(ok){ existing.title=item.title; existing.content=item.content }
   } else {
-    ok = await sbInsert('docket_items',item)
+    ok = await sbInsert('docket_items', item)
     if(ok) CURRENT_ITEMS.push(item)
   }
-  if(ok){closeModal('tsapModal');openEngagement(CURRENT_TSAP_ENG_ID)}
-  else alert('Failed to save.')
+
+  if(ok){
+    // Show save confirmation but keep modal open
+    var btn = document.querySelector('#tsapModal .btn-primary')
+    if(btn){ var orig=btn.textContent; btn.textContent='\u2713 Saved'; setTimeout(function(){ btn.textContent=orig },2000) }
+    // Refresh header pill
+    openEngagement(CURRENT_TSAP_ENG_ID)
+  } else {
+    alert('Failed to save TSAP configuration.')
+  }
 }
+
 
 async function generateVisionDoc(){
   saveTsapCurrentData()
@@ -2890,7 +2980,61 @@ async function confirmAddToDocket(){
   }
 }
 
-</script>
+
+
+function openDocketItem(itemId){
+  var item = CURRENT_ITEMS.find(function(i){ return i.id===itemId })
+  if(!item) return
+  var tc = ITEM_TYPES[item.item_type]||{icon:'\uD83D\uDCCC',label:item.item_type}
+  var content = item.content||{}
+
+  // Build detail view based on item type
+  var detail = ''
+  if(item.item_type==='solution' && item.title&&item.title.indexOf('TSAP Config')===0){
+    // TSAP config \u2014 open the TSAP modal with data loaded
+    openL1Config(CURRENT_ENGAGEMENT_ID)
+    return
+  }
+  if(item.item_type==='pricing' && content.archetype_code){
+    // Profiler result \u2014 show summary
+    detail = '<div style="margin-bottom:8px"><strong>Archetype:</strong> '+esc(content.archetype_name||'')+'</div>'
+      +'<div style="font-size:12px;color:var(--mid)">'+esc(content.archetype_tagline||'')+'</div>'
+    if(content.profile_scores){
+      detail += '<div style="font-size:11px;margin-top:8px"><strong>Profile scores:</strong> '
+        +Object.entries(content.profile_scores).map(function(e){ return e[0]+': '+e[1] }).join(' \u00B7 ')
+        +'</div>'
+    }
+  }
+  if(item.item_type==='solution'){
+    detail = '<div style="font-size:12px;line-height:1.6">'+esc(item.notes||'')+'</div>'
+    if(content.blocks&&content.blocks.length){
+      detail += '<div style="font-size:11px;margin-top:8px"><strong>Blocks:</strong> '+content.blocks.map(function(b){ return b.code }).join(', ')+'</div>'
+    }
+  }
+  if(item.item_type==='intel'||item.item_type==='pei'){
+    detail = '<div style="font-size:12px;line-height:1.6;margin-bottom:6px">'+esc(item.notes||'')+'</div>'
+    if(content.problem_statement) detail += '<div style="font-size:11px;color:var(--mid)"><strong>Problem:</strong> '+esc(content.problem_statement)+'</div>'
+    if(content.opportunity) detail += '<div style="font-size:11px;color:var(--mid);margin-top:4px"><strong>Opportunity:</strong> '+esc(content.opportunity)+'</div>'
+  }
+
+  // Show in a panel below the item (toggle)
+  var panelId = 'item-detail-'+itemId
+  var existing = document.getElementById(panelId)
+  if(existing){ existing.remove(); return }
+  var itemEl = document.querySelector('[data-item-id="'+itemId+'"]')
+  if(!itemEl) return
+  var panel = document.createElement('div')
+  panel.id = panelId
+  panel.style.cssText = 'background:var(--light);border-radius:0 0 var(--r) var(--r);padding:12px 14px;margin-top:-4px;border:0.5px solid var(--light-border);border-top:none'
+  panel.innerHTML = detail
+    +'<div style="margin-top:10px;display:flex;gap:6px">'
+    +(item.item_type==='solution'&&item.title&&item.title.indexOf('TSAP Config')>=0
+      ?'<button class="btn btn-outline btn-xs" onclick="openL1Config(CURRENT_ENGAGEMENT_ID)">Open TSAP Configure</button>':'' )
+    +'<button class="btn btn-ghost btn-xs" onclick="updateItemStatus(\''+itemId+'\',\'approved\')">Mark approved</button>'
+    +'<button class="btn btn-ghost btn-xs" onclick="document.getElementById(\''+panelId+'\').remove()">Close</button>'
+    +'</div>'
+  itemEl.parentNode.insertBefore(panel, itemEl.nextSibling)
+}</script>
 
 <!-- Add to Docket Trigger Modal (called from Second Brain, PEI etc.) -->
 <div class="modal-overlay" id="triggerModal">
