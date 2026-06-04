@@ -457,7 +457,394 @@ textarea{resize:vertical;min-height:72px;}
   </div>
 </div>
 
-<script charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script charset="utf-8">// \u2500\u2500 Territory AI Programme Profiler \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Reads questions/options/archetypes from Supabase
+// Weighted cosine similarity matching
+// AI-generated actions + challenges
+
+var PROFILER_STATE = {
+  questions: [],
+  options: {},      // {dimension: [options]}
+  archetypes: [],
+  archDims: {},     // {archetype_code: {dimension: score}}
+  answers: {},      // {dimension: value or [values]}
+  scores: {},       // {dimension: numeric 1-5}
+  step: 0,
+  result: null,
+  loaded: false
+}
+
+async function loadProfilerData(){
+  if(PROFILER_STATE.loaded) return true
+  try{
+    var qs = await sbFetch('profiler_questions','active=eq.true&order=sort_order.asc',20)
+    var opts = await sbFetch('profiler_options','order=sort_order.asc',200)
+    var archs = await sbFetch('profiler_archetypes','active=eq.true&order=sort_order.asc',10)
+    var dims = await sbFetch('profiler_archetype_dims','',100)
+    if(!qs.length || !archs.length) return false
+    PROFILER_STATE.questions = qs
+    PROFILER_STATE.options = {}
+    opts.forEach(function(o){
+      var q = qs.find(function(q){ return q.id===o.question_id })
+      if(!q) return
+      if(!PROFILER_STATE.options[q.dimension]) PROFILER_STATE.options[q.dimension]=[]
+      PROFILER_STATE.options[q.dimension].push(o)
+    })
+    PROFILER_STATE.archetypes = archs
+    PROFILER_STATE.archDims = {}
+    archs.forEach(function(a){
+      PROFILER_STATE.archDims[a.code]={}
+      dims.filter(function(d){ return d.archetype_id===a.id }).forEach(function(d){
+        PROFILER_STATE.archDims[a.code][d.dimension]=d.score
+      })
+    })
+    PROFILER_STATE.loaded = true
+    return true
+  }catch(e){
+    console.error('Profiler load error:', e)
+    return false
+  }
+}
+
+function profilerDimScore(dimension, value){
+  var opts = PROFILER_STATE.options[dimension] || []
+  var opt = opts.find(function(o){ return o.value===value })
+  return opt ? opt.score : 3
+}
+
+function profilerCosineSimilarity(userScores, archScores, questions){
+  var dims = Object.keys(userScores)
+  var dot=0, normU=0, normA=0
+  dims.forEach(function(d){
+    var q = questions.find(function(q){ return q.dimension===d })
+    var w = q ? parseFloat(q.weight)||1 : 1
+    var u = (userScores[d]||3)*w
+    var a = (archScores[d]||3)*w
+    dot += u*a
+    normU += u*u
+    normA += a*a
+  })
+  return normU&&normA ? dot/(Math.sqrt(normU)*Math.sqrt(normA)) : 0
+}
+
+function profilerMatch(){
+  var scores = PROFILER_STATE.scores
+  var best = null, bestSim = -1
+  var sims = {}
+  PROFILER_STATE.archetypes.forEach(function(arch){
+    var archScores = PROFILER_STATE.archDims[arch.code]||{}
+    var sim = profilerCosineSimilarity(scores, archScores, PROFILER_STATE.questions)
+    sims[arch.code] = sim
+    if(sim>bestSim){ bestSim=sim; best=arch }
+  })
+  return {matched: best, similarities: sims}
+}
+
+async function openProfilerTab(){
+  var content = document.getElementById('tsapTabContent')
+  if(!content) return
+
+  content.innerHTML = '<div style="padding:20px;text-align:center;color:var(--mid);font-size:13px">Loading profiler data...</div>'
+
+  var ok = await loadProfilerData()
+  if(!ok){
+    content.innerHTML = '<div style="padding:20px;color:#991b1b;font-size:13px">Failed to load profiler questions. Check Supabase connection.</div>'
+    return
+  }
+
+  PROFILER_STATE.step = 0
+  PROFILER_STATE.answers = {}
+  PROFILER_STATE.scores = {}
+  PROFILER_STATE.result = null
+  renderProfilerStep()
+}
+
+function renderProfilerStep(){
+  var content = document.getElementById('tsapTabContent')
+  if(!content) return
+  var qs = PROFILER_STATE.questions
+  var step = PROFILER_STATE.step
+
+  if(step >= qs.length){
+    renderProfilerResult()
+    return
+  }
+
+  var q = qs[step]
+  var opts = PROFILER_STATE.options[q.dimension]||[]
+  var isMulti = q.type==='multi'
+  var ans = PROFILER_STATE.answers[q.dimension]
+  var selVals = isMulti ? (ans||[]) : []
+  var hasAns = isMulti ? (ans&&ans.length>0) : !!ans
+
+  var pct = Math.round((step/qs.length)*100)
+  var progHtml = qs.map(function(_,i){
+    var cls = i<step?'done':i===step?'active':''
+    return '<div style="flex:1;height:3px;border-radius:2px;background:'+(cls==='done'?'var(--navy)':cls==='active'?'var(--orange)':'var(--light)')+'"></div>'
+  }).join('')
+
+  var optsHtml = opts.map(function(o){
+    var isSel = isMulti ? selVals.indexOf(o.value)>=0 : ans===o.value
+    var borderStyle = isSel ? '1.5px solid var(--navy)' : '0.5px solid var(--light-border)'
+    var bgStyle = isSel ? 'rgba(0,40,112,0.04)' : 'var(--white)'
+    var dotBg = isSel ? 'var(--navy)' : 'transparent'
+    var dotBorder = isSel ? 'var(--navy)' : 'var(--mid)'
+    var dotInner = isSel ? '<div style="width:6px;height:6px;border-radius:50%;background:#fff"></div>' : ''
+    return '<div onclick="profilerPick(\''+q.dimension+'\',\''+o.value+'\','+isMulti+')" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:'+borderStyle+';border-radius:var(--r);margin-bottom:7px;cursor:pointer;background:'+bgStyle+'">'
+      +'<div style="width:18px;height:18px;border-radius:50%;border:1.5px solid '+dotBorder+';background:'+dotBg+';margin-top:1px;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+dotInner+'</div>'
+      +'<div><div style="font-size:13px;font-weight:500;color:var(--dark)">'+esc(o.label)+'</div>'
+      +(o.sub_text?'<div style="font-size:11px;color:var(--mid);margin-top:2px;line-height:1.4">'+esc(o.sub_text)+'</div>':'')
+      +'</div></div>'
+  }).join('')
+
+  content.innerHTML = '<div style="padding:4px 0 0">'
+    +'<div style="display:flex;gap:3px;margin-bottom:14px">'+progHtml+'<span style="font-size:10px;color:var(--mid);margin-left:6px;white-space:nowrap">'+(step+1)+' / '+qs.length+'</span></div>'
+    +'<div style="font-size:10px;font-weight:600;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">'+esc(q.section)+'</div>'
+    +'<div style="font-size:15px;font-weight:500;color:var(--dark);margin-bottom:3px;line-height:1.4">'+esc(q.question)+'</div>'
+    +(q.sub_text?'<div style="font-size:11px;color:var(--mid);margin-bottom:12px;line-height:1.4">'+esc(q.sub_text)+'</div>':'<div style="margin-bottom:12px"></div>')
+    +(isMulti?'<div style="font-size:11px;color:var(--mid);font-style:italic;margin-bottom:8px">Select all that apply</div>':'')
+    +optsHtml
+    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    +(step>0?'<button class="btn btn-ghost btn-sm" onclick="profilerNav(-1)">Back</button>':'')
+    +'<button class="btn btn-primary btn-sm" onclick="profilerNav(1)" '+(hasAns?'':'disabled')+'>'+
+    (step===qs.length-1?'See profile \u2192':'Next \u2192')+'</button>'
+    +'</div></div>'
+}
+
+function profilerPick(dimension, value, isMulti){
+  if(isMulti){
+    if(!PROFILER_STATE.answers[dimension]) PROFILER_STATE.answers[dimension]=[]
+    var idx = PROFILER_STATE.answers[dimension].indexOf(value)
+    if(idx>=0) PROFILER_STATE.answers[dimension].splice(idx,1)
+    else PROFILER_STATE.answers[dimension].push(value)
+  } else {
+    PROFILER_STATE.answers[dimension] = value
+  }
+  // Calculate score
+  if(!isMulti){
+    PROFILER_STATE.scores[dimension] = profilerDimScore(dimension, value)
+  } else {
+    // Multi: average score of selected options
+    var vals = PROFILER_STATE.answers[dimension]||[]
+    if(vals.length){
+      var opts = PROFILER_STATE.options[dimension]||[]
+      var total = vals.reduce(function(sum,v){
+        var o = opts.find(function(o){ return o.value===v })
+        return sum + (o?o.score:3)
+      },0)
+      PROFILER_STATE.scores[dimension] = Math.round(total/vals.length)
+    }
+  }
+  renderProfilerStep()
+}
+
+function profilerNav(dir){
+  var qs = PROFILER_STATE.questions
+  if(dir>0 && PROFILER_STATE.step<qs.length) PROFILER_STATE.step++
+  else if(dir<0 && PROFILER_STATE.step>0) PROFILER_STATE.step--
+  renderProfilerStep()
+}
+
+async function renderProfilerResult(){
+  var content = document.getElementById('tsapTabContent')
+  if(!content) return
+  content.innerHTML = '<div style="padding:16px;text-align:center;color:var(--mid);font-size:13px">Analysing profile\u2026 generating recommendations\u2026</div>'
+
+  var matchResult = profilerMatch()
+  var matched = matchResult.matched
+  var sims = matchResult.similarities
+  PROFILER_STATE.result = {matched: matched, similarities: sims}
+
+  // AI-generated actions + challenges
+  var aiOutput = {actions:[], challenges:[], finance:{model:'',rationale:'',watchout:''}}
+  try{
+    var g = atlasGetGlobal()
+    var model = atlasGetTaskModel('pei')||'gemini-3.1-flash-lite'
+    var key = atlasGetKeyForModel(model)||g.key_gemini||g.key_anthropic||''
+    if(!atlasGetKeyForModel(model)&&key){ if(g.key_gemini) model='gemini-3.1-flash-lite' }
+    if(key){
+      var profileSummary = Object.entries(PROFILER_STATE.answers).map(function(entry){
+        var dim=entry[0], val=entry[1]
+        var opts = PROFILER_STATE.options[dim]||[]
+        if(Array.isArray(val)){
+          var labels = val.map(function(v){ var o=opts.find(function(o){return o.value===v}); return o?o.label:v })
+          return dim+': '+labels.join(', ')
+        }
+        var o = opts.find(function(o){return o.value===val})
+        return dim+': '+(o?o.label:val)
+      }).join(' | ')
+      var prompt = 'You are a sovereign AI infrastructure advisor for government and territory clients in India.'
+        +' A territory has completed a profiler assessment. Their profile: '+profileSummary
+        +' Closest archetype match: '+matched.name+' ('+matched.tagline+')'
+        +' Generate:'
+        +' 1. 5 specific priority actions for this territory to advance their AI Centre programme'
+        +' 2. 5 key challenges they will face given their specific profile'
+        +' 3. The most appropriate financing model for their profile (name + 2 sentence rationale + 1 sentence watch-out)'
+        +' Respond ONLY with JSON: {"actions":["..."],"challenges":["..."],"finance":{"model":"...","rationale":"...","watchout":"..."}}'
+        +' Each action and challenge max 20 words. Be specific to their profile, not generic.'
+        +' Start { end }. No markdown.'
+      var text = await atlasCallModel(model, prompt, null, 1200)
+      var first=text.indexOf('{'), last=text.lastIndexOf('}')
+      if(first>=0) aiOutput = JSON.parse(text.slice(first,last+1))
+    }
+  }catch(e){ console.error('Profiler AI error:', e) }
+
+  renderProfilerResultHTML(matched, sims, aiOutput)
+}
+
+function renderProfilerResultHTML(matched, sims, ai){
+  var content = document.getElementById('tsapTabContent')
+  if(!content) return
+  var archs = PROFILER_STATE.archetypes
+  var qs = PROFILER_STATE.questions
+  var dims = qs.filter(function(q){return q.dimension!=='schemes'}).map(function(q){return q.dimension})
+  var dimLabels = {fiscal:'Fiscal',mandate:'Mandate',ownership:'Ownership',dc:'DC ready',sensitivity:'Security',scale:'Scale',urgency:'Urgency',maturity:'AI maturity',stakeholders:'Governance'}
+  var userScores = dims.map(function(d){return PROFILER_STATE.scores[d]||3})
+
+  // Tags
+  var tags = matched.tags||[]
+  if(typeof tags==='string') try{tags=JSON.parse(tags)}catch(e){tags=[]}
+  var tagsHtml = tags.map(function(t){
+    return '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.9);font-weight:500">'+esc(t)+'</span>'
+  }).join('')
+
+  // Build radar charts for all 4 archetypes
+  var radarIds = archs.map(function(a){ return 'radar-'+a.code })
+  var radarGridHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
+    + archs.map(function(a){
+        var isMatch = a.id===matched.id
+        var simPct = Math.round((sims[a.code]||0)*100)
+        var border = isMatch ? '1.5px solid var(--orange)' : '0.5px solid var(--light-border)'
+        return '<div style="background:var(--light);border-radius:var(--r);padding:10px;border:'+border+'">'
+          +(isMatch?'<div style="font-size:10px;font-weight:600;color:var(--orange);margin-bottom:3px">\u2713 Best match</div>':'')
+          +'<div style="font-size:11px;font-weight:500;color:var(--dark);margin-bottom:2px">'+esc(a.name)+'</div>'
+          +'<div style="font-size:10px;color:var(--mid);margin-bottom:6px">'+simPct+'% similarity</div>'
+          +'<canvas id="radar-'+a.code+'" height="160"></canvas>'
+          +'</div>'
+      }).join('')
+    +'</div>'
+
+  // Actions + challenges
+  var actionsHtml = (ai.actions||[]).map(function(a){
+    return '<div style="display:flex;gap:7px;padding:7px 0;border-bottom:0.5px solid var(--light)">'
+      +'<div style="width:6px;height:6px;border-radius:50%;background:var(--navy);margin-top:4px;flex-shrink:0"></div>'
+      +'<div style="font-size:12px;color:var(--dark);line-height:1.5">'+esc(a)+'</div></div>'
+  }).join('')
+
+  var challengesHtml = (ai.challenges||[]).map(function(c){
+    return '<div style="display:flex;gap:7px;padding:7px 0;border-bottom:0.5px solid var(--light)">'
+      +'<div style="width:6px;height:6px;border-radius:50%;background:var(--orange);margin-top:4px;flex-shrink:0"></div>'
+      +'<div style="font-size:12px;color:var(--dark);line-height:1.5">'+esc(c)+'</div></div>'
+  }).join('')
+
+  // Finance
+  var financeHtml = ''
+  if(ai.finance&&ai.finance.model){
+    financeHtml = '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--mid);letter-spacing:.4px;margin:12px 0 6px">Recommended financing</div>'
+      +'<div style="background:var(--white);border:0.5px solid var(--light-border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px">'
+      +'<div style="font-size:13px;font-weight:500;color:var(--dark);margin-bottom:5px">'+esc(ai.finance.model)+'</div>'
+      +'<div style="font-size:12px;color:var(--mid);line-height:1.5;margin-bottom:6px">'+esc(ai.finance.rationale)+'</div>'
+      +(ai.finance.watchout?'<div style="font-size:11px;color:#9a6800;background:rgba(255,182,0,0.1);border:0.5px solid rgba(255,182,0,.3);border-radius:var(--r-sm);padding:8px 10px"><strong>Watch out:</strong> '+esc(ai.finance.watchout)+'</div>':'')
+      +'</div>'
+  }
+
+  content.innerHTML = '<div style="padding:4px 0 0">'
+    +'<div style="background:var(--navy);border-radius:var(--r-lg);padding:16px 18px;color:var(--white);margin-bottom:12px">'
+    +'<div style="font-size:10px;color:rgba(255,255,255,.5);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">Closest archetype</div>'
+    +'<div style="font-size:18px;font-weight:500;margin-bottom:5px">'+esc(matched.name)+'</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:8px">'+esc(matched.tagline)+'</div>'
+    +'<div style="display:flex;gap:5px;flex-wrap:wrap">'+tagsHtml+'</div>'
+    +'</div>'
+    +'<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--mid);letter-spacing:.4px;margin-bottom:8px">Profile vs all archetypes</div>'
+    +radarGridHtml
+    +financeHtml
+    +(actionsHtml?'<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--mid);letter-spacing:.4px;margin:12px 0 6px">Priority actions</div>'+actionsHtml:'')
+    +(challengesHtml?'<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--mid);letter-spacing:.4px;margin:12px 0 6px">Key challenges</div>'+challengesHtml:'')
+    +'<div style="display:flex;gap:8px;margin-top:14px">'
+    +'<button class="btn btn-ghost btn-sm" onclick="openProfilerTab()">Retake</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="saveProfilerResult()">Save to docket</button>'
+    +'</div></div>'
+
+  // Draw radar charts after DOM update
+  setTimeout(function(){
+    if(typeof Chart==='undefined') return
+    archs.forEach(function(a){
+      var ctx = document.getElementById('radar-'+a.code)
+      if(!ctx) return
+      var archScores = dims.map(function(d){
+        return PROFILER_STATE.archDims[a.code]&&PROFILER_STATE.archDims[a.code][d]
+          ? PROFILER_STATE.archDims[a.code][d] : 3
+      })
+      var labels = dims.map(function(d){ return dimLabels[d]||d })
+      new Chart(ctx,{
+        type:'radar',
+        data:{
+          labels: labels,
+          datasets:[
+            {label:'Your territory', data:userScores, backgroundColor:'rgba(0,40,112,0.12)', borderColor:'#002870', borderWidth:2, pointBackgroundColor:'#002870', pointRadius:3},
+            {label:a.name, data:archScores, backgroundColor:'rgba(255,85,57,0.06)', borderColor:'#FF5539', borderWidth:1.5, pointBackgroundColor:'#FF5539', pointRadius:2, borderDash:[3,3]}
+          ]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:true,
+          plugins:{legend:{display:false}},
+          scales:{r:{min:0,max:5,ticks:{display:false,stepSize:1},grid:{color:'rgba(128,128,128,0.12)'},pointLabels:{font:{size:9}}}}
+        }
+      })
+    })
+  }, 150)
+}
+
+async function saveProfilerResult(){
+  if(!PROFILER_STATE.result) return
+  var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===CURRENT_TSAP_ENG_ID })
+  var dockets = await sbFetch('engagement_dockets','engagement_id=eq.'+CURRENT_TSAP_ENG_ID,1)
+  if(!dockets||!dockets.length){ alert('No docket found for this engagement.'); return }
+  var docketId = dockets[0].id
+  var matched = PROFILER_STATE.result.matched
+
+  // Save profiler run to profiler_runs table
+  var run = {
+    docket_id: docketId,
+    engagement_id: CURRENT_TSAP_ENG_ID,
+    customer_id: eng?eng.customer_id:null,
+    answers: PROFILER_STATE.answers,
+    scores: PROFILER_STATE.scores,
+    matched_archetype: matched.code,
+    similarity_scores: PROFILER_STATE.result.similarities
+  }
+  await sbInsert('profiler_runs', run)
+
+  // Save as docket item (pricing type)
+  var item = {
+    id: genId('DI'),
+    docket_id: docketId,
+    item_type: 'pricing',
+    title: 'Territory AI Programme Profile \u2014 '+matched.name,
+    content: {
+      archetype_code: matched.code,
+      archetype_name: matched.name,
+      archetype_tagline: matched.tagline,
+      profile_scores: PROFILER_STATE.scores,
+      answers: PROFILER_STATE.answers,
+      similarity_scores: PROFILER_STATE.result.similarities
+    },
+    status: 'active',
+    notes: 'Closest archetype: '+matched.name+' ('+matched.tagline+')',
+    created_by: 'ATLAS Profiler'
+  }
+  var ok = await sbInsert('docket_items', item)
+  if(ok){
+    CURRENT_ITEMS.push(item)
+    closeModal('tsapModal')
+    openEngagement(CURRENT_TSAP_ENG_ID)
+    alert('Profile saved to docket.')
+  }
+}
+
+
+
 
 // \u2500\u2500 ATLAS Model Registry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 // Central utility \u2014 reads atlas_global_cfg, returns only configured providers
@@ -1623,17 +2010,21 @@ var FINANCING_OPTS_DEF = [
 
 function openL1Config(engId){
   CURRENT_TSAP_ENG_ID = engId
-  switchTsapTab('territory')
+  switchTsapTab('profile')
   openModal('tsapModal')
 }
 
 function switchTsapTab(tab){
   var tabs = document.querySelectorAll('#tsapTabBar .tab')
-  var names = ['territory','objectives','blocks','financial']
+  var names = ['profile','territory','objectives','blocks','financial']
   tabs.forEach(function(t,i){ t.className='tab'+(names[i]===tab?' active':'') })
   saveTsapCurrentData()
   var content = ''
 
+  if(tab==='profile'){
+    openProfilerTab()
+    return
+  }
   if(tab==='territory'){
     content = '<div class="form-grid">'
       +'<div><label>Territory Name</label><input type="text" id="tsap-name" value="'+esc(TSAP_CFG.territory.name)+'" placeholder="e.g. Himachal Pradesh, Northeast India Cluster"></div>'
@@ -2347,7 +2738,8 @@ async function confirmAddToDocket(){
     </div>
     <div style="font-size:11px;color:var(--mid);margin-bottom:14px">Configure territory, objectives, building blocks and financial model.</div>
     <div class="tab-bar" id="tsapTabBar">
-      <div class="tab active" onclick="switchTsapTab('territory')">1. Territory</div>
+      <div class="tab active" onclick="switchTsapTab('profile')">&#9673; Profile</div>
+      <div class="tab" onclick="switchTsapTab('territory')">1. Territory</div>
       <div class="tab" onclick="switchTsapTab('objectives')">2. Objectives</div>
       <div class="tab" onclick="switchTsapTab('blocks')">3. Building Blocks</div>
       <div class="tab" onclick="switchTsapTab('financial')">4. Financial Model</div>
