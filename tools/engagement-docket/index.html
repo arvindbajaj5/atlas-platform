@@ -2324,14 +2324,28 @@ function switchTsapTab(tab){
 
   if(tab==='financial'){
     content = '<div>'
-      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">Financing model</div>'
-      +'<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Select primary financing approach. AI recommendation shown below based on your profile.</div>'
-      +'<div id="tsap-fin-models" style="margin-bottom:10px"></div>'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">1. Programme scale</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Select MDC T-shirt size per site. Total MW = sum of all sites.</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+      +['XS \u22642MW','S 5MW','M 10MW','L 15MW','XL 20MW+'].map(function(s,i){ var v=['xs','s','m','l','xl'][i]; var sel=TSAP_CFG.financial.scale===v; return '<button onclick="setTsapScale(\''+v+'\')" class="btn btn-xs" style="'+(sel?'background:var(--navy);color:var(--white)':'')+'">'+(sel?'\u2713 ':'')+s+'</button>' }).join('')
+      +'</div>'
+      +'<div style="display:flex;gap:8px;margin-bottom:14px">'
+      +'<div style="flex:1"><label>Number of sites</label><input type="number" id="tsap-fin-sites" min="1" max="20" value="'+(TSAP_CFG.financial.sites||1)+'" onchange="TSAP_CFG.financial.sites=this.value" style="width:100%"></div>'
+      +'<div style="flex:1"><label>Estimated CapEx (INR Cr)</label><input type="text" id="tsap-fin-infra_cost" value="'+(TSAP_CFG.financial.infra_cost||'')+'" placeholder="e.g. 2500" style="width:100%"></div>'
+      +'<div style="flex:1"><label>Annual OpEx (INR Cr)</label><input type="text" id="tsap-fin-opex_cost" value="'+(TSAP_CFG.financial.opex_cost||'')+'" placeholder="e.g. 180" style="width:100%"></div>'
+      +'</div>'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">2. Financing model</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Select primary model. AI recommendation shown below.</div>'
+      +'<div id="tsap-fin-models" style="margin-bottom:8px"></div>'
       +'<div id="tsap-fin-navigator" style="margin-bottom:14px"></div>'
-      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;margin-top:8px">Programme build cost (ROM)</div>'
-      +'<div id="tsap-fin-costs" style="margin-bottom:8px"></div>'
-      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%;margin-top:4px">Calculate financing gap</button>'
-      +'<div id="tsap-gap" style="font-size:11px;color:var(--navy);margin-top:8px;padding:8px;background:var(--light);border-radius:var(--r)">Enter costs above and calculate.</div>'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">3. Financing gap</div>'
+      +'<div style="display:flex;gap:8px;margin-bottom:8px">'
+      +'<div style="flex:1"><label>Territory contribution (INR Cr)</label><input type="text" id="tsap-fin-hardware_cost" value="'+(TSAP_CFG.financial.hardware_cost||'')+'" placeholder="e.g. 500" style="width:100%"></div>'
+      +'<div style="flex:1"><label>Central / Bilateral grant (INR Cr)</label><input type="text" id="tsap-fin-software_cost" value="'+(TSAP_CFG.financial.software_cost||'')+'" placeholder="e.g. 1500" style="width:100%"></div>'
+      +'<div style="flex:1"><label>Debt / PPP (INR Cr)</label><input type="text" id="tsap-fin-services_cost" value="'+(TSAP_CFG.financial.services_cost||'')+'" placeholder="e.g. 500" style="width:100%"></div>'
+      +'</div>'
+      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%">Calculate financing gap</button>'
+      +'<div id="tsap-gap" style="font-size:11px;color:var(--navy);margin-top:8px;padding:8px;background:var(--light);border-radius:var(--r)">Enter figures above and calculate.</div>'
       +'</div>'
   }
 
@@ -2453,10 +2467,19 @@ function saveTsapCurrentData(){
 }
 
 function toggleTsapBlock(code){
-  var idx=TSAP_CFG.blocks.findIndex(function(b){return b.code===code})
-  var def=L2_BLOCKS_DEF.find(function(b){return b.code===code})
-  if(idx>=0) TSAP_CFG.blocks.splice(idx,1)
-  else if(def) TSAP_CFG.blocks.push({code:code,name:def.name,icon:def.icon,count:1,location:''})
+  var idx = TSAP_CFG.blocks.findIndex(function(b){ return b.code===code })
+  if(idx>=0){
+    TSAP_CFG.blocks.splice(idx,1)
+  } else {
+    // Check L2 first, then L1x
+    var def = L2_BLOCKS_DEF.find(function(b){ return b.code===code })
+    if(def){
+      TSAP_CFG.blocks.push({code:code, name:def.name, icon:def.icon, count:1, location:''})
+    } else {
+      var l1def = L1X_COMPONENTS_DEF.find(function(c){ return c.code===code })
+      if(l1def) TSAP_CFG.blocks.push({code:code, name:l1def.name, icon:l1def.icon||'', partner:l1def.partner||false})
+    }
+  }
   switchTsapTab('blocks')
 }
 
@@ -2469,6 +2492,12 @@ function toggleTsapFinancing(type,label){
   var idx=TSAP_CFG.financial.financing_models.findIndex(function(m){return m.type===type})
   if(idx>=0) TSAP_CFG.financial.financing_models.splice(idx,1)
   else TSAP_CFG.financial.financing_models.push({type:type,label:label,amount:'',notes:''})
+}
+
+
+function setTsapScale(v){
+  TSAP_CFG.financial.scale = v
+  switchTsapTab('financial')
 }
 
 function calcTsapGap(){
@@ -2620,12 +2649,14 @@ async function generateVisionDoc(){
   var key=atlasGetKeyForModel(model)||g_v.key_gemini||g_v.key_anthropic||g_v.key_openai||''
   if(!atlasGetKeyForModel(model)&&key){ if(g_v.key_gemini) model='gemini-3.1-flash-lite' }
   if(!key){alert('No AI key configured. Go to ATLAS Settings.');return}
-  closeModal('tsapModal')
-  var main=document.getElementById('mainPanel')
-  var genDiv=document.createElement('div')
+  // Stay inside modal - render vision doc in tsapTabContent
+  var tabContent = document.getElementById('tsapTabContent')
+  if(!tabContent) return
+  var genDiv = document.createElement('div')
   genDiv.className='rec-card'
   genDiv.innerHTML='<div class="rec-title">\uD83D\uDCC4 Generating Vision Document for '+esc(territory)+'...</div>'
-  main.insertBefore(genDiv,main.firstChild)
+  tabContent.innerHTML = ''
+  tabContent.appendChild(genDiv)
   var blocks=TSAP_CFG.blocks.map(function(b){return b.name+(b.count>1?' (x'+b.count+')':'')+(b.location?' at '+b.location:'')}).join(', ')
   var financing=TSAP_CFG.financial.financing_models.map(function(f){return f.label}).join(', ')
   var prompt='Write an executive Vision Document for the '+territory+' Territory Sovereign AI Programme.'
@@ -2643,9 +2674,15 @@ async function generateVisionDoc(){
     var docketId=CURRENT_DOCKET_ID
     if(docketId){
       var item={id:genId('DI'),docket_id:docketId,item_type:'exec_doc',title:territory+' \u2014 TSAP Vision Document',content:{vision_doc_text:text,territory:territory},status:'done',notes:text.slice(0,200)+'...',created_by:'ATLAS Vision Doc'}
-      await sbInsert('docket_items',item)
-      CURRENT_ITEMS.push(item)
-      renderItems('all')
+      // Upsert \u2014 replace existing vision doc
+      var existingVD = CURRENT_ITEMS.find(function(i){ return i.item_type==='exec_doc' && i.title&&i.title.indexOf('Vision Document')>=0 })
+      if(existingVD){
+        await sbPatch('docket_items','id=eq.'+existingVD.id,{content:item.content,notes:item.notes,status:'done'})
+        existingVD.content = item.content
+      } else {
+        await sbInsert('docket_items',item)
+        CURRENT_ITEMS.push(item)
+      }
     }
     genDiv.innerHTML='<div class="rec-title">\uD83D\uDCC4 Vision Document Generated \u2014 saved to docket</div>'
       +'<div style="max-height:300px;overflow-y:auto;font-size:12px;line-height:1.7;white-space:pre-wrap;border:1px solid #e0e0e8;border-radius:var(--r);padding:12px;background:var(--white);margin-top:8px">'+esc(text)+'</div>'
@@ -3022,6 +3059,15 @@ function openDocketItem(itemId){
     if(content.blocks&&content.blocks.length){
       detail += '<div style="font-size:11px;margin-top:8px"><strong>Blocks:</strong> '+content.blocks.map(function(b){ return b.code }).join(', ')+'</div>'
     }
+  }
+  if(item.item_type==='exec_doc'){
+    var vd = item.content||{}
+    detail = '<div style="font-size:12px;line-height:1.7;max-height:300px;overflow-y:auto;white-space:pre-wrap">'+esc((vd.vision_doc_text||item.notes||'No content').slice(0,2000))+'</div>'
+  }
+  if(item.item_type==='exec_doc'){
+    var vd = item.content||{}
+    var vdText = vd.vision_doc_text||item.notes||'No content available'
+    detail = '<div style="font-size:12px;line-height:1.7;max-height:280px;overflow-y:auto;white-space:pre-wrap;background:var(--light);padding:10px;border-radius:var(--r)">'+esc(vdText.slice(0,3000))+'</div>'
   }
   if(item.item_type==='intel'||item.item_type==='pei'){
     detail = '<div style="font-size:12px;line-height:1.6;margin-bottom:6px">'+esc(item.notes||'')+'</div>'
