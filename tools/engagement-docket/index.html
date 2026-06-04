@@ -1023,12 +1023,21 @@ async function saveProfilerResult(){
     notes: 'Closest archetype: '+matched.name+' ('+matched.tagline+')',
     created_by: 'ATLAS Profiler'
   }
-  var ok = await sbInsert('docket_items', item)
-  if(ok){
-    if(!existing) CURRENT_ITEMS.push(item)
-    // Don't close modal \u2014 advance to Territory tab to continue configuration
-    switchTsapTab('territory')
+  // Upsert — update existing profiler item if present
+  var existingProfile = CURRENT_ITEMS.find(function(i){
+    return i.item_type==='pricing' && i.title&&i.title.indexOf('Territory AI Programme Profile')===0
+  })
+  var ok = false
+  if(existingProfile){
+    ok = await sbPatch('docket_items','id=eq.'+existingProfile.id,{
+      title: item.title, content: item.content, notes: item.notes, status:'pending'
+    })
+    if(ok){ existingProfile.title=item.title; existingProfile.content=item.content }
+  } else {
+    ok = await sbInsert('docket_items', item)
+    if(ok) CURRENT_ITEMS.push(item)
   }
+  if(ok) switchTsapTab('territory')
 }
 
 
@@ -2196,6 +2205,12 @@ var FINANCING_OPTS_DEF = [
   {type:'mixed',label:'Mixed / Blended Finance'},
 ]
 
+
+function openL1ConfigProfileTab(){
+  openL1Config(CURRENT_ENGAGEMENT_ID)
+  // switchTsapTab called inside openL1Config already goes to profile tab
+}
+
 function openL1Config(engId){
   CURRENT_TSAP_ENG_ID = engId
   var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id===engId })
@@ -3045,13 +3060,17 @@ function openDocketItem(itemId){
     return
   }
   if(item.item_type==='pricing' && content.archetype_code){
-    // Profiler result \u2014 show summary
-    detail = '<div style="margin-bottom:8px"><strong>Archetype:</strong> '+esc(content.archetype_name||'')+'</div>'
-      +'<div style="font-size:12px;color:var(--mid)">'+esc(content.archetype_tagline||'')+'</div>'
+    detail = '<div style="padding:10px;background:var(--navy);border-radius:var(--r);color:var(--white);margin-bottom:8px">'
+      +'<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:2px">Matched archetype</div>'
+      +'<div style="font-size:14px;font-weight:500">'+esc(content.archetype_name||'')+'</div>'
+      +'<div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px">'+esc(content.archetype_tagline||'')+'</div>'
+      +'</div>'
     if(content.profile_scores){
-      detail += '<div style="font-size:11px;margin-top:8px"><strong>Profile scores:</strong> '
-        +Object.entries(content.profile_scores).map(function(e){ return e[0]+': '+e[1] }).join(' \u00B7 ')
-        +'</div>'
+      detail += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">'
+        +Object.entries(content.profile_scores).map(function(e){
+          return '<div style="font-size:11px;padding:4px 8px;background:var(--light);border-radius:var(--r-sm)">'
+            +'<span style="color:var(--mid)">'+e[0]+':</span> <strong>'+e[1]+'</strong></div>'
+        }).join('')+'</div>'
     }
   }
   if(item.item_type==='solution'){
@@ -3088,6 +3107,8 @@ function openDocketItem(itemId){
     +'<div style="margin-top:10px;display:flex;gap:6px">'
     +(item.item_type==='solution'&&item.title&&item.title.indexOf('TSAP Config')>=0
       ?'<button class="btn btn-outline btn-xs" onclick="openL1Config(CURRENT_ENGAGEMENT_ID)">Open TSAP Configure</button>':'' )
+    +(item.item_type==='pricing'&&item.content&&item.content.archetype_code
+      ?'<button class="btn btn-outline btn-xs" onclick="openL1ConfigProfileTab()">Open Profiler</button>':'' )
     +'<button class="btn btn-ghost btn-xs" onclick="updateItemStatus(\''+itemId+'\',\'approved\')">Mark approved</button>'
     +'<button class="btn btn-ghost btn-xs" onclick="document.getElementById(\''+panelId+'\').remove()">Close</button>'
     +'</div>'
