@@ -826,6 +826,15 @@ function profilerPick(dimension, value, isMulti){
   renderProfilerStep()
 }
 
+
+function retakeProfiler(){
+  PROFILER_STATE.step = 0
+  PROFILER_STATE.answers = {}
+  PROFILER_STATE.scores = {}
+  PROFILER_STATE.result = null
+  renderProfilerStep()
+}
+
 function profilerNav(dir){
   var qs = PROFILER_STATE.questions
   if(dir>0 && PROFILER_STATE.step<qs.length) PROFILER_STATE.step++
@@ -942,7 +951,7 @@ function renderProfilerResultHTML(matched, sims, ai){
     +(actionsHtml?'<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--mid);letter-spacing:.4px;margin:12px 0 6px">Priority actions</div>'+actionsHtml:'')
     +(challengesHtml?'<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--mid);letter-spacing:.4px;margin:12px 0 6px">Key challenges</div>'+challengesHtml:'')
     +'<div style="display:flex;gap:8px;margin-top:14px">'
-    +'<button class="btn btn-outline btn-sm" onclick="openProfilerTab()">&#8635; Edit answers</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="retakeProfiler()">&#8635; Edit answers</button>'
     +'<button class="btn btn-primary btn-sm" onclick="saveProfilerResult()">Save to docket</button>'
     +'</div></div>'
 
@@ -2316,14 +2325,15 @@ function switchTsapTab(tab){
 
   if(tab==='financial'){
     content = '<div>'
-      +'<div style="font-size:12px;color:var(--mid);margin-bottom:12px;line-height:1.5">Based on your territory profile. Complete the Profile tab first for the best recommendation.</div>'
-      +'<div id="tsap-fin-navigator"></div>'
-      +'<div style="margin-top:16px">'
-      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Programme Build Cost (ROM)</div>'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">Financing model</div>'
+      +'<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Select primary financing approach. AI recommendation shown below based on your profile.</div>'
+      +'<div id="tsap-fin-models" style="margin-bottom:10px"></div>'
+      +'<div id="tsap-fin-navigator" style="margin-bottom:14px"></div>'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;margin-top:8px">Programme build cost (ROM)</div>'
       +'<div id="tsap-fin-costs" style="margin-bottom:8px"></div>'
-      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%;margin-top:4px">Calculate Financing Gap</button>'
-      +'<div id="tsap-gap" style="font-size:11px;color:var(--navy);margin-top:8px;padding:8px;background:var(--light);border-radius:var(--r)">Enter estimated costs and calculate gap.</div>'
-      +'</div></div>'
+      +'<button class="btn btn-ghost btn-sm" onclick="calcTsapGap()" style="width:100%;margin-top:4px">Calculate financing gap</button>'
+      +'<div id="tsap-gap" style="font-size:11px;color:var(--navy);margin-top:8px;padding:8px;background:var(--light);border-radius:var(--r)">Enter costs above and calculate.</div>'
+      +'</div>'
   }
 
   document.getElementById('tsapTabContent').innerHTML = content
@@ -2487,7 +2497,7 @@ async function aiEnrichTsap(){
   if(!key){ alert('No AI key configured. Go to ATLAS Settings.'); return }
 
   var enrichEl = document.getElementById('tsap-enrich')
-  if(enrichEl) enrichEl.innerHTML='<div style="font-size:12px;color:var(--mid);padding:8px">Analysing territory\u2026</div>'
+  if(enrichEl) enrichEl.style.display='block';enrichEl.innerHTML='<div style="font-size:12px;color:var(--mid);padding:8px">Analysing territory\u2026</div>'
 
   // Tighter prompt \u2014 smaller response to avoid truncation
   var prompt = 'Sovereign AI advisor. Territory: '+territory+'.'
@@ -2606,8 +2616,10 @@ async function generateVisionDoc(){
   if(!territory){alert('Enter territory name in the Territory tab first.');return}
   if(!TSAP_CFG.objectives.core_objective){alert('Enter core objective first.');return}
   var model=atlasGetTaskModel('documents')
-  var key=atlasGetKeyForModel(model)
-  if(!key){alert('Configure Documents model key in ATLAS Settings.');return}
+  var g_v=atlasGetGlobal()
+  var key=atlasGetKeyForModel(model)||g_v.key_gemini||g_v.key_anthropic||g_v.key_openai||''
+  if(!atlasGetKeyForModel(model)&&key){ if(g_v.key_gemini) model='gemini-3.1-flash-lite' }
+  if(!key){alert('No AI key configured. Go to ATLAS Settings.');return}
   closeModal('tsapModal')
   var main=document.getElementById('mainPanel')
   var genDiv=document.createElement('div')
@@ -3121,7 +3133,7 @@ function openDocketItem(itemId){
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('tsapModal')">Cancel</button>
       <button class="btn btn-outline" onclick="generateVisionDoc()">Generate Vision Doc</button>
-      <button class="btn btn-primary" onclick="saveTsapConfig()">Save Configuration</button>
+      <button class="btn btn-primary" onclick="saveTsapConfig()">&#128190; Save</button>
     </div>
   </div>
 </div>
