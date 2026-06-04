@@ -828,9 +828,8 @@ function profilerPick(dimension, value, isMulti){
 
 
 function retakeProfiler(){
+  // Keep existing answers so user can review/edit \u2014 don't wipe them
   PROFILER_STATE.step = 0
-  PROFILER_STATE.answers = {}
-  PROFILER_STATE.scores = {}
   PROFILER_STATE.result = null
   renderProfilerStep()
 }
@@ -2416,7 +2415,7 @@ function switchTsapTab(tab){
       if(l1xGrid){
         l1xGrid.innerHTML = L1X_COMPONENTS_DEF.map(function(c,ci){
           var sel = TSAP_CFG.blocks.some(function(s){return s.code===c.code})
-          return '<div id="tsap-l1x-'+ci+'" onclick="toggleL1xBlock('+ci+')" style="border:2px solid '+(sel?'var(--orange)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(255,85,57,0.04)':'var(--white)')+'">'
+          return '<div id="tsap-l1x-'+ci+'" style="cursor:pointer;border:2px solid '+(sel?'var(--orange)':'#e0e0e8')+';border-radius:var(--r);padding:10px 12px;cursor:pointer;background:'+(sel?'rgba(255,85,57,0.04)':'var(--white)')+'">'
             +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
             +'<span style="font-size:16px">'+c.icon+'</span>'
             +(c.partner?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(0,40,112,0.08);color:var(--navy)">PARTNER</span>':'')
@@ -2593,11 +2592,12 @@ async function saveTsapConfig(){
   }
 
   if(ok){
-    // Show save confirmation but keep modal open
+    // Show save confirmation, keep modal open, refresh docket item counts
     var btn = document.querySelector('#tsapModal .btn-primary')
     if(btn){ var orig=btn.textContent; btn.textContent='\u2713 Saved'; setTimeout(function(){ btn.textContent=orig },2000) }
-    // Refresh header pill
-    openEngagement(CURRENT_TSAP_ENG_ID)
+    // Silently refresh CURRENT_ITEMS without rebuilding the page
+    var fresh = await sbFetch('docket_items','docket_id=eq.'+docketId+'&order=created_at.asc',200)
+    if(fresh) CURRENT_ITEMS = fresh
   } else {
     alert('Failed to save TSAP configuration.')
   }
