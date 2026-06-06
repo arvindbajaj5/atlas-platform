@@ -58,21 +58,18 @@ const NEWS_TOPICS = [
 
 // ── RSS Feeds ─────────────────────────────────────────────────────────────────
 const RSS_FEEDS = [
-  { url:'https://pib.gov.in/RssMain.aspx',                              name:'PIB India',           codes:['GOV-GOV','MKT-TND'], lang:'en' },
-  { url:'https://www.mod.gov.in/rss.xml',                               name:'Ministry of Defence', codes:['DEF-MIL','MKT-DEF'], lang:'en' },
-  { url:'https://www.isro.gov.in/rss.xml',                              name:'ISRO',                codes:['DEF-SPC'],           lang:'en' },
-  { url:'https://www.drdo.gov.in/rss.xml',                              name:'DRDO',                codes:['DEF-MIL','LAB-AIR'], lang:'en' },
-  { url:'https://economictimes.indiatimes.com/tech/rss',                name:'ET Tech',             codes:['TEC-GEN','MKT-HPC'], lang:'en' },
-  { url:'https://economictimes.indiatimes.com/defence/rss',             name:'ET Defence',          codes:['DEF-MIL','MKT-DEF'], lang:'en' },
-  { url:'https://www.thehindubusinessline.com/info-tech/?service=rss',  name:'Hindu BusinessLine',  codes:['TEC-GEN','FIN-BFS'], lang:'en' },
-  { url:'https://www.livemint.com/rss/technology',                      name:'Mint Technology',     codes:['TEC-GEN','MKT-HPC'], lang:'en' },
-  { url:'https://www.business-standard.com/rss/technology-10601.rss',   name:'Business Standard',   codes:['TEC-GEN','MKT-COM'], lang:'en' },
-  { url:'https://www.financialexpress.com/about/artificial-intelligence/feed/', name:'FE AI',       codes:['TEC-GEN','MKT-HPC'], lang:'en' },
-  { url:'https://www.ndtv.com/convergence/ndtv/new/ndtv-news-feed-world.xml',   name:'NDTV',       codes:['GOV-GOV','MKT-SOV'], lang:'en' },
-  // Indic language feeds (processed via Sarvam)
-  { url:'https://www.bhaskar.com/rss-feed/2357/',    name:'Dainik Bhaskar Tech', codes:['GOV-GOV','TEC-GEN'], lang:'hi' },
-  { url:'https://www.eenadu.net/rss/telugu-news.xml',name:'Eenadu',              codes:['GOV-GOV','REG-AIP'], lang:'te' },
-  { url:'https://www.mathrubhumi.com/rss',            name:'Mathrubhumi',         codes:['GOV-GOV','TEC-GEN'], lang:'ml' },
+  // Government & Policy — high signal
+  { url:'https://pib.gov.in/RssMain.aspx',                                       name:'PIB India',     codes:['GOV-GOV','MKT-TND'], lang:'en' },
+  { url:'https://www.mod.gov.in/rss.xml',                                         name:'MoD',           codes:['DEF-MIL','MKT-DEF'], lang:'en' },
+  // Defence & Space — high signal
+  { url:'https://www.isro.gov.in/rss.xml',                                        name:'ISRO',          codes:['DEF-SPC'],           lang:'en' },
+  { url:'https://www.drdo.gov.in/rss.xml',                                        name:'DRDO',          codes:['DEF-MIL','LAB-AIR'], lang:'en' },
+  { url:'https://economictimes.indiatimes.com/defence/rss',                       name:'ET Defence',    codes:['DEF-MIL','MKT-DEF'], lang:'en' },
+  // AI specific — filtered feeds only
+  { url:'https://www.financialexpress.com/about/artificial-intelligence/feed/',   name:'FE AI',         codes:['TEC-GEN','MKT-HPC'], lang:'en' },
+  { url:'https://economictimes.indiatimes.com/tech/artificial-intelligence/rss',  name:'ET AI',         codes:['TEC-GEN','MKT-HPC'], lang:'en' },
+  // Indic language — government focused only
+  { url:'https://www.bhaskar.com/rss-feed/2357/',                                 name:'Bhaskar Tech',  codes:['GOV-GOV'],           lang:'hi' },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -297,7 +294,7 @@ async function scrapeGrounded(domain, geography, existing, isNews = false) {
 Use your web search tool to find ONE real recent news item about: ${domain.name} in ${geography}.
 Focus on: ${domain.focus}
 CRITICAL: ONLY events from 2025 or 2026. Older events = {"relevant":false}.
-TOPIC GATE: Only AI, ML, HPC, supercomputing, data centres, government digital transformation, defence AI, enterprise AI. Off-topic = {"relevant":false}.
+TOPIC GATE: ONLY items directly about AI/ML/HPC/supercomputing/sovereign AI/data centres/government digital transformation/defence AI/geospatial AI for Indian government, defence, or PSU context. EXCLUDE: consumer electronics, mobile phones, smartphones, retail, e-commerce, social media, entertainment, sports, general IT helpdesk, personal tech. Off-topic = {"relevant":false}.
 JSON only: relevant(true), title(exact real headline), summary(factual 80 words from real article), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array of real names), tags(array max 5), opportunity(1 sentence), competitor_signals(empty string if none), uc_suggest(use case name or empty string), confidence(high|medium|low), source_title(exact publication name e.g. Economic Times), published_year(integer 2025 or 2026).
 Start { end }. No markdown.`
 
@@ -338,69 +335,4 @@ Start { end }. No markdown.`
 
   const ok = await sbInsert(row)
   if (ok) {
-    console.log(`    ✓ [${geography}] ${item.title.slice(0, 55)}`)
-    existing.titles.add(titleKey); existing.titles.add(titleNorm)
-    if (urlKey) existing.urls.add(urlKey)
-    return 1
-  }
-  return 0
-}
-
-// ── Main ──────────────────────────────────────────────────────────────────────
-async function main() {
-  const start = Date.now()
-  let total = 0
-
-  console.log('\nLoading existing items for dedup...')
-  const existing = await getExisting()
-  console.log(`  ${existing.titles.size} titles, ${existing.urls.size} URLs in dedup set`)
-
-  let domainsToRun = DOMAINS
-  let newsToRun = NEWS_TOPICS
-  let feedsToRun = RSS_FEEDS
-  if (DOMAINS_OVERRIDE) {
-    const codes = DOMAINS_OVERRIDE.split(',').map(s => s.trim().toUpperCase())
-    domainsToRun = DOMAINS.filter(d => codes.includes(d.code))
-    newsToRun = NEWS_TOPICS.filter(t => codes.includes(t.code))
-    feedsToRun = RSS_FEEDS.filter(f => f.codes.some(c => codes.includes(c)))
-    console.log(`Filtered to: ${codes.join(', ')}`)
-  }
-
-  // Phase 1: RSS
-  if (RUN_RSS) {
-    console.log('\n=== Phase 1: RSS Feeds ===')
-    for (const feed of feedsToRun) {
-      total += await scrapeRSS(feed, existing)
-      await sleep(2000)
-    }
-  }
-
-  // Phase 2: Search Grounding
-  if (RUN_SEARCH) {
-    console.log('\n=== Phase 2: Search Grounding ===')
-    for (const domain of domainsToRun) {
-      console.log(`\n  [SEARCH] ${domain.code}`)
-      for (const geo of GEOGRAPHIES) {
-        for (let i = 0; i < ITEMS_PER_DOMAIN; i++) {
-          total += await scrapeGrounded(domain, geo, existing, false)
-          await sleep(DELAY_MS)
-        }
-      }
-      await sleep(3000)
-    }
-    for (const topic of newsToRun) {
-      console.log(`\n  [NEWS] ${topic.code}`)
-      for (const geo of GEOGRAPHIES) {
-        for (let i = 0; i < Math.min(ITEMS_PER_DOMAIN, 2); i++) {
-          total += await scrapeGrounded(topic, geo, existing, true)
-          await sleep(DELAY_MS)
-        }
-      }
-    }
-  }
-
-  const elapsed = ((Date.now() - start) / 60000).toFixed(1)
-  console.log(`\n=== COMPLETE: ${total} real items in ${elapsed} min ===`)
-}
-
-main().catch(err => { console.error('Fatal:', err); process.exit(1) })
+    console.log(`    ✓ [${geography}] ${item.title.slice(0, 55)}`
