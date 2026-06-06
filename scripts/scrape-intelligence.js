@@ -12,14 +12,14 @@ const SB_URL        = process.env.SUPABASE_URL
 const SB_KEY        = process.env.SUPABASE_KEY
 const SARVAM_KEY    = process.env.SARVAM_API_KEY || ''
 const DOMAINS_OVERRIDE = process.env.DOMAINS_OVERRIDE || ''
-const ITEMS_PER_DOMAIN = parseInt(process.env.ITEMS_PER_DOMAIN || '5')
+const ITEMS_PER_DOMAIN = parseInt(process.env.ITEMS_PER_DOMAIN || '2')
 const RUN_RSS       = process.env.RUN_RSS === 'true'  // off by default - govt sites block cloud IPs
 const RUN_SEARCH    = process.env.RUN_SEARCH !== 'false'
 const GEOGRAPHIES   = (process.env.GEOGRAPHIES || 'India').split(',').map(s => s.trim())
 const GLOBAL_DOMAINS = ['TEC-GEN','MKT-HPC','MKT-COM','MKT-SOV','MKT-DEF','MKT-TND']
 const GROUNDING_MODEL = 'gemini-3.5-flash'   // 3.5-flash more reliable for search grounding
 const EXTRACT_MODEL   = 'gemini-3.1-flash-lite' // cheap for RSS extraction
-const DELAY_MS      = 3000
+const DELAY_MS      = 1000
 
 if (!GEMINI_KEY || !SB_URL || !SB_KEY) { console.error('Missing GEMINI_API_KEY, SUPABASE_URL, SUPABASE_KEY'); process.exit(1) }
 
