@@ -37,13 +37,9 @@ const DOMAINS = [
   { code:'DEF-INT', name:'Defence -- Intelligence & Signals',focus:'SIGINT, IMINT, intelligence agencies, cyber intelligence, signal processing AI India' },
   { code:'GEO-SPA', name:'Geospatial & Earth Observation',  focus:'NRSC, Survey of India, Pixxel, MapMyIndia, civilian EO platforms, GIS, Bhuvan India' },
   { code:'INF-CIV', name:'Critical Infrastructure',         focus:'Indian Railways, airports, ports, civil aviation, DGCA, AAI, metro systems AI India' },
-  { code:'RES-NAT', name:'Natural Resources',               focus:'ONGC, Coal India, oil gas, mines, water resources, geological survey AI India' },
   { code:'TEL-NET', name:'Telecom & Networks',              focus:'Jio, Airtel, BSNL, 5G AI, network optimisation, telecom AI India, DoT, C-DOT' },
   { code:'TEC-GEN', name:'Technology',                      focus:'IT services, AI platforms, cloud, TCS, Infosys, Wipro, HCL AI India 2025 2026' },
-  { code:'MED-BRD', name:'Media & Broadcast',               focus:'OTT, media, broadcast AI, Prasar Bharati, content technology India' },
   { code:'FIN-BFS', name:'Banking & Financial Services',    focus:'RBI, SEBI, PSU banks, fintech, payments, fraud detection, credit AI India 2025 2026' },
-  { code:'MFG-IND', name:'Manufacturing & Industry',        focus:'Industry 4.0, MSME, automotive, manufacturing AI, predictive maintenance India 2025 2026' },
-  { code:'ENR-UTL', name:'Energy & Utilities',              focus:'NTPC, PGCIL, renewable energy, smart grid, solar AI India 2025 2026' },
   { code:'REG-AIP', name:'Regional AI Programmes',          focus:'IndiaAI Mission, state AI CoE, AI cities, regional compute hub India 2025 2026' },
   { code:'LAB-AIR', name:'AI Labs & Research',              focus:'IIT, DRDO labs, AI startups India, research publications, benchmarks 2025 2026' },
   { code:'HLT-LIF', name:'Healthcare & Life Sciences',      focus:'AIIMS, diagnostic AI, pharma, hospital AI, health data India 2025 2026' },
@@ -287,7 +283,7 @@ Start { end }. No markdown.`
 // ── Search Grounding ──────────────────────────────────────────────────────────
 async function scrapeGrounded(domain, geography, existing, isNews = false) {
   const prompt = `You are an intelligence analyst for an AI and HPC hardware OEM.
-Use your web search tool to find ONE real recent news item about: ${domain.name} in ${geography}.
+Use your web search tool to find ONE real recent news item about: ${domain.name}${geography === 'Global' ? ' (international examples outside India, from US/EU/Middle East/Asia Pacific)' : ' in ' + geography}.
 Focus on: ${domain.focus}
 CRITICAL: ONLY events from 2025 or 2026. Older events = {"relevant":false}.
 TOPIC GATE: Exclude ONLY pure consumer content (celebrity gossip, cricket scores, movie reviews, personal finance tips). AI, technology, government, defence, infrastructure, health, agriculture, industry = relevant. Off-topic = {"relevant":false}.
