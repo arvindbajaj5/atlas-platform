@@ -17,6 +17,13 @@ const RUN_RSS       = process.env.RUN_RSS === 'true'  // off by default - govt s
 const RUN_SEARCH    = process.env.RUN_SEARCH !== 'false'
 const GEOGRAPHIES   = (process.env.GEOGRAPHIES || 'India').split(',').map(s => s.trim())
 const GLOBAL_DOMAINS = ['TEC-GEN','MKT-HPC','MKT-COM','MKT-SOV','MKT-DEF','MKT-TND']
+
+// Extra global-only topics for international UC and tech intelligence
+const GLOBAL_TOPICS = [
+  { code:'UC-GLB',  name:'Global Government AI Use Cases',  focus:'AI deployment production case study government defence geospatial health 2025 2026 NOT India' },
+  { code:'TEC-GLB', name:'Global Sovereign AI Infrastructure', focus:'national AI centre sovereign AI GPU cluster HPC deployment 2025 2026 Europe Middle East Singapore NOT India' },
+  { code:'OEM-GLB', name:'AI HPC OEM News Global',          focus:'NVIDIA AMD HPE Dell Supermicro AI infrastructure HPC supercomputer win contract 2025 2026' },
+]
 const GROUNDING_MODEL = 'gemini-3.5-flash'   // 3.5-flash more reliable for search grounding
 const EXTRACT_MODEL   = 'gemini-3.1-flash-lite' // cheap for RSS extraction
 const DELAY_MS      = 1000
@@ -144,7 +151,7 @@ async function callGemini(prompt) {
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 async function getExisting() {
-  const cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - 18)
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7)
   const r = await fetch(`${SB_URL}/rest/v1/intelligence_items?scraped_at=gte.${cutoff.toISOString()}&select=title,source_url&limit=2000`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
   if (!r.ok) return { titles: new Set(), urls: new Set() }
   const rows = await r.json()
@@ -378,9 +385,18 @@ async function main() {
       }
       await sleep(3000)
     }
+    // Global intelligence topics
+    for (const topic of GLOBAL_TOPICS) {
+      console.log(`\n  [GLOBAL] ${topic.code}`)
+      for (let i = 0; i < 2; i++) {
+        total += await scrapeGrounded(topic, 'Global', existing, true)
+        await sleep(DELAY_MS)
+      }
+    }
     for (const topic of newsToRun) {
       console.log(`\n  [NEWS] ${topic.code}`)
-      for (const geo of GEOGRAPHIES) {
+      const newsGeos = GLOBAL_DOMAINS.includes(topic.code) ? [...GEOGRAPHIES, 'Global'] : GEOGRAPHIES
+      for (const geo of newsGeos) {
         for (let i = 0; i < Math.min(ITEMS_PER_DOMAIN, 2); i++) {
           total += await scrapeGrounded(topic, geo, existing, true)
           await sleep(DELAY_MS)
