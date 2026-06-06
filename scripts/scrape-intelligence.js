@@ -12,10 +12,11 @@ const SB_URL        = process.env.SUPABASE_URL
 const SB_KEY        = process.env.SUPABASE_KEY
 const SARVAM_KEY    = process.env.SARVAM_API_KEY || ''
 const DOMAINS_OVERRIDE = process.env.DOMAINS_OVERRIDE || ''
-const ITEMS_PER_DOMAIN = parseInt(process.env.ITEMS_PER_DOMAIN || '3')
-const RUN_RSS       = process.env.RUN_RSS !== 'false'
+const ITEMS_PER_DOMAIN = parseInt(process.env.ITEMS_PER_DOMAIN || '5')
+const RUN_RSS       = process.env.RUN_RSS === 'true'  // off by default - govt sites block cloud IPs
 const RUN_SEARCH    = process.env.RUN_SEARCH !== 'false'
 const GEOGRAPHIES   = (process.env.GEOGRAPHIES || 'India').split(',').map(s => s.trim())
+const GLOBAL_DOMAINS = ['TEC-GEN','MKT-HPC','MKT-COM','MKT-SOV','MKT-DEF','MKT-TND']
 const GROUNDING_MODEL = 'gemini-3.5-flash'   // 3.5-flash more reliable for search grounding
 const EXTRACT_MODEL   = 'gemini-3.1-flash-lite' // cheap for RSS extraction
 const DELAY_MS      = 3000
@@ -289,7 +290,7 @@ async function scrapeGrounded(domain, geography, existing, isNews = false) {
 Use your web search tool to find ONE real recent news item about: ${domain.name} in ${geography}.
 Focus on: ${domain.focus}
 CRITICAL: ONLY events from 2025 or 2026. Older events = {"relevant":false}.
-TOPIC GATE: ONLY items about AI/ML/HPC/supercomputing/sovereign AI/data centres/government digital transformation/defence AI/geospatial AI for Indian government, defence, or PSU. EXCLUDE: consumer electronics, mobile phones, smartphones, retail, e-commerce, social media, entertainment, sports. Off-topic = {"relevant":false}.
+TOPIC GATE: Exclude ONLY pure consumer content (celebrity gossip, cricket scores, movie reviews, personal finance tips). AI, technology, government, defence, infrastructure, health, agriculture, industry = relevant. Off-topic = {"relevant":false}.
 JSON only: relevant(true), title(exact real headline), summary(factual 80 words from real article), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array of real names), tags(array max 5), opportunity(1 sentence), competitor_signals(empty string if none), uc_suggest(use case name or empty string), confidence(high|medium|low), source_title(exact publication name e.g. Economic Times), published_year(integer 2025 or 2026).
 Start { end }. No markdown.`
 
@@ -372,7 +373,8 @@ async function main() {
     console.log('\n=== Phase 2: Search Grounding ===')
     for (const domain of domainsToRun) {
       console.log(`\n  [SEARCH] ${domain.code}`)
-      for (const geo of GEOGRAPHIES) {
+      const geos = GLOBAL_DOMAINS.includes(domain.code) ? [...GEOGRAPHIES, 'Global'] : GEOGRAPHIES
+      for (const geo of geos) {
         for (let i = 0; i < ITEMS_PER_DOMAIN; i++) {
           total += await scrapeGrounded(domain, geo, existing, false)
           await sleep(DELAY_MS)
