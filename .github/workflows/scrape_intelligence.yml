@@ -10,17 +10,17 @@ on:
         required: false
         default: ''
       items_per_domain:
-        description: 'Items per domain (default: 3)'
+        description: 'Items per domain (default: 5)'
         required: false
-        default: '3'
+        default: '5'
       geographies:
         description: 'Geographies (default: India)'
         required: false
         default: 'India'
       run_rss:
-        description: 'Run RSS feeds (true/false)'
+        description: 'Run RSS feeds (true/false) — disabled by default, govt sites block cloud IPs'
         required: false
-        default: 'true'
+        default: 'false'
       run_search:
         description: 'Run search grounding (true/false)'
         required: false
@@ -52,8 +52,8 @@ jobs:
           SUPABASE_KEY:     ${{ secrets.SUPABASE_KEY }}
           SARVAM_API_KEY:   ${{ secrets.SARVAM_API_KEY }}
           DOMAINS_OVERRIDE: ${{ github.event.inputs.domains }}
-          ITEMS_PER_DOMAIN: ${{ github.event.inputs.items_per_domain || '3' }}
+          ITEMS_PER_DOMAIN: ${{ github.event.inputs.items_per_domain || '5' }}
           GEOGRAPHIES:      ${{ github.event.inputs.geographies || 'India' }}
-          RUN_RSS:          ${{ github.event.inputs.run_rss || 'true' }}
+          RUN_RSS:          ${{ github.event.inputs.run_rss || 'false' }}
           RUN_SEARCH:       ${{ github.event.inputs.run_search || 'true' }}
         run: node scripts/scrape-intelligence.js
