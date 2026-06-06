@@ -6,7 +6,7 @@
 import fetch from 'node-fetch'
 import { parseStringPromise } from 'xml2js'
 
-// ?? Config ????????????????????????????????????????????????????????????????????
+// ── Config ────────────────────────────────────────────────────────────────────
 const GEMINI_KEY    = process.env.GEMINI_API_KEY
 const SB_URL        = process.env.SUPABASE_URL
 const SB_KEY        = process.env.SUPABASE_KEY
@@ -27,7 +27,7 @@ console.log(`Grounding: ${GROUNDING_MODEL} | Extract: ${EXTRACT_MODEL}`)
 console.log(`Geographies: ${GEOGRAPHIES.join(', ')} | RSS: ${RUN_RSS} | Search: ${RUN_SEARCH}`)
 console.log(`Sarvam (Indic): ${SARVAM_KEY ? 'enabled' : 'disabled'}`)
 
-// ?? Domain taxonomy ???????????????????????????????????????????????????????????
+// ── Domain taxonomy ───────────────────────────────────────────────────────────
 const DOMAINS = [
   { code:'GOV-GOV', name:'Government & Governance',         focus:'Indian central and state government AI adoption, e-governance, digital India, citizen services, smart cities' },
   { code:'DEF-MIL', name:'Defence -- Armed Forces',          focus:'Indian Army, Navy, Air Force, DPSUs, DRDO combat systems, autonomous weapons, military AI India' },
@@ -56,7 +56,7 @@ const NEWS_TOPICS = [
   { code:'MKT-SOV', name:'Sovereign AI & Policy',        focus:'data localisation sovereign AI DPDP Act on-premise India policy 2025 2026' },
 ]
 
-// ?? RSS Feeds ?????????????????????????????????????????????????????????????????
+// ── RSS Feeds ─────────────────────────────────────────────────────────────────
 const RSS_FEEDS = [
   // Government & Policy -- high signal
   { url:'https://pib.gov.in/RssMain.aspx',                                       name:'PIB India',     codes:['GOV-GOV','MKT-TND'], lang:'en' },
@@ -72,7 +72,7 @@ const RSS_FEEDS = [
   { url:'https://www.bhaskar.com/rss-feed/2357/',                                 name:'Bhaskar Tech',  codes:['GOV-GOV'],           lang:'hi' },
 ]
 
-// ?? Helpers ???????????????????????????????????????????????????????????????????
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
 function normaliseTitle(t) {
@@ -104,7 +104,7 @@ function extractJSON(raw) {
   return null
 }
 
-// ?? Sarvam translation ????????????????????????????????????????????????????????
+// ── Sarvam translation ────────────────────────────────────────────────────────
 async function translateWithSarvam(text, sourceLang) {
   if (!SARVAM_KEY || sourceLang === 'en') return { text, translated: false }
   const langMap = { hi:'hi-IN', te:'te-IN', ml:'ml-IN', ta:'ta-IN', kn:'kn-IN', mr:'mr-IN', gu:'gu-IN', bn:'bn-IN', pa:'pa-IN', or:'or-IN' }
@@ -121,7 +121,7 @@ async function translateWithSarvam(text, sourceLang) {
   } catch { return { text, translated: false } }
 }
 
-// ?? Gemini Search Grounding ???????????????????????????????????????????????????
+// ── Gemini Search Grounding ───────────────────────────────────────────────────
 async function callGeminiGrounded(prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GROUNDING_MODEL}:generateContent?key=${GEMINI_KEY}`
   const body = {
@@ -139,7 +139,7 @@ async function callGeminiGrounded(prompt) {
   return { text, sources }
 }
 
-// ?? Gemini plain (for RSS extraction) ????????????????????????????????????????
+// ── Gemini plain (for RSS extraction) ────────────────────────────────────────
 async function callGemini(prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${EXTRACT_MODEL}:generateContent?key=${GEMINI_KEY}`
   const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 1024 } }
@@ -150,7 +150,7 @@ async function callGemini(prompt) {
   return parts.filter(p => p.text && !p.thought).map(p => p.text).join('') || parts[0]?.text || ''
 }
 
-// ?? Supabase ??????????????????????????????????????????????????????????????????
+// ── Supabase ──────────────────────────────────────────────────────────────────
 async function getExisting() {
   const cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - 18)
   const r = await fetch(`${SB_URL}/rest/v1/intelligence_items?scraped_at=gte.${cutoff.toISOString()}&select=title,source_url&limit=2000`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
@@ -209,13 +209,13 @@ function buildRow(id, domainCode, domainName, item, extra = {}) {
   }
 }
 
-// ?? RSS Scraping ??????????????????????????????????????????????????????????????
+// ── RSS Scraping ──────────────────────────────────────────────────────────────
 async function scrapeRSS(feed, existing) {
   console.log(`  [RSS] ${feed.name} (${feed.lang})`)
   let added = 0
   try {
     const r = await fetch(feed.url, { headers: { 'User-Agent': 'ATLAS-Bot/2.1' }, signal: AbortSignal.timeout(12000) })
-    if (!r.ok) { console.log(`    ? HTTP ${r.status}`); return 0 }
+    if (!r.ok) { console.log(`    WARN HTTP ${r.status}`); return 0 }
     const xml = await r.text()
     const parsed = await parseStringPromise(xml, { explicitArray: false })
     const channel = parsed?.rss?.channel || parsed?.feed
@@ -284,11 +284,11 @@ Start { end }. No markdown.`
         added++
       }
     }
-  } catch (e) { console.log(`    ? ${e.message.slice(0, 80)}`) }
+  } catch (e) { console.log(`    WARN ${e.message.slice(0, 80)}`) }
   return added
 }
 
-// ?? Search Grounding ??????????????????????????????????????????????????????????
+// ── Search Grounding ──────────────────────────────────────────────────────────
 async function scrapeGrounded(domain, geography, existing, isNews = false) {
   const prompt = `You are an intelligence analyst for an AI and HPC hardware OEM.
 Use your web search tool to find ONE real recent news item about: ${domain.name} in ${geography}.
@@ -303,13 +303,13 @@ Start { end }. No markdown.`
   try {
     const result = await callGeminiGrounded(prompt)
     text = result.text; sources = result.sources
-  } catch (e) { console.log(`    ? Grounding [${domain.code}/${geography}]: ${e.message.slice(0,60)}`); return 0 }
+  } catch (e) { console.log(`    WARN Grounding [${domain.code}/${geography}]: ${e.message.slice(0,60)}`); return 0 }
 
   const item = extractJSON(text)
   if (!item || item.relevant === false) return 0
   if (!item.title) return 0
-  if (item.published_year && parseInt(item.published_year) < 2025) { console.log(`    ? Rejected (${item.published_year}): ${item.title.slice(0,40)}`); return 0 }
-  if (/\b(201[0-9]|202[0-4])\b/.test(item.title)) { console.log(`    ? Rejected (old year in title): ${item.title.slice(0,40)}`); return 0 }
+  if (item.published_year && parseInt(item.published_year) < 2025) { console.log(`    WARN Rejected (${item.published_year}): ${item.title.slice(0,40)}`); return 0 }
+  if (/\b(201[0-9]|202[0-4])\b/.test(item.title)) { console.log(`    WARN Rejected (old year in title): ${item.title.slice(0,40)}`); return 0 }
 
   const titleKey = item.title.toLowerCase().trim()
   const titleNorm = normaliseTitle(item.title)
@@ -335,4 +335,4 @@ Start { end }. No markdown.`
 
   const ok = await sbInsert(row)
   if (ok) {
-    console.log(`    OK [${geography}] ${item.title.s
+    console.log('    OK [' + geography
