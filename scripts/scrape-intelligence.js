@@ -184,6 +184,209 @@ async function getExisting() {
   return { titles, urls }
 }
 
+// Semantic Context Tree
+// loadSemanticContexts — loads from Supabase, cached after first call
+let SEMANTIC_CONTEXTS = null
+
+async function loadSemanticContexts() {
+  if (SEMANTIC_CONTEXTS) return SEMANTIC_CONTEXTS
+  try {
+    const r = await fetch(
+      `${SB_URL}/rest/v1/semantic_contexts?active=eq.true&order=tier.asc`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    )
+    if (!r.ok) { console.log('WARN: Could not load semantic_contexts'); SEMANTIC_CONTEXTS = []; return [] }
+    SEMANTIC_CONTEXTS = await r.json()
+    console.log(`  Loaded ${SEMANTIC_CONTEXTS.length} semantic contexts`)
+    return SEMANTIC_CONTEXTS
+  } catch(e) {
+    console.log(`WARN: semantic_contexts error: ${e.message}`)
+    SEMANTIC_CONTEXTS = []
+    return []
+  }
+}
+
+// Phase 1: cheap keyword pre-filter — no API call needed
+function phase1KeywordFilter(title, description) {
+  const text = (title + ' ' + description).toLowerCase()
+  // Hard excludes first
+  const hardExcludes = [
+    'appointed as','promoted to','retirement of','farewell to','passing out parade',
+    'republic day parade','independence day ceremony','sensex','nifty','mutual fund',
+    'share price','stock market','commodity price','crude oil price','gold price',
+    'cricket','ipl','fifa','bollywood','celebrity','movie review','film review',
+    'recipe','travel guide','weather forecast','obituary','passed away','death of'
+  ]
+  for (const exc of hardExcludes) {
+    if (text.includes(exc)) return false
+  }
+  // Must contain at least one AI-adjacent keyword
+  const passKeywords = [
+    'artificial intelligence',' ai ','machine learning','deep learning','llm',
+    'language model','generative ai','gpu ','hpc ','supercomput','data cent',
+    'cloud comput','surveillance','autonomous','drone','satellite','geospatial',
+    'remote sensing','cybersecurity','digital transform','e-governance',
+    'fintech','healthtech','agritech','semiconductor','5g','6g','smart city',
+    'rfp','rfi','tender','procurement','contract award','mou ','budget alloc',
+    'crore','investment','funding','startup','data lake','inference','training'
+  ]
+  for (const kw of passKeywords) {
+    if (text.includes(kw)) return true
+  }
+  return false
+}
+
+// Phase 2: semantic context tree matching via Gemini
+async function phase2SemanticMatch(title, description, contexts) {
+  const excludeContexts = contexts.filter(c => c.tier === 'exclude')
+  const matchContexts   = contexts.filter(c => c.tier !== 'exclude')
+
+  const contextList = matchContexts.map((c, i) =>
+    `${i+1}. [${c.tier.toUpperCase()}] ${c.name}: ${c.context_string}`
+  ).join('\n')
+
+  const excludeList = excludeContexts.map(c =>
+    `- ${c.name}: ${c.context_string}`
+  ).join('\n')
+
+  const prompt = `You are an intelligence analyst for an AI and HPC hardware OEM selling to Indian government and enterprise clients.
+ARTICLE TITLE: ${title.slice(0, 150)}
+ARTICLE CONTENT: ${description.slice(0, 400)}
+
+Match this article to the BEST context below, or return 0 if none match or if it matches an EXCLUDE context.
+
+CONTEXTS:
+${contextList}
+
+HARD EXCLUDE (return matched_context_num:0 if article matches any):
+${excludeList}
+
+Return JSON only: {matched_context_num, matched_tier, intelligence_stream, intelligence_value, summary(80 words), organisations(array), tags(array max 5), opportunity(1 sentence), uc_suggest(or empty), confidence}
+Start { end }. No markdown.`
+
+  const extracted = extractJSON(await callGemini(prompt))
+  if (!extracted || !extracted.matched_context_num || extracted.matched_context_num === 0) return null
+
+  const matchedCtx = matchContexts[extracted.matched_context_num - 1]
+  if (!matchedCtx) return null
+
+  return {
+    ...extracted,
+    matched_context: matchedCtx.name,
+    matched_tier: matchedCtx.tier,
+    portfolio_codes: matchedCtx.portfolio_codes || [],
+    relevant: true
+  }
+}
+
+
+async function sbInsert(row) {
+  const r = await fetch(`${SB_URL}/rest/v1/intelligence_items`, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+    body: JSON.stringify(row)
+  })
+  if (!r.ok) { const e = await r.text(); console.error(`  SB error ${r.status}: ${e.slice(0, 150)}`); return false }
+  return true
+}
+
+function buildRow(id, domainCode, domainName, item, extra = {}) {
+  return {
+    id,
+    domain_code: domainCode,
+    domain_name: domainName,
+    topic_code: extra.topicCode || null,
+    topic_name: extra.topicName || null,
+    source_type: extra.scrapeMethod || 'search_grounded',
+    intelligence_stream: item.intelligence_stream || 'market_pulse',
+    title: (item.title || '').slice(0, 500),
+    summary: (item.summary || '').slice(0, 1000),
+    type: item.type || '',
+    intelligence_value: item.intelligence_value || 'medium',
+    organisations: Array.isArray(item.organisations) ? item.organisations : [],
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    opportunity: (item.opportunity || '').slice(0, 500),
+    competitor_signals: (item.competitor_signals || '').slice(0, 500),
+    uc_suggest: (item.uc_suggest || '').slice(0, 200),
+    confidence: item.confidence || 'medium',
+    scraped_at: new Date().toISOString(),
+    scraped_by: 'github-actions-v2.1',
+    source_url: extra.sourceUrl || null,
+    source_name: extra.sourceName || null,
+    source_language: extra.language || 'en',
+    model_used: extra.modelUsed || GROUNDING_MODEL,
+    scrape_method: extra.scrapeMethod || 'search_grounded',
+    published_date: extra.publishedDate || null,
+    published_year: item.published_year ? parseInt(item.published_year) : (extra.publishedDate ? new Date(extra.publishedDate).getFullYear() : null),
+    geography: extra.geography || 'India',
+    is_real: true,
+  }
+}
+
+// ── RSS Scraping ──────────────────────────────────────────────────────────────
+async function scrapeRSS(feed, existing) {
+  console.log(`  [RSS] ${feed.name} (${feed.lang})`)
+  let added = 0
+  try {
+    const r = await fetch(feed.url, { headers: { 'User-Agent': 'ATLAS-Bot/2.1' }, signal: AbortSignal.timeout(12000) })
+    if (!r.ok) { console.log(`    WARN HTTP ${r.status}`); return 0 }
+    const xml = await r.text()
+    const parsed = await parseStringPromise(xml, { explicitArray: false })
+    const channel = parsed?.rss?.channel || parsed?.feed
+    const rawItems = channel?.item || channel?.entry || []
+    const items = Array.isArray(rawItems) ? rawItems : [rawItems]
+    const cutoff30 = new Date(); cutoff30.setDate(cutoff30.getDate() - 30)
+
+    for (const rssItem of items.slice(0, 20)) {
+      const rawTitle = (rssItem.title?._ || rssItem.title || '').trim()
+      const link = (rssItem.link?._ || rssItem.link || rssItem.id || '').trim()
+      const desc = (rssItem.description?._ || rssItem.description || rssItem.summary?._ || rssItem.summary || '').replace(/<[^>]+>/g, '').trim()
+      const pubDate = rssItem.pubDate || rssItem.published || rssItem.updated || ''
+
+      if (!rawTitle || !link) continue
+      if (pubDate && new Date(pubDate) < cutoff30) continue
+
+      // Translate if Indic
+      let title = rawTitle
+      let description = desc
+      let translated = false
+      let language = feed.lang
+      if (feed.lang !== 'en' && SARVAM_KEY) {
+        const tr = await translateWithSarvam(rawTitle + '. ' + desc.slice(0, 300), feed.lang)
+        if (tr.translated) { title = tr.text.split('.')[0]; description = tr.text; translated = true }
+        await sleep(1000)
+      }
+
+      // Dedup
+      const titleKey = title.toLowerCase().trim()
+      const titleNorm = normaliseTitle(title)
+      const urlKey = link.toLowerCase()
+      if (existing.titles.has(titleKey) || existing.titles.has(titleNorm) || existing.urls.has(urlKey)) continue
+
+      // Phase 1: keyword pre-filter (free, no API call)
+      if (!phase1KeywordFilter(title, description)) continue
+
+      // Phase 2: semantic context tree matching
+      const contexts = await loadSemanticContexts()
+      const matched = await phase2SemanticMatch(title, description, contexts)
+      if (!matched) continue
+
+  const extracted = extractJSON(await callGemini(prompt))
+  if (!extracted || !extracted.matched_context_num || extracted.matched_context_num === 0) return null
+
+  const matchedCtx = matchContexts[extracted.matched_context_num - 1]
+  if (!matchedCtx) return null
+
+  return {
+    ...extracted,
+    matched_context: matchedCtx.name,
+    matched_tier: matchedCtx.tier,
+    portfolio_codes: matchedCtx.portfolio_codes || [],
+    relevant: true
+  }
+}
+
+
 async function sbInsert(row) {
   const r = await fetch(`${SB_URL}/rest/v1/intelligence_items`, {
     method: 'POST',
@@ -287,7 +490,7 @@ Start { end }. No markdown.`
       if (!extracted || extracted.relevant === false) continue
 
       const id = `rss-${domainCode.replace(/-/g,'')}-${Date.now()}-${Math.floor(Math.random()*9999)}`
-      const row = buildRow(id, domainCode, feed.name, extracted, {
+      const row = buildRow(id, domainCode, feed.name, matched, {
         sourceUrl: link,
         sourceName: feed.name,
         language: language,
@@ -297,7 +500,9 @@ Start { end }. No markdown.`
         geography: 'India',
       })
       row.title = title.slice(0, 500)
-      row.summary = (extracted.summary || description.slice(0, 300)).slice(0, 1000)
+      row.summary = (matched.summary || description.slice(0, 300)).slice(0, 1000)
+      row.matched_context = matched.matched_context || ''
+      row.matched_tier = matched.matched_tier || ''
 
       const ok = await sbInsert(row)
       if (ok) {
@@ -330,6 +535,7 @@ Start { end }. No markdown.`
   const item = extractJSON(text)
   if (!item || item.relevant === false) return 0
   if (!item.title) return 0
+  if (!phase1KeywordFilter(item.title, item.summary || '')) return 0
   if (item.published_year && parseInt(item.published_year) < 2025) { console.log(`    WARN Rejected (${item.published_year}): ${item.title.slice(0,40)}`); return 0 }
   if (/\b(201[0-9]|202[0-4])\b/.test(item.title)) { console.log(`    WARN Rejected (old year in title): ${item.title.slice(0,40)}`); return 0 }
 
@@ -355,6 +561,8 @@ Start { end }. No markdown.`
     geography,
   })
 
+  row.matched_context = ''
+  row.matched_tier = ''
   const ok = await sbInsert(row)
   if (ok) {
     console.log(`    OK [${geography}] ${item.title.slice(0, 55)}`)
