@@ -18,9 +18,9 @@ on:
         required: false
         default: 'India'
       run_rss:
-        description: 'Run RSS feeds (true/false) — disabled by default, govt sites block cloud IPs'
+        description: 'Run RSS feeds from feed_library (true/false)'
         required: false
-        default: 'false'
+        default: 'true'
       run_search:
         description: 'Run search grounding (true/false)'
         required: false
@@ -54,6 +54,6 @@ jobs:
           DOMAINS_OVERRIDE: ${{ github.event.inputs.domains }}
           ITEMS_PER_DOMAIN: ${{ github.event.inputs.items_per_domain || '2' }}
           GEOGRAPHIES:      ${{ github.event.inputs.geographies || 'India' }}
-          RUN_RSS:          ${{ github.event.inputs.run_rss || 'false' }}
+          RUN_RSS:          ${{ github.event.inputs.run_rss || 'true' }}
           RUN_SEARCH:       ${{ github.event.inputs.run_search || 'true' }}
         run: node scripts/scrape-intelligence.js
