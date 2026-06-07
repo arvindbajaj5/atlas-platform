@@ -1,0 +1,43 @@
+name: Feed Discovery & Health Check
+
+on:
+  schedule:
+    - cron: '0 18 * * 0'   # Every Sunday 11:30 PM IST
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Mode: discover (find new feeds) | health (check existing) | both'
+        required: false
+        default: 'both'
+      domains:
+        description: 'Comma-separated domain codes to discover for (leave empty for all)'
+        required: false
+        default: ''
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  feed-management:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install node-fetch@3 xml2js
+
+      - name: Run Feed Discovery & Health Check
+        env:
+          GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_URL:     ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:     ${{ secrets.SUPABASE_KEY }}
+          MODE:             ${{ github.event.inputs.mode || 'both' }}
+          DOMAINS_OVERRIDE: ${{ github.event.inputs.domains }}
+        run: node scripts/feed-discovery.js
