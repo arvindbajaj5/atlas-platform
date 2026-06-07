@@ -103,7 +103,7 @@ function normaliseTitle(t) {
 function extractJSON(raw) {
   if (!raw) return null
   let text = raw.trim()
-  const fence = '```'
+  const fence = String.fromCharCode(96,96,96)
   if (text.includes(fence)) {
     const parts = text.split(fence)
     for (const p of parts) {
