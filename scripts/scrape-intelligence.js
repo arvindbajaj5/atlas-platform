@@ -268,13 +268,13 @@ async function scrapeRSS(feed, existing) {
       if (existing.titles.has(titleKey) || existing.titles.has(titleNorm) || existing.urls.has(urlKey)) continue
 
       // Extract signals with Gemini
-      const prompt = `You are an intelligence analyst for an AI and HPC hardware OEM selling to government and enterprise clients.
+      const prompt = `You are an intelligence analyst for an AI and HPC hardware/software OEM selling to Indian government and enterprise clients.
 TITLE: ${title.slice(0, 150)}
 CONTENT: ${description.slice(0, 400)}
 SOURCE: ${feed.name}
-Extract intelligence value from this article. Include if relevant to ANY of: AI, ML, HPC, data centres, cloud, defence technology, government digitisation, enterprise technology, cybersecurity, semiconductors, telecommunications, healthcare tech, financial technology, geospatial technology, space technology, energy technology, manufacturing technology.
-Exclude ONLY: sports, entertainment, celebrity, personal lifestyle, cooking, travel.
-If relevant: JSON with relevant(true), intelligence_stream(market_pulse|domain_intel|tech_watch|competitor_intel), summary(max 80 words factual), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence how this creates an AI opportunity), competitor_signals(string or empty), uc_suggest(potential AI use case or empty), confidence(high|medium|low).
+RELEVANCE TEST: The article MUST mention or directly imply at least one of: artificial intelligence, machine learning, LLM, generative AI, GPU, HPC, supercomputer, AI compute, data centre, digital transformation with AI, surveillance AI, autonomous systems with AI, drone AI, data analytics, computer vision, cybersecurity AI, sovereign AI, national AI programme.
+EXCLUDE: hardware without AI angle (jets, ships, weapons, vehicles without AI), personnel appointments, routine military exercises, financial results without tech detail, opinion without facts.
+If relevant: JSON with relevant(true), intelligence_stream(market_pulse|domain_intel|tech_watch|competitor_intel), summary(max 80 words factual), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence for sales team), competitor_signals(string or empty), uc_suggest(AI use case or empty), confidence(high|medium|low).
 If not relevant: {"relevant":false}
 Start { end }. No markdown.`
 
