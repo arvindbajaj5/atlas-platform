@@ -20,9 +20,16 @@ const GLOBAL_DOMAINS = ['TEC-GEN','MKT-HPC','MKT-COM','MKT-SOV','MKT-DEF','MKT-T
 
 // Extra global-only topics for international UC and tech intelligence
 const GLOBAL_TOPICS = [
-  { code:'UC-GLB',  name:'Global Government AI Use Cases',  focus:'AI deployment production case study government defence geospatial health 2025 2026 NOT India' },
-  { code:'TEC-GLB', name:'Global Sovereign AI Infrastructure', focus:'national AI centre sovereign AI GPU cluster HPC deployment 2025 2026 Europe Middle East Singapore NOT India' },
-  { code:'OEM-GLB', name:'AI HPC OEM News Global',          focus:'NVIDIA AMD HPE Dell Supermicro AI infrastructure HPC supercomputer win contract 2025 2026' },
+  { code:'UC-GLB',  name:'Global AI Use Cases',
+    focus:'AI use case deployment production government defence health agriculture smart city 2025 2026' },
+  { code:'TEC-GLB', name:'Global AI Infrastructure News',
+    focus:'GPU cluster HPC AI data centre supercomputer large language model deployment cloud AI 2025 2026' },
+  { code:'OEM-GLB', name:'AI HPC OEM & Market News',
+    focus:'NVIDIA AMD HPE Dell Supermicro Intel AI server HPC GPU contract announcement partnership 2025 2026' },
+  { code:'POL-GLB', name:'Global AI Policy & Regulation',
+    focus:'AI regulation policy national AI strategy government AI governance EU US China 2025 2026' },
+  { code:'INV-GLB', name:'Global AI Investment & Funding',
+    focus:'AI startup funding investment data centre GPU infrastructure deal billion 2025 2026' },
 ]
 const GROUNDING_MODEL = 'gemini-3.5-flash'   // 3.5-flash more reliable for search grounding
 const EXTRACT_MODEL   = 'gemini-3.1-flash-lite' // cheap for RSS extraction
@@ -293,7 +300,7 @@ async function scrapeGrounded(domain, geography, existing, isNews = false) {
 Use your web search tool to find ONE real recent news item about: ${domain.name}${geography === 'Global' ? ' (international examples outside India, from US/EU/Middle East/Asia Pacific)' : ' in ' + geography}.
 Focus on: ${domain.focus}
 CRITICAL: ONLY events from 2025 or 2026. Older events = {"relevant":false}.
-TOPIC GATE: Exclude ONLY pure consumer content (celebrity gossip, cricket scores, movie reviews, personal finance tips). AI, technology, government, defence, infrastructure, health, agriculture, industry = relevant. Off-topic = {"relevant":false}.
+TOPIC GATE: Include anything about AI, ML, data, technology, government, defence, infrastructure, health, agriculture, industry, investment, policy. Exclude ONLY: celebrity gossip, sports scores, entertainment reviews, personal lifestyle. Off-topic = {"relevant":false}.
 JSON only: relevant(true), title(exact real headline), summary(factual 80 words from real article), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array of real names), tags(array max 5), opportunity(1 sentence), competitor_signals(empty string if none), uc_suggest(use case name or empty string), confidence(high|medium|low), source_title(exact publication name e.g. Economic Times), published_year(integer 2025 or 2026).
 Start { end }. No markdown.`
 
@@ -388,7 +395,7 @@ async function main() {
     // Global intelligence topics
     for (const topic of GLOBAL_TOPICS) {
       console.log(`\n  [GLOBAL] ${topic.code}`)
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < 3; i++) {
         total += await scrapeGrounded(topic, 'Global', existing, true)
         await sleep(DELAY_MS)
       }
