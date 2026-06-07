@@ -268,13 +268,14 @@ async function scrapeRSS(feed, existing) {
       if (existing.titles.has(titleKey) || existing.titles.has(titleNorm) || existing.urls.has(urlKey)) continue
 
       // Extract signals with Gemini
-      const prompt = `Intelligence analyst for AI/HPC OEM. Extract signals from this real news article.
+      const prompt = `You are an intelligence analyst for an AI and HPC hardware OEM selling to government and enterprise clients.
 TITLE: ${title.slice(0, 150)}
 CONTENT: ${description.slice(0, 400)}
 SOURCE: ${feed.name}
-Is this relevant to AI, HPC, data centres, government technology, defence technology, or enterprise digital transformation in India or nearby markets?
-If YES: JSON with relevant(true), intelligence_stream(market_pulse|domain_intel|tech_watch), summary(max 80 words factual), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence), competitor_signals(empty if none), uc_suggest(use case or empty), confidence(high|medium|low).
-If NO: {"relevant":false}
+Extract intelligence value from this article. Include if relevant to ANY of: AI, ML, HPC, data centres, cloud, defence technology, government digitisation, enterprise technology, cybersecurity, semiconductors, telecommunications, healthcare tech, financial technology, geospatial technology, space technology, energy technology, manufacturing technology.
+Exclude ONLY: sports, entertainment, celebrity, personal lifestyle, cooking, travel.
+If relevant: JSON with relevant(true), intelligence_stream(market_pulse|domain_intel|tech_watch|competitor_intel), summary(max 80 words factual), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence how this creates an AI opportunity), competitor_signals(string or empty), uc_suggest(potential AI use case or empty), confidence(high|medium|low).
+If not relevant: {"relevant":false}
 Start { end }. No markdown.`
 
       await sleep(DELAY_MS)
