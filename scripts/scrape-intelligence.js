@@ -68,16 +68,28 @@ const NEWS_TOPICS = [
 ]
 
 // ── RSS Feeds ─────────────────────────────────────────────────────────────────
-const RSS_FEEDS = [
-  { url:'https://pib.gov.in/RssMain.aspx',                                        name:'PIB India',   codes:['GOV-GOV','MKT-TND'], lang:'en' },
-  { url:'https://www.mod.gov.in/rss.xml',                                          name:'MoD',         codes:['DEF-MIL','MKT-DEF'], lang:'en' },
-  { url:'https://www.isro.gov.in/rss.xml',                                         name:'ISRO',        codes:['DEF-SPC'],           lang:'en' },
-  { url:'https://www.drdo.gov.in/rss.xml',                                         name:'DRDO',        codes:['DEF-MIL','LAB-AIR'], lang:'en' },
-  { url:'https://economictimes.indiatimes.com/defence/rss',                        name:'ET Defence',  codes:['DEF-MIL','MKT-DEF'], lang:'en' },
-  { url:'https://www.financialexpress.com/about/artificial-intelligence/feed/',    name:'FE AI',       codes:['TEC-GEN','MKT-HPC'], lang:'en' },
-  { url:'https://economictimes.indiatimes.com/tech/artificial-intelligence/rss',   name:'ET AI',       codes:['TEC-GEN','MKT-HPC'], lang:'en' },
-  { url:'https://www.bhaskar.com/rss-feed/2357/',                                  name:'Bhaskar',     codes:['GOV-GOV'],           lang:'hi' }
-]
+const RSS_FEEDS = []  // populated dynamically from feed_library table
+
+async function loadActiveFeeds() {
+  try {
+    const r = await fetch(
+      `${SB_URL}/rest/v1/feed_library?status=eq.active&order=relevance_score.desc,yield_rate.desc&limit=100`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    )
+    if (!r.ok) { console.log('WARN: Could not load feed_library, using empty feed list'); return [] }
+    const feeds = await r.json()
+    console.log(`  Loaded ${feeds.length} active feeds from feed_library`)
+    return feeds.map(f => ({
+      url: f.url,
+      name: f.name,
+      codes: f.domain_codes || [],
+      lang: f.language || 'en'
+    }))
+  } catch(e) {
+    console.log(`WARN: feed_library load error: ${e.message}`)
+    return []
+  }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
@@ -360,12 +372,12 @@ async function main() {
 
   let domainsToRun = DOMAINS
   let newsToRun = NEWS_TOPICS
-  let feedsToRun = RSS_FEEDS
+  let feedsToRun = await loadActiveFeeds()
   if (DOMAINS_OVERRIDE) {
     const codes = DOMAINS_OVERRIDE.split(',').map(s => s.trim().toUpperCase())
     domainsToRun = DOMAINS.filter(d => codes.includes(d.code))
     newsToRun = NEWS_TOPICS.filter(t => codes.includes(t.code))
-    feedsToRun = RSS_FEEDS.filter(f => f.codes.some(c => codes.includes(c)))
+    feedsToRun = feedsToRun.filter(f => f.codes.some(c => codes.includes(c)))
     console.log(`Filtered to: ${codes.join(', ')}`)
   }
 
