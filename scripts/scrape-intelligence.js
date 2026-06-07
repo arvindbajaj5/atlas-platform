@@ -273,10 +273,13 @@ const prompt = `You are an intelligence analyst for an AI and HPC hardware/softw
 TITLE: ${title.slice(0, 150)}
 CONTENT: ${description.slice(0, 400)}
 SOURCE: ${feed.name}
-RELEVANCE TEST: The article MUST mention or directly imply at least one of: artificial intelligence, machine learning, LLM, generative AI, GPU, HPC, supercomputer, AI compute, data centre, digital transformation with AI, surveillance AI, autonomous systems with AI, drone AI, data analytics, computer vision, cybersecurity AI, sovereign AI, national AI programme.
-EXCLUDE: hardware without AI angle (jets, ships, weapons, vehicles without AI), personnel appointments, routine military exercises, financial results without tech detail, opinion without facts.
-If relevant: JSON with relevant(true), intelligence_stream(market_pulse|domain_intel|tech_watch|competitor_intel), summary(max 80 words factual), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence for sales team), competitor_signals(string or empty), uc_suggest(AI use case or empty), confidence(high|medium|low).
-If not relevant: {"relevant":false}
+STRICT RELEVANCE TEST - article must pass AT LEAST ONE of these tests:
+TEST 1 (AI/Tech): mentions AI, ML, machine learning, deep learning, LLM, generative AI, GPU, HPC, supercomputer, data centre, cloud computing, computer vision, autonomous systems, surveillance technology, drone technology, cybersecurity technology, digital transformation, smart systems, IoT, satellite data analytics
+TEST 2 (Government Digital): mentions government digitisation, e-governance, digital public infrastructure, national programme for technology, ministry technology initiative, defence modernisation with digital/sensor/software angle
+TEST 3 (Market Signal): major technology contract/tender worth >100 crore, technology company funding/IPO/acquisition, semiconductor/chip manufacturing, fibre/5G/6G infrastructure
+HARD EXCLUDE regardless of source: stock prices, mutual funds, commodity prices, loan rates, personal finance, agriculture without tech, general manufacturing, sports, entertainment, celebrity, weather
+If passes any test: JSON with relevant(true), intelligence_stream(market_pulse|domain_intel|tech_watch|competitor_intel), summary(max 80 words factual), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence AI opportunity for our team), competitor_signals(string or empty), uc_suggest(AI use case or empty), confidence(high|medium|low).
+If fails all tests: {"relevant":false}
 Start { end }. No markdown.`
 
       await sleep(DELAY_MS)
