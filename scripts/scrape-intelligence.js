@@ -272,19 +272,17 @@ async function scrapeRSS(feed, existing) {
 const prompt = `You are an intelligence analyst for an AI and HPC hardware/software OEM selling to Indian government and enterprise clients.
 TITLE: ${title.slice(0, 150)}
 CONTENT: ${description.slice(0, 400)}
-SOURCE: ${feed.name} (domain: ${domainCode})
-This article is from a ${domainCode} domain feed. Extract intelligence value for our sales team.
-INCLUDE: technology adoption, digital initiative, government programme, defence modernisation, procurement, investment, market development -- even if AI is not explicitly mentioned. Our team will assess the AI opportunity.
-EXCLUDE ONLY: pure sports, entertainment, celebrity, obituaries, weather, traffic.
-If intelligence value exists: JSON with relevant(true), intelligence_stream(market_pulse|domain_intel|tech_watch|competitor_intel), summary(max 80 words factual), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence what AI opportunity this creates), competitor_signals(string or empty), uc_suggest(AI use case this enables or empty), confidence(high|medium|low).
-If truly irrelevant: {"relevant":false}
+SOURCE: ${feed.name}
+RELEVANCE TEST: The article MUST mention or directly imply at least one of: artificial intelligence, machine learning, LLM, generative AI, GPU, HPC, supercomputer, AI compute, data centre, digital transformation with AI, surveillance AI, autonomous systems with AI, drone AI, data analytics, computer vision, cybersecurity AI, sovereign AI, national AI programme.
+EXCLUDE: hardware without AI angle (jets, ships, weapons, vehicles without AI), personnel appointments, routine military exercises, financial results without tech detail, opinion without facts.
+If relevant: JSON with relevant(true), intelligence_stream(market_pulse|domain_intel|tech_watch|competitor_intel), summary(max 80 words factual), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence for sales team), competitor_signals(string or empty), uc_suggest(AI use case or empty), confidence(high|medium|low).
+If not relevant: {"relevant":false}
 Start { end }. No markdown.`
 
       await sleep(DELAY_MS)
       const extracted = extractJSON(await callGemini(prompt))
       if (!extracted || extracted.relevant === false) continue
 
-      const domainCode = feed.codes[0]
       const id = `rss-${domainCode.replace(/-/g,'')}-${Date.now()}-${Math.floor(Math.random()*9999)}`
       const row = buildRow(id, domainCode, feed.name, extracted, {
         sourceUrl: link,
