@@ -1,5 +1,5 @@
 # ATLAS Claude Session Activator
-# Version: 3.5 | Last Updated: 2026-06-06
+# Version: 3.6 | Last Updated: 2026-06-07
 
 ---
 
@@ -28,30 +28,124 @@ Intelligence → Analysis & Recommendation → Programme Design → Financial Mo
 
 ## Build Status — Honest Assessment
 
-### BUILT AND WORKING ✅ (Intelligence & Engagement Layer)
+### BUILT AND WORKING ✅
 
 | Component | Status | Notes |
 |---|---|---|
 | Second Brain | ✅ Live v2.3 | + Docket buttons on intel/UC items |
 | PEI Tool | ✅ Live v0.4 | Load Saved JSON, + Docket |
-| Engagement Docket | ✅ Live v2.2 | Full Sprint 1+2 complete |
-| Recommendation Engine | ✅ Live | Auto-runs, scopes by archetype, panel with Apply/Dismiss |
-| Intelligence Scraper | ✅ Functional | Needs tuning — 3 items/run, global phase added |
+| Engagement Docket | ✅ Live v2.2 | Sprint 1+2 complete |
+| Recommendation Engine | ✅ Live | Auto-runs, scopes by archetype |
+| Intelligence Scraper | ✅ Running daily | Functional but prompt needs semantic tree |
+| Feed Library | ✅ Live | 15 active feeds, weekly discovery workflow |
 | Portfolio Catalogue | ✅ Updated | L2-GIB added, L2-AIF renamed |
 
-### NOT YET BUILT 🔧 (Design & Financial Layer — the customer-facing heart)
+### NOT YET BUILT 🔧 (in priority order)
 
-This is the majority of the remaining work — 4-6 focused laptop sessions:
-
-| Component | Priority | Estimate |
+| Component | Priority | Notes |
 |---|---|---|
-| AI Centre Configurator (full stack) | 🔴 Next | 1-2 sessions |
-| Mode 1 — Budget Envelope Model | 🔴 Next | 1 session |
-| UC Definition + Reconciliation flow | 🔴 Next | 1 session |
-| Mode 2 — Detailed Financial Model (6 tabs) | 🔴 Next | 2 sessions |
-| Territory AI Programme Profiler | 🟡 Next | 1 session |
-| Pitch Report generator | 🟡 Next | 1 session |
-| AI Centre Builder unified flow (Steps 1-7) | 🟡 Next | 1 session |
+| Semantic Context Tree | 🔴 Next | Foundational — upgrades scraper + RE + PEI simultaneously |
+| AI Centre Configurator | 🔴 Next | Full stack modelling → BOM + ROM |
+| Mode 1 — Budget Envelope Model | 🔴 Next | Pre-UC parametric cost model |
+| UC Definition + Reconciliation | 🔴 Next | UC vs budget fit |
+| Mode 2 — Detailed Financial Model | 🔴 Next | 6 tabs, curves, scenarios |
+| Territory AI Programme Profiler | 🟡 Next | 10 dims, radar, 4 archetypes |
+| Pitch Report generator | 🟡 Next | Boardroom document in the room |
+| AI Centre Builder unified flow | 🟡 Next | Steps 1-7 connected end to end |
+
+---
+
+## NEXT PRIORITY: Semantic Context Tree
+
+**Why it's first:** Single build that upgrades intelligence quality across scraper, Second Brain, PEI, and Recommendation Engine simultaneously. The current extraction prompt oscillates between junk and low yield — the semantic tree solves this permanently.
+
+### Architecture
+
+```
+Supabase: semantic_contexts table
+  → tier (direct_opportunity | technology_signal | market_signal | exclude)
+  → context_string (natural language description of the signal)
+  → portfolio_codes (which L1/L2/L3 items this signal maps to)
+  → active (boolean)
+
+intelligence_items table (add 2 columns):
+  → matched_context text
+  → matched_tier text
+```
+
+### Context Tree Design
+
+**TIER 1 — Direct Opportunity (high value)**
+- Government issuing RFP/RFI/tender for AI, data centre, HPC, or digital infrastructure
+- State government announcing AI programme, digital mission, or data sovereignty initiative
+- Defence ministry procurement for surveillance, autonomous systems, C4I, ISR
+- Ministry or PSU signing MoU for AI/digital transformation
+- Budget allocation for AI, HPC, supercomputing, or digital infrastructure
+- National AI mission, sovereign AI, or digital public infrastructure announcement
+
+**TIER 2 — Technology Signal (medium value)**
+- AI/ML model deployment in government, defence, health, agriculture, or finance
+- GPU cluster, HPC, or supercomputer deployment or procurement
+- Satellite data analytics, EO processing, geospatial AI application
+- Defence system with AI, sensor fusion, autonomous, or surveillance technology
+- LLM, generative AI, or foundation model deployment in enterprise or government
+- Data centre investment, cloud infrastructure, or edge computing deployment
+- Cybersecurity AI, threat detection, or signals intelligence technology
+
+**TIER 3 — Market Signal (lower value, track)**
+- NVIDIA, AMD, HPE, Dell, Supermicro announcing product/win/partnership in India
+- Indian AI startup raising significant funding (>50 crore)
+- Global sovereign AI centre deployment (UAE, Saudi, Singapore, France, UK)
+- AI regulation, data localisation, or sovereignty policy announcement
+- State election manifesto or budget with digital/AI commitments
+
+**HARD EXCLUDE — never relevant**
+- Military personnel appointments, promotions, retirements, command handovers
+- Military ceremonies, parades, exercises without technology angle
+- Geopolitical analysis without technology procurement angle
+- Stock prices, mutual funds, commodity prices, personal finance
+- General health news without digital health or AI angle
+- Sports, entertainment, celebrity, weather, obituaries
+
+### Context → Portfolio Mapping
+
+```javascript
+const CONTEXT_TO_PORTFOLIO = {
+  'government RFP for AI or digital infrastructure':    ['L1-TSAP', 'L2-INF'],
+  'state government AI programme':                      ['L1-TSAP', 'L1.1-TSAP'],
+  'national AI mission or sovereign AI':               ['L1-TSAP', 'L1.3-TSAP'],
+  'budget allocation for AI or HPC':                   ['L1-TSAP', 'L2-AIF'],
+  'GPU cluster or HPC deployment':                     ['L2-AIF', 'L2-TRC'],
+  'satellite data or geospatial AI':                   ['L2.1-INF', 'L2-EDG'],
+  'defence surveillance or autonomous systems':         ['L2.2-INF', 'L2-EDG'],
+  'LLM or generative AI in government':                ['L2-INF', 'L2-GIB'],
+  'data centre investment or edge computing':           ['L2-MDC', 'L2-EDG'],
+  'AI regulation or data localisation':                ['L1.3-TSAP', 'L1.5-TSAP'],
+  'global sovereign AI centre':                        ['L1-TSAP'],
+}
+```
+
+### Two-Phase Filtering (keyword + semantic)
+
+```
+Phase 1 — Keyword pre-filter (free, instant)
+  Title/content must contain AI-adjacent keywords
+  FAIL → skip without API call (cost saving)
+  PASS → go to Phase 2
+
+Phase 2 — Semantic context tree matching (Gemini)
+  Match against context tree
+  Output: tier + matched_context + portfolio_codes
+  Store in intelligence_items with context metadata
+```
+
+### Cross-Platform Impact
+
+- **Scraper** — context tree replaces blunt extraction prompt
+- **Second Brain** — items grouped/filtered by matched_context and tier
+- **PEI** — customer text parsed through tree → matched contexts as structured signals
+- **RE** — reads matched_context tags → maps to portfolio codes directly → precise recommendations
+- **TSAP AI Enrich** — pulls items filtered by context + geography
 
 ---
 
@@ -59,174 +153,86 @@ This is the majority of the remaining work — 4-6 focused laptop sessions:
 
 ```
 INTELLIGENCE LAYER ✅
-  Second Brain          Market signals, domain intel, competitor data
-  PEI Tool              Customer/organisation intelligence brief
+  Second Brain + PEI + Scraper (with semantic tree pending)
         ↓
-ANALYSIS & RECOMMENDATION ✅
-  Recommendation Engine    Portfolio fit by archetype + docket signals
-  Territory Profiler       10-dimension profile → archetypes (NOT BUILT)
+ANALYSIS & RECOMMENDATION ✅ (RE working, context tree will improve it)
         ↓
 DESIGN & CONFIGURATION 🔧
-  AI Centre Builder        Core flow Steps 1-7 (NOT BUILT)
-  AI Centre Configurator   Full stack modelling → BOM + ROM (NOT BUILT)
+  AI Centre Builder Steps 1-7 (not built)
+  AI Centre Configurator — full stack (not built)
         ↓
 FINANCIAL MODELLING 🔧
-  Mode 1: Budget Envelope  (NOT BUILT)
-  Mode 2: Detailed Model   (NOT BUILT — 6 tabs)
+  Mode 1: Budget Envelope (not built)
+  Mode 2: Detailed 6-tab model (not built)
         ↓
 SIGN-OFF PACKAGE 🔧
-  BOM + ROM + Pitch Report (NOT BUILT)
+  Pitch Report (not built)
 ```
 
 ---
 
-## AI Centre Builder — The Real Decision Flow
+## Financial Model — Two Modes (full spec in v3.3-3.5)
 
-```
-Step 1  Territory Profile (PEI + Territory Profiler)
-Step 2  Strategic Objectives + Budget Envelope   ← MODE 1
-Step 3  DC Design (B&M or MDC, sites, T-shirt)
-Step 4  UC Definition + Prioritisation + Reconciliation
-Step 5  AI Centre Configurator (full stack → BOM + ROM)
-Step 6  Detailed Financial Model                 ← MODE 2
-Step 7  Sign-off Package (BOM + ROM + Pitch Report)
-```
+**Mode 1** — Parametric budget envelope pre-UC (±35%)
+**Mode 2** — Detailed 6-tab post-UC model:
+- Tab 1: Objectives (Type A/B/C)
+- Tab 2: Cost Model (from Configurator BOM/ROM)
+- Tab 3: UC Schedule & Benefit Phasing ← key tab
+- Tab 4: Financing Sources (moratorium critical — often more important than rate)
+- Tab 5: Financial Curves (cash-in/out, breakeven, political kill zone visualisation)
+- Tab 6: Scenarios & What-If
 
----
-
-## Financial Model — Two Modes (Full Spec)
-
-### MODE 1 — Budget Envelope Model (Step 2, pre-UC)
-- Parametric cost by T-shirt size (no UCs needed)
-- Financing appetite + indicative sources
-- Output: budget constraints for Steps 3-4
-- Confidence: ±35%
-- "Your envelope supports N UCs of medium complexity"
-
-### MODE 2 — Detailed Financial Model (Step 6, post-UC)
-
-**Three model types:**
-- Type A: Pure Public Good (socio-economic BCR)
-- Type B: Revenue-Generating Infrastructure (ROI + breakeven)
-- Type C: Hybrid — most common, HP TSAP is Type C
-
-#### Tab 1 — Programme Objectives
-Model type, primary KPI, revenue ambition, strategic objectives
-
-#### Tab 2 — Cost Model
-From AI Centre Configurator BOM/ROM (auto-populated), CapEx/OpEx phasing, contingency, reconciliation vs Mode 1
-
-#### Tab 3 — UC Schedule & Benefit Phasing ← KEY
-- Per UC: go-live quarter, benefit type, value (C/B/O), ramp curve
-- Pull-in / Delay / Phase controls
-- Revenue streams by customer segment (internal govt, central agencies, neighbouring territories, private, academic)
-- Socio-economic benefits: disaster avoidance, agricultural productivity, healthcare, govt efficiency, fraud reduction, jobs multiplier, startup ecosystem, data sovereignty value
-- BCR calculation: total quantified benefit (10yr NPV) ÷ total cost
-
-**Critical insight:** Benefits and revenue don't flow when the programme starts — massive cash-out in Year 0-2 with zero cash-in. This is the political kill zone. UC scheduling (pull-in/delay) and moratorium period are the key levers.
-
-#### Tab 4 — Financing Sources
-Per source: amount, %, interest rate, tenure, **moratorium period** (often more important than rate — defers debt service through cash-out zone), grace period, repayment schedule, currency, conditions precedent. Moratorium-adjusted effective cost ranking.
-
-#### Tab 5 — Financial Curves
-- Red: cumulative cash-out (capex + opex + debt service)
-- Green: cumulative cash-in (grants + revenue + benefit value)
-- Blue: cumulative net position
-- Amber: moratorium period (no debt service yet)
-- Markers: ◆ UC go-live, ✕ breakeven, ● self-sufficiency, ★ debt-free
-- Zones: Red (political kill zone), Amber (moratorium), Green (surplus)
-
-#### Tab 6 — Scenarios & What-If
-- UC pull-in/delay sliders, moratorium toggles, revenue ramp, cost overrun %, interest rate ±, financing mix rebalancer, programme delay
-- Scenario comparison: Conservative / Base / Optimistic / Custom
-- Rows: breakeven yr, BCR, peak cash-out, self-sufficiency yr, 10yr NPV, jobs
-
----
-
-## Territory AI Programme Profiler — Design Spec
-
-**Language:** "Territory" not "State"
-**Inspired by:** Atlas of Innovation (atlasofinnovation.org)
-
-**10 dimensions (mixed single/multi-select):**
-1. Fiscal capacity (Strong / Moderate / Constrained)
-2. Political mandate + timeline (Flagship / Central scheme / Long-term)
-3. Ownership preference (Full territory / PPP / Hybrid)
-4. DC readiness (Existing DC / Greenfield / Colocation)
-5. Data sensitivity (Standard / Sensitive / Air-gapped)
-6. Central scheme alignment (CHECKLIST: IndiaAI / NM-ICPS / Smart Cities / DONER / PM-WANI / None)
-7. Programme scale (XS / S / M / L / XL)
-8. Implementation urgency (Within 1yr / 2-3yr / 5+yr)
-9. Stakeholder landscape (Single DM / Coalition / Multi-level)
-10. Existing AI maturity (None / Pilots / Some production / Mature)
-
-**Output:** Radar chart, matched archetype (HP Glacial Hub / Maharashtra Industrial / Northeast Strategic / UT Digital), financing recommendation, actions playbook, challenges
-
----
-
-## AI Centre Configurator — Full Stack
-
-**Replaces: Inferencing Factory (too narrow)**
-
-Layers:
-1. Infrastructure (DC, power, cooling, PUE)
-2. Compute (GPU training + inference, CPU, NVMe, edge)
-3. **Networking** (E-W InfiniBand NDR/HDR, N-S 100GbE, NKC switches, OOB management, air-gap boundary)
-4. Platform (AI platform software, MLOps, private cloud, observability)
-5. Security & Compliance (zero-trust, air-gap, DPDP, SIEM)
-6. Resilience (HA, DR, failover, backup)
-7. Data & Integration (pipelines, connectors, ETL, data lake)
-8. UC Development (effort per UC, fine-tuning, integration, testing)
-9. Skills & Operations (AI workforce, MLOps team, managed services)
-
-**Output:** BOM + ROM (±15% once UCs defined, ±35% parametric pre-UC)
+**Key insight:** Benefits don't flow when programme starts. Moratorium period bridges the cash-out zone. UC pull-in/delay controls the benefit curve.
 
 ---
 
 ## Intelligence Scraper — Current State
 
-**Status:** Functional but needs tuning
-**Runtime:** 14-17 minutes
-**Yield:** 3 items/run (too low — dedup blocking most results)
-**Global phase:** Added (`[GLOBAL]` label), 1 item/run so far
+**Status:** Running daily, functional but low yield (2-3 items/run)
+**Root cause:** Extraction prompt too blunt — oscillates between quality and yield
+**Fix:** Semantic context tree (next priority build)
 
-**Pending fixes for next session:**
-- Global focus strings too narrow — broaden to general AI/HPC/tech (not sovereign-specific)
-  - `UC-GLB`: "AI deployment production government defence health agriculture 2025 2026"
-  - `TEC-GLB`: "GPU cluster HPC AI infrastructure supercomputer 2025 2026"
-  - `OEM-GLB`: "NVIDIA AMD HPE Dell AI server HPC contract announcement 2025 2026"
-- Remove `NOT India` constraint — too restrictive
-- Dedup will improve naturally after 7 days as old items age out
-- Do NOT enable daily schedule yet — test for 2-3 more days first
-
-**Key settings (live):**
-- RSS: false (govt sites block cloud IPs)
+**Current settings:**
+- RSS: true (15 active feeds from feed_library)
 - Items per domain: 2
 - Delay: 1000ms
 - Dedup window: 7 days
-- Sarvam: enabled (but Indic RSS feeds all failing — future fix)
+- Search grounding: gemini-3.5-flash (correct model — do not change)
+- Global topics: 5 (UC-GLB, TEC-GLB, OEM-GLB, POL-GLB, INV-GLB)
+
+**Feed Library:**
+- 15 active feeds across DEF-MIL, DEF-SPC, GEO-SPA, MKT-DEF, TEC-GEN, HLT-LIF, MKT-SOV
+- Weekly discovery workflow (feed_discovery.yml) — runs Sundays
+- Health check auto-dormants failing feeds, re-activates recovered ones
+- Global feed discovery still needed (HPCwire, The Register, C4ISRNET etc.)
+
+**Do NOT enable daily schedule yet** — wait until semantic tree improves quality
+
+**Multilingual:** Deferred — literal translation approach won't work, needs careful design
 
 ---
 
 ## Supabase — Critical Notes
 
-**RLS disabled on ALL tables:**
-```sql
-ALTER TABLE engagements DISABLE ROW LEVEL SECURITY;
-ALTER TABLE customers DISABLE ROW LEVEL SECURITY;
-ALTER TABLE engagement_dockets DISABLE ROW LEVEL SECURITY;
-ALTER TABLE docket_items DISABLE ROW LEVEL SECURITY;
-ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE l1_configurations DISABLE ROW LEVEL SECURITY;
-ALTER TABLE portfolio_catalogue DISABLE ROW LEVEL SECURITY;
-ALTER TABLE uc_queue DISABLE ROW LEVEL SECURITY;
-ALTER TABLE uc_library DISABLE ROW LEVEL SECURITY;
-ALTER TABLE sales_actions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE intelligence_items DISABLE ROW LEVEL SECURITY;
-```
-
+**RLS disabled on ALL tables.**
 **Engagements archetype:** `territory_coe` | `govt_sectorial` | `enterprise` | `defence`
-TSAP Configure shows only for `territory_coe`.
+
+**New columns needed (before semantic tree build):**
+```sql
+ALTER TABLE intelligence_items 
+  ADD COLUMN IF NOT EXISTS matched_context text,
+  ADD COLUMN IF NOT EXISTS matched_tier text;
+
+CREATE TABLE IF NOT EXISTS semantic_contexts (
+  id          text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  tier        text NOT NULL CHECK (tier IN ('direct_opportunity','technology_signal','market_signal','exclude')),
+  name        text NOT NULL,
+  context_string text NOT NULL,
+  portfolio_codes text[] DEFAULT '{}',
+  active      boolean DEFAULT true,
+  created_at  timestamptz DEFAULT now()
+);
+```
 
 ---
 
@@ -257,7 +263,7 @@ L1     L1-TSAP    Territory Sovereign AI Programme
 L1.1-L1.5         Programme components (partner-led)
 L2     L2-GIB     GenAI-in-a-Box ✅
 L2     L2-AIF     Multi-Purpose AI Factory ✅
-L2     L2-INF     AI Centre ← rename pending (L2-AIC candidate)
+L2     L2-INF     AI Centre (rename L2-AIC pending decision)
 L2.1   L2.1-INF   GeoAI Centre
 L2.2   L2.2-INF   Defence AI Centre (air-gapped, MIL-SPEC)
 L2.3   L2.3-INF   Health AI Centre
@@ -281,33 +287,26 @@ L3     L3-*       23 Lifecycle Services
 | L | 15 MW | 1,024–1,536 | 10–15B | Large territory flagship |
 | XL | 20 MW | 1,536–2,048+ | 15–25B | National/multi-territory |
 
-T-shirt = per site. Total programme MW = sum of sites = headline number.
-
 ---
 
-## Next Session Priority (laptop)
-
-1. **Fix global scraper focus strings** (quick — 15 mins)
-2. **Start AI Centre Configurator** — DC decision modal + networking layer
-3. **Mode 1 Budget Envelope Model** — parametric cost by T-shirt size
-
----
-
-## Pending Items
+## Pending Items (Priority Order)
 
 | # | Item | Priority |
 |---|---|---|
-| 1 | Fix global scraper focus strings | 🔴 Next session start |
-| 2 | AI Centre Configurator (full stack, all layers) | 🔴 Next |
-| 3 | Mode 1 — Budget Envelope Model | 🔴 Next |
-| 4 | UC Definition + Reconciliation flow | 🔴 Next |
-| 5 | Mode 2 — Detailed Financial Model (6 tabs) | 🔴 Next |
-| 6 | Territory AI Programme Profiler | 🟡 Next |
-| 7 | Pitch Report generator | 🟡 Next |
-| 8 | AI Centre Builder unified flow (Steps 1-7) | 🟡 Next |
-| 9 | Decide portfolio code rename: L2-INF → L2-AIC? | 🟡 Soon |
-| 10 | Enable daily scraper schedule (after 2-3 more test runs) | 🟡 Soon |
-| 11 | GCP billing investigation | 🟡 Soon |
-| 12 | UX pass — Engagement Docket | ⬜ Later |
-| 13 | Visualisations (radar, territory map, tokenomics chart) | ⬜ Later |
-| 14 | Brand.md + hardware-preferences.md | ⬜ After hardware decisions |
+| 1 | Semantic Context Tree — Supabase table + seed data | 🔴 Next session |
+| 2 | Wire semantic tree into scraper (replace extraction prompt) | 🔴 Next session |
+| 3 | Wire semantic tree into RE (context → portfolio mapping) | 🔴 Next session |
+| 4 | Wire semantic tree into PEI (parse brief through tree) | 🟡 Next |
+| 5 | AI Centre Configurator (full stack, all layers) | 🔴 Next laptop session |
+| 6 | Mode 1 — Budget Envelope Model | 🔴 Next |
+| 7 | UC Definition + Reconciliation flow | 🔴 Next |
+| 8 | Mode 2 — Detailed Financial Model (6 tabs) | 🔴 Next |
+| 9 | Territory AI Programme Profiler | 🟡 Next |
+| 10 | Pitch Report generator | 🟡 Next |
+| 11 | Enable daily scraper schedule (after semantic tree) | 🟡 Soon |
+| 12 | Global feed discovery (HPCwire, C4ISRNET etc.) | 🟡 Soon |
+| 13 | GCP billing investigation | 🟡 Soon |
+| 14 | Decide portfolio code rename L2-INF → L2-AIC | 🟡 Soon |
+| 15 | UX pass — Engagement Docket | ⬜ Later |
+| 16 | Visualisations (radar, territory map, tokenomics) | ⬜ Later |
+| 17 | Brand.md + hardware-preferences.md | ⬜ After hardware decisions |
