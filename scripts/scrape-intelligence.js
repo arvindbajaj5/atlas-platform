@@ -277,7 +277,7 @@ STRICT RELEVANCE TEST - article must pass AT LEAST ONE of these tests:
 TEST 1 (AI/Tech): mentions AI, ML, machine learning, deep learning, LLM, generative AI, GPU, HPC, supercomputer, data centre, cloud computing, computer vision, autonomous systems, surveillance technology, drone technology, cybersecurity technology, digital transformation, smart systems, IoT, satellite data analytics
 TEST 2 (Government Digital): mentions government digitisation, e-governance, digital public infrastructure, national programme for technology, ministry technology initiative, defence modernisation with digital/sensor/software angle
 TEST 3 (Market Signal): major technology contract/tender worth >100 crore, technology company funding/IPO/acquisition, semiconductor/chip manufacturing, fibre/5G/6G infrastructure
-HARD EXCLUDE regardless of source: stock prices, mutual funds, commodity prices, loan rates, personal finance, agriculture without tech, general manufacturing, sports, entertainment, celebrity, weather
+HARD EXCLUDE regardless of source: personnel appointments/retirements/promotions, command handovers, military ceremonies, stock prices, mutual funds, commodity prices, loan rates, personal finance, agriculture without tech angle, sports, entertainment, celebrity, weather, obituaries
 If passes any test: JSON with relevant(true), intelligence_stream(market_pulse|domain_intel|tech_watch|competitor_intel), summary(max 80 words factual), intelligence_value(high|medium|low), organisations(array), tags(array max 5), opportunity(1 sentence AI opportunity for our team), competitor_signals(string or empty), uc_suggest(AI use case or empty), confidence(high|medium|low).
 If fails all tests: {"relevant":false}
 Start { end }. No markdown.`
