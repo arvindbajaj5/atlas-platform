@@ -308,6 +308,7 @@ async function scrapeRSS(feed, existing) {
     const cutoff30 = new Date(); cutoff30.setDate(cutoff30.getDate() - 30)
 
     for (const rssItem of items.slice(0, 20)) {
+      const domainCode = (feed.codes && feed.codes[0]) || 'TEC-GEN'
       const rawTitle = (rssItem.title?._ || rssItem.title || '').trim()
       const link = (rssItem.link?._ || rssItem.link || rssItem.id || '').trim()
       const desc = (rssItem.description?._ || rssItem.description || rssItem.summary?._ || rssItem.summary || '').replace(/<[^>]+>/g, '').trim()
