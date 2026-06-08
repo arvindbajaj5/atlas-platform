@@ -1023,7 +1023,7 @@ async function saveProfilerResult(){
     notes: 'Closest archetype: '+matched.name+' ('+matched.tagline+')',
     created_by: 'ATLAS Profiler'
   }
-  // Upsert — update existing profiler item if present
+  // Upsert \u2014 update existing profiler item if present
   var existingProfile = CURRENT_ITEMS.find(function(i){
     return i.item_type==='pricing' && i.title&&i.title.indexOf('Territory AI Programme Profile')===0
   })
@@ -1662,6 +1662,7 @@ async function openEngagement(engId){
   html += '<div style="display:flex;gap:6px;flex-wrap:wrap">'
   html += '<button class="btn btn-teal btn-sm" onclick="openAddItemModal(\''+dId+'\')">+ Add Item</button>'
   html += '<button class="btn btn-sm" style="background:rgba(255,255,255,0.12);color:var(--white);border:0.5px solid rgba(255,255,255,0.25)" onclick="openPortfolioMap(\''+eId+'\',\''+dId+'\')">Portfolio Map</button>'
+  +'<button class="btn btn-sm" style="background:rgba(0,178,144,0.25);color:#00e6bc;border:0.5px solid rgba(0,178,144,0.3)" onclick="openSASCNew()">SASC</button>'
   if(isL1) html += '<button class="btn btn-sm" style="background:rgba(255,182,0,0.25);color:#ffd060;border:0.5px solid rgba(255,182,0,0.3)" onclick="openL1Config(\''+eId+'\')">TSAP Configure</button>'
   html += '<button class="btn btn-sm" style="background:var(--orange);color:var(--white)" onclick="runRecommendationEngine(\''+eId+'\')">&#9889; Recommend</button>'
   html += '</div></div>'
@@ -1692,6 +1693,22 @@ async function openEngagement(engId){
 }
 
 
+
+function openSASC(itemId){
+  var eng = window._currentEng
+  var docketId = window._currentDocketId || CURRENT_DOCKET_ID
+  if(!eng || !docketId){ alert('Please open an engagement first.'); return }
+  var params = '?eng=' + eng.id + '&docket=' + docketId + (itemId ? '&item=' + itemId : '')
+  window.location.href = '../sasc/index.html' + params
+}
+
+function openSASCNew(){
+  var eng = window._currentEng
+  var docketId = window._currentDocketId || CURRENT_DOCKET_ID
+  if(!eng || !docketId){ alert('Please open an engagement first.'); return }
+  window.location.href = '../sasc/index.html?eng=' + eng.id + '&docket=' + docketId
+}
+
 function renderItems(filterType){
   var items = filterType==='all' ? CURRENT_ITEMS : CURRENT_ITEMS.filter(function(i){ return i.item_type===filterType })
   var html = items.length ? items.map(renderItem).join('')
@@ -1715,6 +1732,7 @@ function renderItem(item){
     +'<div style="display:flex;gap:6px;margin-top:6px">'
     +(item.status==='pending'?'<button class="btn btn-ghost btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'in_progress\')">Start</button>':'')
     +(item.status==='in_progress'?'<button class="btn btn-teal btn-xs" data-id="'+item.id+'" onclick="setItemStatus(this.dataset.id,\'done\')">Done</button>':'')
+    +(item.item_type==='solution'?'<button class="btn btn-xs" style="background:var(--orange);color:var(--white)" data-id="'+item.id+'" onclick="openSASC(this.dataset.id)">Configure</button>':'')
     +'<button class="btn btn-danger btn-xs" data-id="'+item.id+'" onclick="deleteItem(this.dataset.id)">x</button>'
     +'</div></div></div>'
 }
