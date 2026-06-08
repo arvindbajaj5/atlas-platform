@@ -341,10 +341,6 @@ async function scrapeRSS(feed, existing) {
       const matched = await phase2SemanticMatch(title, description, contexts)
       if (!matched) continue
 
-      await sleep(DELAY_MS)
-      const extracted = extractJSON(await callGemini(prompt))
-      if (!extracted || extracted.relevant === false) continue
-
       const id = `rss-${domainCode.replace(/-/g,'')}-${Date.now()}-${Math.floor(Math.random()*9999)}`
       const row = buildRow(id, domainCode, feed.name, matched, {
         sourceUrl: link,
