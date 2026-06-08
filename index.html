@@ -422,7 +422,6 @@ var TOOLS={
   'vision-doc':            {label:'Vision Document',ver:'v1.0',status:'hidden', icon:'&#128196;',ver:'v1.0',status:'ready',cat:'bd',     url:BASE+'/tools/vision-document/',        desc:'Claude API &mdash; CEO-to-CEO vision documents'},
   'domain-config':         {label:'Use Case Identification', icon:'&#9881;',  ver:'v3.0',status:'ready',cat:'presales',url:BASE+'/tools/domain-configurator/', desc:'8-step project definition &mdash; domain packs, personas, use cases, architecture, volumetrics'},
   'inferencing':           {label:'AI Inferencing Factory',  icon:'&#127981;',ver:'v2.3',status:'ready',cat:'presales',url:BASE+'/tools/inferencing-factory/', desc:'BOM, services, manpower, TAD &mdash; domain-aware sizing'},
-  'sasc':                  {label:'Sovereign AI Stack Configurator', icon:'&#9881;&#65039;',ver:'v1.0',status:'ready',cat:'presales',url:BASE+'/tools/sasc/', desc:'SASC &mdash; full stack configuration, BOM + ROM, UC traceability, multi-currency'},
   'benchmark':             {label:'Benchmark Tool',          icon:'&#9889;',  ver:'v1.0',status:'ready',cat:'presales',url:BASE+'/tools/benchmark-tool/',       desc:'35 curated benchmarks, run scripts, extrapolation engine'},
   'ai-sovereignty':        {label:'AI Sovereignty Index',    icon:'&#127963;',ver:'v2.1',status:'ready',cat:'presales',url:BASE+'/tools/ai-sovereignty-index/',desc:'LASI scoring, evaluation report, PPTX + Excel export'},
   'rac-tool':              {label:'RAC Pipeline',            icon:'&#127919;',ver:'v2.0',status:'ready',cat:'sales',  url:BASE+'/tools/rac-tool/',               desc:'Kanban pipeline, activity feed, import from Portfolio Portal'},
@@ -434,7 +433,7 @@ var TOOLS={
 var CATEGORIES=[
   {id:'strategy',label:'01 &middot; Intelligence Engine',  tools:['second-brain','pei-tool']},
   {id:'bd',      label:'02 &middot; Engagement',tools:['engagement-docket']},
-  {id:'presales',label:'03 &middot; Pre-Sales',            tools:['domain-config','inferencing','benchmark','ai-sovereignty']},
+  {id:'presales',label:'03 &middot; Pre-Sales',            tools:['domain-config','inferencing','sasc','benchmark','ai-sovereignty']},
   {id:'sales',   label:'04 &middot; Sales',                tools:['rac-tool','deal-analysis']},
   {id:'ops',     label:'05 &middot; Operations',           tools:['hpc-monitor','compass']},
 ]
@@ -442,7 +441,7 @@ var CATEGORIES=[
 var STAGES=[
   {id:'strategy', icon:'&#129504;', label:'Intelligence Engine', color:'var(--indigo)', desc:'Domain intelligence, customer research and market awareness', tools:['second-brain','pei-tool','intelligence-scraper']},
   {id:'bd',      icon:'&#128640;',label:'Engagement', color:'var(--orange)', desc:'Customer profiles, engagements, dockets, portfolio map and AI recommendation engine',      tools:['engagement-docket']},
-  {id:'presales',icon:'&#9881;',  label:'Pre-Sales',             color:'var(--teal)',   desc:'Use case identification, solution sizing and sovereignty assessment', tools:['domain-config','inferencing','benchmark','ai-sovereignty']},
+  {id:'presales',icon:'&#9881;',  label:'Pre-Sales',             color:'var(--teal)',   desc:'Use case identification, solution sizing and sovereignty assessment', tools:['domain-config','inferencing','sasc','benchmark','ai-sovereignty']},
   {id:'sales',   icon:'&#128188;',label:'Sales',                 color:'var(--blue)',   desc:'Pipeline management, deal analysis and commercial modelling',        tools:['rac-tool','deal-analysis']},
   {id:'ops',     icon:'&#128295;',label:'Operations',            color:'var(--amber)',  desc:'Token governance, HPC monitoring and platform operations',           tools:['hpc-monitor','compass']},
 ]
