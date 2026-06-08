@@ -1,1 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SASC -- Sovereign AI Stack Configurator</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--r-sm:6px;--r-lg:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-actions{display:flex;align-items:center;gap:10px;}
+.hdr-eng{font-size:11px;color:rgba(255,255,255,0.6);padding:4px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:var(--r-sm);}
+.hdr-eng strong{color:var(--white);}
+.main{max-width:960px;margin:0 auto;padding:24px;}
+/* Step progress */
+.step-nav{display:flex;align-items:center;margin-bottom:24px;background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px 20px;gap:0;}
+.step-item{display:flex;align-items:center;flex:1;}
+.step-circle{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;transition:all 0.2s;}
+.step-circle.done{background:var(--teal);color:var(--white);}
+.step-circle.active{background:var(--orange);color:var(--white);}
+.step-circle.pending{background:var(--light);color:var(--mid);border:2px solid #e0e0e8;}
+.step-label{margin-left:8px;font-size:12px;font-weight:600;}
+.step-label.active{color:var(--navy);}
+.step-label.done{color:var(--teal);}
+.step-label.pending{color:var(--mid);}
+.step-connector{flex:1;height:2px;background:#e0e0e8;margin:0 8px;}
+.step-connector.done{background:var(--teal);}
+/* Cards */
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:14px;}
+/* Forms */
+label{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;margin-top:14px;}
+label:first-child{margin-top:0;}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;}
+input:focus,select:focus{border-color:var(--blue);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-navy{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-ghost{background:var(--light);color:var(--dark);border:1px solid #e0e0e8;}
+.btn-ghost:hover{border-color:var(--navy);}
+.btn-sm{padding:5px 12px;font-size:11px;}
+.btn-xs{padding:3px 8px;font-size:10px;}
+/* UC pills */
+.uc-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;}
+.uc-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all 0.15s;}
+.uc-pill.selected{background:rgba(0,40,112,0.08);color:var(--navy);border-color:var(--navy);}
+.uc-pill.unselected{background:var(--light);color:var(--mid);border-color:#e0e0e8;}
+.uc-pill:hover{border-color:var(--navy);}
+/* Scope radio */
+.scope-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.scope-opt{padding:10px 12px;border:1.5px solid #e0e0e8;border-radius:var(--r);cursor:pointer;transition:all 0.15s;}
+.scope-opt.sel{border-color:var(--navy);background:rgba(0,40,112,0.04);}
+.scope-opt-title{font-size:12px;font-weight:700;color:var(--dark);}
+.scope-opt-sub{font-size:10px;color:var(--mid);margin-top:2px;}
+/* DC type */
+.dc-opts{display:flex;flex-direction:column;gap:8px;}
+.dc-opt{padding:12px 14px;border:1.5px solid #e0e0e8;border-radius:var(--r);cursor:pointer;transition:all 0.15s;}
+.dc-opt.sel{border-color:var(--orange);background:rgba(255,85,57,0.04);}
+.dc-opt-hdr{display:flex;align-items:center;gap:8px;}
+.dc-dot{width:14px;height:14px;border-radius:50%;border:2px solid #ccc;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.dc-opt.sel .dc-dot{border-color:var(--orange);}
+.dc-opt.sel .dc-dot::after{content:'';width:6px;height:6px;border-radius:50%;background:var(--orange);}
+.dc-opt-title{font-size:13px;font-weight:700;}
+.dc-opt-sub{font-size:11px;color:var(--mid);margin-left:22px;margin-top:2px;}
+.dc-detail{margin-top:10px;margin-left:22px;padding:10px 12px;background:var(--light);border-radius:var(--r-sm);display:none;}
+.dc-opt.sel .dc-detail{display:block;}
+/* T-shirt buttons */
+.tshirt-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.tshirt-btn{padding:5px 12px;border-radius:var(--r-sm);font-size:11px;font-weight:700;border:1.5px solid #e0e0e8;background:var(--white);cursor:pointer;transition:all 0.15s;}
+.tshirt-btn.sel{background:var(--navy);color:var(--white);border-color:var(--navy);}
+/* Layer rows */
+.layer-list{display:flex;flex-direction:column;gap:0;}
+.layer-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f4;cursor:pointer;}
+.layer-row:last-child{border-bottom:none;}
+.layer-chk{width:18px;height:18px;border-radius:4px;border:2px solid #ccc;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s;}
+.layer-chk.on{background:var(--navy);border-color:var(--navy);}
+.layer-chk.on::after{content:'\2713';color:var(--white);font-size:11px;font-weight:700;}
+.layer-info{flex:1;}
+.layer-name{font-size:13px;font-weight:600;color:var(--dark);}
+.layer-desc{font-size:10px;color:var(--mid);margin-top:1px;}
+.layer-tag{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(0,40,112,0.08);color:var(--navy);}
+/* BOM table */
+.bom-table{width:100%;border-collapse:collapse;font-size:12px;}
+.bom-table th{text-align:left;padding:6px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.3px;border-bottom:2px solid #e0e0e8;}
+.bom-table td{padding:8px 10px;border-bottom:1px solid #f0f0f4;color:var(--dark);}
+.bom-table tr:last-child td{border-bottom:none;}
+.bom-table .cat-row td{background:rgba(0,40,112,0.03);font-weight:700;color:var(--navy);font-size:11px;}
+.bom-total{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:2px solid var(--navy);margin-top:4px;}
+.bom-total-label{font-size:14px;font-weight:700;color:var(--navy);}
+.bom-total-val{font-size:18px;font-weight:900;color:var(--orange);}
+.confidence-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(255,182,0,0.12);color:#9a6800;}
+/* Currency toggle */
+.currency-toggle{display:flex;gap:4px;align-items:center;}
+.curr-btn{padding:4px 10px;border-radius:var(--r-sm);font-size:11px;font-weight:600;border:1px solid #e0e0e8;background:var(--white);cursor:pointer;}
+.curr-btn.active{background:var(--navy);color:var(--white);border-color:var(--navy);}
+/* Actions bar */
+.actions-bar{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid #e0e0e8;}
+/* Loading */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #e0e0e8;border-top-color:var(--orange);border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.status-msg{font-size:12px;color:var(--mid);display:flex;align-items:center;gap:6px;}
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--dark);color:var(--white);padding:10px 16px;border-radius:var(--r);font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
+.toast.show{opacity:1;}
+</style>
+</head>
+<body>
 
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S <span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.5);letter-spacing:1px;margin-left:8px">SASC</span></div>
+  <div class="hdr-actions">
+    <div class="hdr-eng" id="hdr-eng-label">No engagement loaded</div>
+    <button class="btn btn-ghost btn-sm" onclick="backToDocket()">&#8592; Back to Docket</button>
+  </div>
+</div>
+
+<div class="main" id="main">
+  <div id="app-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script charset="utf-8">
+// -- Config -------------------------------------------------------------------
+const DOCKET_URL = '../engagement-docket/index.html'
+
+function getSBConfig() {
+  try { return JSON.parse(localStorage.getItem('atlas_global') || '{}') } catch(e) { return {} }
+}
+function getSB() {
+  const g = getSBConfig()
+  return { url: g.sb_url || '', key: g.sb_key || '' }
+}
+async function sbFetch(table, params, limit) {
+  const sb = getSB()
+  if (!sb.url) return []
+  try {
+    const r = await fetch(sb.url + '/rest/v1/' + table + '?' + params + (limit ? '&limit=' + limit : ''), {
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+    })
+    if (!r.ok) return []
+    return r.json()
+  } catch(e) { return [] }
+}
+async function sbInsert(table, data) {
+  const sb = getSB()
+  if (!sb.url) return false
+  try {
+    const r = await fetch(sb.url + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(data)
+    })
+    return r.ok
+  } catch(e) { return false }
+}
+function genId(prefix) {
+  return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 9999)
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function showToast(msg, duration) {
+  var t = document.getElementById('toast')
+  t.textContent = msg
+  t.className = 'toast show'
+  setTimeout(function() { t.className = 'toast' }, duration || 2500)
+}
+
+// -- Currency formatting -------------------------------------------------------
+var SASC_CURRENCY = localStorage.getItem('sasc_currency') || 'USD'
+var FX_RATES = { USD: 1, INR: 84.20, EUR: 0.93, GBP: 0.79 }
+
+async function loadFxRates() {
+  var rows = await sbFetch('fx_rates', 'from_currency=eq.USD&order=effective_date.desc', 20)
+  if (rows && rows.length) {
+    rows.forEach(function(r) {
+      FX_RATES[r.to_currency] = r.rate
+    })
+  }
+}
+
+function fmtMoney(usdVal, currency) {
+  currency = currency || SASC_CURRENCY
+  var val = usdVal * (FX_RATES[currency] || 1)
+  if (currency === 'INR') {
+    if (val >= 1e7) return '\u20B9' + (val / 1e7).toFixed(2) + ' Cr'
+    if (val >= 1e5) return '\u20B9' + (val / 1e5).toFixed(1) + ' L'
+    return '\u20B9' + Math.round(val).toLocaleString('en-IN')
+  }
+  if (currency === 'EUR') return '\u20AC' + (val / 1e6).toFixed(2) + 'M'
+  if (currency === 'GBP') return '\u00A3' + (val / 1e6).toFixed(2) + 'M'
+  return '$' + (val / 1e6).toFixed(2) + 'M'
+}
+
+function setCurrency(c) {
+  SASC_CURRENCY = c
+  localStorage.setItem('sasc_currency', c)
+  renderStep(SASC_STEP)
+}
+
+// -- State ---------------------------------------------------------------------
+var SASC_STEP = 1
+var SASC_DATA = {
+  engId: null, engName: '', customerName: '', archetype: '',
+  docketId: null, docketItemId: null,
+  selectedUCs: [],
+  scope: 'full',
+  dcType: 'mdc',
+  mdc: { tshirt: 'm', sites: 1, siteNames: '' },
+  bm: { power_kw: '', racks: '', cooling: 'dlc', situation: 'existing' },
+  layers: {
+    infra:    { on: true,  name: 'Infrastructure', desc: 'DC / MDC, power, cooling, physical security', tag: 'Infra' },
+    compute:  { on: true,  name: 'Compute', desc: 'GPU clusters (training + inference), CPU servers, NVMe storage', tag: 'Compute' },
+    network:  { on: true,  name: 'Networking', desc: 'InfiniBand E-W, 100GbE N-S, NKC switches, OOB management', tag: 'NKC' },
+    platform: { on: true,  name: 'AI Platform software', desc: 'Data Fusion, RAG, model registry, APIs, gateways, guardrails', tag: 'Platform' },
+    security: { on: true,  name: 'Security & compliance', desc: 'DPDP, zero-trust, air-gap (if required), SIEM', tag: 'SecOps' },
+    resilience:{ on: true, name: 'Resilience', desc: 'HA, DR, failover, backup and recovery', tag: 'HA/DR' },
+    data:     { on: true,  name: 'Data & integration', desc: 'Ingestion pipelines, connectors, ETL, data lake', tag: 'Data' },
+    ucdev:    { on: true,  name: 'UC development', desc: 'Build, fine-tune, integrate and test use cases', tag: 'UC Dev' },
+    skills:   { on: false, name: 'Skills & operations', desc: 'AI workforce, MLOps team, managed services', tag: 'Ops' }
+  },
+  pricingParams: [],
+  ucProfiles: [],
+  bom: [],
+  rom: { capex_usd: 0, opex_usd: 0, ucdev_usd: 0, total_usd: 0 }
+}
+
+var ALL_UCS = []
+var ENGAGEMENT = null
+
+// -- Init ---------------------------------------------------------------------
+async function init() {
+  await loadFxRates()
+  var params = new URLSearchParams(window.location.search)
+  SASC_DATA.engId      = params.get('eng') || null
+  SASC_DATA.docketId   = params.get('docket') || null
+  SASC_DATA.docketItemId = params.get('item') || null
+
+  // Try to load existing SASC config from docket item
+  if (SASC_DATA.docketItemId) {
+    var items = await sbFetch('docket_items', 'id=eq.' + SASC_DATA.docketItemId, 1)
+    if (items && items[0] && items[0].content && items[0].content.sasc) {
+      var saved = items[0].content.sasc
+      Object.assign(SASC_DATA, saved)
+    }
+  }
+
+  if (SASC_DATA.engId) {
+    var engs = await sbFetch('engagements', 'id=eq.' + SASC_DATA.engId, 1)
+    if (engs && engs[0]) {
+      ENGAGEMENT = engs[0]
+      SASC_DATA.engName   = engs[0].name || ''
+      SASC_DATA.archetype = engs[0].archetype || ''
+      var custs = await sbFetch('customers', 'id=eq.' + engs[0].customer_id, 1)
+      if (custs && custs[0]) SASC_DATA.customerName = custs[0].name || ''
+      document.getElementById('hdr-eng-label').innerHTML =
+        '<strong>' + esc(SASC_DATA.customerName) + '</strong> &mdash; ' + esc(SASC_DATA.engName)
+    }
+
+    // Load UC docket items
+    if (SASC_DATA.docketId) {
+      var docketItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_type=eq.uc', 50)
+      ALL_UCS = docketItems || []
+      if (!SASC_DATA.selectedUCs.length && ALL_UCS.length) {
+        SASC_DATA.selectedUCs = ALL_UCS.map(function(u) { return u.id })
+      }
+    }
+  }
+
+  // Adjust layers by scope on first load
+  adjustLayersByScope(SASC_DATA.scope)
+
+  renderStep(1)
+}
+
+function adjustLayersByScope(scope) {
+  var layers = SASC_DATA.layers
+  if (scope === 'hardware') {
+    layers.platform.on  = false
+    layers.security.on  = false
+    layers.data.on      = false
+    layers.ucdev.on     = false
+    layers.skills.on    = false
+  } else if (scope === 'software') {
+    layers.infra.on     = false
+    layers.compute.on   = false
+    layers.network.on   = false
+  } else if (scope === 'full') {
+    layers.infra.on     = true
+    layers.compute.on   = true
+    layers.network.on   = true
+    layers.platform.on  = true
+    layers.security.on  = true
+    layers.resilience.on = true
+    layers.data.on      = true
+    layers.ucdev.on     = true
+  }
+  // skills always defaults off unless manually enabled
+}
+
+// -- Step navigation -----------------------------------------------------------
+function renderStep(n) {
+  SASC_STEP = n
+  var el = document.getElementById('app-content')
+  renderStepNav()
+  if (n === 1) el.innerHTML = renderScreen1()
+  if (n === 2) el.innerHTML = renderScreen2()
+  if (n === 3) el.innerHTML = renderScreen3Loading()
+  if (n === 3) loadAndRenderBOM()
+}
+
+function renderStepNav() {
+  var steps = [
+    { n:1, label:'Scope & DC' },
+    { n:2, label:'Stack layers' },
+    { n:3, label:'BOM + ROM' }
+  ]
+  var html = '<div class="step-nav">'
+  steps.forEach(function(s, i) {
+    var state = s.n < SASC_STEP ? 'done' : s.n === SASC_STEP ? 'active' : 'pending'
+    html += '<div class="step-item">'
+    html += '<div class="step-circle ' + state + '">' + (state === 'done' ? '&#10003;' : s.n) + '</div>'
+    html += '<div class="step-label ' + state + '">' + s.label + '</div>'
+    html += '</div>'
+    if (i < steps.length - 1) html += '<div class="step-connector ' + (s.n < SASC_STEP ? 'done' : '') + '"></div>'
+  })
+  html += '</div>'
+  // Prepend to app-content before the screen
+  var nav = document.getElementById('step-nav-wrap')
+  if (!nav) {
+    var wrap = document.createElement('div')
+    wrap.id = 'step-nav-wrap'
+    document.getElementById('app-content').parentNode.insertBefore(wrap, document.getElementById('app-content'))
+  }
+  document.getElementById('step-nav-wrap').innerHTML = html
+}
+
+// -- Screen 1: Scope & DC -----------------------------------------------------
+function renderScreen1() {
+  var s = SASC_DATA
+  var ucHtml = ''
+  if (ALL_UCS.length) {
+    ucHtml = '<div class="card"><div class="card-title">Use cases from docket</div>'
+      + '<div class="card-sub">Select which UCs to include in this configuration</div>'
+      + '<div class="uc-grid">'
+      + ALL_UCS.map(function(u) {
+          var sel = s.selectedUCs.indexOf(u.id) >= 0
+          return '<div class="uc-pill ' + (sel ? 'selected' : 'unselected') + '" data-id="' + u.id + '" onclick="toggleUC(this.dataset.idset.id)>'
+            + (sel ? '&#10003; ' : '') + esc(u.title || 'UC') + '</div>'
+        }).join('')
+      + '</div></div>'
+  } else {
+    ucHtml = '<div class="card" style="border-left:3px solid var(--amber)">'
+      + '<div class="card-sub">&#9888; No UC items in docket. Add UCs from the UC Library first, or continue without -- compute sizing will use defaults.</div></div>'
+  }
+
+  var scopeOpts = [
+    { v:'full',     t:'Full stack',              s:'DC, compute, network, platform, security, ops' },
+    { v:'hardware', t:'Hardware + networking',    s:'Customer handles software stack' },
+    { v:'software', t:'Platform + software only', s:'Customer has existing compute' },
+    { v:'custom',   t:'Custom',                   s:'Toggle individual layers in Step 2' }
+  ]
+
+  var tshirtSizes = [
+    { v:'xs', l:'XS', sub:'&le;2MW' },
+    { v:'s',  l:'S',  sub:'5MW' },
+    { v:'m',  l:'M',  sub:'10MW' },
+    { v:'l',  l:'L',  sub:'15MW' },
+    { v:'xl', l:'XL', sub:'20MW+' }
+  ]
+
+  var mdc = s.mdc
+  var bm  = s.bm
+
+  return ucHtml
+    + '<div class="card"><div class="card-title">Scope of supply</div>'
+    + '<div class="card-sub">What are we responsible for delivering?</div>'
+    + '<div class="scope-opts">'
+    + scopeOpts.map(function(o) {
+        return '<div class="scope-opt ' + (s.scope === o.v ? 'sel' : '') + '" data-scope="' + o.v + '" onclick="setScope(this.dataset.scope)">'
+          + '<div class="scope-opt-title">' + o.t + '</div>'
+          + '<div class="scope-opt-sub">' + o.s + '</div></div>'
+      }).join('')
+    + '</div></div>'
+
+    + '<div class="card"><div class="card-title">DC / Infrastructure</div>'
+    + '<div class="card-sub">Does the customer have existing infrastructure, or are we supplying an MDC?</div>'
+    + '<div class="dc-opts">'
+
+    // MDC option
+    + '<div class="dc-opt ' + (s.dcType === 'mdc' ? 'sel' : '') + '" data-dc="mdc" onclick="setDCType(this.dataset.dc)">'
+    + '<div class="dc-opt-hdr"><div class="dc-dot"></div><div class="dc-opt-title">MDC &mdash; we supply</div></div>'
+    + '<div class="dc-opt-sub">Modular Datacenter, T-shirt sized, delivered to site</div>'
+    + '<div class="dc-detail">'
+    + '<label>T-shirt size per site</label>'
+    + '<div class="tshirt-btns">'
+    + tshirtSizes.map(function(t) {
+        return '<button class="tshirt-btn ' + (mdc.tshirt === t.v ? 'sel' : '') + '" data-ts="' + t.v + '" onclick="event.stopPropagation();setTshirt(this.dataset.ts)">'
+          + t.l + '<br><span style="font-weight:400;font-size:9px">' + t.sub + '</span></button>'
+      }).join('')
+    + '</div>'
+    + '<div class="form-grid">'
+    + '<div><label>Number of sites</label><input type="number" min="1" max="20" value="' + mdc.sites + '" id="mdc-sites" onchange="SASC_DATA.mdc.sites=parseInt(this.value)||1"></div>'
+    + '<div><label>Site names (optional)</label><input type="text" value="' + esc(mdc.siteNames) + '" id="mdc-sitenames" placeholder="e.g. Kangra, Bilaspur, Kullu" onchange="SASC_DATA.mdc.siteNames=this.value"></div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--teal);margin-top:6px;font-weight:600" id="mdc-summary"></div>'
+    + '</div></div>'
+
+    // B&M Existing
+    + '<div class="dc-opt ' + (s.dcType === 'bm_existing' ? 'sel' : '') + '" data-dc="bm_existing" onclick="setDCType(this.dataset.dc)">'
+    + '<div class="dc-opt-hdr"><div class="dc-dot"></div><div class="dc-opt-title">B&amp;M &mdash; existing building</div></div>'
+    + '<div class="dc-opt-sub">Customer has an existing data centre &mdash; specify available headroom</div>'
+    + '<div class="dc-detail">'
+    + '<div class="form-grid-3">'
+    + '<div><label>Available power (kW)</label><input type="number" value="' + (bm.power_kw||'') + '" id="bm-power" placeholder="e.g. 500" onchange="SASC_DATA.bm.power_kw=this.value"></div>'
+    + '<div><label>Rack positions</label><input type="number" value="' + (bm.racks||'') + '" id="bm-racks" placeholder="e.g. 40" onchange="SASC_DATA.bm.racks=this.value"></div>'
+    + '<div><label>Cooling type</label><select id="bm-cooling" onchange="SASC_DATA.bm.cooling=this.value">'
+    + ['dlc','air','hybrid'].map(function(c){ return '<option value="' + c + '" ' + (bm.cooling===c?'selected':'') + '>' + c.toUpperCase() + '</option>' }).join('')
+    + '</select></div></div>'
+    + '</div></div>'
+
+    // B&M New Build
+    + '<div class="dc-opt ' + (s.dcType === 'bm_new' ? 'sel' : '') + '" data-dc="bm_new" onclick="setDCType(this.dataset.dc)">'
+    + '<div class="dc-opt-hdr"><div class="dc-dot"></div><div class="dc-opt-title">B&amp;M &mdash; new build</div></div>'
+    + '<div class="dc-opt-sub">Customer is constructing a new data centre &mdash; specify planned capacity</div>'
+    + '<div class="dc-detail">'
+    + '<div class="form-grid-3">'
+    + '<div><label>Planned power (kW)</label><input type="number" value="' + (bm.power_kw||'') + '" id="bm-new-power" placeholder="e.g. 2000" onchange="SASC_DATA.bm.power_kw=this.value"></div>'
+    + '<div><label>Floor space (sqft)</label><input type="number" id="bm-sqft" placeholder="e.g. 5000"></div>'
+    + '<div><label>DC ready in (months)</label><input type="number" id="bm-timeline" placeholder="e.g. 18"></div>'
+    + '</div></div></div>'
+
+    + '</div></div>'
+
+    + '<div class="actions-bar"><div></div>'
+    + '<button class="btn btn-primary" onclick="goStep2()">Next: Configure stack &rarr;</button>'
+    + '</div>'
+}
+
+// -- Screen 2: Stack layers ----------------------------------------------------
+function renderScreen2() {
+  var layers = SASC_DATA.layers
+  var html = '<div class="card"><div class="card-title">Stack configuration</div>'
+    + '<div class="card-sub" style="margin-bottom:14px">Toggle layers on or off. Pre-selected based on your scope of supply. Click a layer to toggle.</div>'
+    + '<div class="layer-list">'
+
+  Object.keys(layers).forEach(function(key) {
+    var l = layers[key]
+    html += '<div class="layer-row" data-key="' + key + '" onclick="toggleLayer(this.dataset.key)">'
+      + '<div class="layer-chk ' + (l.on ? 'on' : '') + '" id="chk-' + key + '"></div>'
+      + '<div class="layer-info">'
+      + '<div class="layer-name">' + esc(l.name) + '</div>'
+      + '<div class="layer-desc">' + esc(l.desc) + '</div>'
+      + '</div>'
+      + '<div class="layer-tag">' + esc(l.tag) + '</div>'
+      + '</div>'
+  })
+
+  html += '</div></div>'
+    + '<div class="actions-bar">'
+    + '<button class="btn btn-ghost" onclick="renderStep(1)">&larr; Back</button>'
+    + '<button class="btn btn-primary" onclick="renderStep(3)">Generate BOM + ROM &rarr;</button>'
+    + '</div>'
+  return html
+}
+
+// -- Screen 3: BOM + ROM -------------------------------------------------------
+function renderScreen3Loading() {
+  return '<div class="card"><div style="display:flex;align-items:center;gap:10px;padding:20px">'
+    + '<div class="spinner"></div>'
+    + '<div class="status-msg">Calculating BOM + ROM from pricing parameters&hellip;</div>'
+    + '</div></div>'
+}
+
+async function loadAndRenderBOM() {
+  // Load pricing params
+  var pricing = await sbFetch('pricing_params', 'active=eq.true&order=category.asc', 200)
+  var ucProfiles = await sbFetch('uc_workload_profiles', 'order=domain.asc', 50)
+  var benchmarks = await sbFetch('benchmark_results', 'order=gpu_type.asc', 50)
+
+  SASC_DATA.pricingParams  = pricing  || []
+  SASC_DATA.ucProfiles     = ucProfiles || []
+  SASC_DATA.benchmarks     = benchmarks || []
+
+  // Calculate BOM
+  var bom = calculateBOM(pricing, ucProfiles)
+  SASC_DATA.bom = bom
+
+  document.getElementById('app-content').innerHTML = renderScreen3(bom)
+}
+
+function calculateBOM(pricing, ucProfiles) {
+  var s = SASC_DATA
+  var layers = s.layers
+  var bom = []
+  var totalCapex = 0
+  var totalOpex  = 0
+  var totalUcdev = 0
+
+  function addLine(category, component, qty, unit, usdPrice, notes) {
+    var line = { category: category, component: component, qty: qty, unit: unit, usd_unit: usdPrice, usd_total: qty * usdPrice, notes: notes || '' }
+    bom.push(line)
+    return line.usd_total
+  }
+
+  function findParam(comp) {
+    return pricing.find(function(p) { return p.component === comp }) || null
+  }
+
+  // -- INFRASTRUCTURE --------------------------------------------------------
+  if (layers.infra.on) {
+    if (s.dcType === 'mdc') {
+      var mdcComp = { xs:'MDC XS (2MW)', s:'MDC S (5MW)', m:'MDC M (10MW)', l:'MDC L (15MW)', xl:'MDC XL (20MW)' }[s.mdc.tshirt]
+      var mdcParam = findParam(mdcComp)
+      var sites = s.mdc.sites || 1
+      if (mdcParam) totalCapex += addLine('Infrastructure', mdcComp + ' x' + sites + ' sites', sites, 'per_site', mdcParam.base_price_usd, 'MDC T-shirt: ' + s.mdc.tshirt.toUpperCase())
+    }
+  }
+
+  // -- COMPUTE ---------------------------------------------------------------
+  if (layers.compute.on) {
+    // Estimate GPU servers needed from UC profiles
+    var selectedProfiles = ucProfiles.filter(function(p) {
+      return s.selectedUCs.length === 0 || true // include all profiles as estimate
+    })
+    var maxGPUs = 0
+    if (selectedProfiles.length) {
+      maxGPUs = selectedProfiles.reduce(function(sum, p) { return sum + (p.gpu_count_rec || 2) }, 0)
+    } else {
+      // Default based on T-shirt or B&M size
+      var defaultGPUs = { xs:16, s:32, m:64, l:96, xl:128 }
+      maxGPUs = s.dcType === 'mdc' ? (defaultGPUs[s.mdc.tshirt] || 64) : 32
+    }
+    var gpuServers = Math.max(1, Math.ceil(maxGPUs / 8))
+    var gpuParam = findParam('GPU Server H100 SXM5 8x')
+    if (gpuParam) totalCapex += addLine('Compute', 'GPU Server H100 SXM5 8x', gpuServers, 'per_server', gpuParam.base_price_usd, maxGPUs + ' GPUs recommended across ' + s.selectedUCs.length + ' UCs')
+    // CPU servers (1 per 4 GPU servers)
+    var cpuServers = Math.max(2, Math.ceil(gpuServers / 4))
+    var cpuParam = findParam('CPU Server AMD EPYC 9654')
+    if (cpuParam) totalCapex += addLine('Compute', 'CPU Server AMD EPYC 9654', cpuServers, 'per_server', cpuParam.base_price_usd, 'Platform + orchestration')
+    // Storage
+    var storageParam = findParam('NVMe All-Flash Storage')
+    var storageTB = Math.max(50, gpuServers * 20)
+    if (storageParam) totalCapex += addLine('Storage', 'NVMe All-Flash Storage', storageTB, 'per_tb', storageParam.base_price_usd, storageTB + ' TB estimated')
+    var objParam = findParam('Object Storage')
+    var objTB = storageTB * 3
+    if (objParam) totalCapex += addLine('Storage', 'Object Storage', objTB, 'per_tb', objParam.base_price_usd, objTB + ' TB for models + datasets')
+  }
+
+  // -- NETWORKING ------------------------------------------------------------
+  if (layers.network.on) {
+    var gpuServersCount = bom.find(function(b) { return b.component.indexOf('GPU Server') >= 0 })
+    var srvCount = gpuServersCount ? gpuServersCount.qty : 4
+    var ibSpines = Math.max(1, Math.ceil(srvCount / 8))
+    var ibParam = findParam('InfiniBand NDR 400Gbps Switch')
+    if (ibParam) totalCapex += addLine('Networking', 'InfiniBand NDR 400Gbps Switch', ibSpines, 'per_switch', ibParam.base_price_usd, 'E-W GPU fabric')
+    var nkcSpines = Math.max(2, Math.ceil(srvCount / 16))
+    var nkcParam = findParam('NKC 100GbE Spine Switch')
+    if (nkcParam) totalCapex += addLine('Networking', 'NKC 100GbE Spine Switch', nkcSpines, 'per_switch', nkcParam.base_price_usd, 'N-S fabric (NKC proprietary)')
+    var torCount = Math.max(2, Math.ceil(srvCount / 10))
+    var torParam = findParam('NKC 25GbE ToR Switch')
+    if (torParam) totalCapex += addLine('Networking', 'NKC 25GbE ToR Switch', torCount, 'per_switch', torParam.base_price_usd, 'Top-of-rack')
+  }
+
+  // -- SOFTWARE PLATFORM -----------------------------------------------------
+  if (layers.platform.on) {
+    var nodeCount = (bom.find(function(b){return b.component.indexOf('GPU')+b.component.indexOf('CPU')>0})
+                    ? bom.reduce(function(s,b){return s+(b.component.indexOf('Server')>=0?b.qty:0)},0) : 10)
+    var dfParam = findParam('Data Fusion Platform')
+    if (dfParam) totalOpex += addLine('Software', 'Data Fusion Platform (annual)', nodeCount, 'per_node', dfParam.base_price_usd, 'Year 1 annual licence')
+    var ragParam = findParam('RAG Platform')
+    if (ragParam) totalOpex += addLine('Software', 'RAG Platform (annual)', 1, 'per_instance', ragParam.base_price_usd, 'Per cluster')
+    var mlParam = findParam('Model Registry + MLflow')
+    if (mlParam) totalOpex += addLine('Software', 'Model Registry + MLflow (annual)', 1, 'per_instance', mlParam.base_price_usd, 'Per cluster')
+    var govParam = findParam('AI Governance + Audit')
+    if (govParam) totalOpex += addLine('Software', 'AI Governance + Audit (annual)', 1, 'per_instance', govParam.base_price_usd, '')
+    var sarvamParam = findParam('Sarvam AI Sovereign LLM')
+    if (sarvamParam) totalOpex += addLine('Software', 'Sarvam AI Sovereign LLM licence (annual)', 1, 'per_instance', 50000, 'Annual licence estimate')
+  }
+
+  // -- SECURITY --------------------------------------------------------------
+  if (layers.security.on) {
+    var secNodes = 20
+    var siemParam = findParam('SIEM Platform')
+    if (siemParam) totalOpex += addLine('Security', 'SIEM Platform (annual)', secNodes, 'per_node', siemParam.base_price_usd, '')
+    var ztParam = findParam('Zero-Trust Platform')
+    if (ztParam) totalOpex += addLine('Security', 'Zero-Trust Platform (annual)', secNodes, 'per_node', ztParam.base_price_usd, '')
+    var auditParam = findParam('Security Audit')
+    if (auditParam) totalCapex += addLine('Security', 'Security Audit (per site)', s.dcType === 'mdc' ? (s.mdc.sites||1) : 1, 'per_site', auditParam.base_price_usd, 'CERT-In empanelled')
+  }
+
+  // -- INFRA SOFTWARE --------------------------------------------------------
+  if (layers.platform.on || layers.resilience.on) {
+    var k8sNodes = 15
+    var k8sParam = findParam('Kubernetes + OpenShift')
+    if (k8sParam) totalOpex += addLine('Infra Software', 'Kubernetes + OpenShift (annual)', k8sNodes, 'per_node', k8sParam.base_price_usd, '')
+    var mlopsParam = findParam('MLOps Platform (Kubeflow)')
+    if (mlopsParam) totalOpex += addLine('Infra Software', 'MLOps Platform (annual)', 1, 'per_instance', mlopsParam.base_price_usd, '')
+    var bkpParam = findParam('Backup Software')
+    var bkpTB = 200
+    if (bkpParam) totalOpex += addLine('Infra Software', 'Backup Software (annual)', bkpTB, 'per_tb', bkpParam.base_price_usd, bkpTB + ' TB managed')
+  }
+
+  // -- SERVICES --------------------------------------------------------------
+  if (layers.data.on || layers.compute.on) {
+    var deployDays = 30
+    var saParam = findParam('Solution Architecture')
+    if (saParam) totalCapex += addLine('Services', 'Solution Architecture', deployDays * 0.3, 'person_day', saParam.base_price_usd, '')
+    var platParam = findParam('Platform Deployment')
+    if (platParam) totalCapex += addLine('Services', 'Platform Deployment', deployDays * 0.5, 'person_day', platParam.base_price_usd, '')
+    var netParam2 = findParam('Network Configuration')
+    if (netParam2) totalCapex += addLine('Services', 'Network Configuration', 10, 'person_day', netParam2.base_price_usd, '')
+    var secHParam = findParam('Security Hardening')
+    if (secHParam) totalCapex += addLine('Services', 'Security Hardening', 15, 'person_day', secHParam.base_price_usd, '')
+    var perfParam = findParam('Performance Testing')
+    if (perfParam) totalCapex += addLine('Services', 'Performance Testing', 1, 'fixed', perfParam.base_price_usd, 'Per cluster')
+  }
+
+  // -- UC DEVELOPMENT --------------------------------------------------------
+  if (layers.ucdev.on) {
+    var ucCount = Math.max(1, s.selectedUCs.length || (ALL_UCS.length || 3))
+    var medParam = findParam('UC Development - Medium')
+    if (medParam) totalUcdev += addLine('UC Development', 'UC Development - Medium complexity', ucCount, 'per_uc', medParam.base_price_usd, ucCount + ' UCs estimated at medium complexity')
+    var uatParam = findParam('UAT and Acceptance Testing')
+    if (uatParam) totalUcdev += addLine('UC Development', 'UAT and Acceptance Testing', ucCount, 'per_uc', uatParam.base_price_usd, '')
+  }
+
+  SASC_DATA.rom = {
+    capex_usd: totalCapex,
+    opex_usd: totalOpex,
+    ucdev_usd: totalUcdev,
+    total_usd: totalCapex + (totalOpex * 3) + totalUcdev  // 3-year opex
+  }
+
+  return bom
+}
+
+function renderScreen3(bom) {
+  var rom = SASC_DATA.rom
+  var confidence = 35  // parametric pre-UC
+
+  // Group BOM by category
+  var categories = {}
+  bom.forEach(function(line) {
+    if (!categories[line.category]) categories[line.category] = []
+    categories[line.category].push(line)
+  })
+
+  var html = '<div class="card">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    + '<div><div class="card-title">Bill of Materials + ROM</div>'
+    + '<div class="card-sub">' + (SASC_DATA.mdc.sites || 1) + ' site(s) &bull; ' + SASC_DATA.mdc.tshirt.toUpperCase() + '-class MDC &bull; ' + SASC_DATA.scope + ' stack</div>'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:8px">'
+    + '<span class="confidence-badge">&#177;' + confidence + '% confidence</span>'
+    + '<div class="currency-toggle">'
+    + ['USD','INR','EUR'].map(function(c){
+        return '<button class="curr-btn ' + (SASC_CURRENCY===c?'active':'') + '" data-curr="' + c + '" onclick="setCurrency(this.dataset.curr)">' + c + '</button>'
+      }).join('')
+    + '</div></div></div>'
+
+    + '<table class="bom-table"><thead><tr>'
+    + '<th>Component</th><th>Qty</th><th>Unit price</th><th>Total</th>'
+    + '</tr></thead><tbody>'
+
+  Object.keys(categories).forEach(function(cat) {
+    html += '<tr class="cat-row"><td colspan="4">' + esc(cat) + '</td></tr>'
+    categories[cat].forEach(function(line) {
+      html += '<tr><td>' + esc(line.component) + (line.notes ? '<div style="font-size:10px;color:var(--mid)">' + esc(line.notes) + '</div>' : '') + '</td>'
+        + '<td>' + line.qty + '</td>'
+        + '<td>' + fmtMoney(line.usd_unit) + '</td>'
+        + '<td style="font-weight:600">' + fmtMoney(line.usd_total) + '</td></tr>'
+    })
+  })
+
+  html += '</tbody></table>'
+    + '<div class="bom-total"><div class="bom-total-label">Total CapEx</div>'
+    + '<div class="bom-total-val">' + fmtMoney(rom.capex_usd) + '</div></div>'
+    + '</div>'
+
+    // ROM summary card
+    + '<div class="card"><div class="card-title">Rough Order of Magnitude (ROM)</div>'
+    + '<div class="card-sub">3-year programme cost including CapEx, OpEx and UC development</div>'
+    + '<table class="bom-table"><tbody>'
+    + '<tr><td>CapEx (hardware + software + services)</td><td style="font-weight:600;text-align:right">' + fmtMoney(rom.capex_usd) + '</td></tr>'
+    + '<tr><td>OpEx (software licences &times; 3 years)</td><td style="font-weight:600;text-align:right">' + fmtMoney(rom.opex_usd * 3) + '</td></tr>'
+    + '<tr><td>UC development</td><td style="font-weight:600;text-align:right">' + fmtMoney(rom.ucdev_usd) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div class="bom-total"><div class="bom-total-label">Programme ROM (3yr)</div>'
+    + '<div class="bom-total-val">' + fmtMoney(rom.total_usd) + '</div></div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-top:4px">'
+    + 'Range: ' + fmtMoney(rom.total_usd * (1 - confidence/100)) + ' &mdash; ' + fmtMoney(rom.total_usd * (1 + confidence/100))
+    + ' at &plusmn;' + confidence + '% confidence'
+    + '</div></div>'
+
+    + '<div class="actions-bar">'
+    + '<button class="btn btn-ghost" onclick="renderStep(2)">&larr; Back</button>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button class="btn btn-outline" onclick="exportBOM()">&#128196; Export CSV</button>'
+    + '<button class="btn btn-primary" onclick="saveToDocket()">&#128190; Save to docket</button>'
+    + '</div></div>'
+  return html
+}
+
+// -- Actions -------------------------------------------------------------------
+function toggleUC(id) {
+  var idx = SASC_DATA.selectedUCs.indexOf(id)
+  if (idx >= 0) SASC_DATA.selectedUCs.splice(idx, 1)
+  else SASC_DATA.selectedUCs.push(id)
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function setScope(v) {
+  SASC_DATA.scope = v
+  adjustLayersByScope(v)
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function setDCType(v) {
+  SASC_DATA.dcType = v
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function setTshirt(v) {
+  SASC_DATA.mdc.tshirt = v
+  document.getElementById('app-content').innerHTML = renderScreen1()
+  updateMDCSummary()
+}
+
+function updateMDCSummary() {
+  var el = document.getElementById('mdc-summary')
+  if (!el) return
+  var mwMap = { xs:2, s:5, m:10, l:15, xl:20 }
+  var sites = SASC_DATA.mdc.sites || 1
+  var mw = (mwMap[SASC_DATA.mdc.tshirt] || 10) * sites
+  el.textContent = 'Total programme: ' + mw + ' MW across ' + sites + ' site(s)'
+}
+
+function toggleLayer(key) {
+  SASC_DATA.layers[key].on = !SASC_DATA.layers[key].on
+  var chk = document.getElementById('chk-' + key)
+  if (chk) { chk.className = 'layer-chk ' + (SASC_DATA.layers[key].on ? 'on' : '') }
+}
+
+function goStep2() {
+  // Save DC detail inputs before navigating
+  var sitesEl = document.getElementById('mdc-sites')
+  if (sitesEl) SASC_DATA.mdc.sites = parseInt(sitesEl.value) || 1
+  var snEl = document.getElementById('mdc-sitenames')
+  if (snEl) SASC_DATA.mdc.siteNames = snEl.value
+  renderStep(2)
+}
+
+async function saveToDocket() {
+  if (!SASC_DATA.docketId) {
+    showToast('No docket linked. Launch SASC from an engagement docket.')
+    return
+  }
+  var itemId = SASC_DATA.docketItemId || genId('SASC')
+  var item = {
+    id: itemId,
+    docket_id: SASC_DATA.docketId,
+    item_type: 'solution',
+    title: 'SASC: ' + SASC_DATA.mdc.tshirt.toUpperCase() + ' MDC x' + (SASC_DATA.mdc.sites||1) + ' -- ' + SASC_DATA.scope + ' stack',
+    notes: 'ROM: ' + fmtMoney(SASC_DATA.rom.total_usd, 'USD') + ' (' + fmtMoney(SASC_DATA.rom.total_usd, 'INR') + ')',
+    content: {
+      type: 'sasc',
+      sasc: {
+        engId: SASC_DATA.engId, docketId: SASC_DATA.docketId,
+        scope: SASC_DATA.scope, dcType: SASC_DATA.dcType,
+        mdc: SASC_DATA.mdc, bm: SASC_DATA.bm,
+        layers: Object.fromEntries(Object.entries(SASC_DATA.layers).map(function(e){ return [e[0], {on: e[1].on}] })),
+        selectedUCs: SASC_DATA.selectedUCs,
+        rom: SASC_DATA.rom
+      },
+      bom_lines: SASC_DATA.bom.map(function(l){ return { component: l.component, qty: l.qty, usd_total: l.usd_total } }),
+      rom_usd: SASC_DATA.rom.total_usd,
+      rom_inr: SASC_DATA.rom.total_usd * (FX_RATES.INR || 84.2)
+    },
+    status: 'active',
+    created_at: new Date().toISOString()
+  }
+  var method = SASC_DATA.docketItemId ? 'PATCH' : 'POST'
+  var url = getSB().url + '/rest/v1/docket_items' + (SASC_DATA.docketItemId ? '?id=eq.' + SASC_DATA.docketItemId : '')
+  try {
+    var r = await fetch(url, {
+      method: method,
+      headers: { apikey: getSB().key, Authorization: 'Bearer ' + getSB().key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(item)
+    })
+    if (r.ok) {
+      SASC_DATA.docketItemId = itemId
+      showToast('Saved to docket')
+      setTimeout(function(){ backToDocket() }, 1200)
+    } else {
+      showToast('Save failed -- check Supabase connection')
+    }
+  } catch(e) { showToast('Error: ' + e.message) }
+}
+
+function exportBOM() {
+  var rows = ['Category,Component,Qty,Unit Price (USD),Total (USD),Total (' + SASC_CURRENCY + ')']
+  SASC_DATA.bom.forEach(function(l) {
+    rows.push([l.category, '"' + l.component + '"', l.qty, l.usd_unit.toFixed(0), l.usd_total.toFixed(0), fmtMoney(l.usd_total)].join(','))
+  })
+  rows.push(',,,,,')
+  rows.push(',Total CapEx,,,' + SASC_DATA.rom.capex_usd.toFixed(0) + ',' + fmtMoney(SASC_DATA.rom.capex_usd))
+  rows.push(',Programme ROM (3yr),,,' + SASC_DATA.rom.total_usd.toFixed(0) + ',' + fmtMoney(SASC_DATA.rom.total_usd))
+  var blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+  var a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'SASC_BOM_' + (SASC_DATA.engName || 'export').replace(/\s+/g,'_') + '.csv'
+  a.click()
+  showToast('BOM exported as CSV')
+}
+
+function backToDocket() {
+  if (SASC_DATA.engId && SASC_DATA.docketId) {
+    window.location.href = DOCKET_URL + '?eng=' + SASC_DATA.engId + '&docket=' + SASC_DATA.docketId
+  } else {
+    window.location.href = DOCKET_URL
+  }
+}
+
+// -- Boot ----------------------------------------------------------------------
+init()
+</script>
+</body>
+</html>
