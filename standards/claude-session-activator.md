@@ -310,3 +310,66 @@ L3     L3-*       23 Lifecycle Services
 | 15 | UX pass — Engagement Docket | ⬜ Later |
 | 16 | Visualisations (radar, territory map, tokenomics) | ⬜ Later |
 | 17 | Brand.md + hardware-preferences.md | ⬜ After hardware decisions |
+
+---
+
+## Intelligence Operations — Agent Architecture (Future Sprint)
+
+**Decision: Build after current ATLAS priorities (AI Centre Configurator, Financial Model, Pitch Report)**
+
+### Planned Agent Harness
+
+```
+Agent 1 — Feed Discovery Agent (weekly, feed_discovery.yml — BUILT)
+  Finds new RSS feeds, validates accessibility, writes to feed_library
+
+Agent 2 — Feed Health Agent (daily, part of feed_discovery.yml — BUILT)
+  Dormants/drops underperformers, reactivates recovered feeds
+
+Agent 3 — Intelligence Gathering Agent (daily, scrape-intelligence.js — BUILT)
+  Fetches feeds + search grounding, two-phase semantic filter, writes to intelligence_items
+
+Agent 4 — Intelligence Quality Agent (future)
+  Weekly: reviews captured items, scores quality, flags stale/irrelevant
+  Feeds back to improve semantic context tree
+
+Agent 5 — Context Tree Improvement Agent (future)
+  Monthly: analyses what's captured vs missed
+  Suggests new contexts, refines existing ones — human approval before applying
+```
+
+### Search API Evaluation (June 2026)
+
+**Exa.ai — RECOMMENDED for future Intelligence Gathering Agent**
+- $7 per 1,000 searches (standard, includes 10 results + full page content)
+- $12 per 1,000 searches (Exa Deep / agentic)
+- Free tier: 1,000 searches/month
+- **Killer feature:** "Find Similar" — give it a URL, get 10 semantically similar articles from sources not yet indexed. Perfect for feed discovery.
+- Dedicated news search mode — structured, LLM-ready
+- At our daily volume (~200 searches/day): ~$50/month
+- Use case: replace Gemini search grounding in Agent 3, power Agent 1 feed discovery
+
+**Tavily — SKIP**
+- Credit-based pricing ($30-100/month)
+- Unpredictable cost on research tasks (4-250 credits per request)
+- Good for RAG pipelines but overcomplicated for our use case
+
+**Current approach (keep for now):**
+- Gemini search grounding (free, already working)
+- Add Exa.ai when refactoring into proper agent architecture
+
+---
+
+## Intelligence Scraper — Current Bugs to Fix
+
+**Bug 1 (next session):** `prompt is not defined` in RSS Phase 2
+- `phase2SemanticMatch` builds its own prompt internally
+- But `callGemini(prompt)` is still being called somewhere with undefined `prompt`
+- Fix: find and remove the orphaned `callGemini(prompt)` call in scrapeRSS
+
+**Bug 2 (low priority):** FE AI feed has malformed XML (`&` in entity name)
+- Feed itself is broken — dormant it in feed_library
+
+**Known issue:** 498 titles in dedup set suppressing yield
+- Will clear naturally as 7-day window ages out old items
+- Do NOT enable daily schedule until yield stabilises at 10+ items/run
