@@ -373,3 +373,42 @@ Agent 5 — Context Tree Improvement Agent (future)
 **Known issue:** 498 titles in dedup set suppressing yield
 - Will clear naturally as 7-day window ages out old items
 - Do NOT enable daily schedule until yield stabilises at 10+ items/run
+
+---
+
+## Sprint 3 — Complete ✅ (2026-06-08)
+
+### Sovereign AI Stack Configurator (SASC) — Live at `tools/sasc/`
+
+**New tool:** `tools/sasc/index.html`
+**Launch flows:**
+1. Engagement Docket → solution item → `Configure` button → SASC pre-loaded with context
+2. Engagement Docket header → `SASC` button → fresh configuration
+3. Portal nav → SASC card in presales section
+
+**Three-screen flow:**
+- Screen 1: UC pills from docket (checkboxes), scope selector (full/hardware/software/custom), DC decision (MDC T-shirt+sites / B&M existing / B&M new build)
+- Screen 2: 9 toggleable stack layers, pre-checked by scope
+- Screen 3: BOM + ROM from pricing_params table, currency toggle (USD/INR/EUR), Indian numbering, ±35% confidence, Export CSV, Save to docket
+
+**Foundation tables (in Supabase):**
+- `pricing_params` — 45 components, all prices in USD
+- `people_params` — 20 roles with USD rates + COLA %
+- `benchmark_results` — 8 GPU benchmarks (H100, MI325X, GB200)
+- `uc_workload_profiles` — 7 HP TSAP UC profiles
+- `fx_rates` — USD→INR/EUR/GBP/JPY, updated manually
+
+**Key design decisions:**
+- All prices stored in USD — forex applied at display time via `fx_latest` view
+- INR display uses Indian numbering (Crores/Lakhs)
+- T-shirt sizing (XS-XL) only for MDC — B&M uses actual power/rack specs
+- UC workload profiles drive compute sizing (GPU count from tokens/day + latency SLA)
+- BOM traces: UC → workload → compute → networking → power → T-shirt validation
+
+**Pending (next sessions):**
+- SASC: wire UC workload profiles more precisely to compute sizing (currently uses estimated GPU count)
+- SASC: add people model tab (team ramp-up/down, COLA, multi-year)
+- SASC: networking sizing from compute count
+- SASC: detailed layer configuration forms (currently just toggles)
+- Mode 1 Budget Envelope Model (pre-UC parametric — Sprint 4)
+- Mode 2 Detailed Financial Model (post-UC, 6 tabs — Sprint 4)
