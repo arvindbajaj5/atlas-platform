@@ -412,3 +412,36 @@ Agent 5 — Context Tree Improvement Agent (future)
 - SASC: detailed layer configuration forms (currently just toggles)
 - Mode 1 Budget Envelope Model (pre-UC parametric — Sprint 4)
 - Mode 2 Detailed Financial Model (post-UC, 6 tabs — Sprint 4)
+
+---
+
+## SASC — Current Status (June 2026)
+
+**Live at:** `tools/sasc/index.html`
+
+**Working:**
+- 4-screen flow: Scope & DC → Stack layers → Workload Profiler → BOM + ROM
+- Supabase connection fixed — was reading from wrong localStorage key (`atlas_global` vs `atlas_global_cfg` / `sbUrl` vs `sb_url`)
+- UCs load from docket when launched via `?eng=...&docket=...` params
+- GPU sizing from workload inputs (DAU, peak multiplier, session length, tokens/session)
+- Traceability chain: UC → tokens/day → benchmark → servers → power
+- BOM driven by real UC workload sizing
+- Currency toggle USD/INR/EUR with Indian numbering
+- Save to docket, Export CSV
+
+**Known gaps for next session:**
+- BOM figures need review against real HP pricing
+- People model tab (team ramp, COLA, multi-year OpEx)
+- Detailed layer config forms (layers currently just toggles)
+- UC complexity tier selector (Simple/Medium/Complex/Research) affects UC dev cost
+- Benchmark override UI (currently alert-only)
+
+**Critical: SASC localStorage pattern**
+```javascript
+// CORRECT - matches all other ATLAS tools
+function getSB() {
+  var g = typeof atlasGetGlobal === 'function' ? atlasGetGlobal()
+    : (function(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } })()
+  return { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
+}
+```
