@@ -239,6 +239,7 @@ var SASC_DATA = {
 }
 
 var ALL_UCS = []
+var ALL_ENGAGEMENTS = []
 var ENGAGEMENT = null
 
 // -- Init ---------------------------------------------------------------------
@@ -269,7 +270,6 @@ async function init() {
       document.getElementById('hdr-eng-label').innerHTML =
         '<strong>' + esc(SASC_DATA.customerName) + '</strong> &mdash; ' + esc(SASC_DATA.engName)
     }
-
     // Load UC docket items
     if (SASC_DATA.docketId) {
       var docketItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_type=eq.uc', 50)
@@ -278,6 +278,11 @@ async function init() {
         SASC_DATA.selectedUCs = ALL_UCS.map(function(u) { return u.id })
       }
     }
+  } else {
+    // Standalone launch -- load all engagements for selection
+    var allEngs = await sbFetch('engagements', 'order=name.asc', 50)
+    ALL_ENGAGEMENTS = allEngs || []
+    document.getElementById('hdr-eng-label').innerHTML = 'Select engagement below'
   }
 
   // Adjust layers by scope on first load
@@ -353,6 +358,21 @@ function renderStepNav() {
 // -- Screen 1: Scope & DC -----------------------------------------------------
 function renderScreen1() {
   var s = SASC_DATA
+  // Standalone mode -- show engagement selector
+  var engHtml = ''
+  if (!SASC_DATA.engId && ALL_ENGAGEMENTS.length) {
+    engHtml = '<div class="card" style="border-left:3px solid var(--orange)">'
+      + '<div class="card-title">Select engagement</div>'
+      + '<div class="card-sub">SASC was opened without an engagement context. Select one to load UCs.</div>'
+      + '<select onchange="selectEngagement(this.value)" style="width:100%">'
+      + '<option value="">-- Select engagement --</option>'
+      + ALL_ENGAGEMENTS.map(function(e){ return '<option value="' + e.id + '">' + esc(e.name||'Engagement') + '</option>' }).join('')
+      + '</select></div>'
+  } else if (!SASC_DATA.engId) {
+    engHtml = '<div class="card" style="border-left:3px solid var(--amber)">'
+      + '<div class="card-sub">No engagement loaded. Launch SASC from an Engagement Docket for full UC context, or continue without UCs for a generic configuration.</div></div>'
+  }
+
   var ucHtml = ''
   if (ALL_UCS.length) {
     ucHtml = '<div class="card"><div class="card-title">Use cases from docket</div>'
@@ -373,7 +393,7 @@ function renderScreen1() {
     { v:'full',     t:'Full stack',              s:'DC, compute, network, platform, security, ops' },
     { v:'hardware', t:'Hardware + networking',    s:'Customer handles software stack' },
     { v:'software', t:'Platform + software only', s:'Customer has existing compute' },
-    { v:'custom',   t:'Custom',                   s:'Toggle individual layers in Step 2' }
+    { v:'custom',   t:'Custom',                   s:'You select which layers apply in Step 3' }
   ]
 
   var tshirtSizes = [
@@ -387,7 +407,7 @@ function renderScreen1() {
   var mdc = s.mdc
   var bm  = s.bm
 
-  return ucHtml
+  return engHtml + ucHtml
     + '<div class="card"><div class="card-title">Scope of supply</div>'
     + '<div class="card-sub">What are we responsible for delivering?</div>'
     + '<div class="scope-opts">'
@@ -751,7 +771,7 @@ function renderScreen3() {
   html += '</div></div>'
     + '<div class="actions-bar">'
     + '<button class="btn btn-ghost" onclick="renderStep(1)">&larr; Back</button>'
-    + '<button class="btn btn-primary" onclick="renderStep(3)">Generate BOM + ROM &rarr;</button>'
+    + '<button class="btn btn-primary" onclick="renderStep(4)">Generate BOM + ROM &rarr;</button>'
     + '</div>'
   return html
 }
@@ -995,6 +1015,30 @@ function renderScreen4(bom) {
 }
 
 // -- Actions -------------------------------------------------------------------
+
+async function selectEngagement(engId) {
+  if (!engId) return
+  var engs = await sbFetch('engagements', 'id=eq.' + engId, 1)
+  if (!engs || !engs[0]) return
+  SASC_DATA.engId = engId
+  ENGAGEMENT = engs[0]
+  SASC_DATA.engName = engs[0].name || ''
+  SASC_DATA.archetype = engs[0].archetype || ''
+  var custs = await sbFetch('customers', 'id=eq.' + engs[0].customer_id, 1)
+  if (custs && custs[0]) SASC_DATA.customerName = custs[0].name || ''
+  document.getElementById('hdr-eng-label').innerHTML =
+    '<strong>' + esc(SASC_DATA.customerName) + '</strong> &mdash; ' + esc(SASC_DATA.engName)
+  // Load dockets for this engagement
+  var dockets = await sbFetch('engagement_dockets', 'engagement_id=eq.' + engId + '&order=created_at.desc', 1)
+  if (dockets && dockets[0]) {
+    SASC_DATA.docketId = dockets[0].id
+    var docketItems = await sbFetch('docket_items', 'docket_id=eq.' + dockets[0].id + '&item_type=eq.uc', 50)
+    ALL_UCS = docketItems || []
+    SASC_DATA.selectedUCs = ALL_UCS.map(function(u) { return u.id })
+  }
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
 function toggleUC(id) {
   var idx = SASC_DATA.selectedUCs.indexOf(id)
   if (idx >= 0) SASC_DATA.selectedUCs.splice(idx, 1)
