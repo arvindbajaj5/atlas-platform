@@ -135,12 +135,9 @@ input:focus,select:focus{border-color:var(--blue);}
 // -- Config -------------------------------------------------------------------
 const DOCKET_URL = '../engagement-docket/index.html'
 
-function getSBConfig() {
-  try { return JSON.parse(localStorage.getItem('atlas_global') || '{}') } catch(e) { return {} }
-}
 function getSB() {
-  const g = getSBConfig()
-  return { url: g.sb_url || '', key: g.sb_key || '' }
+  var g = typeof atlasGetGlobal === 'function' ? atlasGetGlobal() : (function(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } })()
+  return { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
 }
 async function sbFetch(table, params, limit) {
   const sb = getSB()
