@@ -981,6 +981,21 @@ function setCfgBool(el) {
   setLayerCfg(el.dataset.lk, el.dataset.lf, el.value === 'true')
 }
 
+
+function getLCfg(key) {
+  if (!SASC_DATA.layerCfg) SASC_DATA.layerCfg = {}
+  if (!SASC_DATA.layerCfg[key]) SASC_DATA.layerCfg[key] = Object.assign({}, LAYER_CFG_DEFAULTS[key] || {})
+  return SASC_DATA.layerCfg[key]
+}
+
+function setLayerCfg(key, field, value) {
+  if (!SASC_DATA.layerCfg) SASC_DATA.layerCfg = {}
+  if (!SASC_DATA.layerCfg[key]) SASC_DATA.layerCfg[key] = Object.assign({}, LAYER_CFG_DEFAULTS[key] || {})
+  SASC_DATA.layerCfg[key][field] = value
+  var el = document.getElementById('layer-cfg-' + key)
+  if (el) el.innerHTML = renderLayerCfgPanel(key)
+}
+
 function renderLayerCfgPanel(key) {
   var cfg = getLCfg(key)
   var h = ''
@@ -1148,6 +1163,7 @@ function renderUCComplexityTier(ucId) {
 }
 
 function renderScreen3() {
+  initLayerCfg()
   var layers = SASC_DATA.layers
   var html = '<div class="card"><div class="card-title">Stack configuration</div>'
     + '<div class="card-sub" style="margin-bottom:14px">Toggle layers on or off. Pre-selected based on your scope of supply. Click a layer to toggle.</div>'
