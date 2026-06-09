@@ -319,8 +319,8 @@ function renderStep(n) {
   var el = document.getElementById('app-content')
   renderStepNav()
   if (n === 1) el.innerHTML = renderScreen1()
-  if (n === 2) el.innerHTML = renderScreen2Loading(); if (n === 2) loadWorkloadProfiles()
-  if (n === 3) el.innerHTML = renderScreen3()
+  if (n === 2) { el.innerHTML = renderScreen3() }
+  if (n === 3) { el.innerHTML = renderScreen2Loading(); loadWorkloadProfiles() }
   if (n === 4) el.innerHTML = renderScreen4Loading()
   if (n === 4) loadAndRenderBOM()
 }
@@ -328,8 +328,8 @@ function renderStep(n) {
 function renderStepNav() {
   var steps = [
     { n:1, label:'Scope & DC' },
-    { n:2, label:'Workloads' },
-    { n:3, label:'Stack layers' },
+    { n:2, label:'Stack layers' },
+    { n:3, label:'Workloads' },
     { n:4, label:'BOM + ROM' }
   ]
   var html = '<div class="step-nav">'
@@ -465,7 +465,7 @@ function renderScreen1() {
     + '</div></div>'
 
     + '<div class="actions-bar"><div></div>'
-    + '<button class="btn btn-primary" onclick="goToWorkloads()">Next: Configure stack &rarr;</button>'
+    + '<button class="btn btn-primary" onclick="goToStack()">Next: Configure stack &rarr;</button>'
     + '</div>'
 }
 
@@ -711,8 +711,8 @@ function renderScreen2() {
     + (headroomPct < 0 ? '<div style="font-size:11px;color:#9a6800;margin-top:8px;padding:8px 10px;background:rgba(255,182,0,0.08);border-radius:var(--r-sm)">&#9888; Your UC requirements exceed the selected MDC capacity. Consider upgrading the T-shirt size or adding more sites in Step 1.</div>' : '')
     + '</div>'
   
-  html += '<div class="actions-bar"><button class="btn btn-ghost" onclick="renderStep(1)">&larr; Back</button>'
-    + '<button class="btn btn-primary" onclick="renderStep(3)">Next: Stack layers &rarr;</button></div>'
+  html += '<div class="actions-bar"><button class="btn btn-ghost" onclick="renderStep(2)">&larr; Back</button>'
+    + '<button class="btn btn-primary" onclick="renderStep(4)">Next: BOM + ROM &rarr;</button></div>'
   
   return html
 }
@@ -768,7 +768,7 @@ function renderScreen3() {
   html += '</div></div>'
     + '<div class="actions-bar">'
     + '<button class="btn btn-ghost" onclick="renderStep(1)">&larr; Back</button>'
-    + '<button class="btn btn-primary" onclick="renderStep(4)">Generate BOM + ROM &rarr;</button>'
+    + '<button class="btn btn-primary" onclick="renderStep(3)">Next: Workloads &rarr;</button>'
     + '</div>'
   return html
 }
@@ -1075,7 +1075,7 @@ function toggleLayer(key) {
   if (chk) { chk.className = 'layer-chk ' + (SASC_DATA.layers[key].on ? 'on' : '') }
 }
 
-function goToWorkloads() {
+function goToStack() {
   // Save DC detail inputs before navigating
   var sitesEl = document.getElementById('mdc-sites')
   if (sitesEl) SASC_DATA.mdc.sites = parseInt(sitesEl.value) || 1
