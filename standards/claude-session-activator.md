@@ -445,3 +445,43 @@ function getSB() {
   return { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
 }
 ```
+
+---
+
+## SASC Sprint 3 — Next Build Items (agreed June 2026)
+
+### 1. Model dropdown "?" icons
+Fix `uc_interaction_types` table — update `icon` column with proper emoji per type:
+- Citizen Chatbot → 💬, RAG Q&A → 🔍, Document Processing → 📄
+- Advisory → 💡, Form Filling → 📝, Data Extraction → 🗂️
+- Satellite/Image → 🛰️, Complex Analytics → 📊, Code Assistant → 💻
+- Drug Discovery → 🔬, Speech → 🎙️, Batch Analytics → ⚙️
+Supabase table update only — no code change needed.
+
+### 2. Per-UC GPU override
+- Global GPU selector remains for primary configuration
+- Per-UC "GPU override" flag for exceptions (e.g. GB200 for 405B research UC)
+- BOM shows primary GPU for most UCs + separate line for overrides
+- Keeps BOM clean while allowing exceptions
+
+### 3. People model tab (Tab 2 on BOM+ROM screen)
+- Tab 1: Hardware + Software BOM (current)
+- Tab 2: People model (new)
+  - Role | Grade | Count | Start month | End month | Monthly rate (USD)
+  - COLA applied per year (from people_params table)
+  - Ramp-up / ramp-down curves
+  - Managed service vs customer staff split
+  - Total people cost Year 1 / Year 2 / Year 3
+  - Peak headcount
+- `people_params` table already seeded — needs programme duration input + team composition UI
+- People cost added to ROM total
+
+### 4. People cost in ROM
+- ROM currently = CapEx + OpEx (3yr) + UC dev
+- Update to: ROM = CapEx + OpEx (3yr) + UC dev + People cost
+- Requires people model tab to be built first
+
+### SASC Known Bugs to Fix in Next Build
+- `getCfgBool` helper used but verify setCfgBool called correctly everywhere
+- Layer config panels — verify all 9 layers render without errors
+- BOM numbers need validation against real HP pricing after DB cleanup
