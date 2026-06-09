@@ -267,6 +267,383 @@ var ALL_ENGAGEMENTS = []
 var ENGAGEMENT = null
 
 // -- Init ---------------------------------------------------------------------
+//    PEOPLE MODEL                                                               
+// Tab 2 on Screen 4. Pulls from people_params table.
+// Auto-suggests team from scope + UC count + complexity.
+// Contract types: fixed_price | tm | hybrid
+
+var ALL_PEOPLE_PARAMS = []
+var PEOPLE_MODEL = {
+  contract_type:    'tm',       // fixed_price | tm | hybrid
+  duration_months:  0,          // 0 = auto-calculated
+  team:             [],         // [{role_id, role, grade, count, start_month, end_month, rate_usd, cola_pct}]
+  loaded:           false
+}
+
+// Duration auto-calculation
+function calcAutoDuration() {
+  var s = SASC_DATA
+  var totalMonths = 3  // base infrastructure setup
+  var ucs = s.selectedUCs || []
+  var globalComp = (s.layerCfg && s.layerCfg.ucdev && s.layerCfg.ucdev.complexity) || 'medium'
+  var compMonths = { simple:2, medium:4, complex:6, research:9 }
+  ucs.forEach(function(ucId) {
+    var wl = s.ucWorkloads[ucId] || {}
+    var comp = wl.complexity || globalComp
+    totalMonths += compMonths[comp] || 4
+  })
+  // Parallel execution discount for 2+ UCs
+  if (ucs.length > 1) totalMonths = Math.round(totalMonths * 0.8)
+  return Math.max(6, totalMonths)
+}
+
+// Auto-suggest team based on scope + UC count + complexity
+function suggestTeam(peopleParams, durationMonths) {
+  var s = SASC_DATA
+  var layers = s.layers || {}
+  var ucCount = Math.max(1, (s.selectedUCs || []).length || 1)
+  var globalComp = (s.layerCfg && s.layerCfg.ucdev && s.layerCfg.ucdev.complexity) || 'medium'
+  var team = []
+
+  function addRole(role, grade, count, startMonth, endMonth) {
+    var param = peopleParams.find(function(p) {
+      return p.role === role && p.grade === grade
+    }) || peopleParams.find(function(p) { return p.role === role })
+    if (!param) return
+    team.push({
+      role_id:     param.id,
+      role:        param.role,
+      grade:       param.grade,
+      count:       count,
+      start_month: startMonth,
+      end_month:   endMonth || durationMonths,
+      rate_usd:    param.monthly_rate_usd,
+      cola_pct:    param.cola_pct || 10,
+      managed:     param.managed_service || false
+    })
+  }
+
+  // Programme Manager -- always present
+  addRole('Programme Manager', 'senior', 1, 1, durationMonths)
+
+  // AI/ML Engineers -- scale with UC count + complexity
+  var aiCount = globalComp === 'complex' || globalComp === 'research' ? ucCount : Math.ceil(ucCount * 0.7)
+  aiCount = Math.max(1, Math.min(aiCount, 4))
+  var aiGrade = globalComp === 'research' ? 'lead' : 'senior'
+  if (layers.ucdev && layers.ucdev.on) addRole('AI/ML Engineer', aiGrade, aiCount, 2, durationMonths - 1)
+
+  // Data Engineers
+  if (layers.data && layers.data.on) addRole('Data Engineer', 'senior', Math.max(1, Math.ceil(ucCount/2)), 2, durationMonths - 1)
+
+  // MLOps
+  if (layers.platform && layers.platform.on) addRole('MLOps Engineer', 'senior', 1, 3, durationMonths)
+
+  // Infrastructure
+  if (layers.compute && layers.compute.on) addRole('Infrastructure Engineer', 'senior', 1, 1, 4)
+
+  // Security
+  if (layers.security && layers.security.on) addRole('Security Engineer', 'mid', 1, 2, 5)
+
+  // Domain SME -- based on UC domain
+  var ucDomains = {}
+  ;(s.selectedUCs || []).forEach(function(ucId) {
+    var ucType = ALL_UC_TYPES.find(function(t) {
+      var wl = s.ucWorkloads[ucId] || {}
+      return t.id === wl.uc_type_id
+    })
+    if (ucType) {
+      var domain = ucType.name.toLowerCase().indexOf('satellite') >= 0 ? 'Geospatial' :
+                   ucType.name.toLowerCase().indexOf('drug') >= 0 ? 'Health' :
+                   ucType.name.toLowerCase().indexOf('citizen') >= 0 || ucType.name.toLowerCase().indexOf('governance') >= 0 ? 'Governance' : null
+      if (domain) ucDomains[domain] = true
+    }
+  })
+  Object.keys(ucDomains).forEach(function(domain) {
+    addRole('Domain SME - ' + domain, 'senior', 1, 2, Math.round(durationMonths * 0.7))
+  })
+
+  return team
+}
+
+// Monthly cost for a team member at a given month
+function memberMonthlyCost(member, month) {
+  if (month < member.start_month || month > member.end_month) return 0
+  // Ramp up: 50% in first month, 100% after
+  var rampFactor = month === member.start_month ? 0.5 : 1.0
+  // Ramp down: 50% in last month
+  if (month === member.end_month) rampFactor = 0.5
+  // COLA: apply per year
+  var yearIdx = Math.floor((month - 1) / 12)
+  var colaMultiplier = Math.pow(1 + member.cola_pct / 100, yearIdx)
+  return member.count * member.rate_usd * rampFactor * colaMultiplier
+}
+
+// Calculate total people cost
+function calcPeopleCost(team, durationMonths) {
+  var yearCosts = [0, 0, 0]
+  var peakHeadcount = 0
+  var monthlyBurn = []
+
+  for (var m = 1; m <= durationMonths; m++) {
+    var monthCost = 0
+    var monthHeadcount = 0
+    team.forEach(function(member) {
+      monthCost += memberMonthlyCost(member, m)
+      if (m >= member.start_month && m <= member.end_month) {
+        monthHeadcount += member.count
+      }
+    })
+    monthlyBurn.push({ month: m, cost: Math.round(monthCost) })
+    peakHeadcount = Math.max(peakHeadcount, monthHeadcount)
+    var yearIdx = Math.min(2, Math.floor((m - 1) / 12))
+    yearCosts[yearIdx] += monthCost
+  }
+
+  var managedCost = 0
+  var internalCost = 0
+  team.forEach(function(member) {
+    var totalMemberCost = 0
+    for (var m2 = member.start_month; m2 <= member.end_month; m2++) {
+      totalMemberCost += memberMonthlyCost(member, m2)
+    }
+    if (member.managed) managedCost += totalMemberCost
+    else internalCost += totalMemberCost
+  })
+
+  return {
+    yearCosts:        yearCosts,
+    total:            yearCosts.reduce(function(a,b){ return a+b }, 0),
+    peakHeadcount:    peakHeadcount,
+    monthlyBurn:      monthlyBurn,
+    managedCost:      managedCost,
+    internalCost:     internalCost
+  }
+}
+
+async function loadPeopleModel() {
+  if (!ALL_PEOPLE_PARAMS.length) {
+    ALL_PEOPLE_PARAMS = await sbFetch('people_params', 'active=eq.true&order=role.asc', 50) || []
+  }
+  if (!PEOPLE_MODEL.loaded || !PEOPLE_MODEL.team.length) {
+    var duration = PEOPLE_MODEL.duration_months || calcAutoDuration()
+    PEOPLE_MODEL.duration_months = duration
+    PEOPLE_MODEL.team = suggestTeam(ALL_PEOPLE_PARAMS, duration)
+    PEOPLE_MODEL.loaded = true
+  }
+  return PEOPLE_MODEL
+}
+
+function setPeopleContract(type) {
+  PEOPLE_MODEL.contract_type = type
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
+
+function setPeopleDuration(val) {
+  var n = parseInt(val) || calcAutoDuration()
+  PEOPLE_MODEL.duration_months = n
+  // Re-suggest team with new duration
+  PEOPLE_MODEL.team = suggestTeam(ALL_PEOPLE_PARAMS, n)
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
+
+function updateTeamMember(idx, field, value) {
+  if (!PEOPLE_MODEL.team[idx]) return
+  PEOPLE_MODEL.team[idx][field] = isNaN(Number(value)) ? value : Number(value)
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
+
+function addTeamMember() {
+  var param = ALL_PEOPLE_PARAMS[0]
+  if (!param) return
+  PEOPLE_MODEL.team.push({
+    role_id: param.id, role: param.role, grade: param.grade,
+    count: 1, start_month: 1, end_month: PEOPLE_MODEL.duration_months,
+    rate_usd: param.monthly_rate_usd, cola_pct: param.cola_pct || 10, managed: false
+  })
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
+
+function removeTeamMember(idx) {
+  PEOPLE_MODEL.team.splice(idx, 1)
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
+
+function changePeopleRole(idx, roleId) {
+  var param = ALL_PEOPLE_PARAMS.find(function(p){ return p.id === roleId })
+  if (!param || !PEOPLE_MODEL.team[idx]) return
+  PEOPLE_MODEL.team[idx].role_id   = param.id
+  PEOPLE_MODEL.team[idx].role      = param.role
+  PEOPLE_MODEL.team[idx].grade     = param.grade
+  PEOPLE_MODEL.team[idx].rate_usd  = param.monthly_rate_usd
+  PEOPLE_MODEL.team[idx].cola_pct  = param.cola_pct || 10
+  PEOPLE_MODEL.team[idx].managed   = param.managed_service || false
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
+
+//    Render people model tab                                                    
+function renderPeopleTab() {
+  var pm = PEOPLE_MODEL
+  var duration = pm.duration_months || calcAutoDuration()
+  var autoDur  = calcAutoDuration()
+  var peopleCost = calcPeopleCost(pm.team, duration)
+
+  // Contract type selector
+  var html = '<div class="card">'
+    + '<div class="card-title">Contract type</div>'
+    + '<div class="card-sub">Determines how people costs are presented in the ROM</div>'
+    + '<div class="scope-opts" style="margin-bottom:0">'
+    + [
+        {v:'tm',          t:'Time & Materials',  s:'Customer pays monthly actuals. We bill at agreed rates.'},
+        {v:'fixed_price', t:'Fixed Price',       s:'Lump sum. Our risk. Margin baked in.'},
+        {v:'hybrid',      t:'Hybrid',            s:'Fixed price for UC dev, T&M for managed services.'}
+      ].map(function(o) {
+        return '<div class="scope-opt ' + (pm.contract_type===o.v?'sel':'') + '" data-ct="' + o.v + '" onclick="setPeopleContract(this.dataset.ct)">'
+          + '<div class="scope-opt-title">' + o.t + '</div>'
+          + '<div class="scope-opt-sub">' + o.s + '</div></div>'
+      }).join('')
+    + '</div></div>'
+
+  // Programme duration
+  html += '<div class="card">'
+    + '<div class="card-title">Programme duration</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+    + '<div><label>Duration (months)</label>'
+    + '<input type="number" min="3" max="60" value="' + duration + '" id="prog-duration" onchange="setPeopleDuration(this.value)">'
+    + '<div style="font-size:10px;color:var(--mid);margin-top:3px">Auto-calculated: ' + autoDur + ' months from UC count + complexity. Override above.</div>'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:4px;justify-content:flex-end">'
+    + '<div style="font-size:12px;font-weight:600;color:var(--navy)">Peak headcount: ' + peopleCost.peakHeadcount + '</div>'
+    + '<div style="font-size:11px;color:var(--mid)">Managed service: ' + fmtMoney(peopleCost.managedCost) + '</div>'
+    + '<div style="font-size:11px;color:var(--mid)">Internal team: ' + fmtMoney(peopleCost.internalCost) + '</div>'
+    + '</div></div></div>'
+
+  // Team table
+  html += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    + '<div><div class="card-title">Team composition</div>'
+    + '<div class="card-sub">Auto-suggested from scope + UC count. Override as needed.</div></div>'
+    + '<button class="btn btn-ghost btn-sm" onclick="addTeamMember()">+ Add role</button>'
+    + '</div>'
+    + '<div style="overflow-x:auto"><table class="bom-table"><thead><tr>'
+    + '<th>Role</th><th>Grade</th><th>Count</th><th>Start mo.</th><th>End mo.</th>'
+    + '<th>Rate/mo (USD)</th><th>COLA%</th><th>MS</th>'
+    + '<th>Yr 1</th><th>Yr 2</th><th>Yr 3</th><th></th>'
+    + '</tr></thead><tbody>'
+
+  pm.team.forEach(function(member, idx) {
+    var yr1 = 0, yr2 = 0, yr3 = 0
+    for (var m = member.start_month; m <= member.end_month; m++) {
+      var cost = memberMonthlyCost(member, m)
+      var yi   = Math.min(2, Math.floor((m-1)/12))
+      if (yi===0) yr1+=cost; else if(yi===1) yr2+=cost; else yr3+=cost
+    }
+    html += '<tr>'
+      // Role selector
+      + '<td><select style="font-size:11px;padding:2px 4px;min-width:140px" data-idx="' + idx + '" onchange="changePeopleRole(this.dataset.idx,this.value)">'
+      + ALL_PEOPLE_PARAMS.map(function(p) {
+          return '<option value="' + p.id + '"' + (member.role_id===p.id?' selected':'') + '>' + p.role + ' (' + p.grade + ')</option>'
+        }).join('')
+      + '</select></td>'
+      + '<td style="font-size:11px;color:var(--mid)">' + esc(member.grade) + '</td>'
+      + '<td><input type="number" min="1" max="20" value="' + member.count + '" style="width:50px;font-size:11px;padding:2px 4px" data-idx="' + idx + '" data-field="count" onchange="updateTeamMember(this.dataset.idx,this.dataset.field,this.value)"></td>'
+      + '<td><input type="number" min="1" max="' + duration + '" value="' + member.start_month + '" style="width:50px;font-size:11px;padding:2px 4px" data-idx="' + idx + '" data-field="start_month" onchange="updateTeamMember(this.dataset.idx,this.dataset.field,this.value)"></td>'
+      + '<td><input type="number" min="1" max="' + duration + '" value="' + member.end_month + '" style="width:50px;font-size:11px;padding:2px 4px" data-idx="' + idx + '" data-field="end_month" onchange="updateTeamMember(this.dataset.idx,this.dataset.field,this.value)"></td>'
+      + '<td style="font-size:11px">' + fmtMoney(member.rate_usd) + '</td>'
+      + '<td style="font-size:11px">' + member.cola_pct + '%</td>'
+      + '<td style="font-size:11px">' + (member.managed?'Yes':'No') + '</td>'
+      + '<td style="font-size:11px;font-weight:600">' + fmtMoney(yr1) + '</td>'
+      + '<td style="font-size:11px">' + fmtMoney(yr2) + '</td>'
+      + '<td style="font-size:11px">' + fmtMoney(yr3) + '</td>'
+      + '<td><button class="btn btn-ghost btn-xs" data-idx="' + idx + '" onclick="removeTeamMember(this.dataset.idx)" style="color:var(--orange)">x</button></td>'
+      + '</tr>'
+  })
+
+  html += '</tbody></table></div>'
+
+  // People cost summary
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:2px solid var(--navy);margin-top:8px">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy)">Total people cost</div>'
+    + '<div style="display:flex;gap:16px">'
+    + '<div style="text-align:center"><div style="font-size:11px;color:var(--mid)">Year 1</div><div style="font-size:14px;font-weight:700;color:var(--navy)">' + fmtMoney(peopleCost.yearCosts[0]) + '</div></div>'
+    + '<div style="text-align:center"><div style="font-size:11px;color:var(--mid)">Year 2</div><div style="font-size:14px;font-weight:700;color:var(--navy)">' + fmtMoney(peopleCost.yearCosts[1]) + '</div></div>'
+    + '<div style="text-align:center"><div style="font-size:11px;color:var(--mid)">Year 3</div><div style="font-size:14px;font-weight:700;color:var(--navy)">' + fmtMoney(peopleCost.yearCosts[2]) + '</div></div>'
+    + '<div style="text-align:center;padding-left:12px;border-left:2px solid var(--navy)"><div style="font-size:11px;color:var(--mid)">Programme total</div><div style="font-size:18px;font-weight:900;color:var(--orange)">' + fmtMoney(peopleCost.total) + '</div></div>'
+    + '</div></div>'
+    + '</div>'
+
+  return html
+}
+
+//    ROM Summary tab                                                            
+function renderROMSummary() {
+  var rom = SASC_DATA.rom || { capex_usd:0, opex_usd:0, ucdev_usd:0, total_usd:0 }
+  var pm = PEOPLE_MODEL
+  var duration = pm.duration_months || calcAutoDuration()
+  var peopleCost = calcPeopleCost(pm.team, duration)
+  var confidence = 35
+
+  var totalROM = rom.capex_usd + (rom.opex_usd * 3) + rom.ucdev_usd + peopleCost.total
+  var lo = Math.round(totalROM * (1 - confidence/100))
+  var hi = Math.round(totalROM * (1 + confidence/100))
+
+  var html = '<div class="card">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    + '<div><div class="card-title">Programme ROM</div>'
+    + '<div class="card-sub">' + (pm.contract_type==='tm'?'Time & Materials':pm.contract_type==='fixed_price'?'Fixed Price':'Hybrid') + ' &bull; ' + duration + ' months</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:3px">'
+    + ['USD','INR','EUR'].map(function(c) {
+        return '<button class="curr-btn ' + (SASC_CURRENCY===c?'active':'') + '" data-curr="' + c + '" onclick="setCurrency(this.dataset.curr)">' + c + '</button>'
+      }).join('')
+    + '</div></div>'
+
+    + '<table class="bom-table"><tbody>'
+    + '<tr><td>CapEx (hardware + networking + infrastructure)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(rom.capex_usd) + '</td></tr>'
+    + '<tr><td>OpEx (software licences x 3 years)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(rom.opex_usd*3) + '</td></tr>'
+    + '<tr><td>UC development (build + test)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(rom.ucdev_usd) + '</td></tr>'
+    + '<tr><td>People cost (' + duration + ' month programme)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(peopleCost.total) + '</td></tr>'
+    + '</tbody></table>'
+
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:2px solid var(--navy);margin-top:4px">'
+    + '<div style="font-size:15px;font-weight:700;color:var(--navy)">Total Programme ROM</div>'
+    + '<div style="font-size:22px;font-weight:900;color:var(--orange)">' + fmtMoney(totalROM) + '</div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:14px">Range: ' + fmtMoney(lo) + ' &mdash; ' + fmtMoney(hi) + ' at &plusmn;' + confidence + '% confidence</div>'
+
+  // Contract-specific view
+  if (pm.contract_type === 'tm') {
+    var avgMonthly = Math.round(totalROM / duration)
+    html += '<div style="background:rgba(0,40,112,0.04);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:14px">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px">T&M view</div>'
+      + '<div style="font-size:12px;color:var(--mid)">Average monthly billing: <strong>' + fmtMoney(avgMonthly) + '</strong></div>'
+      + '<div style="font-size:12px;color:var(--mid)">Over ' + duration + ' months</div>'
+      + '</div>'
+  } else if (pm.contract_type === 'fixed_price') {
+    var margin = 0.18
+    var fixedPrice = Math.round(totalROM * (1 + margin))
+    html += '<div style="background:rgba(0,40,112,0.04);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:14px">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px">Fixed Price view</div>'
+      + '<div style="font-size:12px;color:var(--mid)">Recommended fixed price (18% margin): <strong>' + fmtMoney(fixedPrice) + '</strong></div>'
+      + '<div style="font-size:10px;color:var(--mid);margin-top:2px">Adjust margin in commercial review before quoting.</div>'
+      + '</div>'
+  } else {
+    html += '<div style="background:rgba(0,40,112,0.04);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:14px">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px">Hybrid view</div>'
+      + '<div style="font-size:12px;color:var(--mid)">UC development (fixed): <strong>' + fmtMoney(rom.ucdev_usd * 1.18) + '</strong></div>'
+      + '<div style="font-size:12px;color:var(--mid)">Managed services (T&M): <strong>' + fmtMoney(peopleCost.managedCost / duration) + '/month</strong></div>'
+      + '</div>'
+  }
+
+  html += '<div class="actions-bar">'
+    + '<button class="btn btn-ghost" onclick="renderStep(3)">&larr; Back to stack</button>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button class="btn btn-outline" onclick="exportBOM()">&#128196; Export CSV</button>'
+    + '<button class="btn btn-primary" onclick="saveToDocket()">&#128190; Save to docket</button>'
+    + '</div></div>'
+    + '</div>'
+
+  return html
+}
+
 async function init() {
   await loadFxRates()
   var params = new URLSearchParams(window.location.search)
@@ -773,7 +1150,7 @@ function renderScreen2() {
         + '<select data-field="uc_type_id" onchange="wlChange(this)">'
         + '<option value="">-- Select type --</option>'
         + ALL_UC_TYPES.map(function(t) {
-            return '<option value="' + t.id + '"' + (wl.uc_type_id===t.id?' selected':'') + '>' + t.icon + ' ' + esc(t.name) + '</option>'
+            return '<option value="' + t.id + '"' + (wl.uc_type_id===t.id?' selected':'') + '>' + esc(t.name) + '</option>'
           }).join('')
         + '</select></div>'
         + '<div><label>AI model</label>'
@@ -1379,6 +1756,48 @@ function calculateBOM(pricing, ucProfiles) {
 }
 
 function renderScreen4(bom) {
+  var tab = window._sascBomTab || 'bom'
+  var tabBar = '<div style="display:flex;gap:0;border-bottom:2px solid #e0e0e8;margin-bottom:16px">'
+    + [{id:'bom',l:'Bill of Materials'},{id:'people',l:'People Model'},{id:'rom',l:'ROM Summary'}].map(function(t){
+        var on = tab === t.id
+        return '<button style="padding:8px 16px;font-size:12px;font-weight:' + (on?'700':'500') + ';border:none;background:transparent;cursor:pointer;border-bottom:' + (on?'2px solid var(--orange)':'2px solid transparent') + ';color:' + (on?'var(--orange)':'var(--mid)') + ';font-family:inherit;margin-bottom:-2px" data-tab="' + t.id + '" onclick="switchBOMTab(this.dataset.tab)">' + t.l + '</button>'
+      }).join('') + '</div>'
+  return '<div id="bom-screen">' + tabBar + '<div id="bom-tab-content">' + renderBOMTabContent(tab, bom) + '</div></div>'
+}
+
+function switchBOMTab(tab) {
+  window._sascBomTab = tab
+  if (tab === 'people' && !PEOPLE_MODEL.loaded) {
+    document.getElementById('bom-tab-content').innerHTML = '<div style="padding:20px;display:flex;align-items:center;gap:10px"><div class="spinner"></div><div class="status-msg">Loading people data...</div></div>'
+    loadPeopleModel().then(function() {
+      document.getElementById('bom-tab-content').innerHTML = renderBOMTabContent('people', SASC_DATA.bom)
+      refreshBOMTabs(tab)
+    })
+    return
+  }
+  document.getElementById('bom-tab-content').innerHTML = renderBOMTabContent(tab, SASC_DATA.bom)
+  refreshBOMTabs(tab)
+}
+
+function refreshBOMTabs(activeTab) {
+  var btns = document.querySelectorAll('#bom-screen button[data-tab]')
+  btns.forEach(function(btn) {
+    var on = btn.dataset.tab === activeTab
+    btn.style.fontWeight = on ? '700' : '500'
+    btn.style.borderBottom = on ? '2px solid var(--orange)' : '2px solid transparent'
+    btn.style.color = on ? 'var(--orange)' : 'var(--mid)'
+  })
+}
+
+function renderActiveTab() { return renderBOMTabContent(window._sascBomTab || 'bom', SASC_DATA.bom) }
+
+function renderBOMTabContent(tab, bom) {
+  if (tab === 'people') return renderPeopleTab()
+  if (tab === 'rom')    return renderROMSummary()
+  return renderBOMContent(bom)
+}
+
+function renderBOMContent(bom) {
   var rom = SASC_DATA.rom
   var confidence = 35  // parametric pre-UC
 
