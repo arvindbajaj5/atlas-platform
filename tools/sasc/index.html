@@ -232,7 +232,10 @@ var SASC_DATA = {
   pricingParams: [],
   ucProfiles: [],
   bom: [],
-  rom: { capex_usd: 0, opex_usd: 0, ucdev_usd: 0, total_usd: 0 }
+  rom: { capex_usd: 0, opex_usd: 0, ucdev_usd: 0, total_usd: 0 },
+  gpuType: 'H100_SXM5',
+  deratingPct: 80,
+  ucWorkloads: {}    // keyed by uc docket item id
 }
 
 var ALL_UCS = []
@@ -314,16 +317,18 @@ function renderStep(n) {
   var el = document.getElementById('app-content')
   renderStepNav()
   if (n === 1) el.innerHTML = renderScreen1()
-  if (n === 2) el.innerHTML = renderScreen2()
-  if (n === 3) el.innerHTML = renderScreen3Loading()
-  if (n === 3) loadAndRenderBOM()
+  if (n === 2) el.innerHTML = renderScreen2Loading(); if (n === 2) loadWorkloadProfiles()
+  if (n === 3) el.innerHTML = renderScreen3()
+  if (n === 4) el.innerHTML = renderScreen4Loading()
+  if (n === 4) loadAndRenderBOM()
 }
 
 function renderStepNav() {
   var steps = [
     { n:1, label:'Scope & DC' },
-    { n:2, label:'Stack layers' },
-    { n:3, label:'BOM + ROM' }
+    { n:2, label:'Workloads' },
+    { n:3, label:'Stack layers' },
+    { n:4, label:'BOM + ROM' }
   ]
   var html = '<div class="step-nav">'
   steps.forEach(function(s, i) {
@@ -443,12 +448,289 @@ function renderScreen1() {
     + '</div></div>'
 
     + '<div class="actions-bar"><div></div>'
-    + '<button class="btn btn-primary" onclick="goStep2()">Next: Configure stack &rarr;</button>'
+    + '<button class="btn btn-primary" onclick="goToWorkloads()">Next: Configure stack &rarr;</button>'
     + '</div>'
 }
 
 // -- Screen 2: Stack layers ----------------------------------------------------
+
+function renderScreen2Loading() {
+  return '<div class="card"><div style="display:flex;align-items:center;gap:10px;padding:20px">'
+    + '<div class="spinner"></div>'
+    + '<div class="status-msg">Loading UC workload profiles&hellip;</div>'
+    + '</div></div>'
+}
+
+async function loadWorkloadProfiles() {
+  var profiles = await sbFetch('uc_workload_profiles', 'order=domain.asc', 100)
+  var benchmarks = await sbFetch('benchmark_results', 'order=gpu_type.asc', 50)
+  SASC_DATA.ucProfiles = profiles || []
+  SASC_DATA.benchmarks = benchmarks || []
+  
+  // Pre-fill workload inputs from UC profiles for selected UCs
+  ALL_UCS.forEach(function(uc) {
+    if (SASC_DATA.selectedUCs.indexOf(uc.id) >= 0 && !SASC_DATA.ucWorkloads[uc.id]) {
+      // Try to match UC to a profile
+      var title = (uc.title || '').toLowerCase()
+      var profile = profiles.find(function(p) {
+        return title.includes(p.uc_name.toLowerCase().split(' ')[0].toLowerCase())
+      })
+      SASC_DATA.ucWorkloads[uc.id] = {
+        dau:          profile ? (profile.concurrent_users || 1000) : 1000,
+        peak_mult:    3,
+        session_min:  10,
+        tokens_session: profile ? Math.round((profile.tokens_per_day || 5000000) / (profile.concurrent_users || 1000) / 3 / (1440/10)) : 2000,
+        latency_sla:  profile ? (profile.latency_sla_ms || 2000) : 2000,
+        model_size:   profile ? (profile.model_size || '7B') : '7B',
+        training:     profile ? (profile.training_required || false) : false,
+        train_gpu_hrs: profile ? (profile.training_gpu_hours || 500) : 500,
+        data_tb:      profile ? (profile.data_volume_tb || 2) : 2,
+        expanded:     false
+      }
+    }
+  })
+  
+  document.getElementById('app-content').innerHTML = renderScreen2()
+}
+
+function calcWorkload(wl) {
+  // Derived: tokens/day = DAU x peak x sessions_per_day x tokens_per_session
+  var sessions_per_day = Math.max(1, Math.round(480 / Math.max(1, wl.session_min)))
+  var peak_users = Math.round(wl.dau * wl.peak_mult)
+  var tokens_per_day = Math.round(wl.dau * wl.peak_mult * sessions_per_day * wl.tokens_session)
+  return { sessions_per_day: sessions_per_day, peak_users: peak_users, tokens_per_day: tokens_per_day }
+}
+
+function calcGPUServers(tokens_per_day, gpuType, deratingPct, benchmarks) {
+  // Find benchmark for selected GPU and appropriate model
+  var bm = benchmarks.find(function(b) {
+    return b.gpu_type === gpuType && b.workload_type === 'inference_llm' && b.model_name === 'Llama-3'
+  }) || benchmarks.find(function(b) {
+    return b.gpu_type === gpuType && b.workload_type === 'inference_llm'
+  })
+  
+  if (!bm || !bm.tokens_per_day) {
+    // Fallback defaults
+    var defaults = { 'H100_SXM5': 159840000, 'MI325X': 142560000, 'GB200_NVL72': 3628800000 }
+    bm = { tokens_per_day: defaults[gpuType] || 159840000, power_watts: 5600, latency_p99_ms: 210 }
+  }
+  
+  var derated = Math.round(bm.tokens_per_day * (deratingPct / 100))
+  var servers_needed = Math.max(1, Math.ceil(tokens_per_day / derated))
+  var headroom_pct = Math.round((1 - tokens_per_day / (derated * servers_needed)) * 100)
+  var latency_ok = !bm.latency_p99_ms || (bm.latency_p99_ms <= 5000)
+  
+  return {
+    servers: servers_needed,
+    benchmark_tok_day: bm.tokens_per_day,
+    derated_tok_day: derated,
+    power_kw: Math.round(servers_needed * (bm.power_watts || 5600) / 1000 * 10) / 10,
+    headroom_pct: headroom_pct,
+    latency_ok: latency_ok,
+    latency_p99: bm.latency_p99_ms || 0
+  }
+}
+
+function toggleUCExpand(ucId) {
+  if (SASC_DATA.ucWorkloads[ucId]) {
+    SASC_DATA.ucWorkloads[ucId].expanded = !SASC_DATA.ucWorkloads[ucId].expanded
+  }
+  document.getElementById('app-content').innerHTML = renderScreen2()
+}
+
+
+function wlChange(el) {
+  var uid = el.dataset.uid
+  if (!uid) {
+    var p = el.parentElement
+    while (p && !uid) { uid = p.dataset.uid; p = p.parentElement }
+  }
+  if (uid) updateWorkload(uid, el.dataset.field, el.value)
+}
+
+function updateWorkload(ucId, field, value) {
+  if (SASC_DATA.ucWorkloads[ucId]) {
+    SASC_DATA.ucWorkloads[ucId][field] = field === 'training' ? value === 'true' : (isNaN(Number(value)) ? value : Number(value))
+    document.getElementById('app-content').innerHTML = renderScreen2()
+  }
+}
+
 function renderScreen2() {
+  var s = SASC_DATA
+  var benchmarks = s.benchmarks || []
+  var gpuTypes = ['H100_SXM5', 'MI325X', 'GB200_NVL72']
+  var gpuLabels = { 'H100_SXM5': 'H100 SXM5 8x', 'MI325X': 'MI325X 8x', 'GB200_NVL72': 'GB200 NVL72' }
+  
+  var selectedUCs = ALL_UCS.filter(function(u) { return s.selectedUCs.indexOf(u.id) >= 0 })
+  
+  var html = '<div class="card">'
+    + '<div class="card-title">UC workload profiler</div>'
+    + '<div class="card-sub">Enter workload parameters per UC. Defaults loaded from UC library &mdash; override as needed.</div>'
+    + '<div class="form-grid">'
+    + '<div><label>GPU type for sizing</label><select onchange="SASC_DATA.gpuType=this.value;document.getElementById(\'app-content\').innerHTML=renderScreen2()">'
+    + gpuTypes.map(function(g){ return '<option value="' + g + '"' + (s.gpuType===g?' selected':'') + '>' + (gpuLabels[g]||g) + '</option>' }).join('')
+    + '</select></div>'
+    + '<div><label>Derating factor</label><select onchange="SASC_DATA.deratingPct=parseInt(this.value);document.getElementById(\'app-content\').innerHTML=renderScreen2()">'
+    + [{v:70,l:'70% (conservative)'},{v:80,l:'80% (standard)'},{v:90,l:'90% (optimistic)'}].map(function(d){
+        return '<option value="' + d.v + '"' + (s.deratingPct===d.v?' selected':'') + '>' + d.l + '</option>'
+      }).join('')
+    + '</select></div>'
+    + '</div></div>'
+  
+  if (!selectedUCs.length) {
+    html += '<div class="card" style="border-left:3px solid var(--amber)">'
+      + '<div class="card-sub">No UCs selected. Go back to Step 1 and select UCs from your docket, or continue with default compute sizing.</div></div>'
+  }
+  
+  var totalServers = 0, totalPowerKW = 0, totalTrainHrs = 0, totalStorageTB = 0
+  
+  selectedUCs.forEach(function(uc) {
+    var wl = s.ucWorkloads[uc.id] || { dau:1000, peak_mult:3, session_min:10, tokens_session:2000, latency_sla:2000, model_size:'7B', training:false, train_gpu_hrs:500, data_tb:2, expanded:false }
+    var derived = calcWorkload(wl)
+    var sizing = calcGPUServers(derived.tokens_per_day, s.gpuType, s.deratingPct, benchmarks)
+    
+    totalServers += sizing.servers
+    totalPowerKW += sizing.power_kw
+    if (wl.training) totalTrainHrs += wl.train_gpu_hrs
+    totalStorageTB += wl.data_tb * 3  // raw + index + backup
+    
+    var badgeColor = sizing.headroom_pct > 50 ? 'background:rgba(0,178,144,0.1);color:#085041' : 'background:rgba(255,182,0,0.1);color:#9a6800'
+    
+    html += '<div class="card" style="padding:0;overflow:hidden">'
+    // Header
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--light);cursor:pointer" data-uid="' + uc.id + '" onclick="toggleUCExpand(this.dataset.uid)">'
+      + '<div style="width:28px;height:28px;border-radius:6px;background:var(--navy);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+      + '<span style="color:#fff;font-size:11px;font-weight:700">' + (uc.title||'UC').slice(0,2).toUpperCase() + '</span></div>'
+      + '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--dark)">' + esc(uc.title||'UC') + '</div>'
+      + '<div style="font-size:10px;color:var(--mid)">' + derived.tokens_per_day.toLocaleString() + ' tok/day &bull; ' + sizing.servers + ' server' + (sizing.servers>1?'s':'') + '</div>'
+      + '</div>'
+      + '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;' + badgeColor + '">' + sizing.servers + ' server' + (sizing.servers>1?'s':'') + '</span>'
+      + '<span style="font-size:12px;color:var(--mid);margin-left:4px">' + (wl.expanded ? '&#9650;' : '&#9660;') + '</span>'
+      + '</div>'
+    
+    if (wl.expanded) {
+      html += '<div style="padding:14px" data-uid="' + uc.id + '">'
+        // Workload inputs
+        + '<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Workload parameters</div>'
+        + '<div class="form-grid">'
+        + '<div><label>DAU (daily active users)</label><input type="number" value="' + wl.dau + '" data-field="dau" onchange="wlChange(this)"></div>'
+        + '<div><label>Peak multiplier</label><input type="number" value="' + wl.peak_mult + '" step="0.5" data-field="peak_mult" onchange="wlChange(this)"></div>'
+        + '<div><label>Avg session (minutes)</label><input type="number" value="' + wl.session_min + '" data-field="session_min" onchange="wlChange(this)"></div>'
+        + '<div><label>Tokens per session</label><input type="number" value="' + wl.tokens_session + '" data-field="tokens_session" onchange="wlChange(this)"></div>'
+        + '<div><label>Latency SLA (p99 ms)</label><input type="number" value="' + wl.latency_sla + '" data-field="latency_sla" onchange="wlChange(this)"></div>'
+        + '<div><label>Model size</label><select data-field="model_size" onchange="wlChange(this)">'
+        + ['2B','7B','13B','70B','405B'].map(function(m){ return '<option' + (wl.model_size===m?' selected':'') + '>' + m + '</option>' }).join('')
+        + '</select></div>'
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;margin:10px 0 6px">'
+        + '<span style="font-size:12px;color:var(--dark);flex:1">Fine-tuning / training required</span>'
+        + '<select style="width:auto;padding:4px 8px" data-field="training" onchange="wlChange(this)">'
+        + '<option value="false"' + (!wl.training?' selected':'') + '>No</option>'
+        + '<option value="true"' + (wl.training?' selected':'') + '>Yes</option>'
+        + '</select></div>'
+        + (wl.training ? '<div class="form-grid" style="margin-bottom:10px">'
+          + '<div><label>Training GPU-hours</label><input type="number" value="' + wl.train_gpu_hrs + '" data-field="train_gpu_hrs" onchange="wlChange(this)"></div>'
+          + '<div><label>Data volume (TB)</label><input type="number" value="' + wl.data_tb + '" data-field="data_tb" onchange="wlChange(this)"></div>'
+          + '</div>' : '')
+        
+        // Derived values
+        + '<div style="background:var(--light);border-radius:var(--r-sm);padding:10px 12px;margin:8px 0">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Derived</div>'
+        + '<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0">'
+        + '<span style="color:var(--mid)">Peak concurrent users</span>'
+        + '<span style="font-weight:600">' + derived.peak_users.toLocaleString() + '</span></div>'
+        + '<div style="font-size:10px;color:var(--mid);margin-bottom:4px">' + wl.dau.toLocaleString() + ' DAU &times; ' + wl.peak_mult + 'x peak</div>'
+        + '<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0">'
+        + '<span style="color:var(--mid)">Tokens / day required</span>'
+        + '<span style="font-weight:600">' + (derived.tokens_per_day >= 1e6 ? (derived.tokens_per_day/1e6).toFixed(1)+'M' : derived.tokens_per_day.toLocaleString()) + '</span></div>'
+        + '<div style="font-size:10px;color:var(--mid)">' + wl.dau.toLocaleString() + ' DAU &times; ' + wl.peak_mult + 'x &times; ' + derived.sessions_per_day + ' sessions/day &times; ' + wl.tokens_session.toLocaleString() + ' tok/session</div>'
+        + '</div>'
+        
+        // Traceability chain
+        + '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:8px 0">'
+        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--light);color:var(--mid);border:0.5px solid #e0e0e8">' + (derived.tokens_per_day >= 1e6 ? (derived.tokens_per_day/1e6).toFixed(1)+'M' : derived.tokens_per_day.toLocaleString()) + ' tok/day</span>'
+        + '<span style="font-size:10px;color:var(--mid)">&#8594;</span>'
+        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--light);color:var(--mid);border:0.5px solid #e0e0e8">GPU: ' + sizing.derated_tok_day.toLocaleString() + ' tok/day</span>'
+        + '<span style="font-size:10px;color:var(--mid)">&#8594;</span>'
+        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--navy);color:#fff">' + sizing.servers + ' server' + (sizing.servers>1?'s':'') + '</span>'
+        + '<span style="font-size:10px;color:var(--mid)">&#8594;</span>'
+        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--light);color:var(--mid);border:0.5px solid #e0e0e8">' + sizing.power_kw + ' kW</span>'
+        + '</div>'
+        
+        // Result
+        + '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--r-sm);background:var(--light);margin-top:4px">'
+        + '<div><div style="font-size:18px;font-weight:700;color:var(--navy)">' + sizing.servers + '</div>'
+        + '<div style="font-size:10px;color:var(--mid)">server' + (sizing.servers>1?'s':'') + '</div></div>'
+        + '<div style="flex:1;padding-left:10px;border-left:0.5px solid #e0e0e8">'
+        + '<div style="font-size:11px;color:var(--teal);font-weight:600">'
+        + (sizing.headroom_pct > 50 ? '&#10003; ' : '&#9888; ') + sizing.headroom_pct + '% headroom on throughput</div>'
+        + (sizing.latency_p99 ? '<div style="font-size:10px;color:var(--mid)">Benchmark p99 latency: ' + sizing.latency_p99 + 'ms</div>' : '')
+        + '</div>'
+        + '<button class="btn btn-ghost btn-xs" data-uid="' + uc.id + '" onclick="showCalcDetail(this.dataset.uid)">&#9432; How?</button>'
+        + '</div>'
+        
+        + '</div>'
+    }
+    
+    html += '</div>'
+  })
+  
+  // Total summary
+  var mdcCapacity = { xs:64, s:256, m:512, l:768, xl:1024 }
+  var mdcGPUs = (mdcCapacity[s.mdc.tshirt] || 512) * (s.mdc.sites || 1)
+  var totalGPUs = totalServers * 8
+  var headroomPct = Math.round((1 - totalGPUs / mdcGPUs) * 100)
+  
+  html += '<div class="card" style="border-left:3px solid var(--navy)">'
+    + '<div class="card-title" style="margin-bottom:8px">Total compute across all UCs</div>'
+    + '<div style="background:var(--light);border-radius:var(--r-sm);padding:10px 12px">'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--mid)">GPU servers needed</span><span style="font-weight:600">' + totalServers + ' servers (' + totalGPUs + ' GPUs)</span></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--mid)">Total inference power</span><span style="font-weight:600">' + totalPowerKW.toFixed(1) + ' kW</span></div>'
+    + (totalTrainHrs ? '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--mid)">Training (one-time)</span><span style="font-weight:600">' + totalTrainHrs.toLocaleString() + ' GPU-hrs</span></div>' : '')
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--mid)">Storage estimate</span><span style="font-weight:600">' + totalStorageTB + ' TB (incl. index + backup)</span></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--mid)">MDC capacity (' + (s.mdc.tshirt||'m').toUpperCase() + ' &times; ' + (s.mdc.sites||1) + ' site' + ((s.mdc.sites||1)>1?'s':'') + ')</span>'
+    + '<span style="font-weight:600;color:' + (headroomPct > 30 ? '#085041' : '#9a6800') + '">' + mdcGPUs + ' GPUs &mdash; ' + headroomPct + '% headroom</span></div>'
+    + '</div>'
+    + (headroomPct < 0 ? '<div style="font-size:11px;color:#9a6800;margin-top:8px;padding:8px 10px;background:rgba(255,182,0,0.08);border-radius:var(--r-sm)">&#9888; Your UC requirements exceed the selected MDC capacity. Consider upgrading the T-shirt size or adding more sites in Step 1.</div>' : '')
+    + '</div>'
+  
+  html += '<div class="actions-bar"><button class="btn btn-ghost" onclick="renderStep(1)">&larr; Back</button>'
+    + '<button class="btn btn-primary" onclick="renderStep(3)">Next: Stack layers &rarr;</button></div>'
+  
+  return html
+}
+
+function showCalcDetail(ucId) {
+  var s = SASC_DATA
+  var wl = s.ucWorkloads[ucId]
+  if (!wl) return
+  var uc = ALL_UCS.find(function(u){ return u.id === ucId })
+  var derived = calcWorkload(wl)
+  var sizing = calcGPUServers(derived.tokens_per_day, s.gpuType, s.deratingPct, s.benchmarks || [])
+  var gpuLabels = { 'H100_SXM5': 'H100 SXM5 8x', 'MI325X': 'MI325X 8x', 'GB200_NVL72': 'GB200 NVL72 rack' }
+  
+  var msg = 'Calculation detail for ' + (uc ? uc.title : ucId) + ':\n\n'
+    + 'WORKLOAD INPUTS:\n'
+    + '  DAU: ' + wl.dau.toLocaleString() + '\n'
+    + '  Peak multiplier: ' + wl.peak_mult + 'x\n'
+    + '  Sessions per day: ' + derived.sessions_per_day + '  (480min / ' + wl.session_min + 'min)\n'
+    + '  Tokens per session: ' + wl.tokens_session.toLocaleString() + '\n\n'
+    + 'DERIVED:\n'
+    + '  Peak concurrent users: ' + derived.peak_users.toLocaleString() + '\n'
+    + '  Tokens/day = ' + wl.dau.toLocaleString() + ' x ' + wl.peak_mult + 'x x ' + derived.sessions_per_day + ' x ' + wl.tokens_session.toLocaleString() + ' = ' + derived.tokens_per_day.toLocaleString() + '\n\n'
+    + 'GPU SIZING:\n'
+    + '  GPU: ' + (gpuLabels[s.gpuType] || s.gpuType) + '\n'
+    + '  Benchmark throughput: ' + sizing.benchmark_tok_day.toLocaleString() + ' tok/day\n'
+    + '  Derating (' + s.deratingPct + '%): ' + sizing.derated_tok_day.toLocaleString() + ' tok/day effective\n'
+    + '  Servers needed: ceil(' + derived.tokens_per_day.toLocaleString() + ' / ' + sizing.derated_tok_day.toLocaleString() + ') = ' + sizing.servers + '\n'
+    + '  Headroom: ' + sizing.headroom_pct + '%\n'
+    + '  Power: ' + sizing.power_kw + ' kW\n\n'
+    + 'To update benchmark figures: edit benchmark_results table in Supabase or use the Benchmark Tool.'
+  
+  alert(msg)
+}
+
+function renderScreen3() {
   var layers = SASC_DATA.layers
   var html = '<div class="card"><div class="card-title">Stack configuration</div>'
     + '<div class="card-sub" style="margin-bottom:14px">Toggle layers on or off. Pre-selected based on your scope of supply. Click a layer to toggle.</div>'
@@ -475,7 +757,7 @@ function renderScreen2() {
 }
 
 // -- Screen 3: BOM + ROM -------------------------------------------------------
-function renderScreen3Loading() {
+function renderScreen4Loading() {
   return '<div class="card"><div style="display:flex;align-items:center;gap:10px;padding:20px">'
     + '<div class="spinner"></div>'
     + '<div class="status-msg">Calculating BOM + ROM from pricing parameters&hellip;</div>'
@@ -496,7 +778,7 @@ async function loadAndRenderBOM() {
   var bom = calculateBOM(pricing, ucProfiles)
   SASC_DATA.bom = bom
 
-  document.getElementById('app-content').innerHTML = renderScreen3(bom)
+  document.getElementById('app-content').innerHTML = renderScreen4(bom)
 }
 
 function calculateBOM(pricing, ucProfiles) {
@@ -645,7 +927,7 @@ function calculateBOM(pricing, ucProfiles) {
   return bom
 }
 
-function renderScreen3(bom) {
+function renderScreen4(bom) {
   var rom = SASC_DATA.rom
   var confidence = 35  // parametric pre-UC
 
@@ -704,7 +986,7 @@ function renderScreen3(bom) {
     + '</div></div>'
 
     + '<div class="actions-bar">'
-    + '<button class="btn btn-ghost" onclick="renderStep(2)">&larr; Back</button>'
+    + '<button class="btn btn-ghost" onclick="renderStep(3)">&larr; Back</button>'
     + '<div style="display:flex;gap:8px">'
     + '<button class="btn btn-outline" onclick="exportBOM()">&#128196; Export CSV</button>'
     + '<button class="btn btn-primary" onclick="saveToDocket()">&#128190; Save to docket</button>'
@@ -752,7 +1034,7 @@ function toggleLayer(key) {
   if (chk) { chk.className = 'layer-chk ' + (SASC_DATA.layers[key].on ? 'on' : '') }
 }
 
-function goStep2() {
+function goToWorkloads() {
   // Save DC detail inputs before navigating
   var sitesEl = document.getElementById('mdc-sites')
   if (sitesEl) SASC_DATA.mdc.sites = parseInt(sitesEl.value) || 1
@@ -760,6 +1042,8 @@ function goStep2() {
   if (snEl) SASC_DATA.mdc.siteNames = snEl.value
   renderStep(2)
 }
+
+function goStep2() { goToWorkloads() }
 
 async function saveToDocket() {
   if (!SASC_DATA.docketId) {
