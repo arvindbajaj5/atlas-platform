@@ -110,6 +110,31 @@ input:focus,select:focus{border-color:var(--blue);}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid #e0e0e8;border-top-color:var(--orange);border-radius:50%;animation:spin 0.7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .status-msg{font-size:12px;color:var(--mid);display:flex;align-items:center;gap:6px;}
+
+/* Layer config panels (Inferencing Factory style) */
+.layer-row{cursor:pointer;}
+.layer-cfg{padding:10px 14px 14px;background:rgba(0,40,112,0.02);border-top:0.5px solid #e8e8f0;}
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:8px;}
+.cfg-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+.lb{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:3px;}
+.cfg-grid select,.cfg-grid input,.cfg-grid-2 select,.cfg-grid-2 input{width:100%;font-size:11px;padding:4px 6px;border:0.5px solid #d0d0d8;border-radius:4px;font-family:inherit;background:var(--white);}
+/* Complexity tier pills */
+.tier-opts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.tier-btn{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid #e0e0e8;background:var(--white);cursor:pointer;color:var(--mid);transition:all 0.15s;}
+.tier-btn.sel-simple{background:rgba(0,178,144,0.1);color:#085041;border-color:#00B290;}
+.tier-btn.sel-medium{background:rgba(28,56,245,0.08);color:#1C38F5;border-color:#1C38F5;}
+.tier-btn.sel-complex{background:rgba(255,182,0,0.12);color:#9a6800;border-color:#FFB600;}
+.tier-btn.sel-research{background:rgba(255,85,57,0.1);color:#c0341a;border-color:#FF5539;}
+/* Layer colour accents */
+.layer-infra{border-left:3px solid #6B7280;}
+.layer-compute{border-left:3px solid var(--navy);}
+.layer-network{border-left:3px solid var(--teal);}
+.layer-platform{border-left:3px solid var(--blue);}
+.layer-security{border-left:3px solid var(--orange);}
+.layer-resilience{border-left:3px solid #8B5CF6;}
+.layer-data{border-left:3px solid #059669;}
+.layer-ucdev{border-left:3px solid var(--amber);}
+.layer-skills{border-left:3px solid #6B7280;}
 /* Toast */
 .toast{position:fixed;bottom:20px;right:20px;background:var(--dark);color:var(--white);padding:10px 16px;border-radius:var(--r);font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
 .toast.show{opacity:1;}
@@ -175,7 +200,7 @@ function showToast(msg, duration) {
 
 // -- Currency formatting -------------------------------------------------------
 var SASC_CURRENCY = localStorage.getItem('sasc_currency') || 'USD'
-var FX_RATES = { USD: 1, INR: 84.20, EUR: 0.93, GBP: 0.79 }
+var FX_RATES = { USD: 1, INR: 84.20, EUR: 0.93 }
 
 async function loadFxRates() {
   var rows = await sbFetch('fx_rates', 'from_currency=eq.USD&order=effective_date.desc', 20)
@@ -195,7 +220,6 @@ function fmtMoney(usdVal, currency) {
     return '\u20B9' + Math.round(val).toLocaleString('en-IN')
   }
   if (currency === 'EUR') return '\u20AC' + (val / 1e6).toFixed(2) + 'M'
-  if (currency === 'GBP') return '\u00A3' + (val / 1e6).toFixed(2) + 'M'
   return '$' + (val / 1e6).toFixed(2) + 'M'
 }
 
@@ -232,7 +256,8 @@ var SASC_DATA = {
   rom: { capex_usd: 0, opex_usd: 0, ucdev_usd: 0, total_usd: 0 },
   gpuType: 'H100_SXM5',
   deratingPct: 80,
-  ucWorkloads: {}    // keyed by uc docket item id
+  ucWorkloads: {},
+  layerCfg: {}    // keyed by uc docket item id
 }
 
 var ALL_UCS = []
@@ -747,6 +772,273 @@ function showCalcDetail(ucId) {
   alert(msg)
 }
 
+//    LAYER CONFIG STATE (added to SASC_DATA)                                    
+// These are added to the existing layers object per layer key:
+// infra:     { dcBrand:'standard', rackCount:'auto', cooling:'dlc' }
+// compute:   { gpuVendor:'nvidia', cpuBrand:'amd', storageMode:'auto', nvmeOverride:0, objOverride:0 }
+// network:   { ibFabric:'ndr', nsFabric:'nkc', oobSwitch:true }
+// platform:  { sarvam:true, mlops:'kubeflow', observability:true }
+// security:  { airgap:false, dpdp:true, siem:'splunk', ztrust:true }
+// resilience:{ ha:true, drSite:false, backupDays:30 }
+// data:      { pipelineTool:'custom', connectors:3, dataLake:true }
+// ucdev:     { complexity:'medium', testCoverage:'standard' }
+// skills:    { managedService:false, teamSize:'auto' }
+
+// Default layer config
+var LAYER_CFG_DEFAULTS = {
+  infra:      { dcBrand:'standard', rackCount:'auto', cooling:'dlc' },
+  compute:    { gpuVendor:'nvidia', cpuBrand:'amd', storageMode:'auto', nvmeOverride:0, objOverride:0 },
+  network:    { ibFabric:'ndr', nsFabric:'nkc', oobSwitch:true },
+  platform:   { sarvam:true, mlops:'kubeflow', observability:true },
+  security:   { airgap:false, dpdp:true, siem:'splunk', ztrust:true },
+  resilience: { ha:true, drSite:false, backupDays:30 },
+  data:       { pipelineTool:'custom', connectors:3, dataLake:true },
+  ucdev:      { complexity:'medium', testCoverage:'standard' },
+  skills:     { managedService:false, teamSize:'auto' }
+}
+
+// Layer accent colours
+var LAYER_COLORS = {
+  infra:'#6B7280', compute:'var(--navy)', network:'var(--teal)',
+  platform:'var(--blue)', security:'var(--orange)', resilience:'#8B5CF6',
+  data:'#059669', ucdev:'var(--amber)', skills:'#6B7280'
+}
+
+// Complexity tier pricing labels
+var COMPLEXITY_TIERS = [
+  { v:'simple',   l:'Simple',   sub:'Data pipeline + pre-trained model', price:'~$42K/UC',  cls:'sel-simple' },
+  { v:'medium',   l:'Medium',   sub:'Fine-tuning + integration',          price:'~$101K/UC', cls:'sel-medium' },
+  { v:'complex',  l:'Complex',  sub:'Bespoke model + multi-system',       price:'~$208K/UC', cls:'sel-complex' },
+  { v:'research', l:'Research', sub:'Novel model development',            price:'~$476K/UC', cls:'sel-research' }
+]
+
+function initLayerCfg() {
+  Object.keys(LAYER_CFG_DEFAULTS).forEach(function(key) {
+    if (!SASC_DATA.layerCfg) SASC_DATA.layerCfg = {}
+    if (!SASC_DATA.layerCfg[key]) {
+      SASC_DATA.layerCfg[key] = Object.assign({}, LAYER_CFG_DEFAULTS[key])
+    }
+  })
+}
+
+function setLayerCfg(key, field, value) {
+  if (!SASC_DATA.layerCfg) SASC_DATA.layerCfg = {}
+  if (!SASC_DATA.layerCfg[key]) SASC_DATA.layerCfg[key] = Object.assign({}, LAYER_CFG_DEFAULTS[key])
+  SASC_DATA.layerCfg[key][field] = value
+  // Re-render stack screen in place to reflect change
+  var el = document.getElementById('layer-cfg-' + key)
+  if (el) el.innerHTML = renderLayerCfgPanel(key)
+}
+
+function getLCfg(key) {
+  if (!SASC_DATA.layerCfg) SASC_DATA.layerCfg = {}
+  if (!SASC_DATA.layerCfg[key]) SASC_DATA.layerCfg[key] = Object.assign({}, LAYER_CFG_DEFAULTS[key])
+  return SASC_DATA.layerCfg[key]
+}
+
+function renderLayerCfgPanel(key) {
+  var cfg = getLCfg(key)
+  var h = ''
+
+  if (key === 'infra') {
+    var dcType = SASC_DATA.dcType || 'mdc'
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">DC brand/type</span><select data-lk="infra" data-lf="dcBrand" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + ['<option value="standard"' + (cfg.dcBrand==='standard'?' selected':'') + '>Our MDC (standard)</option>',
+         '<option value="hyperscaler"' + (cfg.dcBrand==='hyperscaler'?' selected':'') + '>Hyperscaler colo</option>',
+         '<option value="custom"' + (cfg.dcBrand==='custom'?' selected':'') + '>Customer custom build</option>'].join('')
+      + '</select></div>'
+      + '<div><span class="lb">Rack count</span><select data-lk="infra" data-lf="rackCount" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + ['auto','20','40','60','80','100','120','160'].map(function(v){ return '<option value="' + v + '"' + (cfg.rackCount===v?' selected':'') + '>' + (v==='auto'?'Auto from compute':v+' racks') + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Cooling</span><select data-lk="infra" data-lf="cooling" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['dlc','DLC (direct liquid)'],['air','Air cooling'],['hybrid','Hybrid DLC+Air']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.cooling===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Power redundancy</span><select data-lk="infra" data-lf="powerRed" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['2n','2N (full)'],['n1','N+1 (standard)'],['n','N only']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.powerRed||'n1')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  }
+
+  else if (key === 'compute') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">GPU vendor</span><select data-lk="compute" data-lf="gpuVendor" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value);SASC_DATA.gpuType=(this.value===\'amd\'?\'MI325X\':this.value===\'gb200\'?\'GB200_NVL72\':\'H100_SXM5\')">'
+      + [['nvidia','NVIDIA (H100 SXM5)'],['amd','AMD (MI325X)'],['gb200','NVIDIA GB200 NVL72']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.gpuVendor===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">CPU (management/platform)</span><select data-lk="compute" data-lf="cpuBrand" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['amd','AMD EPYC (preferred)'],['intel','Intel Xeon']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.cpuBrand===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Storage sizing</span><select data-lk="compute" data-lf="storageMode" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['auto','Auto from workloads'],['manual','Manual override']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.storageMode===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Quantization</span><select data-lk="compute" data-lf="quant" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['fp16','FP16 (default)'],['fp8','FP8 (faster)'],['int4','INT4 (edge)']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.quant||'fp16')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+    if (cfg.storageMode === 'manual') {
+      h += '<div class="cfg-grid-2" style="margin-top:6px">'
+        + '<div><span class="lb">NVMe storage (TB)</span><input type="number" value="' + (cfg.nvmeOverride||100) + '" data-lk="compute" data-lf="nvmeOverride" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,+this.value)"></div>'
+        + '<div><span class="lb">Object storage (TB)</span><input type="number" value="' + (cfg.objOverride||300) + '" data-lk="compute" data-lf="objOverride" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,+this.value)"></div>'
+        + '</div>'
+    }
+  }
+
+  else if (key === 'network') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">E-W GPU fabric</span><select data-lk="network" data-lf="ibFabric" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['ndr','InfiniBand NDR 400G'],['hdr','InfiniBand HDR 200G'],['eth','100GbE (no IB)']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.ibFabric===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">N-S fabric</span><select data-lk="network" data-lf="nsFabric" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['nkc','NKC (proprietary)'],['3rdparty','3rd party 100GbE'],['mellanox','Mellanox']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.nsFabric===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">OOB management</span><select data-lk="network" data-lf="oobSwitch" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.oobSwitch?' selected':'') + '>Yes (recommended)</option>'
+      + '<option value="false"' + (!cfg.oobSwitch?' selected':'') + '>No</option>'
+      + '</select></div>'
+      + '<div><span class="lb">Network redundancy</span><select data-lk="network" data-lf="netRed" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['dual','Dual-homed (HA)'],['single','Single path']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.netRed||'dual')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  }
+
+  else if (key === 'platform') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">Sovereign LLM</span><select data-lk="platform" data-lf="sarvam" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.sarvam?' selected':'') + '>Sarvam AI (sovereign)</option>'
+      + '<option value="false"' + (!cfg.sarvam?' selected':'') + '>Third-party LLM only</option>'
+      + '</select></div>'
+      + '<div><span class="lb">MLOps platform</span><select data-lk="platform" data-lf="mlops" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['kubeflow','Kubeflow (OSS)'],['mlflow','MLflow only'],['custom','Custom pipeline']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.mlops===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Observability</span><select data-lk="platform" data-lf="observability" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.observability?' selected':'') + '>Full stack (Prometheus + Grafana)</option>'
+      + '<option value="false"' + (!cfg.observability?' selected':'') + '>Minimal</option>'
+      + '</select></div>'
+      + '<div><span class="lb">API gateway</span><select data-lk="platform" data-lf="apiGw" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['included','Included (standard)'],['none','Not required']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.apiGw||'included')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  }
+
+  else if (key === 'security') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">Air-gap required</span><select data-lk="security" data-lf="airgap" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="false"' + (!cfg.airgap?' selected':'') + '>No (standard)</option>'
+      + '<option value="true"' + (cfg.airgap?' selected':'') + '>Yes (classified/defence)</option>'
+      + '</select></div>'
+      + '<div><span class="lb">DPDP compliance</span><select data-lk="security" data-lf="dpdp" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.dpdp?' selected':'') + '>Required</option>'
+      + '<option value="false"' + (!cfg.dpdp?' selected':'') + '>Not required</option>'
+      + '</select></div>'
+      + '<div><span class="lb">SIEM platform</span><select data-lk="security" data-lf="siem" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['splunk','Splunk'],['qradar','IBM QRadar'],['oss','OSS (Wazuh)']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.siem===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Zero-trust</span><select data-lk="security" data-lf="ztrust" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.ztrust?' selected':'') + '>Yes (recommended)</option>'
+      + '<option value="false"' + (!cfg.ztrust?' selected':'') + '>No</option>'
+      + '</select></div>'
+      + '</div>'
+  }
+
+  else if (key === 'resilience') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">HA configuration</span><select data-lk="resilience" data-lf="ha" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.ha?' selected':'') + '>Active-active HA</option>'
+      + '<option value="false"' + (!cfg.ha?' selected':'') + '>Active-passive</option>'
+      + '</select></div>'
+      + '<div><span class="lb">DR site</span><select data-lk="resilience" data-lf="drSite" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="false"' + (!cfg.drSite?' selected':'') + '>No separate DR site</option>'
+      + '<option value="true"' + (cfg.drSite?' selected':'') + '>Yes (separate DR site)</option>'
+      + '</select></div>'
+      + '<div><span class="lb">Backup retention</span><select data-lk="resilience" data-lf="backupDays" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,+this.value)">'
+      + [7,14,30,90].map(function(d){ return '<option value="' + d + '"' + (cfg.backupDays===d?' selected':'') + '>' + d + ' days</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">RTO target</span><select data-lk="resilience" data-lf="rto" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['4h','4 hours'],['1h','1 hour'],['15m','15 minutes (premium)']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.rto||'4h')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  }
+
+  else if (key === 'data') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">Pipeline tooling</span><select data-lk="data" data-lf="pipelineTool" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['custom','Custom (Spark/Kafka)'],['airflow','Apache Airflow'],['nifi','Apache NiFi']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.pipelineTool===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">No. of source connectors</span><input type="number" min="1" max="50" value="' + (cfg.connectors||3) + '" data-lk="data" data-lf="connectors" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,+this.value)"></div>'
+      + '<div><span class="lb">Data lake</span><select data-lk="data" data-lf="dataLake" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.dataLake?' selected':'') + '>Yes (Delta Lake / Iceberg)</option>'
+      + '<option value="false"' + (!cfg.dataLake?' selected':'') + '>No</option>'
+      + '</select></div>'
+      + '<div><span class="lb">Data governance</span><select data-lk="data" data-lf="dataGov" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['basic','Basic (lineage + catalog)'],['full','Full (DPDP + masking)'],['none','Not required']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.dataGov||'basic')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  }
+
+  else if (key === 'ucdev') {
+    // UC complexity tier selector   applies globally to all UCs
+    // Individual UC overrides are in the workload profiler (Screen 3)
+    h += '<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Default complexity applies to all UCs unless overridden in the Workload Profiler.</div>'
+      + '<div class="tier-opts">'
+      + COMPLEXITY_TIERS.map(function(t) {
+          var isSel = (cfg.complexity === t.v)
+          return '<button class="tier-btn ' + (isSel ? t.cls : '') + '" data-lk="ucdev" data-tv="' + t.v + '" onclick="setLayerCfg(this.dataset.lk,\'complexity\',this.dataset.tv);document.getElementById(\'layer-cfg-ucdev\').innerHTML=renderLayerCfgPanel(\'ucdev\')">'
+            + '<div style="font-weight:700">' + t.l + '</div>'
+            + '<div style="font-size:10px;opacity:0.8">' + t.price + '</div>'
+            + '</button>'
+        }).join('')
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--mid);margin-top:6px">' + (COMPLEXITY_TIERS.find(function(t){ return t.v === cfg.complexity }) || COMPLEXITY_TIERS[1]).sub + '</div>'
+      + '<div class="cfg-grid-2" style="margin-top:10px">'
+      + '<div><span class="lb">Test coverage</span><select data-lk="ucdev" data-lf="testCoverage" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['standard','Standard UAT + perf test'],['full','Full (incl. security audit)'],['minimal','Minimal (smoke test only)']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.testCoverage===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">UC team model</span><select data-lk="ucdev" data-lf="teamModel" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['si','SI team (we deliver)'],['customer','Customer team'],['hybrid','Hybrid (SI + customer)']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.teamModel||'si')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  }
+
+  else if (key === 'skills') {
+    h += '<div class="cfg-grid-2">'
+      + '<div><span class="lb">Managed service</span><select data-lk="skills" data-lf="managedService" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="false"' + (!cfg.managedService?' selected':'') + '>Customer-managed (we train)</option>'
+      + '<option value="true"' + (cfg.managedService?' selected':'') + '>Managed service (we operate)</option>'
+      + '</select></div>'
+      + '<div><span class="lb">Team sizing</span><select data-lk="skills" data-lf="teamSize" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['auto','Auto from UC count'],['small','Small team (3-5)'],['medium','Medium team (6-10)'],['large','Large team (11-20)']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.teamSize===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  }
+
+  return h
+}
+
+// Also add per-UC complexity override in workload profiler
+// This goes inside each expanded UC block in renderScreen2()
+function renderUCComplexityTier(ucId) {
+  var wl = SASC_DATA.ucWorkloads[ucId] || {}
+  var current = wl.complexity || (SASC_DATA.layerCfg && SASC_DATA.layerCfg.ucdev && SASC_DATA.layerCfg.ucdev.complexity) || 'medium'
+  var html = '<div style="margin-top:10px;padding-top:10px;border-top:0.5px solid #e8e8f0">'
+    + '<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">UC development complexity</div>'
+    + '<div class="tier-opts">'
+    + COMPLEXITY_TIERS.map(function(t) {
+        var isSel = current === t.v
+        return '<button class="tier-btn ' + (isSel ? t.cls : '') + '" data-uid="' + ucId + '" data-tv="' + t.v + '" onclick="setUCComplexity(this.dataset.uid,this.dataset.tv)">'
+          + '<div style="font-weight:700">' + t.l + '</div>'
+          + '<div style="font-size:10px;opacity:0.8">' + t.price + '</div>'
+          + '</button>'
+      }).join('')
+    + '</div></div>'
+  return html
+}
+
+function setUCComplexity(ucId, tier) {
+  if (!SASC_DATA.ucWorkloads[ucId]) SASC_DATA.ucWorkloads[ucId] = {}
+  SASC_DATA.ucWorkloads[ucId].complexity = tier
+  document.getElementById('app-content').innerHTML = renderScreen2()
+}
+
 function renderScreen3() {
   var layers = SASC_DATA.layers
   var html = '<div class="card"><div class="card-title">Stack configuration</div>'
@@ -755,13 +1047,17 @@ function renderScreen3() {
 
   Object.keys(layers).forEach(function(key) {
     var l = layers[key]
-    html += '<div class="layer-row" data-key="' + key + '" onclick="toggleLayer(this.dataset.key)">'
-      + '<div class="layer-chk ' + (l.on ? 'on' : '') + '" id="chk-' + key + '"></div>'
-      + '<div class="layer-info">'
-      + '<div class="layer-name">' + esc(l.name) + '</div>'
-      + '<div class="layer-desc">' + esc(l.desc) + '</div>'
-      + '</div>'
-      + '<div class="layer-tag">' + esc(l.tag) + '</div>'
+    var color = LAYER_COLORS[key] || 'var(--navy)'
+    html += '<div class="card" style="padding:0;overflow:hidden;margin-bottom:8px;border-left:3px solid ' + color + '">'
+      + '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer" data-key="' + key + '" onclick="toggleLayer(this.dataset.key)">'
+      + '<div class="layer-chk ' + (l.on ? 'on' : '') + '" id="chk-' + key + '" style="flex-shrink:0"></div>'
+      + '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--dark)">' + esc(l.name) + '</div>'
+      + '<div style="font-size:10px;color:var(--mid)">' + esc(l.desc) + '</div></div>'
+      + '<div style="display:flex;align-items:center;gap:6px">'
+      + '<span class="layer-tag">' + esc(l.tag) + '</span>'
+      + (l.on ? '<span style="font-size:11px;color:var(--mid);cursor:pointer" data-cfgkey="' + key + '" onclick="event.stopPropagation();toggleLayerCfgPanel(this.dataset.cfgkey)">&#9660; Config</span>' : '')
+      + '</div></div>'
+      + (l.on ? '<div class="layer-cfg" id="layer-cfg-' + key + '" style="display:none">' + renderLayerCfgPanel(key) + '</div>' : '')
       + '</div>'
   })
 
@@ -928,8 +1224,22 @@ function calculateBOM(pricing, ucProfiles) {
   // -- UC DEVELOPMENT --------------------------------------------------------
   if (layers.ucdev.on) {
     var ucCount = Math.max(1, s.selectedUCs.length || (ALL_UCS.length || 3))
-    var medParam = findParam('UC Development - Medium')
-    if (medParam) totalUcdev += addLine('UC Development', 'UC Development - Medium complexity', ucCount, 'per_uc', medParam.base_price_usd, ucCount + ' UCs estimated at medium complexity')
+    var globalComplexity = (s.layerCfg && s.layerCfg.ucdev && s.layerCfg.ucdev.complexity) || 'medium'
+    var complexityMap = { simple:'UC Development - Simple', medium:'UC Development - Medium', complex:'UC Development - Complex', research:'UC Development - Research Grade' }
+    var complexityGroups = { simple:0, medium:0, complex:0, research:0 }
+    if (s.selectedUCs.length) {
+      s.selectedUCs.forEach(function(uid) {
+        var wl = s.ucWorkloads[uid] || {}
+        var comp = wl.complexity || globalComplexity
+        complexityGroups[comp] = (complexityGroups[comp] || 0) + 1
+      })
+    } else { complexityGroups[globalComplexity] = ucCount }
+    Object.keys(complexityGroups).forEach(function(comp) {
+      var cnt = complexityGroups[comp]
+      if (!cnt) return
+      var compParam = findParam(complexityMap[comp]) || findParam('UC Development - Medium')
+      if (compParam) totalUcdev += addLine('UC Development', complexityMap[comp], cnt, 'per_uc', compParam.base_price_usd, cnt + ' UC(s) at ' + comp + ' complexity')
+    })
     var uatParam = findParam('UAT and Acceptance Testing')
     if (uatParam) totalUcdev += addLine('UC Development', 'UAT and Acceptance Testing', ucCount, 'per_uc', uatParam.base_price_usd, '')
   }
@@ -1067,6 +1377,13 @@ function updateMDCSummary() {
   var sites = SASC_DATA.mdc.sites || 1
   var mw = (mwMap[SASC_DATA.mdc.tshirt] || 10) * sites
   el.textContent = 'Total programme: ' + mw + ' MW across ' + sites + ' site(s)'
+}
+
+
+function toggleLayerCfgPanel(key) {
+  var panel = document.getElementById('layer-cfg-' + key)
+  if (!panel) return
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none'
 }
 
 function toggleLayer(key) {
