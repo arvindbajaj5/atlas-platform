@@ -629,56 +629,107 @@ function init(){
   refreshSettingsStatus()
 }
 
+
+var TTL_CFG = { domain:7, news:7, rss:7, global:7, extend_empty:14, extend_empty2:21 }
+var RUN_RECORDS = {}
+
+async function loadTTLConfig() {
+  var cfg = getConfig()
+  var sbUrl = cfg.sbUrl || cfg.sb_url || ''
+  var sbKey = cfg.sbKey || cfg.sb_key || ''
+  if (!sbUrl || !sbKey) return
+  try {
+    var r = await fetch(sbUrl + '/rest/v1/app_config?key=in.(ttl_domain_days,ttl_news_days,ttl_rss_days,ttl_global_days,ttl_extend_empty,ttl_extend_empty2)&limit=20', { headers: { apikey: sbKey, Authorization: 'Bearer ' + sbKey } })
+    if (!r.ok) return
+    var rows = await r.json()
+    var map = { ttl_domain_days:'domain', ttl_news_days:'news', ttl_rss_days:'rss', ttl_global_days:'global', ttl_extend_empty:'extend_empty', ttl_extend_empty2:'extend_empty2' }
+    rows.forEach(function(row) { if (map[row.key]) TTL_CFG[map[row.key]] = parseInt(row.value) || TTL_CFG[map[row.key]] })
+  } catch(e) {}
+}
+
+async function loadRunRecords() {
+  var cfg = getConfig()
+  var sbUrl = cfg.sbUrl || cfg.sb_url || ''
+  var sbKey = cfg.sbKey || cfg.sb_key || ''
+  if (!sbUrl || !sbKey) return
+  try {
+    var r = await fetch(sbUrl + '/rest/v1/scrape_runs?geography=eq.India&order=topic_code.asc&limit=200', { headers: { apikey: sbKey, Authorization: 'Bearer ' + sbKey } })
+    if (!r.ok) return
+    var rows = await r.json()
+    RUN_RECORDS = {}
+    rows.forEach(function(row) { RUN_RECORDS[row.topic_code] = row })
+  } catch(e) {}
+}
+
+function getDomainTTLState(code, runType) {
+  var rec = RUN_RECORDS[code]
+  if (!rec || !rec.last_run_at) return { locked:false, daysAgo:null, daysLeft:null, lastRunAt:null, itemsAdded:0 }
+  var daysAgo = (Date.now() - new Date(rec.last_run_at).getTime()) / 86400000
+  var ttl = rec.ttl_days || (runType === 'news' ? TTL_CFG.news : TTL_CFG.domain)
+  var daysLeft = ttl - daysAgo
+  return { locked:daysLeft > 0, daysAgo:Math.round(daysAgo*10)/10, daysLeft:Math.ceil(daysLeft), lastRunAt:rec.last_run_at, itemsAdded:rec.items_added||0 }
+}
+
 function renderDomainGrid(){
-  var meta = getMetaDB()
   var db = getIntelDB()
   document.getElementById('domainGrid').innerHTML = DOMAINS.map(function(d){
-    var m = meta[d.code] || {}
+    var ttlState = getDomainTTLState(d.code, 'domain')
+    var locked = ttlState.locked
     var items = (db[d.code] || []).length
-    var status = getStatus(m.last_scraped)
-    var statusLabel = status === 'never' ? 'Never scraped' : status === 'fresh' ? 'Fresh' : 'Stale'
-    var lastStr = m.last_scraped ? new Date(m.last_scraped).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : 'Never'
-    var sel = selectedDomains.has(d.code)
-    return '<div class="domain-card ' + (sel?'selected':'') + '" id="dc-' + d.code + '" data-code="' + d.code + '" data-type="domain" onclick="toggleDomain(this)">'
-      + '<div class="domain-card-hdr">'
-      + '<span class="domain-icon">' + d.icon + '</span>'
-      + '<div><div class="domain-name">' + d.name + '</div><div class="domain-code">' + d.code + '</div></div>'
-      + '<div class="domain-check" id="chk-' + d.code + '"></div>'
+    var isSelected = selectedDomains.has(d.code) && !locked
+    var lastStr = ttlState.lastRunAt
+      ? new Date(ttlState.lastRunAt).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) + ' (' + ttlState.daysAgo + 'd ago)'
+      : 'Never scraped'
+    var statusLabel = locked
+      ? ' Locked   ' + ttlState.daysLeft + 'd left'
+      : ttlState.lastRunAt ? 'Available' : 'Never scraped'
+    var statusClass = locked ? 'status-fresh' : ttlState.lastRunAt ? 'status-stale' : 'status-never'
+    return '<div class="domain-card' + (locked ? ' domain-locked' : '') + (isSelected ? ' selected' : '') + '"'
+      + (locked ? ' title="Next scrape in ' + ttlState.daysLeft + ' day' + (ttlState.daysLeft===1?'':'s') + '"' : ' onclick="toggleDomain(\'' + d.code + '\')"')
+      + '>'
+      + '<div class="domain-header">'
+      + '<input type="checkbox" class="domain-check"' + (isSelected ? ' checked' : '') + (locked ? ' disabled' : '') + ' onclick="event.stopPropagation()">'
+      + '<span class="domain-icon">' + (d.icon||'') + '</span>'
+      + (locked ? '<span style="font-size:9px;color:var(--mid);margin-left:auto"> Locked</span>' : '')
       + '</div>'
-      + '<div class="domain-meta">'
-      + '<span>Last: ' + lastStr + '</span>'
-      + '<span class="domain-status status-' + status + '">' + statusLabel + '</span>'
-      + '</div>'
-      + '<div style="font-size:10px;color:var(--mid);margin-top:4px">' + items + ' items in database</div>'
-      + '<div class="domain-progress" id="prog-' + d.code + '"><div class="domain-progress-bar" id="progbar-' + d.code + '"></div></div>'
+      + '<div class="domain-name">' + d.name + '</div>'
+      + '<div class="domain-meta"><span class="status-badge ' + statusClass + '">' + statusLabel + '</span></div>'
+      + '<div style="font-size:10px;color:var(--mid);margin-top:2px">' + lastStr + '</div>'
+      + (ttlState.lastRunAt ? '<div style="font-size:10px;color:var(--mid)">+' + ttlState.itemsAdded + ' items last run</div>' : '')
       + '</div>'
   }).join('')
+  selectedDomains.forEach(function(code){ if (getDomainTTLState(code,'domain').locked) selectedDomains.delete(code) })
+  updateRunBtn()
 }
 
 function renderNewsGrid(){
-  var meta = getMetaDB()
   var db = getIntelDB()
   document.getElementById('newsGrid').innerHTML = NEWS_TOPICS.map(function(t){
-    var m = meta['news_' + t.code] || {}
+    var ttlState = getDomainTTLState(t.code, 'news')
+    var locked = ttlState.locked
     var items = (db['news_' + t.code] || []).length
-    var status = getStatus(m.last_scraped)
-    var statusLabel = status === 'never' ? 'Never scraped' : status === 'fresh' ? 'Fresh' : 'Stale'
-    var lastStr = m.last_scraped ? new Date(m.last_scraped).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : 'Never'
-    var sel = selectedNews.has(t.code)
-    return '<div class="domain-card ' + (sel?'selected':'') + '" id="dc-news-' + t.code + '" data-code="' + t.code + '" data-type="news" onclick="toggleNews(this)">'
-      + '<div class="domain-card-hdr">'
-      + '<span class="domain-icon">' + t.icon + '</span>'
-      + '<div><div class="domain-name">' + t.name + '</div><div class="domain-code">NEWS &middot; ' + t.code + '</div></div>'
-      + '<div class="domain-check" id="chk-news-' + t.code + '"></div>'
+    var isSelected = selectedNews.has(t.code) && !locked
+    var lastStr = ttlState.lastRunAt
+      ? new Date(ttlState.lastRunAt).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) + ' (' + ttlState.daysAgo + 'd ago)'
+      : 'Never scraped'
+    var statusLabel = locked ? ' Locked   ' + ttlState.daysLeft + 'd left' : ttlState.lastRunAt ? 'Available' : 'Never scraped'
+    var statusClass = locked ? 'status-fresh' : ttlState.lastRunAt ? 'status-stale' : 'status-never'
+    return '<div class="domain-card' + (locked ? ' domain-locked' : '') + (isSelected ? ' selected' : '') + '"'
+      + (locked ? ' title="Next scrape in ' + ttlState.daysLeft + ' day' + (ttlState.daysLeft===1?'':'s') + '"' : ' onclick="toggleNews(\'' + t.code + '\')"')
+      + '>'
+      + '<div class="domain-header">'
+      + '<input type="checkbox" class="domain-check"' + (isSelected ? ' checked' : '') + (locked ? ' disabled' : '') + ' onclick="event.stopPropagation()">'
+      + '<span class="domain-icon">' + (t.icon||'') + '</span>'
+      + (locked ? '<span style="font-size:9px;color:var(--mid);margin-left:auto"> Locked</span>' : '')
       + '</div>'
-      + '<div class="domain-meta">'
-      + '<span>Last: ' + lastStr + '</span>'
-      + '<span class="domain-status status-' + status + '">' + statusLabel + '</span>'
-      + '</div>'
-      + '<div style="font-size:10px;color:var(--mid);margin-top:4px">' + items + ' items in database</div>'
-      + '<div class="domain-progress" id="prog-news-' + t.code + '"><div class="domain-progress-bar" id="progbar-news-' + t.code + '"></div></div>'
+      + '<div class="domain-name">' + t.name + '</div>'
+      + '<div class="domain-meta"><span class="status-badge ' + statusClass + '">' + statusLabel + '</span></div>'
+      + '<div style="font-size:10px;color:var(--mid);margin-top:2px">' + lastStr + '</div>'
+      + (ttlState.lastRunAt ? '<div style="font-size:10px;color:var(--mid)">+' + ttlState.itemsAdded + ' items last run</div>' : '')
       + '</div>'
   }).join('')
+  selectedNews.forEach(function(code){ if (getDomainTTLState(code,'news').locked) selectedNews.delete(code) })
+  updateRunBtn()
 }
 
 function getStatus(lastScraped){
@@ -1350,7 +1401,7 @@ async function enrichItem(item){
 
 async function runEnrichmentPhase(allItems){
   var cfg = getConfig()
-  if(!cfg.useEnrich) return
+  if(!cfg.useEnrich) { log('Auto-enrich is off. Toggle it in settings to enable.', 'dim'); return }
   if(!allItems || allItems.length === 0) return
   log('', 'dim')
   log('Phase 2 \u2014 Enriching ' + allItems.length + ' items...', 'info')
@@ -1598,10 +1649,17 @@ function clearIntelligence(){
 }
 
 window.addEventListener('DOMContentLoaded', function(){
-  init()
-  // Load metadata from Supabase on startup
-  var cfg0 = getConfig()
-  if(cfg0.sbUrl && cfg0.sbKey){ loadFromSupabase(); updateStatsFromSupabase() }
+  loadTTLConfig().then(function(){
+    return loadRunRecords()
+  }).then(function(){
+    init()
+    var cfg0 = getConfig()
+    if(cfg0.sbUrl && cfg0.sbKey){ loadFromSupabase(); updateStatsFromSupabase() }
+  }).catch(function(){
+    init()
+    var cfg0 = getConfig()
+    if(cfg0.sbUrl && cfg0.sbKey){ loadFromSupabase(); updateStatsFromSupabase() }
+  })
   // Show any existing results
   var db = getIntelDB()
   if(Object.keys(db).length > 0) renderResults()
