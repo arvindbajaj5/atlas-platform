@@ -67,7 +67,7 @@ input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
 </head>
 <body>
 
-<div class="hdr">
+<div style="display:flex;gap:8px;margin:12px 16px 4px;padding-bottom:10px;border-bottom:1px solid #e0e0e8"><button style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:700;border:none;background:#002870;color:#fff;cursor:pointer" onclick="showSettingsTab()">Settings</button><button style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid #e0e0e8;background:#fff;color:#666;cursor:pointer" onclick="showUsageTab()">Usage</button></div><div id="main-section"><div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S</div>
   <div style="font-size:11px;color:rgba(255,255,255,0.5)">Global Settings</div>
   <div class="hdr-right">
@@ -235,6 +235,94 @@ var PROVIDERS = [
 
 var DEFAULT_MODEL_KEY = 'atlas_default_model'
 
+
+var USAGE_TAB_ACTIVE = false
+
+function showUsageTab() {
+  USAGE_TAB_ACTIVE = true
+  document.getElementById('usage-section').style.display = 'block'
+  document.getElementById('main-section').style.display  = 'none'
+  loadUsageDashboard()
+}
+
+function showSettingsTab() {
+  USAGE_TAB_ACTIVE = false
+  document.getElementById('usage-section').style.display = 'none'
+  document.getElementById('main-section').style.display  = 'block'
+}
+
+function fmtInr(usd) { return "Rs." + (parseFloat(usd||0)*84.20).toFixed(2) }
+function fmtUsdStr(usd) { return "$" + parseFloat(usd||0).toFixed(4) }
+function fmtTok(n) { var t = parseInt(n||0); return t>=1000000?(t/1000000).toFixed(2)+"M":(t/1000).toFixed(0)+"K" }
+
+async function loadUsageDashboard() {
+  var cfg = getCfg()
+  var sbUrl = cfg.sbUrl || ""
+  var sbKey = cfg.sbKey || ""
+  var el = document.getElementById("usage-dashboard")
+  if (!sbUrl || !sbKey) { el.innerHTML = "<div style=\"padding:20px\">Configure Supabase in Settings first.</div>"; return }
+  el.innerHTML = "<div style=\"padding:20px\">Loading...</div>"
+  try {
+    var h1 = { apikey:sbKey, Authorization:"Bearer "+sbKey }
+    var r30  = await fetch(sbUrl+"/rest/v1/usage_last_30d", {headers:h1})
+    var rMon = await fetch(sbUrl+"/rest/v1/usage_monthly_summary?order=month.desc&limit=50", {headers:h1})
+    var rRec = await fetch(sbUrl+"/rest/v1/api_usage_log?order=ts.desc&limit=20", {headers:h1})
+    var s30   = r30.ok   ? await r30.json()  : []
+    var mon   = rMon.ok  ? await rMon.json() : []
+    var recent= rRec.ok  ? await rRec.json() : []
+    var tCost = s30.reduce(function(s,r){ return s+parseFloat(r.cost_usd||0) },0)
+    var tTok  = s30.reduce(function(s,r){ return s+parseInt(r.tokens||0) },0)
+    var tCalls= s30.reduce(function(s,r){ return s+parseInt(r.calls||0) },0)
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">'
+      + '<div class="ucrd"><div class="ucrd-v">'+fmtInr(tCost)+'</div><div class="ucrd-l">Cost last 30 days</div></div>'
+      + '<div class="ucrd"><div class="ucrd-v">'+fmtTok(tTok)+'</div><div class="ucrd-l">Tokens last 30 days</div></div>'
+      + '<div class="ucrd"><div class="ucrd-v">'+tCalls+'</div><div class="ucrd-l">Calls last 30 days</div></div>'
+      + '</div>'
+    if (s30.length) {
+      html += '<div class="ushdr">By tool and model (last 30 days)</div>'
+        + '<table class="utbl"><thead><tr><th>Tool</th><th>Model</th><th>Calls</th><th>Tokens</th><th>USD</th><th>INR</th></tr></thead><tbody>'
+      s30.forEach(function(row){
+        html += '<tr><td><span class="ubadge">'+esc(row.tool||'')+'</span></td>'
+          +'<td style="font-size:11px">'+esc(row.model||'')+'</td>'
+          +'<td style="text-align:right">'+(row.calls||0)+'</td>'
+          +'<td style="text-align:right">'+fmtTok(row.tokens)+'</td>'
+          +'<td style="text-align:right;font-weight:600">'+fmtUsdStr(row.cost_usd)+'</td>'
+          +'<td style="text-align:right;color:#FF5539;font-weight:600">'+fmtInr(row.cost_usd)+'</td></tr>'
+      })
+      html += '</tbody></table>'
+    }
+    if (mon.length) {
+      html += '<div class="ushdr" style="margin-top:20px">Monthly trend</div>'
+        + '<table class="utbl"><thead><tr><th>Month</th><th>Tool</th><th>Calls</th><th>Tokens</th><th>INR</th></tr></thead><tbody>'
+      mon.slice(0,30).forEach(function(row){
+        html += '<tr><td>'+(row.month||"").toString().slice(0,7)+'</td>'
+          +'<td><span class="ubadge">'+esc(row.tool||'')+'</span></td>'
+          +'<td style="text-align:right">'+(row.calls||0)+'</td>'
+          +'<td style="text-align:right">'+fmtTok(row.total_tokens)+'</td>'
+          +'<td style="text-align:right;color:#FF5539;font-weight:600">'+fmtInr(row.total_cost_usd)+'</td></tr>'
+      })
+      html += '</tbody></table>'
+    }
+    if (recent.length) {
+      html += '<div class="ushdr" style="margin-top:20px">Recent calls (last 20)</div>'
+        + '<table class="utbl"><thead><tr><th>Time</th><th>Tool</th><th>Type</th><th>Model</th><th>In</th><th>Out</th><th>INR</th><th>Status</th></tr></thead><tbody>'
+      recent.forEach(function(row){
+        var ts = row.ts ? new Date(row.ts).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : ""
+        var ok = row.status==="success"
+        html += '<tr><td style="font-size:10px;white-space:nowrap">'+ts+'</td>'
+          +'<td><span class="ubadge">'+esc(row.tool||'')+'</span></td>'
+          +'<td style="font-size:10px">'+esc(row.call_type||'')+'</td>'
+          +'<td style="font-size:10px">'+esc((row.model||"").split("-").slice(0,3).join("-"))+'</td>'
+          +'<td style="text-align:right;font-size:11px">'+(row.input_tokens||0)+'</td>'
+          +'<td style="text-align:right;font-size:11px">'+(row.output_tokens||0)+'</td>'
+          +'<td style="text-align:right;font-size:11px">'+fmtInr(row.cost_usd)+'</td>'
+          +'<td><span style="font-size:10px;padding:1px 5px;border-radius:4px;background:'+(ok?"rgba(0,178,144,0.12)":"rgba(255,85,57,0.12)")+';color:'+(ok?"#085041":"#c0341a")+'">'+esc(row.status||'')+'</span></td></tr>'
+      })
+      html += '</tbody></table>'
+    }
+    el.innerHTML = html
+  } catch(e) { el.innerHTML = '<div style="padding:20px">Error: '+e.message+'</div>' }
+}
 function getCfg(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } }
 function setCfg(obj){ localStorage.setItem('atlas_global_cfg', JSON.stringify(obj)) }
 
@@ -425,5 +513,5 @@ window.addEventListener('DOMContentLoaded', function(){
   render()
 })
 </script>
-</body>
+</div><div id="usage-section" style="display:none;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700;color:#002870">API Usage Dashboard</div><button onclick="loadUsageDashboard()" style="padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid #e0e0e8;background:#fff;cursor:pointer">Refresh</button></div><div id="usage-dashboard"></div></div></body>
 </html>
