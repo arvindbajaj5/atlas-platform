@@ -6,7 +6,7 @@
 import fetch from 'node-fetch'
 import { parseStringPromise } from 'xml2js'
 
-// ── Config ────────────────────────────────────────────────────────────────────
+//    Config                                                                     
 const GEMINI_KEY    = process.env.GEMINI_API_KEY
 const SB_URL        = process.env.SUPABASE_URL
 const SB_KEY        = process.env.SUPABASE_KEY
@@ -20,18 +20,14 @@ const GLOBAL_DOMAINS = ['TEC-GEN','MKT-HPC','MKT-COM','MKT-SOV','MKT-DEF','MKT-T
 
 // Extra global-only topics for international UC and tech intelligence
 const GLOBAL_TOPICS = [
-  { code:'UC-GLB',  name:'Global AI Use Cases',
-    focus:'AI use case deployment production government defence health agriculture smart city 2025 2026' },
   { code:'TEC-GLB', name:'Global AI Infrastructure News',
     focus:'GPU cluster HPC AI data centre supercomputer large language model deployment cloud AI 2025 2026' },
-  { code:'OEM-GLB', name:'AI HPC OEM & Market News',
+  { code:'OEM-GLB', name:'AI HPC OEM and Market News',
     focus:'NVIDIA AMD HPE Dell Supermicro Intel AI server HPC GPU contract announcement partnership 2025 2026' },
-  { code:'POL-GLB', name:'Global AI Policy & Regulation',
+  { code:'POL-GLB', name:'Global AI Policy and Regulation',
     focus:'AI regulation policy national AI strategy government AI governance EU US China 2025 2026' },
-  { code:'INV-GLB', name:'Global AI Investment & Funding',
-    focus:'AI startup funding investment data centre GPU infrastructure deal billion 2025 2026' },
 ]
-const GROUNDING_MODEL = 'gemini-3.5-flash'   // 3.5-flash more reliable for search grounding
+const GROUNDING_MODEL = 'gemini-2.0-flash'   // 2.0-flash cheaper, supports grounding
 const EXTRACT_MODEL   = 'gemini-3.1-flash-lite' // cheap for RSS extraction
 const DELAY_MS      = 1000
 
@@ -42,21 +38,16 @@ console.log(`Grounding: ${GROUNDING_MODEL} | Extract: ${EXTRACT_MODEL}`)
 console.log(`Geographies: ${GEOGRAPHIES.join(', ')} | RSS: ${RUN_RSS} | Search: ${RUN_SEARCH}`)
 console.log(`Sarvam (Indic): ${SARVAM_KEY ? 'enabled' : 'disabled'}`)
 
-// ── Domain taxonomy ───────────────────────────────────────────────────────────
+//    Domain taxonomy                                                            
 const DOMAINS = [
-  { code:'GOV-GOV', name:'Government & Governance',         focus:'Indian central and state government AI adoption, e-governance, digital India, citizen services, smart cities' },
-  { code:'DEF-MIL', name:'Defence -- Armed Forces',          focus:'Indian Army, Navy, Air Force, DPSUs, DRDO combat systems, autonomous weapons, military AI India' },
-  { code:'DEF-SPC', name:'Defence -- Space & Satellite',     focus:'ISRO, IN-SPACe, Defence Space Agency, military satellite, launch vehicles, space situational awareness India' },
-  { code:'DEF-HLS', name:'Defence -- Homeland Security',     focus:'BSF, CRPF, paramilitary, border security, surveillance, critical infrastructure protection India' },
-  { code:'DEF-INT', name:'Defence -- Intelligence & Signals',focus:'SIGINT, IMINT, intelligence agencies, cyber intelligence, signal processing AI India' },
-  { code:'GEO-SPA', name:'Geospatial & Earth Observation',  focus:'NRSC, Survey of India, Pixxel, MapMyIndia, civilian EO platforms, GIS, Bhuvan India' },
-  { code:'INF-CIV', name:'Critical Infrastructure',         focus:'Indian Railways, airports, ports, civil aviation, DGCA, AAI, metro systems AI India' },
-  { code:'TEL-NET', name:'Telecom & Networks',              focus:'Jio, Airtel, BSNL, 5G AI, network optimisation, telecom AI India, DoT, C-DOT' },
-  { code:'TEC-GEN', name:'Technology',                      focus:'IT services, AI platforms, cloud, TCS, Infosys, Wipro, HCL AI India 2025 2026' },
-  { code:'FIN-BFS', name:'Banking & Financial Services',    focus:'RBI, SEBI, PSU banks, fintech, payments, fraud detection, credit AI India 2025 2026' },
-  { code:'REG-AIP', name:'Regional AI Programmes',          focus:'IndiaAI Mission, state AI CoE, AI cities, regional compute hub India 2025 2026' },
-  { code:'LAB-AIR', name:'AI Labs & Research',              focus:'IIT, DRDO labs, AI startups India, research publications, benchmarks 2025 2026' },
-  { code:'HLT-LIF', name:'Healthcare & Life Sciences',      focus:'AIIMS, diagnostic AI, pharma, hospital AI, health data India 2025 2026' },
+  { code:'GOV-GOV', name:'Government -- Digital & AI',         focus:'Indian central/state government AI, data centre, digital transformation, e-governance, smart city procurement 2025 2026' },
+  { code:'DEF-MIL', name:'Defence -- Armed Forces',            focus:'Indian Army, Navy, Air Force, DPSUs, DRDO combat AI, autonomous weapons, military AI India 2025 2026' },
+  { code:'DEF-SPC', name:'Defence -- Space & Satellite',       focus:'ISRO, IN-SPACe, Defence Space Agency, military satellite, launch vehicles India 2025 2026' },
+  { code:'GEO-SPA', name:'Geospatial & Earth Observation',     focus:'Satellite imagery AI, EO processing, geospatial analytics, ISRO, Survey of India, GIS India 2025 2026' },
+  { code:'INF-CIV', name:'Infrastructure -- Civilian AI',      focus:'Smart city, urban AI, transport AI, logistics AI, public infrastructure digital India 2025 2026' },
+  { code:'TEC-GEN', name:'Technology -- General AI',           focus:'AI deployment, GPU, HPC, data centre, LLM, sovereign AI India enterprise government 2025 2026' },
+  { code:'REG-AIP', name:'Regulation -- AI Policy',            focus:'AI regulation, data localisation, DPDP, AI governance, MeitY policy India 2025 2026' },
+  { code:'HLT-LIF', name:'Health & Life Sciences AI',          focus:'Healthcare AI, clinical AI, drug discovery, health informatics, telemedicine AI India 2025 2026' },
 ]
 
 const NEWS_TOPICS = [
@@ -67,7 +58,7 @@ const NEWS_TOPICS = [
   { code:'MKT-SOV', name:'Sovereign AI & Policy',        focus:'data localisation sovereign AI DPDP Act on-premise India policy 2025 2026' },
 ]
 
-// ── RSS Feeds ─────────────────────────────────────────────────────────────────
+//    RSS Feeds                                                                  
 const RSS_FEEDS = []  // populated dynamically from feed_library table
 
 async function loadActiveFeeds() {
@@ -91,7 +82,7 @@ async function loadActiveFeeds() {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+//    Helpers                                                                    
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
 function normaliseTitle(t) {
@@ -123,7 +114,7 @@ function extractJSON(raw) {
   return null
 }
 
-// ── Sarvam translation ────────────────────────────────────────────────────────
+//    Sarvam translation                                                         
 async function translateWithSarvam(text, sourceLang) {
   if (!SARVAM_KEY || sourceLang === 'en') return { text, translated: false }
   const langMap = { hi:'hi-IN', te:'te-IN', ml:'ml-IN', ta:'ta-IN', kn:'kn-IN', mr:'mr-IN', gu:'gu-IN', bn:'bn-IN', pa:'pa-IN', or:'or-IN' }
@@ -140,7 +131,7 @@ async function translateWithSarvam(text, sourceLang) {
   } catch { return { text, translated: false } }
 }
 
-// ── Gemini Search Grounding ───────────────────────────────────────────────────
+//    Gemini Search Grounding                                                    
 async function callGeminiGrounded(prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GROUNDING_MODEL}:generateContent?key=${GEMINI_KEY}`
   const body = {
@@ -158,7 +149,7 @@ async function callGeminiGrounded(prompt) {
   return { text, sources }
 }
 
-// ── Gemini plain (for RSS extraction) ────────────────────────────────────────
+//    Gemini plain (for RSS extraction)                                         
 async function callGemini(prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${EXTRACT_MODEL}:generateContent?key=${GEMINI_KEY}`
   const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 1024 } }
@@ -168,7 +159,7 @@ async function callGemini(prompt) {
   return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 }
 
-// ── Supabase ──────────────────────────────────────────────────────────────────
+//    Supabase                                                                   
 async function getExisting() {
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7)
   const dedupParams = 'select=title,source_url&limit=2000'
@@ -225,10 +216,10 @@ async function phase2SemanticMatch(title, description, contexts) {
   const excludeContexts = contexts.filter(function(c) { return c.tier === 'exclude' })
   const matchContexts   = contexts.filter(function(c) { return c.tier !== 'exclude' })
   const contextList = matchContexts.map(function(c, i) {
-    return (i+1) + '. [' + c.tier.toUpperCase() + '] ' + c.name + ': ' + c.context_string
+    return (i+1) + '. [' + c.tier.toUpperCase() + '] ' + c.name + ': ' + (c.short_description || c.context_string)
   }).join('\n')
   const excludeList = excludeContexts.map(function(c) {
-    return '- ' + c.name + ': ' + c.context_string
+    return '- ' + c.name + ': ' + (c.short_description || c.context_string)
   }).join('\n')
   const prompt = 'You are an intelligence analyst for an AI and HPC hardware OEM selling to Indian government and enterprise clients.\n'
     + 'ARTICLE TITLE: ' + title.slice(0, 150) + '\n'
@@ -293,82 +284,137 @@ function buildRow(id, domainCode, domainName, item, extra = {}) {
   }
 }
 
-// ── RSS Scraping ──────────────────────────────────────────────────────────────
+//    RSS Scraping                                                               
+
+// Phase 2 batch: classify up to PHASE2_BATCH_SIZE items in one Gemini call
+const PHASE2_BATCH_SIZE = 5
+
+async function phase2SemanticMatchBatch(items, contexts) {
+  if (!items || !items.length) return []
+  var excludeContexts = contexts.filter(function(c) { return c.tier === 'exclude' })
+  var matchContexts   = contexts.filter(function(c) { return c.tier !== 'exclude' })
+
+  var contextList = matchContexts.map(function(c, i) {
+    return (i+1) + '. [' + c.tier.toUpperCase() + '] ' + c.name + ': ' + (c.short_description || c.context_string)
+  }).join('\n')
+  var excludeList = excludeContexts.map(function(c) {
+    return '- ' + c.name + ': ' + (c.short_description || c.context_string)
+  }).join('\n')
+  var articlesText = items.map(function(item, idx) {
+    return 'ARTICLE ' + (idx+1) + ':\nTitle: ' + item.title.slice(0, 100) + '\nContent: ' + item.description.slice(0, 200)
+  }).join('\n\n')
+
+  var prompt = 'Intelligence analyst for AI/HPC OEM selling to Indian govt and enterprise.\n'
+    + 'Classify each article. Return 0 if none match or matches EXCLUDE.\n\n'
+    + 'CONTEXTS:\n' + contextList + '\n\n'
+    + 'EXCLUDE:\n' + excludeList + '\n\n'
+    + articlesText + '\n\n'
+    + 'Return JSON array only, one per article: [{matched_context_num,matched_tier,intelligence_stream,intelligence_value,summary(50 words),organisations,tags(max 3),opportunity,uc_suggest,confidence},...]\n'
+    + 'Start [ end ]. No markdown.'
+
+  var raw = await callGemini(prompt)
+  var parsed = extractJSON(raw)
+  if (!Array.isArray(parsed)) return items.map(function() { return null })
+
+  return parsed.map(function(extracted, i) {
+    if (!extracted || !extracted.matched_context_num || extracted.matched_context_num === 0) return null
+    var matchedCtx = matchContexts[extracted.matched_context_num - 1]
+    if (!matchedCtx) return null
+    return Object.assign({}, extracted, {
+      matched_context: matchedCtx.name,
+      matched_tier:    matchedCtx.tier,
+      portfolio_codes: matchedCtx.portfolio_codes || [],
+      relevant:        true
+    })
+  })
+}
+
 async function scrapeRSS(feed, existing) {
-  console.log(`  [RSS] ${feed.name} (${feed.lang})`)
+  console.log('  [RSS] ' + feed.name + ' (' + feed.lang + ')')
   let added = 0
   try {
     const r = await fetch(feed.url, { headers: { 'User-Agent': 'ATLAS-Bot/2.1' }, signal: AbortSignal.timeout(12000) })
-    if (!r.ok) { console.log(`    WARN HTTP ${r.status}`); return 0 }
+    if (!r.ok) { console.log('    WARN HTTP ' + r.status); return 0 }
     const xml = await r.text()
     const parsed = await parseStringPromise(xml, { explicitArray: false })
-    const channel = parsed?.rss?.channel || parsed?.feed
-    const rawItems = channel?.item || channel?.entry || []
+    const channel = parsed && parsed.rss && parsed.rss.channel || parsed && parsed.feed
+    const rawItems = (channel && channel.item) || (channel && channel.entry) || []
     const items = Array.isArray(rawItems) ? rawItems : [rawItems]
     const cutoff30 = new Date(); cutoff30.setDate(cutoff30.getDate() - 30)
+    const domainCode = (feed.codes && feed.codes[0]) || 'TEC-GEN'
 
+    // Phase 1: collect items passing keyword filter
+    const phase1Passed = []
     for (const rssItem of items.slice(0, 20)) {
-      const domainCode = (feed.codes && feed.codes[0]) || 'TEC-GEN'
-      const rawTitle = (rssItem.title?._ || rssItem.title || '').trim()
-      const link = (rssItem.link?._ || rssItem.link || rssItem.id || '').trim()
-      const desc = (rssItem.description?._ || rssItem.description || rssItem.summary?._ || rssItem.summary || '').replace(/<[^>]+>/g, '').trim()
-      const pubDate = rssItem.pubDate || rssItem.published || rssItem.updated || ''
+      const rawTitle = ((rssItem.title && (rssItem.title._ || rssItem.title)) || '').trim()
+      const link     = ((rssItem.link && (rssItem.link._ || rssItem.link)) || rssItem.id || '').trim()
+      const desc     = ((rssItem.description && (rssItem.description._ || rssItem.description)) || (rssItem.summary && (rssItem.summary._ || rssItem.summary)) || '').replace(/<[^>]+>/g, '').trim()
+      const pubDate  = rssItem.pubDate || rssItem.published || rssItem.updated || ''
 
       if (!rawTitle || !link) continue
       if (pubDate && new Date(pubDate) < cutoff30) continue
 
-      // Translate if Indic
-      let title = rawTitle
-      let description = desc
-      let translated = false
-      let language = feed.lang
+      let title = rawTitle, description = desc, translated = false
+      const language = feed.lang
       if (feed.lang !== 'en' && SARVAM_KEY) {
         const tr = await translateWithSarvam(rawTitle + '. ' + desc.slice(0, 300), feed.lang)
         if (tr.translated) { title = tr.text.split('.')[0]; description = tr.text; translated = true }
         await sleep(1000)
       }
 
-      // Dedup
-      const titleKey = title.toLowerCase().trim()
+      const titleKey  = title.toLowerCase().trim()
       const titleNorm = normaliseTitle(title)
-      const urlKey = link.toLowerCase()
+      const urlKey    = link.toLowerCase()
       if (existing.titles.has(titleKey) || existing.titles.has(titleNorm) || existing.urls.has(urlKey)) continue
-
-      // Phase 1: keyword pre-filter (free)
       if (!phase1KeywordFilter(title, description)) continue
 
-      // Phase 2: semantic context tree
-      const contexts = await loadSemanticContexts()
-      const matched = await phase2SemanticMatch(title, description, contexts)
-      if (!matched) continue
-
-      const id = `rss-${domainCode.replace(/-/g,'')}-${Date.now()}-${Math.floor(Math.random()*9999)}`
-      const row = buildRow(id, domainCode, feed.name, matched, {
-        sourceUrl: link,
-        sourceName: feed.name,
-        language: language,
-        modelUsed: EXTRACT_MODEL,
-        scrapeMethod: translated ? 'rss_sarvam' : 'rss',
-        publishedDate: pubDate ? new Date(pubDate).toISOString() : null,
-        geography: 'India',
-      })
-      row.title = title.slice(0, 500)
-      row.summary = (matched.summary || description.slice(0, 300)).slice(0, 1000)
-      row.matched_context = matched.matched_context || ''
-      row.matched_tier = matched.matched_tier || ''
-
-      const ok = await sbInsert(row)
-      if (ok) {
-        console.log(`    OK [${feed.lang}${translated?'/Sarvam':''}] ${title.slice(0, 55)}`)
-        existing.titles.add(titleKey); existing.titles.add(titleNorm); existing.urls.add(urlKey)
-        added++
-      }
+      phase1Passed.push({ title, description, link, pubDate, language, translated, titleKey, titleNorm, urlKey })
     }
-  } catch (e) { console.log(`    WARN ${e.message.slice(0, 80)}`) }
+
+    if (!phase1Passed.length) return 0
+
+    // Phase 2: batch semantic matching
+    const contexts = await loadSemanticContexts()
+    for (let b = 0; b < phase1Passed.length; b += PHASE2_BATCH_SIZE) {
+      const batch = phase1Passed.slice(b, b + PHASE2_BATCH_SIZE)
+      const matchResults = await phase2SemanticMatchBatch(batch, contexts)
+
+      for (let i = 0; i < batch.length; i++) {
+        const item = batch[i]
+        const matched = matchResults[i]
+        if (!matched) continue
+
+        const id = 'rss-' + domainCode.replace(/-/g, '') + '-' + Date.now() + '-' + Math.floor(Math.random() * 9999)
+        const row = buildRow(id, domainCode, feed.name, matched, {
+          sourceUrl:     item.link,
+          sourceName:    feed.name,
+          language:      item.language,
+          modelUsed:     EXTRACT_MODEL,
+          scrapeMethod:  item.translated ? 'rss_sarvam' : 'rss',
+          publishedDate: item.pubDate ? new Date(item.pubDate).toISOString() : null,
+          geography:     'India',
+        })
+        row.title           = item.title.slice(0, 500)
+        row.summary         = (matched.summary || item.description.slice(0, 300)).slice(0, 1000)
+        row.matched_context = matched.matched_context || ''
+        row.matched_tier    = matched.matched_tier || ''
+
+        const ok = await sbInsert(row)
+        if (ok) {
+          console.log('    OK [' + item.language + (item.translated ? '/Sarvam' : '') + '] ' + item.title.slice(0, 55))
+          existing.titles.add(item.titleKey)
+          existing.titles.add(item.titleNorm)
+          existing.urls.add(item.urlKey)
+          added++
+        }
+      }
+      if (b + PHASE2_BATCH_SIZE < phase1Passed.length) await sleep(DELAY_MS)
+    }
+  } catch (e) { console.log('    WARN ' + e.message.slice(0, 80)) }
   return added
 }
 
-// ── Search Grounding ──────────────────────────────────────────────────────────
+//    Search Grounding                                                           
 async function scrapeGrounded(domain, geography, existing, isNews = false) {
   const prompt = `You are an intelligence analyst for an AI and HPC hardware OEM.
 Use your web search tool to find ONE real recent news item about: ${domain.name}${geography === 'Global' ? ' (international examples outside India, from US/EU/Middle East/Asia Pacific)' : ' in ' + geography}.
@@ -426,7 +472,7 @@ Start { end }. No markdown.`
   return 0
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+//    Main                                                                       
 async function main() {
   const start = Date.now()
   let total = 0
@@ -472,7 +518,7 @@ async function main() {
     // Global intelligence topics
     for (const topic of GLOBAL_TOPICS) {
       console.log(`\n  [GLOBAL] ${topic.code}`)
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 1; i++) {
         total += await scrapeGrounded(topic, 'Global', existing, true)
         await sleep(DELAY_MS)
       }
