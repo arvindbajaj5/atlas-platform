@@ -31,6 +31,103 @@ const GROUNDING_MODEL = 'gemini-2.0-flash'   // 2.0-flash cheaper, supports grou
 const EXTRACT_MODEL   = 'gemini-3.1-flash-lite' // cheap for RSS extraction
 const DELAY_MS      = 1000
 
+//    TTL constants                                                              
+const TTL_DOMAIN_DAYS   = 7
+const TTL_NEWS_DAYS     = 7
+const TTL_GLOBAL_DAYS   = 7
+const TTL_EXTEND_DAYS   = 14   // extended TTL when last run added 0 items
+const TTL_EXTEND_EMPTY  = 21   // further extended if 2+ consecutive empty runs
+
+//    Content fingerprint (no API call needed)                                   
+function contentFingerprint(title, summary) {
+  var combined = (title + ' ' + (summary||'')).toLowerCase()
+    .replace(/[^a-z0-9 ]/g, '').split(/\s+/).slice(0, 30).join(' ')
+  var h = 0
+  for (var i = 0; i < combined.length; i++) {
+    h = ((h << 5) - h) + combined.charCodeAt(i)
+    h = h & h
+  }
+  return Math.abs(h).toString(36)
+}
+
+//    Scrape run TTL helpers                                                     
+async function getRunRecord(runType, topicCode, geography) {
+  var id = runType + '-' + topicCode + '-' + (geography||'India')
+  var rows = await sbFetch('scrape_runs', 'id=eq.' + encodeURIComponent(id), 1)
+  return rows && rows[0] ? rows[0] : null
+}
+
+async function isDue(runType, topicCode, geography) {
+  var rec = await getRunRecord(runType, topicCode, geography)
+  if (!rec || !rec.last_run_at) return { due: true, publishedAfter: null }
+  var daysSince = (Date.now() - new Date(rec.last_run_at).getTime()) / 86400000
+  var ttl = rec.ttl_days || (runType === 'domain' ? TTL_DOMAIN_DAYS : runType === 'news' ? TTL_NEWS_DAYS : TTL_GLOBAL_DAYS)
+  if (daysSince < ttl) {
+    console.log('    SKIP ' + topicCode + ' (scraped ' + daysSince.toFixed(1) + 'd ago, TTL ' + ttl + 'd)')
+    return { due: false, publishedAfter: null }
+  }
+  // Due   return publishedAfter date from last run
+  var publishedAfter = rec.published_after_date || rec.last_run_at
+  return { due: true, publishedAfter: publishedAfter }
+}
+
+async function updateRunRecord(runType, topicCode, geography, itemsAdded) {
+  var id = runType + '-' + topicCode + '-' + (geography||'India')
+  var existing = await getRunRecord(runType, topicCode, geography)
+  var baseTTL = runType === 'domain' ? TTL_DOMAIN_DAYS : runType === 'news' ? TTL_NEWS_DAYS : TTL_GLOBAL_DAYS
+  // Extend TTL if empty run
+  var newTTL = baseTTL
+  if (itemsAdded === 0) {
+    newTTL = (existing && existing.items_added === 0) ? TTL_EXTEND_EMPTY : TTL_EXTEND_DAYS
+    console.log('    Empty run   extending TTL to ' + newTTL + 'd for ' + topicCode)
+  }
+  var payload = {
+    id:                   id,
+    run_type:             runType,
+    topic_code:           topicCode,
+    geography:            geography || 'India',
+    last_run_at:          new Date().toISOString(),
+    items_added:          itemsAdded,
+    runs_total:           ((existing && existing.runs_total) || 0) + 1,
+    ttl_days:             newTTL,
+    published_after_date: new Date().toISOString().slice(0,10)
+  }
+  try {
+    var sb = getSB()
+    await fetch(sb.url + '/rest/v1/scrape_runs', {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(payload)
+    })
+  } catch(e) { console.log('    WARN: could not update scrape_runs:', e.message) }
+}
+
+//    Content hash dedup                                                         
+var KNOWN_HASHES = new Set()   // loaded once at start of run
+
+async function loadKnownHashes() {
+  // Load recent content hashes from Supabase to prevent syndication re-ingestion
+  try {
+    var sb = getSB()
+    var r = await fetch(sb.url + '/rest/v1/intelligence_items?select=content_hash&content_hash=not.is.null&order=scraped_at.desc&limit=2000', {
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+    })
+    if (r.ok) {
+      var rows = await r.json()
+      rows.forEach(function(row) { if (row.content_hash) KNOWN_HASHES.add(row.content_hash) })
+      console.log('  Loaded ' + KNOWN_HASHES.size + ' known content hashes (syndication dedup)')
+    }
+  } catch(e) { console.log('  WARN: could not load content hashes:', e.message) }
+}
+
+function isKnownContent(title, summary) {
+  var hash = contentFingerprint(title, summary)
+  if (KNOWN_HASHES.has(hash)) return true
+  KNOWN_HASHES.add(hash)   // add to in-memory set for within-run dedup too
+  return false
+}
+
+
 if (!GEMINI_KEY || !SB_URL || !SB_KEY) { console.error('Missing GEMINI_API_KEY, SUPABASE_URL, SUPABASE_KEY'); process.exit(1) }
 
 console.log(`=== ATLAS Intelligence Scraper v2.1 ===`)
@@ -398,6 +495,12 @@ async function scrapeRSS(feed, existing) {
         row.summary         = (matched.summary || item.description.slice(0, 300)).slice(0, 1000)
         row.matched_context = matched.matched_context || ''
         row.matched_tier    = matched.matched_tier || ''
+        row.content_hash    = contentFingerprint(item.title, matched.summary || item.description)
+        // Skip syndicated content
+        if (isKnownContent(item.title, matched.summary || item.description)) {
+          console.log('    DEDUP (hash/RSS) ' + item.title.slice(0, 55))
+          continue
+        }
 
         const ok = await sbInsert(row)
         if (ok) {
@@ -415,11 +518,10 @@ async function scrapeRSS(feed, existing) {
 }
 
 //    Search Grounding                                                           
-async function scrapeGrounded(domain, geography, existing, isNews = false) {
+async function scrapeGrounded(domain, geography, existing, isNews = false, publishedAfter = null) {
   const prompt = `You are an intelligence analyst for an AI and HPC hardware OEM.
 Use your web search tool to find ONE real recent news item about: ${domain.name}${geography === 'Global' ? ' (international examples outside India, from US/EU/Middle East/Asia Pacific)' : ' in ' + geography}.
-Focus on: ${domain.focus}
-CRITICAL: ONLY events from 2025 or 2026. Older events = {"relevant":false}.
+Focus on: ${domain.focus || domain.name}${publishedAfter ? '\nReturn ONLY items published after ' + new Date(publishedAfter).toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'}) + '. Exclude anything published before this date   we already have those.' : ''} events from 2025 or 2026. Older events = {"relevant":false}.
 TOPIC GATE: Include anything about AI, ML, data, technology, government, defence, infrastructure, health, agriculture, industry, investment, policy. Exclude ONLY: celebrity gossip, sports scores, entertainment reviews, personal lifestyle. Off-topic = {"relevant":false}.
 JSON only: relevant(true), title(exact real headline), summary(factual 80 words from real article), intelligence_stream(market_pulse|domain_intel|tech_watch), intelligence_value(high|medium|low), organisations(array of real names), tags(array max 5), opportunity(1 sentence), competitor_signals(empty string if none), uc_suggest(use case name or empty string), confidence(high|medium|low), source_title(exact publication name e.g. Economic Times), published_year(integer 2025 or 2026).
 Start { end }. No markdown.`
@@ -462,7 +564,13 @@ Start { end }. No markdown.`
 
   row.matched_context = ''
   row.matched_tier = ''
-  const ok = await sbInsert(row)
+  // Skip syndicated content (hash dedup)
+  if (isKnownContent(item.title, item.summary || '')) {
+    console.log('    DEDUP ' + (item.title||'').slice(0, 55))
+    return 0
+  }
+  row.content_hash = contentFingerprint(item.title, item.summary || '')
+      const ok = await sbInsert(row)
   if (ok) {
     console.log(`    OK [${geography}] ${item.title.slice(0, 55)}`)
     existing.titles.add(titleKey); existing.titles.add(titleNorm)
@@ -479,24 +587,32 @@ async function main() {
 
   console.log('\nLoading existing items for dedup...')
   const existing = await getExisting()
-  console.log(`  ${existing.titles.size} titles, ${existing.urls.size} URLs in dedup set`)
+  console.log('  ' + existing.titles.size + ' titles, ' + existing.urls.size + ' URLs in dedup set')
+
+  // Load content hashes for syndication dedup (across runs)
+  await loadKnownHashes()
 
   let domainsToRun = DOMAINS
   let newsToRun = NEWS_TOPICS
   let feedsToRun = await loadActiveFeeds()
   if (DOMAINS_OVERRIDE) {
-    const codes = DOMAINS_OVERRIDE.split(',').map(s => s.trim().toUpperCase())
-    domainsToRun = DOMAINS.filter(d => codes.includes(d.code))
-    newsToRun = NEWS_TOPICS.filter(t => codes.includes(t.code))
-    feedsToRun = feedsToRun.filter(f => f.codes.some(c => codes.includes(c)))
-    console.log(`Filtered to: ${codes.join(', ')}`)
+    const codes = DOMAINS_OVERRIDE.split(',').map(function(s) { return s.trim().toUpperCase() })
+    domainsToRun = DOMAINS.filter(function(d) { return codes.includes(d.code) })
+    newsToRun = NEWS_TOPICS.filter(function(t) { return codes.includes(t.code) })
+    feedsToRun = feedsToRun.filter(function(f) { return f.codes.some(function(c) { return codes.includes(c) }) })
+    console.log('Filtered to: ' + codes.join(', '))
   }
 
-  // Phase 1: RSS
+  // Phase 1: RSS Feeds
   if (RUN_RSS) {
     console.log('\n=== Phase 1: RSS Feeds ===')
     for (const feed of feedsToRun) {
-      total += await scrapeRSS(feed, existing)
+      const feedCode = (feed.codes && feed.codes[0]) || 'RSS'
+      const ttlCheck = await isDue('rss', feedCode, 'India')
+      if (!ttlCheck.due) continue
+      const added = await scrapeRSS(feed, existing)
+      await updateRunRecord('rss', feedCode, 'India', added)
+      total += added
       await sleep(2000)
     }
   }
@@ -504,39 +620,61 @@ async function main() {
   // Phase 2: Search Grounding
   if (RUN_SEARCH) {
     console.log('\n=== Phase 2: Search Grounding ===')
+
+    // Domains
     for (const domain of domainsToRun) {
-      console.log(`\n  [SEARCH] ${domain.code}`)
       const geos = GLOBAL_DOMAINS.includes(domain.code) ? [...GEOGRAPHIES, 'Global'] : GEOGRAPHIES
       for (const geo of geos) {
+        const ttlCheck = await isDue('domain', domain.code, geo)
+        if (!ttlCheck.due) continue
+        console.log('\n  [SEARCH] ' + domain.code + ' / ' + geo)
+        // Add "published after" constraint to prompt if available
+        const publishedAfter = ttlCheck.publishedAfter
+        let domainAdded = 0
         for (let i = 0; i < ITEMS_PER_DOMAIN; i++) {
-          total += await scrapeGrounded(domain, geo, existing, false)
+          domainAdded += await scrapeGrounded(domain, geo, existing, false, publishedAfter)
           await sleep(DELAY_MS)
         }
+        await updateRunRecord('domain', domain.code, geo, domainAdded)
+        total += domainAdded
       }
       await sleep(3000)
     }
+
     // Global intelligence topics
     for (const topic of GLOBAL_TOPICS) {
-      console.log(`\n  [GLOBAL] ${topic.code}`)
-      for (let i = 0; i < 1; i++) {
-        total += await scrapeGrounded(topic, 'Global', existing, true)
-        await sleep(DELAY_MS)
-      }
+      const ttlCheck = await isDue('global', topic.code, 'Global')
+      if (!ttlCheck.due) continue
+      console.log('\n  [GLOBAL] ' + topic.code)
+      const publishedAfter = ttlCheck.publishedAfter
+      const globalAdded = await scrapeGrounded(topic, 'Global', existing, true, publishedAfter)
+      await updateRunRecord('global', topic.code, 'Global', globalAdded)
+      total += globalAdded
+      await sleep(DELAY_MS)
     }
+
+    // News topics
     for (const topic of newsToRun) {
-      console.log(`\n  [NEWS] ${topic.code}`)
       const newsGeos = GLOBAL_DOMAINS.includes(topic.code) ? [...GEOGRAPHIES, 'Global'] : GEOGRAPHIES
       for (const geo of newsGeos) {
+        const ttlCheck = await isDue('news', topic.code, geo)
+        if (!ttlCheck.due) continue
+        console.log('\n  [NEWS] ' + topic.code + ' / ' + geo)
+        const publishedAfter = ttlCheck.publishedAfter
+        let newsAdded = 0
         for (let i = 0; i < Math.min(ITEMS_PER_DOMAIN, 2); i++) {
-          total += await scrapeGrounded(topic, geo, existing, true)
+          newsAdded += await scrapeGrounded(topic, geo, existing, true, publishedAfter)
           await sleep(DELAY_MS)
         }
+        await updateRunRecord('news', topic.code, geo, newsAdded)
+        total += newsAdded
       }
     }
   }
 
   const elapsed = ((Date.now() - start) / 60000).toFixed(1)
-  console.log(`\n=== COMPLETE: ${total} real items in ${elapsed} min ===`)
+  console.log('\n=== COMPLETE: ' + total + ' real items in ' + elapsed + ' min ===')
 }
+
 
 main().catch(err => { console.error('Fatal:', err); process.exit(1) })
