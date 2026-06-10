@@ -2,7 +2,7 @@ name: Intelligence Scraper
 
 on:
   schedule:
-    - cron: '30 20 * * *'   # 2:00 AM IST daily
+    - cron: '30 20 * * 0'   # Every Sunday at 2:00 AM IST (Sunday 8:30 PM UTC)
   workflow_dispatch:
     inputs:
       domains:
