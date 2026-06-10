@@ -31,6 +31,56 @@ const GROUNDING_MODEL = 'gemini-2.0-flash'   // 2.0-flash cheaper, supports grou
 const EXTRACT_MODEL   = 'gemini-3.1-flash-lite' // cheap for RSS extraction
 const DELAY_MS      = 1000
 
+var RUN_ID = Date.now().toString(36)
+
+var PRICING_TABLE = {
+  'gemini-2.0-flash':          { input: 0.10,  output: 0.40  },
+  'gemini-3.1-flash-lite':     { input: 0.075, output: 0.30  },
+  'gemini-3.1-flash-lite-001': { input: 0.075, output: 0.30  },
+  'gemini-3.5-flash':          { input: 0.15,  output: 0.60  },
+}
+
+var USAGE_BUFFER = []
+
+function calcCostUSD(model, inputTok, outputTok) {
+  var p = PRICING_TABLE[model] || { input: 0.10, output: 0.40 }
+  return (inputTok * p.input + outputTok * p.output) / 1e6
+}
+
+function bufferUsage(tool, callType, model, inputTok, outputTok, latencyMs, status, topicCode) {
+  USAGE_BUFFER.push({
+    tool:          tool,
+    call_type:     callType,
+    provider:      'google',
+    model:         model || GROUNDING_MODEL,
+    input_tokens:  inputTok  || 0,
+    output_tokens: outputTok || 0,
+    cost_usd:      calcCostUSD(model || GROUNDING_MODEL, inputTok||0, outputTok||0),
+    latency_ms:    latencyMs || 0,
+    status:        status || 'success',
+    topic_code:    topicCode || null,
+    session_id:    'gh-' + RUN_ID
+  })
+}
+
+async function flushUsageLog() {
+  if (!USAGE_BUFFER.length) return
+  var sb = getSB()
+  if (!sb.url || !sb.key) { console.log('  Usage log skipped (no SB config)'); return }
+  try {
+    var r = await fetch(sb.url + '/rest/v1/api_usage_log', {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(USAGE_BUFFER)
+    })
+    var totalCost = USAGE_BUFFER.reduce(function(s, row) { return s + row.cost_usd }, 0)
+    var totalTok  = USAGE_BUFFER.reduce(function(s, row) { return s + row.input_tokens + row.output_tokens }, 0)
+    console.log('  Usage logged: ' + USAGE_BUFFER.length + ' calls | ' + totalTok + ' tokens | $' + totalCost.toFixed(5))
+    USAGE_BUFFER = []
+  } catch(e) { console.log('  WARN: usage log failed:', e.message) }
+}
+
+
 //    TTL constants                                                              
 const TTL_DOMAIN_DAYS   = 7
 const TTL_NEWS_DAYS     = 7
@@ -61,7 +111,7 @@ async function isDue(runType, topicCode, geography) {
   var rec = await getRunRecord(runType, topicCode, geography)
   if (!rec || !rec.last_run_at) return { due: true, publishedAfter: null }
   var daysSince = (Date.now() - new Date(rec.last_run_at).getTime()) / 86400000
-  var ttl = rec.ttl_days || (runType === 'domain' ? TTL_DOMAIN_DAYS : runType === 'news' ? TTL_NEWS_DAYS : TTL_GLOBAL_DAYS)
+  var ttl = rec.ttl_days || (runType === 'domain' ? TTL_CFG.domain : runType === 'news' ? TTL_CFG.news : runType === 'rss' ? TTL_CFG.rss : TTL_CFG.global)
   if (daysSince < ttl) {
     console.log('    SKIP ' + topicCode + ' (scraped ' + daysSince.toFixed(1) + 'd ago, TTL ' + ttl + 'd)')
     return { due: false, publishedAfter: null }
@@ -74,11 +124,11 @@ async function isDue(runType, topicCode, geography) {
 async function updateRunRecord(runType, topicCode, geography, itemsAdded) {
   var id = runType + '-' + topicCode + '-' + (geography||'India')
   var existing = await getRunRecord(runType, topicCode, geography)
-  var baseTTL = runType === 'domain' ? TTL_DOMAIN_DAYS : runType === 'news' ? TTL_NEWS_DAYS : TTL_GLOBAL_DAYS
+  var baseTTL = runType === 'domain' ? TTL_CFG.domain : runType === 'news' ? TTL_CFG.news : runType === 'rss' ? TTL_CFG.rss : TTL_CFG.global
   // Extend TTL if empty run
   var newTTL = baseTTL
   if (itemsAdded === 0) {
-    newTTL = (existing && existing.items_added === 0) ? TTL_EXTEND_EMPTY : TTL_EXTEND_DAYS
+    newTTL = (existing && existing.items_added === 0) ? TTL_CFG.extend_empty2 : TTL_CFG.extend_empty
     console.log('    Empty run   extending TTL to ' + newTTL + 'd for ' + topicCode)
   }
   var payload = {
@@ -243,6 +293,8 @@ async function callGeminiGrounded(prompt) {
   const text = candidate?.content?.parts?.[0]?.text || ''
   const chunks = candidate?.groundingMetadata?.groundingChunks || []
   const sources = chunks.filter(c => c.web?.uri).map(c => ({ url: c.web.uri, title: c.web.title || '' }))
+  callGeminiGrounded._lastInputTok  = (data.usageMetadata && data.usageMetadata.promptTokenCount)     || 0
+  callGeminiGrounded._lastOutputTok = (data.usageMetadata && data.usageMetadata.candidatesTokenCount) || 0
   return { text, sources }
 }
 
@@ -253,7 +305,10 @@ async function callGemini(prompt) {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!r.ok) throw new Error(`Gemini ${r.status}`)
   const data = await r.json()
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  callGemini._lastInputTok  = (data.usageMetadata && data.usageMetadata.promptTokenCount)     || 0
+  callGemini._lastOutputTok = (data.usageMetadata && data.usageMetadata.candidatesTokenCount) || 0
+  return text
 }
 
 //    Supabase                                                                   
@@ -410,6 +465,7 @@ async function phase2SemanticMatchBatch(items, contexts) {
     + 'Start [ end ]. No markdown.'
 
   var raw = await callGemini(prompt)
+  bufferUsage('scraper_gh', 'phase2_batch', EXTRACT_MODEL, callGemini._lastInputTok||0, callGemini._lastOutputTok||0, 0, raw ? 'success' : 'error', null)
   var parsed = extractJSON(raw)
   if (!Array.isArray(parsed)) return items.map(function() { return null })
 
@@ -531,6 +587,7 @@ Start { end }. No markdown.`
   try {
     const result = await callGeminiGrounded(prompt)
     text = result.text; sources = result.sources
+    bufferUsage('scraper_gh', isNews ? 'scrape_news' : 'scrape_domain', GROUNDING_MODEL, callGeminiGrounded._lastInputTok||0, callGeminiGrounded._lastOutputTok||0, 0, text ? 'success' : 'error', domain.code)
   } catch (e) { console.log(`    WARN Grounding [${domain.code}/${geography}]: ${e.message.slice(0,60)}`); return 0 }
 
   const item = extractJSON(text)
@@ -588,6 +645,9 @@ async function main() {
   console.log('\nLoading existing items for dedup...')
   const existing = await getExisting()
   console.log('  ' + existing.titles.size + ' titles, ' + existing.urls.size + ' URLs in dedup set')
+
+  // Load TTL config from app_config table
+  await loadTTLConfig()
 
   // Load content hashes for syndication dedup (across runs)
   await loadKnownHashes()
@@ -674,6 +734,7 @@ async function main() {
 
   const elapsed = ((Date.now() - start) / 60000).toFixed(1)
   console.log('\n=== COMPLETE: ' + total + ' real items in ' + elapsed + ' min ===')
+  await flushUsageLog()
 }
 
 
