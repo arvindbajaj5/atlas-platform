@@ -378,7 +378,7 @@ async function callProvider(model, prompt, keyOverride){
     var key = keyOverride || g['key_gemini'] || localStorage.getItem('atlas_gemini_key') || ''
     if(!key) throw new Error('Gemini API key not configured.')
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+key
-    var body = {contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:8192}}
+    var body = {contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:4096}}
     var r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     if(!r.ok){var e=await r.json();throw new Error(e.error?.message||'Gemini error '+r.status)}
     var d = await r.json()
@@ -513,6 +513,59 @@ async function queryIntelligenceDB(sector, country, ownership){
 }
 
 // \u2500\u2500 Main generate function \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+//    PEI Cache (30-day TTL)                                                     
+const PEI_TTL_DAYS = 30
+
+function normOrgName(name) {
+  return (name||'').toLowerCase().trim().replace(/[^a-z0-9]/g, '')
+}
+
+async function checkPEICache(orgName, country) {
+  var g = atlasGetGlobal()
+  var sb = { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
+  if (!sb.url) return null
+  try {
+    var key = normOrgName(orgName)
+    var url = sb.url + '/rest/v1/pei_cache?org_name_key=eq.' + encodeURIComponent(key)
+      + '&country=eq.' + encodeURIComponent(country||'India')
+      + '&expires_at=gt.' + new Date().toISOString()
+      + '&order=generated_at.desc&limit=1'
+    var r = await fetch(url, { headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key } })
+    if (!r.ok) return null
+    var rows = await r.json()
+    return (rows && rows.length) ? rows[0] : null
+  } catch(e) { return null }
+}
+
+async function savePEICache(orgName, sector, country, ownership, peiJson, modelUsed, dbItemsUsed) {
+  var g = atlasGetGlobal()
+  var sb = { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
+  if (!sb.url) return
+  try {
+    var expires = new Date()
+    expires.setDate(expires.getDate() + PEI_TTL_DAYS)
+    var payload = {
+      org_name:      orgName,
+      org_name_key:  normOrgName(orgName),
+      sector:        sector||'',
+      country:       country||'India',
+      ownership:     ownership||'',
+      generated_at:  new Date().toISOString(),
+      expires_at:    expires.toISOString(),
+      model_used:    modelUsed||'',
+      db_items_used: dbItemsUsed||0,
+      pei_json:      peiJson,
+      confidence:    peiJson.confidence||'medium'
+    }
+    await fetch(sb.url + '/rest/v1/pei_cache', {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(payload)
+    })
+  } catch(e) { console.log('PEI cache save failed:', e.message) }
+}
+
 async function generatePEI(){
   var g = atlasGetGlobal()
   // Model: from selector, or task default, or fallback to gemini-3.1-flash-lite
@@ -535,6 +588,25 @@ async function generatePEI(){
 
   if(!apiKey){ alert('No API key found for '+model+'. Configure it in ATLAS Settings \u2192 AI Model Registry.'); return }
   if(!orgName){ alert('Please enter an organisation name.'); return }
+
+  // Check 30-day cache before calling API
+  var cachedPEI = await checkPEICache(orgName, country)
+  if (cachedPEI) {
+    var cacheAge = Math.round((Date.now() - new Date(cachedPEI.generated_at).getTime()) / 86400000)
+    var useCached = confirm('A PEI brief for "' + orgName + '" was generated ' + cacheAge + ' day' + (cacheAge===1?'':'s') + ' ago (valid for 30 days).\n\nUse cached version to save API tokens?\n\nOK = use cache | Cancel = regenerate')
+    if (useCached) {
+      PEI_DATA = Object.assign({ meta: { organisation: orgName, ownership_type: ownership, functional_sector: sector, country: country, generated_at: cachedPEI.generated_at, model: cachedPEI.model_used, tool: 'ATLAS PEI (cached)', db_items_used: cachedPEI.db_items_used } }, cachedPEI.pei_json)
+      renderPEI(PEI_DATA, orgName, ownership, sector, country, [])
+      document.getElementById('loadingPanel').style.display = 'none'
+      document.getElementById('generateBtn').disabled = false
+      var cacheNote = document.createElement('div')
+      cacheNote.style.cssText = 'font-size:11px;color:var(--mid);margin:8px 0;padding:6px 10px;background:rgba(0,40,112,0.06);border-radius:6px;text-align:center'
+      cacheNote.innerHTML = ' Loaded from cache &mdash; generated ' + cacheAge + ' day' + (cacheAge===1?'':'s') + ' ago &mdash; <a href="#" style="color:var(--orange)" onclick="event.preventDefault();document.getElementById(\'peiOutput\').style.display=\'none\'">Regenerate</a>'
+      var outPanel = document.getElementById('peiOutput')
+      if (outPanel) outPanel.insertBefore(cacheNote, outPanel.firstChild)
+      return
+    }
+  }
 
   document.getElementById('peiOutput').style.display = 'none'
   document.getElementById('errorPanel').style.display = 'none'
@@ -602,6 +674,8 @@ async function generatePEI(){
     }
 
     PEI_DATA = {meta:{organisation:target, ownership_type:ownership, functional_sector:sector, country:country, generated_at:new Date().toISOString(), model:model, tool:'ATLAS PEI v0.2', db_items_used:dbItems.length}, ...pei}
+
+    await savePEICache(orgName, sector, country, ownership, pei, model, dbItems.length)
 
     renderPEI(PEI_DATA, target, ownership, sector, country, dbItems)
 
