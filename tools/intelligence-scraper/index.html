@@ -216,6 +216,7 @@ input:focus,select:focus{border-color:var(--blue);}
         <button class="btn btn-outline btn-sm" onclick="exportIntelligence()" id="exportBtn" disabled>&#11015; Export JSON</button>
         <button class="btn btn-outline btn-sm" onclick="clearIntelligence()" id="clearBtn">&#128465; Clear Database</button>
         <button class="btn btn-primary" id="runBtn" onclick="runScraper()" disabled>&#9654; Run Scraper</button>
+        <button class="btn" id="stopBtn" onclick="stopScraper()" style="display:none;background:#c0341a;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">&#9632; Stop</button>
       </div>
     </div>
 
@@ -619,9 +620,9 @@ function init(){
   if(itemCountEl && cfg.itemCount) itemCountEl.value = cfg.itemCount
   var enrichEl = document.getElementById('cfgEnrich')
   if(enrichEl && cfg.useEnrich !== undefined) enrichEl.value = cfg.useEnrich ? 'yes' : 'no'
-  // Select all domains and news topics by default
-  DOMAINS.forEach(function(d){ selectedDomains.add(d.code) })
-  NEWS_TOPICS.forEach(function(t){ selectedNews.add(t.code) })
+  // Select only unlocked domains/news
+  DOMAINS.forEach(function(d){ if(!getDomainTTLState(d.code,"domain").locked) selectedDomains.add(d.code) })
+  NEWS_TOPICS.forEach(function(t){ if(!getDomainTTLState(t.code,"news").locked) selectedNews.add(t.code) })
   renderDomainGrid()
   renderNewsGrid()
   updateStats()
@@ -765,7 +766,8 @@ function selectNoneNews(){ selectedNews.clear(); renderNewsGrid(); updateSelecte
 
 function updateSelectedCount(){
   var total = selectedDomains.size + selectedNews.size
-  document.getElementById('selectedCount').textContent = total + ' domain' + (total!==1?'s':'') + '/topic' + (total!==1?'s':'') + ' selected'
+  var nL=DOMAINS.filter(function(d){return getDomainTTLState(d.code,'domain').locked}).length+NEWS_TOPICS.filter(function(t){return getDomainTTLState(t.code,'news').locked}).length
+  document.getElementById('selectedCount').textContent=total+' domain'+(total!==1?'s':'')+'/topic'+(total!==1?'s':'')+' selected'+(nL>0?' ('+nL+' locked)':'')
 }
 
 function updateRunBtn(){
@@ -859,6 +861,7 @@ async function callGemini(prompt, label){
   var resp = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
   if(!resp.ok){
     var err = await resp.json()
+    if(resp.status===429){log(label+' 429 -- waiting 30s...','warn');await new Promise(function(r){setTimeout(r,30000)});return callGeminiGround(prompt,label)}
     throw new Error((err.error && err.error.message) || 'API error ' + resp.status)
   }
   var data = await resp.json()
@@ -876,6 +879,7 @@ async function callGemini(prompt, label){
   document.getElementById('statTokens').textContent = sessionTokens.toLocaleString()
   document.getElementById('statCost').textContent = '$' + sessionCost.toFixed(4)
   // token meter removed from HTML, stats row handles display
+  logUsage('scrape_domain', getConfig().model||'gemini-3.1-flash-lite', inTokens, outTokens)
 
   log(label + ' &mdash; tokens: in=' + inTokens + ' out=' + outTokens + ' cost=~$' + ((inTokens*0.0000003)+(outTokens*0.0000025)).toFixed(5), 'dim')
 
@@ -1414,6 +1418,22 @@ async function runEnrichmentPhase(allItems){
   log('Enrichment complete.', 'success')
 }
 
+var SCRAPER_ABORT = false
+
+function stopScraper(){
+  SCRAPER_ABORT = true
+  log("Stop requested -- finishing current domain...","warn")
+  var btn=document.getElementById("stopBtn"); if(btn){btn.disabled=true;btn.textContent="Stopping..."}
+}
+
+function logUsage(callType,model,inTok,outTok){
+  var cfg=getConfig(),sbUrl=cfg.sbUrl||"",sbKey=cfg.sbKey||""
+  if(!sbUrl||!sbKey) return
+  var lite=model&&model.includes("lite")
+  var cost=lite?(inTok*0.000000075)+(outTok*0.0000003):(inTok*0.0000001)+(outTok*0.0000004)
+  fetch(sbUrl+"/rest/v1/api_usage_log",{method:"POST",headers:{apikey:sbKey,Authorization:"Bearer "+sbKey,"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({tool:"intel_scraper",call_type:callType,provider:"google",model:model,input_tokens:inTok||0,output_tokens:outTok||0,cost_usd:cost,status:"success",session_id:"portal-"+Date.now().toString(36)})}).catch(function(){})
+}
+
 async function runScraper(){
   if(running) return
   var cfg = getConfig()
@@ -1438,6 +1458,7 @@ async function runScraper(){
   // Scrape domains
   var domainList = DOMAINS.filter(function(d){ return selectedDomains.has(d.code) })
   for(var i=0; i<domainList.length; i++){
+    if(SCRAPER_ABORT){log("Scraper stopped.","warn");break}
     var domain = domainList[i]
     setDomainStatus(domain.code, 'running', false)
     log('Scraping domain: ' + domain.name + '...', 'info')
@@ -1464,6 +1485,7 @@ async function runScraper(){
   // Scrape news
   var newsList = NEWS_TOPICS.filter(function(t){ return selectedNews.has(t.code) })
   for(var j=0; j<newsList.length; j++){
+    if(SCRAPER_ABORT){log("Scraper stopped.","warn");break}
     var topic = newsList[j]
     setDomainStatus(topic.code, 'running', true)
     log('Scraping news: ' + topic.name + '...', 'info')
