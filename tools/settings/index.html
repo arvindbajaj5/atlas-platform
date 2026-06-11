@@ -67,7 +67,7 @@ input[type=password]{font-family:'Roboto Mono',monospace;letter-spacing:2px;}
 </head>
 <body>
 
-<div style="display:flex;gap:8px;margin:12px 16px 4px;padding-bottom:10px;border-bottom:1px solid #e0e0e8"><button style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:700;border:none;background:#002870;color:#fff;cursor:pointer" onclick="showSettingsTab()">Settings</button><button style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid #e0e0e8;background:#fff;color:#666;cursor:pointer" onclick="showUsageTab()">Usage</button></div><div id="main-section"><div class="hdr">
+<div style="display:flex;gap:8px;margin:12px 16px 4px;padding-bottom:10px;border-bottom:1px solid #e0e0e8"><button style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:700;border:none;background:#002870;color:#fff;cursor:pointer" onclick="showSettingsTab()">Settings</button><button style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid #e0e0e8;background:#fff;color:#666;cursor:pointer" onclick="showUsageTab()">Usage</button><button style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid #e0e0e8;background:#fff;color:#666;cursor:pointer" onclick="showUnitCostsTab()">Unit Costs</button></div><div id="main-section"><div class="hdr">
   <div class="hdr-brand">ATL<span>A</span>S</div>
   <div style="font-size:11px;color:rgba(255,255,255,0.5)">Global Settings</div>
   <div class="hdr-right">
@@ -135,8 +135,11 @@ var PROVIDERS = [
     keyPlaceholder: 'AIza...',
     keyHint: 'From aistudio.google.com',
     models: [
-      {id:'gemini-3.1-flash-lite', label:'Gemini 3.1 Flash-Lite', desc:'Fast, cheap, recommended default'},
-      {id:'gemini-3.5-flash', label:'Gemini 3.5 Flash', desc:'More capable, higher cost'},
+      {id:'gemini-2.0-flash',      label:'Gemini 2.0 Flash',      desc:'Grounding + vision, cheaper   use for scraper'},
+      {id:'gemini-3.1-flash-lite', label:'Gemini 3.1 Flash-Lite', desc:'Fast, cheap, recommended default for portal tools'},
+      {id:'gemini-3.5-flash',      label:'Gemini 3.5 Flash',      desc:'More capable, higher cost'},
+      {id:'gemini-3.0-flash',      label:'Gemini 3.0 Flash',      desc:'Legacy   prefer 2.0 or 3.1'},
+
     ]
   },
   {
@@ -234,6 +237,113 @@ var PROVIDERS = [
 var DEFAULT_MODEL_KEY = 'atlas_default_model'
 
 
+function showUnitCostsTab() {
+  document.getElementById('main-section').style.display = 'none'
+  document.getElementById('usage-section').style.display = 'none'
+  document.getElementById('unit-costs-section').style.display = 'block'
+  loadUnitCosts()
+}
+
+var ALL_UNIT_COSTS = []
+var UC_FILTER_CAT = 'all'
+
+async function loadUnitCosts() {
+  var cfg = getCfg()
+  var sbUrl = cfg.sbUrl || '', sbKey = cfg.sbKey || ''
+  var el = document.getElementById('unit-costs-dashboard')
+  if (!sbUrl) { el.innerHTML = '<div style="padding:20px;color:#666">Configure Supabase first.</div>'; return }
+  el.innerHTML = '<div style="padding:20px">Loading...</div>'
+  try {
+    var r = await fetch(sbUrl + '/rest/v1/tsap_unit_costs?order=category.asc,item_code.asc&limit=200', { headers: { apikey:sbKey, Authorization:'Bearer '+sbKey } })
+    ALL_UNIT_COSTS = r.ok ? await r.json() : []
+    renderUnitCosts()
+  } catch(e) { el.innerHTML = '<div style="padding:20px">Error: '+e.message+'</div>' }
+}
+
+function renderUnitCosts() {
+  var cats = ['all','capex','opex','ucdev','people','revenue']
+  var filtered = UC_FILTER_CAT === 'all' ? ALL_UNIT_COSTS : ALL_UNIT_COSTS.filter(function(r){ return r.category === UC_FILTER_CAT })
+  var html = '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">'
+  cats.forEach(function(c) {
+    var on = UC_FILTER_CAT === c
+    var bg = on ? '#002870' : '#fff'
+    var fg = on ? '#fff' : '#666'
+    var bdr = on ? '#002870' : '#e0e0e8'
+    var fw = on ? 700 : 500
+    html += '<button style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:' + fw + ';border:1px solid ' + bdr + ';background:' + bg + ';color:' + fg + ';cursor:pointer" onclick="UC_FILTER_CAT=\'' + c + '\';renderUnitCosts()">' + c.charAt(0).toUpperCase() + c.slice(1) + '</button>'
+  })
+  html += '</div><div style="overflow-x:auto"><table class="utbl"><thead><tr>'
+    + '<th>Cat</th><th>Code</th><th>Label</th><th>Unit</th>'
+    + '<th>USD</th><th>INR Cr</th><th>DC</th><th>Updated</th><th></th>'
+    + '</tr></thead><tbody>'
+  filtered.forEach(function(row, idx) {
+    var updStr = row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) : '-'
+    var ucId = 'uc' + idx
+    html += '<tr>'
+      + '<td><span class="ubadge">' + row.category + '</span></td>'
+      + '<td style="font-size:10px;color:#666;max-width:120px;word-break:break-all">' + row.item_code + '</td>'
+      + '<td style="font-size:12px">' + row.label + '</td>'
+      + '<td style="font-size:11px;color:#666">' + row.unit + '</td>'
+      + '<td><input type="number" id="usd-' + ucId + '" value="' + (row.value_usd||0) + '" step="0.01" style="width:65px;font-size:11px;padding:2px 4px" onblur="patchUC(this)" data-id="' + row.id + '" data-field="value_usd"></td>'
+      + '<td><input type="number" id="inr-' + ucId + '" value="' + (row.value_inr||0) + '" step="0.1" style="width:65px;font-size:11px;padding:2px 4px" onblur="patchUC(this)" data-id="' + row.id + '" data-field="value_inr"></td>'
+      + '<td style="font-size:11px;color:#666">' + (row.dc_type||'both') + '</td>'
+      + '<td style="font-size:10px;color:#999">' + updStr + '</td>'
+      + '<td><button style="font-size:10px;color:#FF5539;border:none;background:none;cursor:pointer" onclick="toggleUCActive(\'' + row.id + '\',' + (row.active ? 'false' : 'true') + ')">' + (row.active ? 'Disable' : 'Enable') + '</button></td>'
+      + '</tr>'
+  })
+  html += '</tbody></table></div>'
+  document.getElementById('unit-costs-dashboard').innerHTML = html
+}
+
+async function patchUC(inp) {
+  var id = inp.dataset.id, field = inp.dataset.field, value = +inp.value
+  var cfg = getCfg()
+  if (!cfg.sbUrl) return
+  var patch = {}
+  patch[field] = value
+  patch.updated_at = new Date().toISOString()
+  await fetch(cfg.sbUrl + '/rest/v1/tsap_unit_costs?id=eq.' + id, {
+    method: 'PATCH',
+    headers: { apikey:cfg.sbKey, Authorization:'Bearer '+cfg.sbKey, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    body: JSON.stringify(patch)
+  })
+  var row = ALL_UNIT_COSTS.find(function(r){ return r.id === id })
+  if (row) { row[field] = value; row.updated_at = patch.updated_at }
+}
+
+async function toggleUCActive(id, newState) {
+  var cfg = getCfg()
+  if (!cfg.sbUrl) return
+  var patch = { active: newState === 'true' || newState === true, updated_at: new Date().toISOString() }
+  await fetch(cfg.sbUrl + '/rest/v1/tsap_unit_costs?id=eq.' + id, {
+    method: 'PATCH',
+    headers: { apikey:cfg.sbKey, Authorization:'Bearer '+cfg.sbKey, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    body: JSON.stringify(patch)
+  })
+  await loadUnitCosts()
+}
+
+async function syncUCToINR() {
+  var fxStr = prompt('USD/INR rate to sync all USD values:', '85')
+  if (!fxStr) return
+  var fx = parseFloat(fxStr) || 85
+  for (var i = 0; i < ALL_UNIT_COSTS.length; i++) {
+    var row = ALL_UNIT_COSTS[i]
+    if (row.value_usd > 0) {
+      row.value_inr = Math.round(row.value_usd * fx / 10 * 100) / 100
+      var cfg = getCfg()
+      var patch = { value_inr: row.value_inr, updated_at: new Date().toISOString() }
+      await fetch(cfg.sbUrl + '/rest/v1/tsap_unit_costs?id=eq.' + row.id, {
+        method: 'PATCH',
+        headers: { apikey:cfg.sbKey, Authorization:'Bearer '+cfg.sbKey, 'Content-Type':'application/json', Prefer:'return=minimal' },
+        body: JSON.stringify(patch)
+      })
+    }
+  }
+  renderUnitCosts()
+  alert('Synced ' + ALL_UNIT_COSTS.filter(function(r){ return r.value_usd > 0 }).length + ' rows at Rs ' + fx + '/USD')
+}
+
 var USAGE_TAB_ACTIVE = false
 
 function showUsageTab() {
@@ -246,6 +356,7 @@ function showUsageTab() {
 function showSettingsTab() {
   USAGE_TAB_ACTIVE = false
   document.getElementById('usage-section').style.display = 'none'
+  var ucs = document.getElementById('unit-costs-section'); if(ucs) ucs.style.display='none'
   document.getElementById('main-section').style.display  = 'block'
 }
 
@@ -510,5 +621,5 @@ window.addEventListener('DOMContentLoaded', function(){
   document.getElementById('sbKey').value = cfg.sbKey||''
   render()
 })
-</script><div id="usage-section" style="display:none;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700;color:#002870">API Usage Dashboard</div><button onclick="loadUsageDashboard()" style="padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid #e0e0e8;background:#fff;cursor:pointer">Refresh</button></div><div id="usage-dashboard"></div></div></body>
+</script><div id="unit-costs-section" style="display:none;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:16px;font-weight:700;color:#002870">TSAP Unit Costs</div><div style="display:flex;gap:8px"><button onclick="syncUCToINR()" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid #e0e0e8;background:#fff;cursor:pointer">Sync USD to INR</button><button onclick="loadUnitCosts()" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid #e0e0e8;background:#fff;cursor:pointer">Refresh</button></div></div><div id="unit-costs-dashboard"></div></div><div id="usage-section" style="display:none;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700;color:#002870">API Usage Dashboard</div><button onclick="loadUsageDashboard()" style="padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid #e0e0e8;background:#fff;cursor:pointer">Refresh</button></div><div id="usage-dashboard"></div></div></body>
 </html>
