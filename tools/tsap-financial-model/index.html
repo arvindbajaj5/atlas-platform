@@ -1,1 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TSAP Financial Model   ATLAS</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#002870;--orange:#FF5539;--teal:#00B290;--blue:#1C38F5;--amber:#FFB600;
+  --dark:#111827;--mid:#6B7280;--light:#F8F9FA;--white:#fff;--border:#E5E7EB;--card:#fff;
+  --r:8px;--r-sm:6px
+}
+body{font-family:'Inter',sans-serif;font-size:13px;color:var(--dark);background:#F0F2F5;min-height:100vh}
+/* Header */
+.hdr{background:var(--navy);color:#fff;padding:14px 20px}
+.hdr-row1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.hdr-title{font-size:16px;font-weight:700}
+.hdr-territory{font-size:11px;opacity:0.7;margin-top:2px}
+.hdr-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.hdr-kpi{background:rgba(255,255,255,0.1);border-radius:var(--r-sm);padding:8px 10px}
+.hdr-kpi-val{font-size:14px;font-weight:700}
+.hdr-kpi-lbl{font-size:10px;opacity:0.7;margin-top:1px}
+/* Engagement bar */
+.eng-bar{background:var(--white);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:10px}
+.eng-bar select{flex:1;max-width:300px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Inter',sans-serif}
+/* Tabs */
+.tab-bar{display:flex;background:var(--white);border-bottom:1px solid var(--border);padding:0 16px;overflow-x:auto}
+.tab-btn{padding:10px 14px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:var(--mid);font-family:'Inter',sans-serif;white-space:nowrap;margin-bottom:-1px;transition:color 0.15s}
+/* Cards */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.card-hdr{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px}
+/* KPI cards */
+.ucrd{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;text-align:center}
+.ucrd-v{font-size:16px;font-weight:700;margin-bottom:2px}
+.ucrd-l{font-size:11px;color:var(--mid)}
+/* Forms */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Inter',sans-serif;color:var(--dark);background:var(--white)}
+/* Tables */
+.fm-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.fm-tbl th{text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);color:var(--mid);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.fm-tbl td{padding:5px 8px;border-bottom:1px solid var(--border)}
+.fm-tbl .total-row{border-top:2px solid var(--navy)}
+.fm-tbl .total-row td{font-weight:700;color:var(--navy)}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--dark)}
+.btn-primary{background:var(--orange);color:#fff;border-color:var(--orange)}
+.btn-outline{background:transparent;color:var(--navy);border-color:var(--navy)}
+/* Main */
+.main{padding:16px;max-width:980px;margin:0 auto}
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--dark);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none}
+.toast.show{opacity:1}
+.toast.toast-err{background:#c0341a}
+</style>
+</head>
+<body>
 
+<div class="hdr">
+  <div class="hdr-row1">
+    <div>
+      <div class="hdr-title" id="hdr-title">TSAP Financial Model</div>
+      <div class="hdr-territory" id="hdr-territory">Loading...</div>
+    </div>
+    <div style="font-size:10px;opacity:0.5;text-align:right">ATLAS Sprint 4A</div>
+  </div>
+  <div class="hdr-kpis">
+    <div class="hdr-kpi"><div class="hdr-kpi-val" id="hdr-demand"> </div><div class="hdr-kpi-lbl">Total demand</div></div>
+    <div class="hdr-kpi"><div class="hdr-kpi-val" id="hdr-supply" style="color:#4ade80"> </div><div class="hdr-kpi-lbl">Effective supply</div></div>
+    <div class="hdr-kpi"><div class="hdr-kpi-val" id="hdr-gap"> </div><div class="hdr-kpi-lbl">Net commitment</div></div>
+    <div class="hdr-kpi"><div class="hdr-kpi-val" id="hdr-coverage" style="color:#4ade80"> </div><div class="hdr-kpi-lbl">Coverage</div></div>
+  </div>
+</div>
+
+<div class="eng-bar">
+  <span style="font-size:11px;font-weight:600;color:var(--mid);white-space:nowrap">Engagement:</span>
+  <select id="eng-select" onchange="selectEngagement(this.value)">
+    <option value="">-- Standalone --</option>
+  </select>
+  <span style="font-size:11px;color:var(--teal);font-weight:600" id="eng-status"></span>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn" data-tab="cost"     onclick="switchTab('cost')">Programme Cost</button>
+  <button class="tab-btn" data-tab="supply"   onclick="switchTab('supply')">Funding Sources</button>
+  <button class="tab-btn" data-tab="gap"      onclick="switchTab('gap')">Funding Gap</button>
+  <button class="tab-btn" data-tab="revenue"  onclick="switchTab('revenue')">Revenue Model</button>
+  <button class="tab-btn" data-tab="cashflow" onclick="switchTab('cashflow')">Cash Flow</button>
+  <button class="tab-btn" data-tab="whatif"   onclick="switchTab('whatif')">What-If</button>
+</div>
+
+<div class="main">
+  <div id="tab-content"><div style="padding:40px;text-align:center;color:var(--mid)">Loading...</div></div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script charset="utf-8">
+//                                                                            
+// TSAP Financial Model   full build
+// Both sides: demand (cost) derived from SASC + unit costs
+//             supply (funding) with full instrument modelling
+// Revenue model (Track 2), cash flow (quarterly), charts (Chart.js)
+//                                                                            
+
+//    Supabase                                                                   
+function atlasGetGlobal() {
+  try { return JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}') } catch(e) { return {} }
+}
+function getSB() {
+  var g = atlasGetGlobal()
+  return { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
+}
+async function sbGet(table, params, limit) {
+  var sb = getSB(); if (!sb.url) return []
+  try {
+    var r = await fetch(sb.url + '/rest/v1/' + table + '?' + params + (limit ? '&limit=' + limit : ''), { headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key } })
+    return r.ok ? r.json() : []
+  } catch(e) { return [] }
+}
+async function sbPost(table, data, prefer) {
+  var sb = getSB(); if (!sb.url) return false
+  try {
+    var r = await fetch(sb.url + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: prefer || 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(data)
+    })
+    return r.ok
+  } catch(e) { return false }
+}
+async function sbDelete(table, params) {
+  var sb = getSB(); if (!sb.url) return false
+  try {
+    var r = await fetch(sb.url + '/rest/v1/' + table + '?' + params, { method: 'DELETE', headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key } })
+    return r.ok
+  } catch(e) { return false }
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function fmtCr(v, dp) { var n = parseFloat(v||0); return (dp === undefined ? Math.round(n) : n.toFixed(dp)).toLocaleString('en-IN') }
+function fmtCrFull(v) { return 'Rs ' + fmtCr(v) + ' Cr' }
+function showToast(msg, type) {
+  var t = document.getElementById('toast')
+  if (!t) return
+  t.textContent = msg
+  t.className = 'toast show' + (type === 'error' ? ' toast-err' : '')
+  setTimeout(function() { t.className = 'toast' }, 3000)
+}
+function genId() { return 'fs-' + Date.now() + '-' + Math.floor(Math.random()*9999) }
+
+//    State                                                                      
+var ACTIVE_TAB = 'cost'
+var ENGAGEMENT_ID = null
+var ENGAGEMENT_NAME = ''
+var ALL_ENGAGEMENTS = []
+var UNIT_COSTS = {}      // keyed by item_code
+var SASC_DATA = null     // latest SASC docket_item for engagement
+var FUNDING_SOURCES = [] // from tsap_funding_sources
+var ACTIVE_SCENARIO = 'base'
+var CHARTS = {}          // Chart.js instances keyed by canvas id
+
+//    Model state                                                                
+var MODEL = {
+  programme_name:    'TSAP Financial Model',
+  territory:         'Himachal Pradesh',
+  programme_years:   5,
+  dc_type:           'mdc',
+  phase1_mw:         10,
+  fx_usd_inr:        85,
+  discount_rate_pct: 10,
+
+  // Demand overrides (null = use derived value)
+  capex_override_cr:  null,
+  opex_override_cr:   null,
+  ucdev_override_cr:  null,
+
+  // Revenue model
+  rev_enabled:        true,
+  rev_scenario:       'base',   // bear | base | bull
+  rev_ramp_pct:       [8, 25, 55, 80, 100],   // Y1-Y5 as % of Y5 run-rate
+  rev_capture_bear:   3.0,
+  rev_capture_base:   7.0,
+  rev_capture_bull:   15.0,
+  rev_market_y1_cr:   34000,
+  rev_market_cagr:    65.0,
+  rev_gm_ow_pct:      40.0,
+  rev_gst_rate:       18.0,
+  rev_territory_gst_share: 45.0,
+}
+
+//    Unit cost helpers                                                          
+function uc(code) { return UNIT_COSTS[code] || { value_usd: 0, value_inr: 0 } }
+function ucInr(code) { return parseFloat(uc(code).value_inr || 0) }
+function ucUsd(code) { return parseFloat(uc(code).value_usd || 0) }
+function usdToCr(usd) { return usd * MODEL.fx_usd_inr / 10 }   // $M -> Rs Cr: $1M * 85 / 10 = 8.5 Cr
+
+//    Demand calculations                                                        
+function calcCapex() {
+  if (MODEL.capex_override_cr !== null) return { total: MODEL.capex_override_cr, lines: [{ label: 'Override', cr: MODEL.capex_override_cr, source: 'manual' }] }
+  var mw = MODEL.phase1_mw
+  var isMDC = MODEL.dc_type === 'mdc'
+  var lines = [
+    { label: 'Compute (GPU accelerators)',       cr: usdToCr(ucUsd('capex_compute_per_mw') * mw),                         source: 'HAICE FM v2.1' },
+    { label: 'MDC container / pod',              cr: isMDC ? usdToCr(ucUsd('capex_pod_per_mw') * mw) : 0,                 source: 'HAICE FM v2.1' },
+    { label: 'Civil & structural',               cr: usdToCr(ucUsd(isMDC ? 'capex_civil_mdc_per_mw' : 'capex_civil_bm_per_mw') * mw), source: 'HAICE FM v2.1' },
+    { label: 'DLC-HPAC cooling',                 cr: usdToCr(ucUsd(isMDC ? 'capex_cooling_mdc_per_mw' : 'capex_cooling_bm_per_mw') * mw), source: 'HAICE FM v2.1' },
+    { label: 'Power & electrical',               cr: usdToCr(ucUsd(isMDC ? 'capex_power_mdc_per_mw' : 'capex_power_bm_per_mw') * mw), source: 'HAICE FM v2.1' },
+    { label: 'Seismic risk + insurance',         cr: usdToCr(ucUsd(isMDC ? 'capex_seismic_mdc_per_mw' : 'capex_seismic_bm_per_mw') * mw), source: 'HAICE FM v2.1' },
+    { label: 'Regulatory + environmental',       cr: ucInr(isMDC ? 'capex_regulatory_mdc' : 'capex_regulatory_bm'),       source: 'HAICE FM v2.1' },
+  ]
+  if (SASC_DATA && SASC_DATA.bom && SASC_DATA.bom.capex_usd) {
+    var sascCr = usdToCr(SASC_DATA.bom.capex_usd / 1e6)
+    lines.push({ label: 'SASC BOM additional items', cr: Math.max(0, sascCr - lines.reduce(function(s,l){ return s+l.cr },0)), source: 'SASC' })
+  }
+  var total = lines.reduce(function(s, l) { return s + l.cr }, 0)
+  return { total: Math.round(total), lines: lines }
+}
+
+function calcOpex() {
+  if (MODEL.opex_override_cr !== null) return { total: MODEL.opex_override_cr, lines: [{ label: 'Override', cr: MODEL.opex_override_cr }] }
+  var lines = [
+    { label: 'Power (hydel Rs 3.5/kWh, PUE 1.15)', cr: ucInr('opex_power_phase1') },
+    { label: 'Core ops & maintenance',              cr: ucInr('opex_core_ops_phase1') },
+    { label: 'NOC / SOC / inference engineering',   cr: ucInr('opex_noc_soc_phase1') },
+    { label: 'DR + HP State Cloud + multi-site',    cr: ucInr('opex_dr_cloud_phase1') },
+    { label: 'Bandwidth & connectivity',            cr: ucInr('opex_bandwidth_phase1') },
+    { label: 'Sales, marketing & API platform',     cr: ucInr('opex_sales_phase1') },
+    { label: 'Model licences',                      cr: ucInr('opex_model_licence') },
+  ]
+  var total = lines.reduce(function(s,l){ return s+l.cr },0)
+  return { total: Math.round(total), lines: lines }
+}
+
+function calcUCDev() {
+  if (MODEL.ucdev_override_cr !== null) return { total: MODEL.ucdev_override_cr, lines: [{ label: 'Override', cr: MODEL.ucdev_override_cr }] }
+  if (!SASC_DATA || !SASC_DATA.selectedUCs) return { total: 0, lines: [] }
+  var complexity = { simple:0, medium:0, complex:0, research:0 }
+  var globalComp = (SASC_DATA.layerCfg && SASC_DATA.layerCfg.ucdev && SASC_DATA.layerCfg.ucdev.complexity) || 'medium'
+  ;(SASC_DATA.selectedUCs || []).forEach(function(ucId) {
+    var wl = (SASC_DATA.ucWorkloads || {})[ucId] || {}
+    var comp = wl.complexity || globalComp
+    complexity[comp] = (complexity[comp] || 0) + 1
+  })
+  var lines = []
+  var costs = { simple: ucInr('ucdev_simple'), medium: ucInr('ucdev_medium'), complex: ucInr('ucdev_complex'), research: ucInr('ucdev_research') }
+  Object.keys(complexity).forEach(function(tier) {
+    if (complexity[tier] > 0) {
+      lines.push({ label: complexity[tier] + ' x ' + tier + ' UC', cr: complexity[tier] * (costs[tier] || 8.5) })
+    }
+  })
+  var uat = (SASC_DATA.selectedUCs.length || 0) * ucInr('ucdev_uat')
+  if (uat > 0) lines.push({ label: 'UAT & acceptance testing', cr: uat })
+  var total = lines.reduce(function(s,l){ return s+l.cr },0)
+  return { total: Math.round(total), lines: lines }
+}
+
+function calcPeople() {
+  if (!SASC_DATA || !SASC_DATA.peopleModel) return { byYear: [0,0,0,0,0,0], total: 0 }
+  var pm = SASC_DATA.peopleModel
+  var duration = pm.duration_months || 12
+  var byYear = [0,0,0,0,0,0]
+  if (pm.yearCosts) {
+    byYear = [0, pm.yearCosts[0]||0, pm.yearCosts[1]||0, pm.yearCosts[2]||0, 0, 0]
+  } else if (pm.total) {
+    // Distribute evenly
+    var perYear = pm.total / Math.ceil(duration/12)
+    for (var y = 1; y <= Math.ceil(duration/12); y++) byYear[y] = Math.round(perYear)
+  }
+  var total = byYear.reduce(function(s,v){ return s+v },0)
+  return { byYear: byYear, total: total }
+}
+
+function capexPhase() {
+  return MODEL.dc_type === 'mdc' ? [0, 0.60, 0.30, 0.10, 0, 0] : [0, 0.20, 0.40, 0.40, 0, 0]
+}
+
+function ucDevPhase() {
+  var total = calcUCDev().total
+  return [0, total*0.40, total*0.40, total*0.20, 0, 0]  // waves 1/2/3
+}
+
+function calcDemandByYear() {
+  var capex  = calcCapex().total
+  var opex   = calcOpex().total
+  var ppl    = calcPeople().byYear
+  var ucdev  = ucDevPhase()
+  var cxPh   = capexPhase()
+  var yrs = MODEL.programme_years
+  var byYear = [0,0,0,0,0,0]
+  for (var y = 1; y <= yrs; y++) {
+    byYear[y] = Math.round(
+      (cxPh[y]||0) * capex +
+      opex +
+      (ppl[y]||0) +
+      (ucdev[y]||0)
+    )
+  }
+  return byYear
+}
+
+function totalDemand() {
+  return calcDemandByYear().slice(1, MODEL.programme_years+1).reduce(function(s,v){ return s+v },0)
+}
+
+//    Revenue model                                                              
+function calcRevenue() {
+  if (!MODEL.rev_enabled) return { byYear: [0,0,0,0,0,0], gstByYear: [0,0,0,0,0,0], totalRev: 0, totalGst: 0 }
+  var m = MODEL
+  var captureY5 = m.rev_scenario === 'bear' ? m.rev_capture_bear : m.rev_scenario === 'bull' ? m.rev_capture_bull : m.rev_capture_base
+  var yrs = m.programme_years
+  var byYear = [0,0,0,0,0,0]
+  var gstByYear = [0,0,0,0,0,0]
+  var gpByYear = [0,0,0,0,0,0]
+  for (var y = 1; y <= yrs; y++) {
+    var marketY = m.rev_market_y1_cr * Math.pow(1 + m.rev_market_cagr/100, y-1)
+    var ramp = (m.rev_ramp_pct[y-1] || 100) / 100
+    var rev = Math.round(marketY * (captureY5/100) * ramp)
+    var gst = Math.round(rev * (m.rev_gst_rate/100) * (m.rev_territory_gst_share/100))
+    var gp  = Math.round(rev * (m.rev_gm_ow_pct/100))
+    byYear[y]  = rev
+    gstByYear[y] = gst
+    gpByYear[y]  = gp
+  }
+  var totalRev = byYear.slice(1,yrs+1).reduce(function(s,v){ return s+v },0)
+  var totalGst = gstByYear.slice(1,yrs+1).reduce(function(s,v){ return s+v },0)
+  return { byYear: byYear, gstByYear: gstByYear, gpByYear: gpByYear, totalRev: totalRev, totalGst: totalGst }
+}
+
+//    Supply / funding sources                                                   
+function calcEMI(source) {
+  if (source.type !== 'loan' || !source.interest_rate_pct || !source.tenure_years) return 0
+  var P = source.amount_cr || 0
+  var totalMonths = source.tenure_years * 12
+  var moratorium = (source.moratorium_months || 0) + (source.grace_period_months || 0)
+  var n = totalMonths - moratorium
+  if (n <= 0) return P   // bullet
+  var r = (source.interest_rate_pct / 100) / 12
+  if (r === 0) return P / n
+  var emi = P * r * Math.pow(1+r, n) / (Math.pow(1+r, n) - 1)
+  return Math.round(emi * 100) / 100
+}
+
+function calcTotalInterest(source) {
+  var emi = calcEMI(source)
+  if (!emi) return 0
+  var n = (source.tenure_years * 12) - ((source.moratorium_months||0) + (source.grace_period_months||0))
+  return Math.round((emi * n - source.amount_cr) * 100) / 100
+}
+
+function calcTotalSupply() {
+  var byType = { grant:0, loan:0, equity:0, vgf:0, inkind:0, scheme:0, revenue_share:0 }
+  FUNDING_SOURCES.forEach(function(fs) {
+    byType[fs.type] = (byType[fs.type]||0) + (fs.amount_cr||0)
+  })
+  var total = FUNDING_SOURCES.reduce(function(s,fs){ return s + (fs.amount_cr||0) },0)
+  return { byType: byType, total: Math.round(total) }
+}
+
+function calcFundingGap() {
+  var demand = totalDemand()
+  var supply = calcTotalSupply().total
+  var rev = calcRevenue()
+  var netRev = rev.totalRev * (MODEL.rev_gm_ow_pct/100)  // only gross profit offsets cash
+  var effective_supply = supply + netRev
+  return {
+    demand:            demand,
+    supply:            supply,
+    revenue_gp:        Math.round(netRev),
+    effective_supply:  Math.round(effective_supply),
+    net_commitment:    Math.max(0, demand - effective_supply),
+    coverage_pct:      demand > 0 ? Math.round(effective_supply / demand * 100) : 0
+  }
+}
+
+//    Cash flow (quarterly)                                                      
+function calcCashFlow() {
+  var yrs  = MODEL.programme_years
+  var qtrs = yrs * 4
+  var demand  = calcDemandByYear()
+  var capex   = calcCapex().total
+  var opex    = calcOpex().total
+  var ucdev   = ucDevPhase()
+  var ppl     = calcPeople().byYear
+  var cxPh    = capexPhase()
+  var rev     = calcRevenue()
+  var supply  = calcTotalSupply()
+
+  // Spread supply inflows evenly across programme quarters (simplified)
+  var supplyPerQtr = supply.total / qtrs
+
+  var quarters = []
+  var cumulative = 0
+  var peakCash = 0
+  var breakevenQtr = null
+
+  for (var q = 1; q <= qtrs; q++) {
+    var yr = Math.ceil(q / 4)
+    var qInYr = ((q-1) % 4)
+
+    // Outflows
+    var capexQ  = Math.round((cxPh[yr]||0) * capex / 4)
+    var opexQ   = Math.round(opex / 4)
+    var ucdevQ  = Math.round((ucdev[yr]||0) / 4)
+    var peopleQ = Math.round((ppl[yr]||0) / 4)
+    var loanEMI = FUNDING_SOURCES.filter(function(fs){
+      return fs.type === 'loan' && (fs.start_year||1) <= yr && (fs.end_year||yrs) >= yr
+    }).reduce(function(s,fs){
+      // EMI is monthly, convert to quarterly
+      var emi = calcEMI(fs)
+      var morQ = Math.floor(((fs.moratorium_months||0) + (fs.grace_period_months||0)) / 3)
+      var startQ = ((fs.start_year||1) - 1) * 4 + morQ + 1
+      return q >= startQ ? s + emi * 3 : s
+    }, 0)
+
+    var outflow = capexQ + opexQ + ucdevQ + peopleQ + Math.round(loanEMI)
+
+    // Inflows
+    var revQ   = Math.round((rev.byYear[yr]||0) * (MODEL.rev_gm_ow_pct/100) / 4)
+    var grantQ = Math.round(supplyPerQtr)
+    var inflow = revQ + grantQ
+
+    var net = inflow - outflow
+    cumulative += net
+
+    if (cumulative < peakCash) peakCash = cumulative
+    if (breakevenQtr === null && cumulative >= 0 && q > 1) breakevenQtr = q
+
+    quarters.push({
+      q: q, yr: yr, qInYr: qInYr+1,
+      capexQ: capexQ, opexQ: opexQ, ucdevQ: ucdevQ, peopleQ: peopleQ, loanEMI: Math.round(loanEMI),
+      outflow: outflow,
+      revQ: revQ, grantQ: grantQ, inflow: inflow,
+      net: net, cumulative: cumulative
+    })
+  }
+
+  // IRR (Newton-Raphson, quarterly cash flows)
+  function calcIRR(cashflows) {
+    var rate = 0.02
+    for (var iter = 0; iter < 100; iter++) {
+      var npv = 0, dnpv = 0
+      for (var i = 0; i < cashflows.length; i++) {
+        npv  += cashflows[i] / Math.pow(1+rate, i)
+        dnpv -= i * cashflows[i] / Math.pow(1+rate, i+1)
+      }
+      if (Math.abs(npv) < 0.01) break
+      rate -= npv / dnpv
+    }
+    return Math.round(rate * 4 * 100)  // annualise quarterly rate   %
+  }
+
+  var cfArr = quarters.map(function(q) { return q.net })
+  cfArr.unshift(-(calcCapex().total * 0.2))  // initial investment
+
+  // NPV at discount rate
+  var discountQ = MODEL.discount_rate_pct / 100 / 4
+  var npv = quarters.reduce(function(s,q) {
+    return s + q.net / Math.pow(1 + discountQ, q.q)
+  }, 0)
+
+  return {
+    quarters: quarters,
+    peakCash: Math.round(peakCash),
+    breakevenQtr: breakevenQtr,
+    irr: calcIRR(cfArr),
+    npv: Math.round(npv)
+  }
+}
+
+//    Navigation                                                                 
+function switchTab(tab) {
+  ACTIVE_TAB = tab
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    var on = b.dataset.tab === tab
+    b.style.fontWeight   = on ? '700' : '500'
+    b.style.borderBottom = on ? '2px solid var(--orange)' : '2px solid transparent'
+    b.style.color        = on ? 'var(--orange)' : 'var(--mid)'
+  })
+  document.getElementById('tab-content').innerHTML = renderTab(tab)
+  initCharts(tab)
+}
+
+function renderTab(tab) {
+  if (tab === 'cost')     return renderCostTab()
+  if (tab === 'supply')   return renderSupplyTab()
+  if (tab === 'gap')      return renderGapTab()
+  if (tab === 'revenue')  return renderRevenueTab()
+  if (tab === 'cashflow') return renderCashFlowTab()
+  if (tab === 'whatif')   return renderWhatIfTab()
+  return ''
+}
+
+function updateHeader() {
+  var gap = calcFundingGap()
+  document.getElementById('hdr-title').textContent = MODEL.programme_name || 'TSAP Financial Model'
+  document.getElementById('hdr-territory').textContent = MODEL.territory + ' | ' + MODEL.programme_years + ' years | ' + MODEL.dc_type.toUpperCase()
+  document.getElementById('hdr-demand').textContent  = 'Rs ' + fmtCr(gap.demand) + ' Cr'
+  document.getElementById('hdr-supply').textContent  = 'Rs ' + fmtCr(gap.effective_supply) + ' Cr'
+  document.getElementById('hdr-gap').textContent     = 'Rs ' + fmtCr(gap.net_commitment) + ' Cr'
+  document.getElementById('hdr-gap').style.color     = gap.net_commitment > 0 ? '#FF5539' : '#00B290'
+  document.getElementById('hdr-coverage').textContent = gap.coverage_pct + '% covered'
+}
+
+//    TAB 1: Programme Cost                                                      
+function renderCostTab() {
+  var capex   = calcCapex()
+  var opex    = calcOpex()
+  var ucdev   = calcUCDev()
+  var people  = calcPeople()
+  var demand  = calcDemandByYear()
+  var yrs     = MODEL.programme_years
+  var ucphase = ucDevPhase()
+  var cxph    = capexPhase()
+
+  var sascBadge = SASC_DATA
+    ? '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(0,178,144,0.12);color:#00B290;margin-left:8px"> Derived from SASC</span>'
+    : '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,182,0,0.15);color:#b45309;margin-left:8px">No SASC data   using defaults</span>'
+
+  var html = '<div class="card">'
+    + '<div class="card-hdr">Programme parameters</div>'
+    + '<div class="form-grid">'
+    + fmtInput('Programme name', 'text', MODEL.programme_name, 'MODEL.programme_name=this.value;updateHeader()')
+    + fmtInput('Territory', 'text', MODEL.territory, 'MODEL.territory=this.value;updateHeader()')
+    + fmtSelect('Duration', MODEL.programme_years, [3,4,5,7], function(v){ return v + ' years' }, 'MODEL.programme_years=+this.value;switchTab(ACTIVE_TAB)')
+    + fmtSelect('DC type', MODEL.dc_type, ['mdc','bm'], function(v){ return v==='mdc'?'MDC   Modular (14 months)':'B&M   Brick & Mortar (30 months)' }, 'MODEL.dc_type=this.value;switchTab(ACTIVE_TAB)')
+    + fmtInput('Phase 1 compute (MW)', 'number', MODEL.phase1_mw, 'MODEL.phase1_mw=+this.value;switchTab(ACTIVE_TAB)', 'min="1" max="100"')
+    + fmtInput('USD/INR rate', 'number', MODEL.fx_usd_inr, 'MODEL.fx_usd_inr=+this.value;switchTab(ACTIVE_TAB)', 'min="70" max="120"')
+    + '</div></div>'
+
+    // CapEx table
+    + '<div class="card"><div class="card-hdr">Infrastructure CapEx' + sascBadge + '</div>'
+    + '<table class="fm-tbl"><thead><tr><th>Component</th><th style="text-align:right">Rs Cr</th><th>Source</th></tr></thead><tbody>'
+    + capex.lines.map(function(l) {
+        return '<tr><td>' + esc(l.label) + '</td><td style="text-align:right">' + fmtCr(l.cr) + '</td><td style="font-size:10px;color:var(--mid)">' + esc(l.source||'') + '</td></tr>'
+      }).join('')
+    + '<tr class="total-row"><td>Total CapEx</td><td style="text-align:right">' + fmtCr(capex.total) + '</td><td></td></tr>'
+    + '</tbody></table>'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
+    + '<input type="checkbox"' + (MODEL.capex_override_cr !== null ? ' checked' : '') + ' onchange="MODEL.capex_override_cr=this.checked?'+capex.total+':null;switchTab(ACTIVE_TAB)">'
+    + '<label style="margin:0;font-size:11px">Override CapEx</label>'
+    + (MODEL.capex_override_cr !== null ? '<input type="number" value="' + MODEL.capex_override_cr + '" style="width:100px" onchange="MODEL.capex_override_cr=+this.value;switchTab(ACTIVE_TAB)"><span style="font-size:11px;color:var(--mid)">Rs Cr</span>' : '')
+    + '</div></div>'
+
+    // OpEx table
+    + '<div class="card"><div class="card-hdr">Annual OpEx (Phase 1, Rs Cr/yr)</div>'
+    + '<table class="fm-tbl"><thead><tr><th>Component</th><th style="text-align:right">Rs Cr/yr</th></tr></thead><tbody>'
+    + opex.lines.map(function(l) {
+        return '<tr><td>' + esc(l.label) + '</td><td style="text-align:right">' + fmtCr(l.cr, 1) + '</td></tr>'
+      }).join('')
+    + '<tr class="total-row"><td>Total annual OpEx</td><td style="text-align:right">' + fmtCr(opex.total) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
+    + '<input type="checkbox"' + (MODEL.opex_override_cr !== null ? ' checked' : '') + ' onchange="MODEL.opex_override_cr=this.checked?'+opex.total+':null;switchTab(ACTIVE_TAB)">'
+    + '<label style="margin:0;font-size:11px">Override OpEx</label>'
+    + (MODEL.opex_override_cr !== null ? '<input type="number" value="' + MODEL.opex_override_cr + '" style="width:100px" onchange="MODEL.opex_override_cr=+this.value;switchTab(ACTIVE_TAB)"><span style="font-size:11px;color:var(--mid)">Rs Cr/yr</span>' : '')
+    + '</div></div>'
+
+    // UC Dev
+    + '<div class="card"><div class="card-hdr">UC Development' + sascBadge + '</div>'
+    + (ucdev.lines.length ? '<table class="fm-tbl"><thead><tr><th>Wave</th><th style="text-align:right">Rs Cr</th></tr></thead><tbody>'
+      + ucdev.lines.map(function(l){ return '<tr><td>' + esc(l.label) + '</td><td style="text-align:right">' + fmtCr(l.cr) + '</td></tr>' }).join('')
+      + '<tr class="total-row"><td>Total UC dev</td><td style="text-align:right">' + fmtCr(ucdev.total) + '</td></tr>'
+      + '</tbody></table>' : '<div style="color:var(--mid);font-size:12px">No SASC data. Set override below.</div>')
+    + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
+    + '<input type="checkbox"' + (MODEL.ucdev_override_cr !== null ? ' checked' : '') + ' onchange="MODEL.ucdev_override_cr=this.checked?'+(ucdev.total||85)+':null;switchTab(ACTIVE_TAB)">'
+    + '<label style="margin:0;font-size:11px">Override UC dev</label>'
+    + (MODEL.ucdev_override_cr !== null ? '<input type="number" value="' + MODEL.ucdev_override_cr + '" style="width:100px" onchange="MODEL.ucdev_override_cr=+this.value;switchTab(ACTIVE_TAB)"><span style="font-size:11px;color:var(--mid)">Rs Cr</span>' : '')
+    + '</div></div>'
+
+    // Year by year demand + chart
+    + '<div class="card"><div class="card-hdr">Programme cost by year (Rs Cr)</div>'
+    + '<table class="fm-tbl"><thead><tr><th></th>'
+    + Array.from({length:yrs},function(_,i){ return '<th style="text-align:right">Y'+(i+1)+'</th>' }).join('')
+    + '<th style="text-align:right">Total</th></tr></thead><tbody>'
+    + '<tr><td>CapEx</td>' + Array.from({length:yrs},function(_,i){ return '<td style="text-align:right">' + fmtCr(Math.round(cxph[i+1]*capex.total)) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(capex.total) + '</td></tr>'
+    + '<tr><td>OpEx</td>' + Array.from({length:yrs},function(){ return '<td style="text-align:right">' + fmtCr(opex.total) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(opex.total * yrs) + '</td></tr>'
+    + '<tr><td>UC Dev</td>' + Array.from({length:yrs},function(_,i){ return '<td style="text-align:right">' + fmtCr(Math.round(ucphase[i+1])) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(ucdev.total) + '</td></tr>'
+    + '<tr><td>People</td>' + Array.from({length:yrs},function(_,i){ return '<td style="text-align:right">' + fmtCr(people.byYear[i+1]||0) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(people.total) + '</td></tr>'
+    + '<tr class="total-row"><td>Total</td>' + Array.from({length:yrs},function(_,i){ return '<td style="text-align:right">' + fmtCr(demand[i+1]) + '</td>' }).join('') + '<td style="text-align:right">' + fmtCr(totalDemand()) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div style="margin-top:16px;height:220px"><canvas id="chart-demand"></canvas></div>'
+    + '</div>'
+
+  return html
+}
+
+//    TAB 2: Funding Sources                                                     
+function renderSupplyTab() {
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy)">Funding sources</div>'
+    + '<button class="btn btn-primary" onclick="addFundingSource()">+ Add source</button>'
+    + '</div>'
+
+  if (!FUNDING_SOURCES.length) {
+    html += '<div class="card" style="color:var(--mid);font-size:12px;text-align:center;padding:30px">No funding sources added yet. Click "+ Add source" to begin.</div>'
+  } else {
+    FUNDING_SOURCES.forEach(function(fs, idx) {
+      html += renderFundingSourceCard(fs, idx)
+    })
+  }
+
+  var sup = calcTotalSupply()
+  html += '<div class="card" style="border-left:3px solid var(--teal);margin-top:16px">'
+    + '<div class="card-hdr">Total funding   Rs Cr</div>'
+    + '<table class="fm-tbl"><tbody>'
+    + Object.keys(sup.byType).filter(function(k){ return sup.byType[k] > 0 }).map(function(k) {
+        return '<tr><td style="text-transform:capitalize">' + k.replace('_',' ') + '</td><td style="text-align:right;font-weight:600">' + fmtCr(sup.byType[k]) + '</td></tr>'
+      }).join('')
+    + '<tr class="total-row"><td>Total supply</td><td style="text-align:right">' + fmtCr(sup.total) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div style="margin-top:16px;height:200px"><canvas id="chart-funding-mix"></canvas></div>'
+    + '</div>'
+
+  return html
+}
+
+function renderFundingSourceCard(fs, idx) {
+  var emi  = calcEMI(fs)
+  var intT = calcTotalInterest(fs)
+  var isLoan = fs.type === 'loan'
+
+  var html = '<div class="card" style="border-left:3px solid var(--blue)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'
+    + '<div style="font-size:13px;font-weight:700">' + esc(fs.name||'Source '+(idx+1)) + '</div>'
+    + '<button onclick="removeFundingSource(\'' + fs.id + '\')" style="font-size:11px;color:var(--orange);border:none;background:none;cursor:pointer">Remove</button>'
+    + '</div>'
+    + '<div class="form-grid">'
+    + fmtInput('Name', 'text', fs.name, 'updateFS(\'' + fs.id + '\',\'name\',this.value)')
+    + fmtSelect('Type', fs.type, ['grant','loan','scheme','vgf','equity','inkind','revenue_share'], function(v){ return v.replace('_',' ') }, 'updateFS(\'' + fs.id + '\',\'type\',this.value)')
+    + fmtInput('Amount (Rs Cr)', 'number', fs.amount_cr, 'updateFS(\'' + fs.id + '\',\'amount_cr\',+this.value)', 'min="0"')
+    + fmtInput('Start year', 'number', fs.start_year||1, 'updateFS(\'' + fs.id + '\',\'start_year\',+this.value)', 'min="1" max="'+MODEL.programme_years+'"')
+    + '</div>'
+    + (isLoan ? '<div class="form-grid" style="margin-top:8px">'
+        + fmtInput('Interest rate (% pa)', 'number', fs.interest_rate_pct||0, 'updateFS(\'' + fs.id + '\',\'interest_rate_pct\',+this.value)', 'min="0" max="30" step="0.5"')
+        + fmtInput('Tenure (years)', 'number', fs.tenure_years||10, 'updateFS(\'' + fs.id + '\',\'tenure_years\',+this.value)', 'min="1" max="30"')
+        + fmtInput('Grace period (months)', 'number', fs.grace_period_months||0, 'updateFS(\'' + fs.id + '\',\'grace_period_months\',+this.value)', 'min="0" max="36"')
+        + fmtInput('Moratorium (months)', 'number', fs.moratorium_months||0, 'updateFS(\'' + fs.id + '\',\'moratorium_months\',+this.value)', 'min="0" max="60"')
+        + fmtSelect('Repayment type', fs.repayment_type||'annuity', ['annuity','bullet','stepup'], function(v){ return v }, 'updateFS(\'' + fs.id + '\',\'repayment_type\',this.value)')
+        + '</div>'
+        + '<div style="display:flex;gap:16px;margin-top:8px;padding:8px 10px;background:rgba(0,40,112,0.04);border-radius:6px;font-size:12px">'
+        + '<div><span style="color:var(--mid)">Monthly EMI </span><strong>Rs ' + fmtCr(emi, 2) + ' Cr</strong></div>'
+        + '<div><span style="color:var(--mid)">Total interest </span><strong style="color:var(--orange)">Rs ' + fmtCr(intT, 1) + ' Cr</strong></div>'
+        + '<div><span style="color:var(--mid)">Total outflow </span><strong>Rs ' + fmtCr((fs.amount_cr||0) + intT, 1) + ' Cr</strong></div>'
+        + '</div>'
+      : '')
+    + (fs.type === 'scheme' ? '<div class="form-grid" style="margin-top:8px">'
+        + fmtInput('Scheme code', 'text', fs.scheme_code||'', 'updateFS(\'' + fs.id + '\',\'scheme_code\',this.value)')
+        + fmtInput('Coverage % of eligible', 'number', fs.coverage_pct||60, 'updateFS(\'' + fs.id + '\',\'coverage_pct\',+this.value)', 'min="0" max="100"')
+        + '</div>'
+      : '')
+    + (fs.notes ? '<div style="font-size:11px;color:var(--mid);margin-top:6px">' + esc(fs.notes) + '</div>' : '')
+    + '</div>'
+  return html
+}
+
+//    TAB 3: Funding Gap                                                         
+function renderGapTab() {
+  var gap = calcFundingGap()
+  var netColor = gap.net_commitment > 0 ? 'var(--orange)' : 'var(--teal)'
+  var rev = calcRevenue()
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px">'
+    + kpiCard('Total demand', fmtCrFull(gap.demand), 'var(--navy)')
+    + kpiCard('Scheme + loan + grant', fmtCrFull(gap.supply), 'var(--blue)')
+    + kpiCard('Revenue (gross profit)', fmtCrFull(gap.revenue_gp), 'var(--teal)')
+    + kpiCard(MODEL.territory + ' net commitment', fmtCrFull(gap.net_commitment), netColor)
+    + '</div>'
+
+    // Coverage bar
+    + '<div class="card">'
+    + '<div class="card-hdr">Funding coverage: ' + gap.coverage_pct + '%</div>'
+    + '<div style="height:14px;border-radius:7px;background:#e5e7eb;overflow:hidden;margin:8px 0 12px">'
+    + '<div style="height:100%;border-radius:7px;background:linear-gradient(90deg,var(--teal),var(--blue));width:' + Math.min(100,gap.coverage_pct) + '%;transition:width 0.4s"></div>'
+    + '</div>'
+
+    // Waterfall table
+    + '<table class="fm-tbl"><tbody>'
+    + '<tr><td style="font-weight:600">Programme demand</td><td style="text-align:right;font-weight:600">' + fmtCr(gap.demand) + '</td><td></td></tr>'
+    + '<tr><td style="color:var(--teal)">Less: scheme / grant / other funding</td><td style="text-align:right;color:var(--teal)">(' + fmtCr(gap.supply) + ')</td><td style="text-align:right;font-size:11px;color:var(--mid)">' + Math.round(gap.supply/gap.demand*100) + '%</td></tr>'
+    + (gap.revenue_gp > 0 ? '<tr><td style="color:var(--teal)">Less: Track 2 gross profit</td><td style="text-align:right;color:var(--teal)">(' + fmtCr(gap.revenue_gp) + ')</td><td style="text-align:right;font-size:11px;color:var(--mid)">' + Math.round(gap.revenue_gp/gap.demand*100) + '%</td></tr>' : '')
+    + '<tr class="total-row"><td>' + esc(MODEL.territory) + ' net commitment</td><td style="text-align:right;color:' + netColor + '">' + fmtCr(gap.net_commitment) + '</td><td style="text-align:right;font-size:11px;color:'+netColor+'">' + Math.round(gap.net_commitment/gap.demand*100) + '%</td></tr>'
+    + '</tbody></table></div>'
+
+    // Year by year
+    + '<div class="card"><div class="card-hdr">Net commitment by year (indicative)</div>'
+    + '<table class="fm-tbl"><thead><tr><th>Year</th><th style="text-align:right">Demand</th><th style="text-align:right">Supply est.</th><th style="text-align:right">Track 2 GP</th><th style="text-align:right">Net</th></tr></thead><tbody>'
+
+  var demand = calcDemandByYear()
+  var supplyPerYr = gap.supply / MODEL.programme_years
+  for (var y = 1; y <= MODEL.programme_years; y++) {
+    var d = demand[y] || 0
+    var s = Math.round(Math.min(supplyPerYr, d))
+    var r = Math.round((rev.gpByYear ? rev.gpByYear[y]||0 : 0))
+    var net = Math.max(0, d - s - r)
+    html += '<tr><td>Year ' + y + '</td><td style="text-align:right">' + fmtCr(d) + '</td>'
+      + '<td style="text-align:right;color:var(--teal)">(' + fmtCr(s) + ')</td>'
+      + '<td style="text-align:right;color:var(--teal)">(' + fmtCr(r) + ')</td>'
+      + '<td style="text-align:right;font-weight:700;color:' + (net>0?'var(--orange)':'var(--teal)') + '">' + fmtCr(net) + '</td></tr>'
+  }
+  html += '</tbody></table>'
+    + '<div style="margin-top:16px;height:200px"><canvas id="chart-gap"></canvas></div>'
+    + '</div>'
+
+  // One-liner
+  html += '<div class="card" style="border-left:3px solid var(--teal)">'
+    + '<div style="font-size:13px;line-height:1.75;color:var(--dark)">'
+    + esc(MODEL.territory) + ' puts in <strong>Rs ' + fmtCr(gap.net_commitment) + ' Cr net cash</strong> over ' + MODEL.programme_years + ' years '
+    + (gap.supply > 0 ? '(balance covered by scheme funding, grants and external financing). ' : '. ')
+    + (rev.totalGst > 0 ? 'In return, the territory earns <strong>Rs ' + fmtCr(rev.totalGst) + ' Cr in GST</strong> from the AI economy over ' + MODEL.programme_years + ' years.' : '')
+    + (gap.net_commitment > 0 && rev.totalGst > 0 ? ' <strong>Benefit-cost ratio: ' + Math.round(rev.totalGst / gap.net_commitment * 10)/10 + 'x.</strong>' : '')
+    + '</div></div>'
+
+  return html
+}
+
+//    TAB 4: Revenue model                                                       
+function renderRevenueTab() {
+  var rev = calcRevenue()
+  var m = MODEL
+
+  var html = '<div class="card">'
+    + '<div class="card-hdr">Revenue model (Track 2   Inferencing Factory)</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:14px">'
+    + ['bear','base','bull'].map(function(s) {
+        var on = m.rev_scenario === s
+        var colors = { bear:'#FF5539', base:'#002870', bull:'#00B290' }
+        return '<button style="flex:1;padding:7px 10px;border-radius:6px;border:2px solid ' + (on?colors[s]:'#e5e7eb') + ';background:' + (on?colors[s]+'18':'#fff') + ';cursor:pointer;font-weight:' + (on?'700':'500') + ';color:' + (on?colors[s]:'#6B7280') + ';font-size:12px" onclick="MODEL.rev_scenario=\'' + s + '\';switchTab(\'revenue\')">' + s.charAt(0).toUpperCase()+s.slice(1) + '</button>'
+      }).join('')
+    + '</div>'
+    + '<div class="form-grid">'
+    + fmtInput('Market Y1 (Rs Cr)', 'number', m.rev_market_y1_cr, 'MODEL.rev_market_y1_cr=+this.value;switchTab(ACTIVE_TAB)')
+    + fmtInput('Market CAGR (%)', 'number', m.rev_market_cagr, 'MODEL.rev_market_cagr=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="200" step="0.5"')
+    + fmtInput('Y5 capture %   Bear', 'number', m.rev_capture_bear, 'MODEL.rev_capture_bear=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="100" step="0.5"')
+    + fmtInput('Y5 capture %   Base', 'number', m.rev_capture_base, 'MODEL.rev_capture_base=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="100" step="0.5"')
+    + fmtInput('Y5 capture %   Bull', 'number', m.rev_capture_bull, 'MODEL.rev_capture_bull=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="100" step="0.5"')
+    + fmtInput('Gross margin OW (%)', 'number', m.rev_gm_ow_pct, 'MODEL.rev_gm_ow_pct=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="80" step="1"')
+    + fmtInput('GST rate (%)', 'number', m.rev_gst_rate, 'MODEL.rev_gst_rate=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="30"')
+    + fmtInput('Territory GST share (%)', 'number', m.rev_territory_gst_share, 'MODEL.rev_territory_gst_share=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="100"')
+    + '</div></div>'
+
+    // Revenue ramp inputs
+    + '<div class="card"><div class="card-hdr">Revenue ramp (% of Y5 run-rate)</div>'
+    + '<div class="form-grid">'
+    + [1,2,3,4,5].map(function(y) {
+        return fmtInput('Year ' + y, 'number', m.rev_ramp_pct[y-1], 'MODEL.rev_ramp_pct[' + (y-1) + ']=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="100"')
+      }).join('')
+    + '</div></div>'
+
+    // Revenue table
+    + '<div class="card"><div class="card-hdr">Revenue output (Rs Cr)</div>'
+    + '<table class="fm-tbl"><thead><tr><th></th>'
+    + Array.from({length:m.programme_years},function(_,i){ return '<th style="text-align:right">Y'+(i+1)+'</th>' }).join('')
+    + '<th style="text-align:right">Total</th></tr></thead><tbody>'
+    + '<tr><td>Gross revenue</td>' + Array.from({length:m.programme_years},function(_,i){ return '<td style="text-align:right">' + fmtCr(rev.byYear[i+1]||0) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(rev.totalRev) + '</td></tr>'
+    + '<tr><td>Gross profit (' + m.rev_gm_ow_pct + '%)</td>' + Array.from({length:m.programme_years},function(_,i){ return '<td style="text-align:right">' + fmtCr(rev.gpByYear ? rev.gpByYear[i+1]||0 : 0) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(rev.gpByYear ? rev.gpByYear.slice(1,m.programme_years+1).reduce(function(s,v){return s+v},0) : 0) + '</td></tr>'
+    + '<tr><td style="color:var(--teal)">Territory GST earned</td>' + Array.from({length:m.programme_years},function(_,i){ return '<td style="text-align:right;color:var(--teal)">' + fmtCr(rev.gstByYear[i+1]||0) + '</td>' }).join('') + '<td style="text-align:right;font-weight:700;color:var(--teal)">' + fmtCr(rev.totalGst) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div style="margin-top:16px;height:220px"><canvas id="chart-revenue"></canvas></div>'
+    + '</div>'
+
+  return html
+}
+
+//    TAB 5: Cash Flow                                                           
+function renderCashFlowTab() {
+  var cf = calcCashFlow()
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px">'
+    + kpiCard('Peak cash requirement', fmtCrFull(cf.peakCash), cf.peakCash < 0 ? 'var(--orange)' : 'var(--teal)')
+    + kpiCard('Break-even quarter', cf.breakevenQtr ? 'Q' + cf.breakevenQtr + ' (Y' + Math.ceil(cf.breakevenQtr/4) + ')' : 'Not reached', cf.breakevenQtr ? 'var(--teal)' : 'var(--orange)')
+    + kpiCard('NPV (at ' + MODEL.discount_rate_pct + '%)', fmtCrFull(cf.npv), cf.npv >= 0 ? 'var(--teal)' : 'var(--orange)')
+    + kpiCard('Indicative IRR', cf.irr + '%', cf.irr >= MODEL.discount_rate_pct ? 'var(--teal)' : 'var(--orange)')
+    + '</div>'
+
+    + '<div class="card"><div class="card-hdr">Discount rate</div>'
+    + '<div>' + fmtInput('Discount rate (%)', 'number', MODEL.discount_rate_pct, 'MODEL.discount_rate_pct=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="30" step="0.5"') + '</div>'
+    + '</div>'
+
+    // Cumulative cash flow chart
+    + '<div class="card"><div class="card-hdr">Cumulative cash flow (Rs Cr)</div>'
+    + '<div style="height:220px"><canvas id="chart-cashflow"></canvas></div>'
+    + '</div>'
+
+    // Quarterly bar chart
+    + '<div class="card"><div class="card-hdr">Quarterly cash in vs out (Rs Cr)</div>'
+    + '<div style="height:200px"><canvas id="chart-qtrly"></canvas></div>'
+    + '</div>'
+
+    // Cash flow table (yearly summary)
+    + '<div class="card"><div class="card-hdr">Annual cash flow summary (Rs Cr)</div>'
+    + '<table class="fm-tbl"><thead><tr><th>Year</th><th style="text-align:right">Total outflow</th><th style="text-align:right">Total inflow</th><th style="text-align:right">Net</th><th style="text-align:right">Cumulative</th></tr></thead><tbody>'
+
+  for (var yr = 1; yr <= MODEL.programme_years; yr++) {
+    var yrQtrs = cf.quarters.filter(function(q){ return q.yr === yr })
+    var out = yrQtrs.reduce(function(s,q){ return s+q.outflow },0)
+    var inp = yrQtrs.reduce(function(s,q){ return s+q.inflow },0)
+    var net = yrQtrs.reduce(function(s,q){ return s+q.net },0)
+    var cum = yrQtrs[yrQtrs.length-1].cumulative
+    html += '<tr><td>Year ' + yr + '</td>'
+      + '<td style="text-align:right;color:var(--orange)">(' + fmtCr(out) + ')</td>'
+      + '<td style="text-align:right;color:var(--teal)">' + fmtCr(inp) + '</td>'
+      + '<td style="text-align:right;font-weight:600;color:' + (net>=0?'var(--teal)':'var(--orange)') + '">' + fmtCr(net) + '</td>'
+      + '<td style="text-align:right;font-weight:600;color:' + (cum>=0?'var(--teal)':'var(--orange)') + '">' + fmtCr(cum) + '</td></tr>'
+  }
+  html += '</tbody></table></div>'
+
+  return html
+}
+
+//    TAB 6: What-If                                                             
+function renderWhatIfTab() {
+  var SCENARIOS_DEF = {
+    conservative: { label:'Conservative', rev_scenario:'bear', dc_type:'bm', desc:'B&M DC, bear revenue, minimal schemes' },
+    base:         { label:'Base',         rev_scenario:'base', dc_type:'mdc', desc:'MDC DC, base revenue, standard scheme coverage' },
+    optimistic:   { label:'Optimistic',   rev_scenario:'bull', dc_type:'mdc', desc:'MDC DC, bull revenue, maximum scheme + VGF' }
+  }
+
+  // Compute gap for each scenario without mutating MODEL
+  var results = {}
+  var origDC = MODEL.dc_type, origRev = MODEL.rev_scenario
+  Object.keys(SCENARIOS_DEF).forEach(function(s) {
+    MODEL.dc_type = SCENARIOS_DEF[s].dc_type
+    MODEL.rev_scenario = SCENARIOS_DEF[s].rev_scenario
+    var g = calcFundingGap()
+    var cf = calcCashFlow()
+    var rev = calcRevenue()
+    results[s] = { gap: g, irr: cf.irr, npv: cf.npv, peak: cf.peakCash, rev: rev.totalRev, gst: rev.totalGst }
+  })
+  MODEL.dc_type = origDC; MODEL.rev_scenario = origRev
+
+  var html = '<div class="card"><div class="card-hdr">Scenario comparison</div>'
+    + '<table class="fm-tbl"><thead><tr><th>Metric</th>'
+    + Object.keys(SCENARIOS_DEF).map(function(s){ return '<th style="text-align:right">' + SCENARIOS_DEF[s].label + '</th>' }).join('')
+    + '</tr></thead><tbody>'
+    + [
+        ['Total demand (Rs Cr)',           function(s){ return fmtCr(results[s].gap.demand) }],
+        ['Total supply (Rs Cr)',           function(s){ return fmtCr(results[s].gap.effective_supply) }],
+        ['Net commitment (Rs Cr)',         function(s){ return fmtCr(results[s].gap.net_commitment) }, true],
+        ['Coverage %',                     function(s){ return results[s].gap.coverage_pct + '%' }],
+        ['5yr revenue (Rs Cr)',            function(s){ return fmtCr(results[s].rev) }],
+        ['5yr territory GST (Rs Cr)',      function(s){ return fmtCr(results[s].gst) }],
+        ['Peak cash requirement (Rs Cr)',  function(s){ return fmtCr(results[s].peak) }],
+        ['Indicative IRR',                 function(s){ return results[s].irr + '%' }],
+        ['NPV (Rs Cr)',                    function(s){ return fmtCr(results[s].npv) }],
+      ].map(function(row) {
+        return '<tr><td>' + row[0] + '</td>'
+          + Object.keys(SCENARIOS_DEF).map(function(s) {
+              return '<td style="text-align:right;font-weight:' + (row[2]?'700':'400') + '">' + row[1](s) + '</td>'
+            }).join('')
+          + '</tr>'
+      }).join('')
+    + '</tbody></table></div>'
+
+    // Save scenario
+    + '<div class="card">'
+    + '<div class="card-hdr">Save scenario</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + Object.keys(SCENARIOS_DEF).map(function(s) {
+        return '<button class="btn btn-outline" onclick="saveScenario(\'' + s + '\',\'' + SCENARIOS_DEF[s].label + '\')">' + SCENARIOS_DEF[s].label + '</button>'
+      }).join('')
+    + '<button class="btn btn-primary" onclick="saveScenario(\'custom\',\'Custom\')">Save current as Custom</button>'
+    + '</div></div>'
+
+  return html
+}
+
+//    Chart initialisation                                                       
+function initCharts(tab) {
+  setTimeout(function() {
+    if (tab === 'cost')     initDemandChart()
+    if (tab === 'supply')   initFundingMixChart()
+    if (tab === 'gap')      initGapChart()
+    if (tab === 'revenue')  initRevenueChart()
+    if (tab === 'cashflow') { initCashFlowChart(); initQtrlyChart() }
+  }, 100)
+}
+
+function destroyChart(id) {
+  if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id] }
+}
+
+function initDemandChart() {
+  var el = document.getElementById('chart-demand'); if (!el) return
+  destroyChart('demand')
+  var yrs = MODEL.programme_years
+  var capex  = calcCapex().total
+  var opex   = calcOpex().total
+  var ucdev  = ucDevPhase()
+  var people = calcPeople().byYear
+  var cxph   = capexPhase()
+  var labels = Array.from({length:yrs},function(_,i){ return 'Y'+(i+1) })
+  CHARTS['demand'] = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label:'CapEx',   data:labels.map(function(_,i){ return Math.round((cxph[i+1]||0)*capex) }), backgroundColor:'#1C38F5', stack:'s' },
+        { label:'OpEx',    data:labels.map(function(){ return opex }),                                 backgroundColor:'#002870', stack:'s' },
+        { label:'UC Dev',  data:labels.map(function(_,i){ return Math.round(ucdev[i+1]||0) }),         backgroundColor:'#FFB600', stack:'s' },
+        { label:'People',  data:labels.map(function(_,i){ return people[i+1]||0 }),                   backgroundColor:'#00B290', stack:'s' },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{boxWidth:12,font:{size:10}}} }, scales:{ x:{stacked:true}, y:{stacked:true, ticks:{font:{size:10}}} } }
+  })
+}
+
+function initFundingMixChart() {
+  var el = document.getElementById('chart-funding-mix'); if (!el) return
+  destroyChart('funding-mix')
+  var sup = calcTotalSupply()
+  var labels = [], data = [], colors = []
+  var colorMap = { grant:'#00B290', loan:'#1C38F5', scheme:'#002870', vgf:'#FFB600', inkind:'#6B7280', equity:'#FF5539', revenue_share:'#8B5CF6' }
+  Object.keys(sup.byType).forEach(function(k) {
+    if (sup.byType[k] > 0) { labels.push(k.replace('_',' ')); data.push(sup.byType[k]); colors.push(colorMap[k]||'#ccc') }
+  })
+  if (!data.length) return
+  CHARTS['funding-mix'] = new Chart(el.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels:labels, datasets:[{ data:data, backgroundColor:colors }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{boxWidth:12,font:{size:10}}} } }
+  })
+}
+
+function initGapChart() {
+  var el = document.getElementById('chart-gap'); if (!el) return
+  destroyChart('gap')
+  var demand  = calcDemandByYear()
+  var rev     = calcRevenue()
+  var sup     = calcTotalSupply()
+  var supPerYr = sup.total / MODEL.programme_years
+  var yrs     = MODEL.programme_years
+  var labels  = Array.from({length:yrs},function(_,i){ return 'Y'+(i+1) })
+  CHARTS['gap'] = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label:'Demand',  data:labels.map(function(_,i){ return demand[i+1]||0 }),    backgroundColor:'rgba(255,85,57,0.5)', stack:'a' },
+        { label:'Supply',  data:labels.map(function(){ return Math.round(supPerYr) }), backgroundColor:'rgba(0,178,144,0.6)', stack:'b' },
+        { label:'Revenue', data:labels.map(function(_,i){ return rev.gpByYear ? rev.gpByYear[i+1]||0 : 0 }), backgroundColor:'rgba(28,56,245,0.5)', stack:'b' },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{boxWidth:12,font:{size:10}}} }, scales:{ y:{ticks:{font:{size:10}}} } }
+  })
+}
+
+function initRevenueChart() {
+  var el = document.getElementById('chart-revenue'); if (!el) return
+  destroyChart('revenue')
+  var rev  = calcRevenue()
+  var yrs  = MODEL.programme_years
+  var labels = Array.from({length:yrs},function(_,i){ return 'Y'+(i+1) })
+  CHARTS['revenue'] = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label:'Gross revenue', data:labels.map(function(_,i){ return rev.byYear[i+1]||0 }),  backgroundColor:'rgba(0,40,112,0.15)', yAxisID:'y' },
+        { label:'Gross profit',  data:labels.map(function(_,i){ return rev.gpByYear ? rev.gpByYear[i+1]||0 : 0 }),  backgroundColor:'rgba(0,178,144,0.5)', yAxisID:'y' },
+        { label:'Territory GST', data:labels.map(function(_,i){ return rev.gstByYear[i+1]||0 }), type:'line', borderColor:'#FFB600', backgroundColor:'#FFB600', fill:false, tension:0.3, yAxisID:'y' },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{boxWidth:12,font:{size:10}}} }, scales:{ y:{ticks:{font:{size:10}}} } }
+  })
+}
+
+function initCashFlowChart() {
+  var el = document.getElementById('chart-cashflow'); if (!el) return
+  destroyChart('cashflow')
+  var cf = calcCashFlow()
+  var labels = cf.quarters.map(function(q){ return 'Q'+q.q })
+  var cumData = cf.quarters.map(function(q){ return q.cumulative })
+  var peakIdx = cumData.indexOf(Math.min.apply(null, cumData))
+  CHARTS['cashflow'] = new Chart(el.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        { label:'Cumulative cash (Rs Cr)', data:cumData, borderColor:'#1C38F5', backgroundColor:'rgba(28,56,245,0.08)', fill:true, tension:0.3, pointRadius:0, pointHoverRadius:4 },
+        { label:'Break-even', data:cf.quarters.map(function(){ return 0 }), borderColor:'rgba(0,178,144,0.5)', borderDash:[5,5], pointRadius:0, fill:false }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}},
+        annotation:{ annotations: cf.breakevenQtr ? [{ type:'line', xMin:cf.breakevenQtr-1, xMax:cf.breakevenQtr-1, borderColor:'#00B290', borderWidth:2, label:{display:true, content:'Break-even Q'+cf.breakevenQtr, position:'start', font:{size:9}} }] : [] }
+      },
+      scales:{ y:{ticks:{font:{size:10}}} }
+    }
+  })
+}
+
+function initQtrlyChart() {
+  var el = document.getElementById('chart-qtrly'); if (!el) return
+  destroyChart('qtrly')
+  var cf = calcCashFlow()
+  // Show yearly aggregated for readability
+  var labels = Array.from({length:MODEL.programme_years},function(_,i){ return 'Y'+(i+1) })
+  var outflows = [], inflows = []
+  for (var yr = 1; yr <= MODEL.programme_years; yr++) {
+    var yrQtrs = cf.quarters.filter(function(q){ return q.yr === yr })
+    outflows.push(yrQtrs.reduce(function(s,q){ return s+q.outflow },0))
+    inflows.push(yrQtrs.reduce(function(s,q){ return s+q.inflow },0))
+  }
+  CHARTS['qtrly'] = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label:'Total outflow', data:outflows.map(function(v){ return -v }), backgroundColor:'rgba(255,85,57,0.6)' },
+        { label:'Total inflow',  data:inflows,                                backgroundColor:'rgba(0,178,144,0.6)' },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}} }, scales:{ y:{ticks:{font:{size:10}}} } }
+  })
+}
+
+//    Form helpers                                                               
+function fmtInput(label, type, val, onchange, extra) {
+  return '<div><label>' + esc(label) + '</label><input type="' + type + '" value="' + esc(String(val||'')) + '" onchange="' + onchange + '"' + (extra ? ' ' + extra : '') + '></div>'
+}
+function fmtSelect(label, val, options, labelFn, onchange) {
+  return '<div><label>' + esc(label) + '</label><select onchange="' + onchange + '">'
+    + options.map(function(o){ return '<option value="' + o + '"' + (val==o?' selected':'') + '>' + esc(labelFn(o)) + '</option>' }).join('')
+    + '</select></div>'
+}
+function kpiCard(label, val, color) {
+  return '<div class="ucrd"><div class="ucrd-v" style="color:' + color + '">' + esc(val) + '</div><div class="ucrd-l">' + esc(label) + '</div></div>'
+}
+
+//    Funding source CRUD                                                        
+async function addFundingSource() {
+  var fs = { id: genId(), engagement_id: ENGAGEMENT_ID||'standalone', name: 'New source', type: 'scheme', amount_cr: 0, start_year: 1, end_year: MODEL.programme_years }
+  FUNDING_SOURCES.push(fs)
+  if (ENGAGEMENT_ID) await sbPost('tsap_funding_sources', fs)
+  switchTab('supply')
+}
+
+async function removeFundingSource(id) {
+  FUNDING_SOURCES = FUNDING_SOURCES.filter(function(fs){ return fs.id !== id })
+  if (ENGAGEMENT_ID) await sbDelete('tsap_funding_sources', 'id=eq.' + id)
+  switchTab('supply')
+}
+
+async function updateFS(id, field, value) {
+  var fs = FUNDING_SOURCES.find(function(f){ return f.id === id })
+  if (!fs) return
+  fs[field] = value
+  if (ENGAGEMENT_ID) {
+    var patch = {}; patch[field] = value
+    var sb = getSB()
+    await fetch(sb.url + '/rest/v1/tsap_funding_sources?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(patch)
+    })
+  }
+  switchTab('supply')
+}
+
+//    Scenario save / load                                                       
+async function saveScenario(name, label) {
+  if (!ENGAGEMENT_ID) { showToast('Load an engagement first', 'error'); return }
+  var payload = {
+    id: 'sc-' + ENGAGEMENT_ID + '-' + name,
+    engagement_id: ENGAGEMENT_ID,
+    name: name,
+    label: label || name,
+    model_json: MODEL,
+    results_json: { gap: calcFundingGap(), rev: calcRevenue(), cf: { irr: calcCashFlow().irr, npv: calcCashFlow().npv } },
+    updated_at: new Date().toISOString()
+  }
+  var ok = await sbPost('tsap_scenarios', payload)
+  showToast(ok ? 'Scenario saved' : 'Save failed', ok ? '' : 'error')
+}
+
+//    Boot                                                                       
+async function init() {
+  // Load unit costs
+  var rows = await sbGet('tsap_unit_costs', 'active=eq.true', 200)
+  rows.forEach(function(r) { UNIT_COSTS[r.item_code] = r })
+  console.log('Unit costs loaded:', Object.keys(UNIT_COSTS).length)
+
+  // Load engagements
+  ALL_ENGAGEMENTS = await sbGet('engagements', 'order=name.asc', 50) || []
+
+  // Parse engagement from URL
+  var params = new URLSearchParams(window.location.search)
+  ENGAGEMENT_ID = params.get('eng') || null
+  if (ENGAGEMENT_ID) {
+    var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id === ENGAGEMENT_ID })
+    if (eng) {
+      ENGAGEMENT_NAME = eng.name || ''
+      MODEL.programme_name = ENGAGEMENT_NAME + '   TSAP Financial Model'
+      MODEL.territory = eng.territory || MODEL.territory
+    }
+
+    // Load SASC output for this engagement
+    var sascItems = await sbGet('docket_items', 'engagement_id=eq.' + ENGAGEMENT_ID + '&item_type=eq.solution&order=created_at.desc', 1)
+    if (sascItems && sascItems[0] && sascItems[0].content) {
+      SASC_DATA = sascItems[0].content
+      console.log('SASC data loaded for engagement:', ENGAGEMENT_ID)
+    }
+
+    // Load funding sources
+    FUNDING_SOURCES = await sbGet('tsap_funding_sources', 'engagement_id=eq.' + ENGAGEMENT_ID, 50) || []
+
+    // Load last saved scenario
+    var savedScenarios = await sbGet('tsap_scenarios', 'engagement_id=eq.' + ENGAGEMENT_ID + '&name=eq.custom&order=updated_at.desc', 1)
+    if (savedScenarios && savedScenarios[0] && savedScenarios[0].model_json) {
+      Object.assign(MODEL, savedScenarios[0].model_json)
+    }
+  }
+
+  // Populate engagement dropdown
+  var sel = document.getElementById('eng-select')
+  if (sel && ALL_ENGAGEMENTS.length) {
+    ALL_ENGAGEMENTS.forEach(function(e) {
+      var opt = document.createElement('option')
+      opt.value = e.id
+      opt.textContent = e.name || e.id
+      if (e.id === ENGAGEMENT_ID) opt.selected = true
+      sel.appendChild(opt)
+    })
+  }
+
+  if (ENGAGEMENT_NAME) document.getElementById('eng-status').textContent = ENGAGEMENT_NAME
+  updateHeader()
+  switchTab('cost')
+}
+
+async function selectEngagement(id) {
+  if (!id) { ENGAGEMENT_ID = null; ENGAGEMENT_NAME = ''; document.getElementById('eng-status').textContent = ''; switchTab('cost'); return }
+  window.location.href = window.location.pathname + '?eng=' + id
+}
+
+init()
+</script>
+</body>
+</html>
