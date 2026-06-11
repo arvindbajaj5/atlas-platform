@@ -633,11 +633,16 @@ function renderROMSummary() {
       + '</div>'
   }
 
+  var fmUrl = ENGAGEMENT_ID ? '../tsap-financial-model/?eng=' + ENGAGEMENT_ID : '../tsap-financial-model/'
+  var fmBtn = ENGAGEMENT_ID
+    ? '<a href="' + fmUrl + '" class="btn btn-outline" style="border-color:var(--teal);color:var(--teal);text-decoration:none">&#128184; Financial Model &rarr;</a>'
+    : '<button class="btn btn-ghost" disabled style="opacity:0.4">&#128184; Financial Model</button>'
   html += '<div class="actions-bar">'
     + '<button class="btn btn-ghost" onclick="renderStep(3)">&larr; Back to stack</button>'
     + '<div style="display:flex;gap:8px">'
     + '<button class="btn btn-outline" onclick="exportBOM()">&#128196; Export CSV</button>'
     + '<button class="btn btn-primary" onclick="saveToDocket()">&#128190; Save to docket</button>'
+    + fmBtn
     + '</div></div>'
     + '</div>'
 
