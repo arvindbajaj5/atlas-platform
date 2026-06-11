@@ -56,23 +56,46 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
 .toast{position:fixed;bottom:20px;right:20px;background:var(--dark);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none}
 .toast.show{opacity:1}
 .toast.toast-err{background:#c0341a}
+
+/*    ATLAS Standard Masthead                                                 */
+.atlas-hdr{background:var(--navy,#002870);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+.atlas-hdr-left{display:flex;align-items:center;gap:12px;}
+.atlas-brand{font-size:16px;font-weight:900;color:#fff;letter-spacing:3px;white-space:nowrap;}
+.atlas-brand span{color:#FF5539;}
+.atlas-tool-name{font-size:12px;font-weight:600;color:rgba(255,255,255,0.75);padding:3px 8px;background:rgba(255,255,255,0.1);border-radius:4px;letter-spacing:.3px;}
+.atlas-eng-badge{font-size:11px;color:rgba(255,255,255,0.6);padding:3px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.atlas-eng-badge strong{color:#fff;}
+.atlas-hdr-right{display:flex;align-items:center;gap:8px;}
+.atlas-ver{font-size:10px;font-weight:700;color:#FF5539;padding:2px 7px;background:rgba(255,85,57,0.15);border-radius:10px;white-space:nowrap;}
+.atlas-nav-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;font-family:inherit;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.atlas-nav-btn:hover{background:rgba(255,255,255,0.1);color:#fff;border-color:rgba(255,255,255,0.4);}
+.atlas-nav-btn:disabled{opacity:0.35;cursor:not-allowed;pointer-events:none;}
+.atlas-nav-btn.orange{background:#FF5539;border-color:#FF5539;color:#fff;}
+.atlas-nav-btn.orange:hover{background:#e04530;}
+.atlas-nav-btn.teal{background:rgba(0,178,144,0.15);border-color:#00B290;color:#00B290;}
+.atlas-nav-btn.teal:hover{background:rgba(0,178,144,0.25);}
 </style>
 </head>
 <body>
 
-<div class="hdr">
-  <div class="hdr-row1">
-    <div>
-      <div class="hdr-title" id="hdr-title">TSAP Financial Model</div>
-      <div class="hdr-territory" id="hdr-territory">Loading...</div>
-    </div>
-    <div style="font-size:10px;opacity:0.5;text-align:right">ATLAS Sprint 4A</div>
+<div class="atlas-hdr">
+  <div class="atlas-hdr-left">
+    <div class="atlas-brand">ATL<span>A</span>S</div>
+    <div class="atlas-tool-name">Financial Model</div>
+    <div class="atlas-eng-badge" id="hdr-territory">Loading...</div>
   </div>
-  <div class="hdr-kpis">
-    <div class="hdr-kpi"><div class="hdr-kpi-val" id="hdr-demand"> </div><div class="hdr-kpi-lbl">Total demand</div></div>
-    <div class="hdr-kpi"><div class="hdr-kpi-val" id="hdr-supply" style="color:#4ade80"> </div><div class="hdr-kpi-lbl">Effective supply</div></div>
-    <div class="hdr-kpi"><div class="hdr-kpi-val" id="hdr-gap"> </div><div class="hdr-kpi-lbl">Net commitment</div></div>
-    <div class="hdr-kpi"><div class="hdr-kpi-val" id="hdr-coverage" style="color:#4ade80"> </div><div class="hdr-kpi-lbl">Coverage</div></div>
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#fff" id="hdr-demand"> </div><div style="font-size:9px;color:rgba(255,255,255,0.45)">Demand</div></div>
+    <div style="color:rgba(255,255,255,0.15)">|</div>
+    <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#4ade80" id="hdr-supply"> </div><div style="font-size:9px;color:rgba(255,255,255,0.45)">Supply</div></div>
+    <div style="color:rgba(255,255,255,0.15)">|</div>
+    <div style="text-align:center"><div style="font-size:12px;font-weight:700" id="hdr-gap"> </div><div style="font-size:9px;color:rgba(255,255,255,0.45)">Net commitment</div></div>
+    <div style="color:rgba(255,255,255,0.15)">|</div>
+    <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#4ade80" id="hdr-coverage"> </div><div style="font-size:9px;color:rgba(255,255,255,0.45)">Coverage</div></div>
+  </div>
+  <div class="atlas-hdr-right">
+    <span class="atlas-ver">v1.0</span>
+    <button class="atlas-nav-btn" onclick="window.location.href='../../'">&#8592; Portal</button>
   </div>
 </div>
 
@@ -90,8 +113,9 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
   <button class="tab-btn" data-tab="gap"      onclick="switchTab('gap')">Funding Gap</button>
   <button class="tab-btn" data-tab="revenue"  onclick="switchTab('revenue')">Revenue Model</button>
   <button class="tab-btn" data-tab="cashflow" onclick="switchTab('cashflow')">Cash Flow</button>
-  <button class="tab-btn" data-tab="whatif"   onclick="switchTab('whatif')">What-If</button>
+  <button class="tab-btn" data-tab="whatif" onclick="switchTab('whatif')">What-If</button>
 </div>
+<div style="display:flex;gap:3px;align-items:center;padding:4px 12px;border-bottom:1px solid #E5E7EB;background:#fff"><span style="font-size:10px;color:#6B7280;margin-right:4px">Currency:</span><span id="curr-btns"></span></div>
 
 <div class="main">
   <div id="tab-content"><div style="padding:40px;text-align:center;color:var(--mid)">Loading...</div></div>
@@ -99,7 +123,83 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
 
 <div id="toast" class="toast"></div>
 
-<script charset="utf-8">
+<script charset="utf-8">//    atlasLogUsage (shared, injected into tools that call AI APIs)             
+function atlasGetCfg2() { try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}} }
+var _UC_PRICING = null
+async function _loadPricing() {
+  if (_UC_PRICING) return _UC_PRICING
+  var g=atlasGetCfg2(); var sb={url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}
+  if (!sb.url) { _UC_PRICING={}; return _UC_PRICING }
+  try {
+    var r=await fetch(sb.url+'/rest/v1/app_config?key=like.price_%&limit=50',{headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}})
+    if (r.ok) { var rows=await r.json(); _UC_PRICING={}; rows.forEach(function(row){_UC_PRICING[row.key]=parseFloat(row.value)||0}) }
+    else _UC_PRICING={}
+  } catch(e) { _UC_PRICING={} }
+  return _UC_PRICING
+}
+function _calcAPIcost(model, inTok, outTok) {
+  if (!_UC_PRICING) return 0
+  var m=(model||'').toLowerCase()
+  var prefix = m.startsWith('gemini-2.0')?'price_gemini_2_0_flash':m.startsWith('gemini-3.1')?'price_gemini_3_1_flash_lite':m.startsWith('gemini-3.5')?'price_gemini_3_5_flash':m.startsWith('claude-haiku')?'price_claude_haiku_4_5':m.startsWith('claude-sonnet')?'price_claude_sonnet_4_6':'price_gemini_3_1_flash_lite'
+  return ((inTok*(_UC_PRICING[prefix+'_input']||0))+(outTok*(_UC_PRICING[prefix+'_output']||0)))/1000000
+}
+async function atlasLogUsage(params) {
+  try {
+    await _loadPricing()
+    var g=atlasGetCfg2(); var sb={url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}
+    if (!sb.url||!sb.key) return
+    var inT=params.input_tokens||0, outT=params.output_tokens||0, model=params.model||'unknown'
+    var provider=model.startsWith('gemini')?'google':model.startsWith('claude')?'anthropic':model.startsWith('sarvam')?'sarvam':'other'
+    fetch(sb.url+'/rest/v1/api_usage_log',{method:'POST',headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({tool:params.tool||'unknown',call_type:params.call_type||'api_call',provider:provider,model:model,input_tokens:inT,output_tokens:outT,cost_usd:_calcAPIcost(model,inT,outT),latency_ms:params.latency_ms||0,status:params.status||'success',engagement_id:params.engagement_id||null,topic_code:params.topic_code||null,session_id:null,notes:params.notes||null})}).catch(function(){})
+  } catch(e) {}
+}
+
+//    Currency layer                                                             
+var FX_RATES = { usd_inr: 84.50, usd_eur: 0.92, eur_inr: 91.85 }
+var ACTIVE_CURRENCY = 'INR'
+async function loadFXRates() {
+  var g=atlasGetCfg2(); var sb={url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}
+  if (!sb.url) return
+  try {
+    var r=await fetch(sb.url+'/rest/v1/app_config?key=in.(fx_usd_inr,fx_usd_eur,fx_eur_inr)',{headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}})
+    if (r.ok) {
+      var rows=await r.json()
+      rows.forEach(function(row){
+        if(row.key==='fx_usd_inr') FX_RATES.usd_inr=parseFloat(row.value)||84.50
+        if(row.key==='fx_usd_eur') FX_RATES.usd_eur=parseFloat(row.value)||0.92
+        if(row.key==='fx_eur_inr') FX_RATES.eur_inr=parseFloat(row.value)||91.85
+      })
+    }
+  } catch(e) {}
+}
+function renderCurrencySelector() {
+  var html=''; var currencies=['INR','USD','EUR']
+  for (var i=0;i<currencies.length;i++) {
+    var c=currencies[i]; var on=ACTIVE_CURRENCY===c
+    html+='<button data-curr="'+c+'" onclick="setCurrency(this.dataset.curr)" style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:'+(on?700:500)+';border:1px solid '+(on?'#002870':'#E5E7EB')+';background:'+(on?'#002870':'#ffffff')+';color:'+(on?'#ffffff':'#6B7280')+';cursor:pointer;margin-left:2px">'+c+'</button>'
+  }
+  return html
+}
+function setCurrency(c) {
+  ACTIVE_CURRENCY=c
+  var cb=document.getElementById('curr-btns'); if(cb) cb.innerHTML=renderCurrencySelector()
+  if(typeof renderAll==='function') renderAll()
+  if(typeof updateHeader==='function') updateHeader()
+}
+
+function fmtCr(v, dp) {
+  var n = parseFloat(v || 0)
+  if (ACTIVE_CURRENCY === 'USD') return '$' + (n * 10 / FX_RATES.usd_inr).toFixed(dp !== undefined ? dp : 1) + 'M'
+  if (ACTIVE_CURRENCY === 'EUR') return 'EUR ' + (n * 10 / FX_RATES.usd_inr * FX_RATES.usd_eur).toFixed(dp !== undefined ? dp : 1) + 'M'
+  return (dp === undefined ? Math.round(n) : n.toFixed(dp)).toLocaleString('en-IN')
+}
+function fmtCrFull(v) {
+  if (ACTIVE_CURRENCY === 'USD') return '$' + (parseFloat(v||0) * 10 / FX_RATES.usd_inr).toFixed(1) + 'M'
+  if (ACTIVE_CURRENCY === 'EUR') return 'EUR ' + (parseFloat(v||0) * 10 / FX_RATES.usd_inr * FX_RATES.usd_eur).toFixed(1) + 'M'
+  return 'Rs ' + Math.round(parseFloat(v||0)).toLocaleString('en-IN') + ' Cr'
+}
+
+
 //                                                                            
 // TSAP Financial Model   full build
 // Both sides: demand (cost) derived from SASC + unit costs
@@ -141,8 +241,7 @@ async function sbDelete(table, params) {
   } catch(e) { return false }
 }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
-function fmtCr(v, dp) { var n = parseFloat(v||0); return (dp === undefined ? Math.round(n) : n.toFixed(dp)).toLocaleString('en-IN') }
-function fmtCrFull(v) { return 'Rs ' + fmtCr(v) + ' Cr' }
+// fmtCr, fmtCrFull: currency-aware versions in shared layer below
 function showToast(msg, type) {
   var t = document.getElementById('toast')
   if (!t) return
@@ -497,7 +596,7 @@ function renderTab(tab) {
 function updateHeader() {
   var gap = calcFundingGap()
   document.getElementById('hdr-title').textContent = MODEL.programme_name || 'TSAP Financial Model'
-  document.getElementById('hdr-territory').textContent = MODEL.territory + ' | ' + MODEL.programme_years + ' years | ' + MODEL.dc_type.toUpperCase()
+  document.getElementById('hdr-territory').textContent = (MODEL.territory||'No engagement') + ' - ' + MODEL.programme_years + 'yr ' + MODEL.dc_type.toUpperCase()
   document.getElementById('hdr-demand').textContent  = 'Rs ' + fmtCr(gap.demand) + ' Cr'
   document.getElementById('hdr-supply').textContent  = 'Rs ' + fmtCr(gap.effective_supply) + ' Cr'
   document.getElementById('hdr-gap').textContent     = 'Rs ' + fmtCr(gap.net_commitment) + ' Cr'
@@ -1085,6 +1184,7 @@ async function init() {
   console.log('Unit costs loaded:', Object.keys(UNIT_COSTS).length)
 
   // Load engagements
+  await loadFXRates()
   ALL_ENGAGEMENTS = await sbGet('engagements', 'order=name.asc', 50) || []
 
   // Parse engagement from URL
