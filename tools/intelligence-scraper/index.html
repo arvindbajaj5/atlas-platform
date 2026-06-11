@@ -117,6 +117,24 @@ input:focus,select:focus{border-color:var(--blue);}
 .section-hdr{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--light);display:flex;align-items:center;justify-content:space-between;}
 
 @media(max-width:700px){.stats-row{grid-template-columns:1fr 1fr;}.domain-grid{grid-template-columns:1fr;}}
+
+/*    ATLAS Standard Masthead                                                 */
+.atlas-hdr{background:var(--navy,#002870);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+.atlas-hdr-left{display:flex;align-items:center;gap:12px;}
+.atlas-brand{font-size:16px;font-weight:900;color:#fff;letter-spacing:3px;white-space:nowrap;}
+.atlas-brand span{color:#FF5539;}
+.atlas-tool-name{font-size:12px;font-weight:600;color:rgba(255,255,255,0.75);padding:3px 8px;background:rgba(255,255,255,0.1);border-radius:4px;letter-spacing:.3px;}
+.atlas-eng-badge{font-size:11px;color:rgba(255,255,255,0.6);padding:3px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.atlas-eng-badge strong{color:#fff;}
+.atlas-hdr-right{display:flex;align-items:center;gap:8px;}
+.atlas-ver{font-size:10px;font-weight:700;color:#FF5539;padding:2px 7px;background:rgba(255,85,57,0.15);border-radius:10px;white-space:nowrap;}
+.atlas-nav-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;font-family:inherit;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.atlas-nav-btn:hover{background:rgba(255,255,255,0.1);color:#fff;border-color:rgba(255,255,255,0.4);}
+.atlas-nav-btn:disabled{opacity:0.35;cursor:not-allowed;pointer-events:none;}
+.atlas-nav-btn.orange{background:#FF5539;border-color:#FF5539;color:#fff;}
+.atlas-nav-btn.orange:hover{background:#e04530;}
+.atlas-nav-btn.teal{background:rgba(0,178,144,0.15);border-color:#00B290;color:#00B290;}
+.atlas-nav-btn.teal:hover{background:rgba(0,178,144,0.25);}
 </style>
 </head>
 <body>
@@ -126,7 +144,7 @@ input:focus,select:focus{border-color:var(--blue);}
   <div style="font-size:13px;color:rgba(255,255,255,0.65)">Intelligence Scraper</div>
   <div class="hdr-right">
     <span class="hdr-badge">v2.0</span>
-    <button class="btn btn-ghost btn-sm" onclick="window.history.back()">&#8592; Portal</button>
+    <button class="atlas-nav-btn" onclick="window.location.href='../../'">&#8592; Portal</button>
   </div>
 </div>
 
@@ -240,7 +258,71 @@ input:focus,select:focus{border-color:var(--blue);}
 
 </div>
 
-<script charset="utf-8">var DELAY_MS = 2500
+<script charset="utf-8">//    atlasLogUsage (shared, injected into tools that call AI APIs)             
+function atlasGetCfg2() { try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}} }
+var _UC_PRICING = null
+async function _loadPricing() {
+  if (_UC_PRICING) return _UC_PRICING
+  var g=atlasGetCfg2(); var sb={url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}
+  if (!sb.url) { _UC_PRICING={}; return _UC_PRICING }
+  try {
+    var r=await fetch(sb.url+'/rest/v1/app_config?key=like.price_%&limit=50',{headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}})
+    if (r.ok) { var rows=await r.json(); _UC_PRICING={}; rows.forEach(function(row){_UC_PRICING[row.key]=parseFloat(row.value)||0}) }
+    else _UC_PRICING={}
+  } catch(e) { _UC_PRICING={} }
+  return _UC_PRICING
+}
+function _calcAPIcost(model, inTok, outTok) {
+  if (!_UC_PRICING) return 0
+  var m=(model||'').toLowerCase()
+  var prefix = m.startsWith('gemini-2.0')?'price_gemini_2_0_flash':m.startsWith('gemini-3.1')?'price_gemini_3_1_flash_lite':m.startsWith('gemini-3.5')?'price_gemini_3_5_flash':m.startsWith('claude-haiku')?'price_claude_haiku_4_5':m.startsWith('claude-sonnet')?'price_claude_sonnet_4_6':'price_gemini_3_1_flash_lite'
+  return ((inTok*(_UC_PRICING[prefix+'_input']||0))+(outTok*(_UC_PRICING[prefix+'_output']||0)))/1000000
+}
+async function atlasLogUsage(params) {
+  try {
+    await _loadPricing()
+    var g=atlasGetCfg2(); var sb={url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}
+    if (!sb.url||!sb.key) return
+    var inT=params.input_tokens||0, outT=params.output_tokens||0, model=params.model||'unknown'
+    var provider=model.startsWith('gemini')?'google':model.startsWith('claude')?'anthropic':model.startsWith('sarvam')?'sarvam':'other'
+    fetch(sb.url+'/rest/v1/api_usage_log',{method:'POST',headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({tool:params.tool||'unknown',call_type:params.call_type||'api_call',provider:provider,model:model,input_tokens:inT,output_tokens:outT,cost_usd:_calcAPIcost(model,inT,outT),latency_ms:params.latency_ms||0,status:params.status||'success',engagement_id:params.engagement_id||null,topic_code:params.topic_code||null,session_id:null,notes:params.notes||null})}).catch(function(){})
+  } catch(e) {}
+}
+
+//    Currency layer                                                             
+var FX_RATES = { usd_inr: 84.50, usd_eur: 0.92, eur_inr: 91.85 }
+var ACTIVE_CURRENCY = 'INR'
+async function loadFXRates() {
+  var g=atlasGetCfg2(); var sb={url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}
+  if (!sb.url) return
+  try {
+    var r=await fetch(sb.url+'/rest/v1/app_config?key=in.(fx_usd_inr,fx_usd_eur,fx_eur_inr)',{headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}})
+    if (r.ok) {
+      var rows=await r.json()
+      rows.forEach(function(row){
+        if(row.key==='fx_usd_inr') FX_RATES.usd_inr=parseFloat(row.value)||84.50
+        if(row.key==='fx_usd_eur') FX_RATES.usd_eur=parseFloat(row.value)||0.92
+        if(row.key==='fx_eur_inr') FX_RATES.eur_inr=parseFloat(row.value)||91.85
+      })
+    }
+  } catch(e) {}
+}
+function renderCurrencySelector() {
+  var html=''; var currencies=['INR','USD','EUR']
+  for (var i=0;i<currencies.length;i++) {
+    var c=currencies[i]; var on=ACTIVE_CURRENCY===c
+    html+='<button data-curr="'+c+'" onclick="setCurrency(this.dataset.curr)" style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:'+(on?700:500)+';border:1px solid '+(on?'#002870':'#E5E7EB')+';background:'+(on?'#002870':'#ffffff')+';color:'+(on?'#ffffff':'#6B7280')+';cursor:pointer;margin-left:2px">'+c+'</button>'
+  }
+  return html
+}
+function setCurrency(c) {
+  ACTIVE_CURRENCY=c
+  var cb=document.getElementById('curr-btns'); if(cb) cb.innerHTML=renderCurrencySelector()
+  if(typeof renderAll==='function') renderAll()
+  if(typeof updateHeader==='function') updateHeader()
+}
+
+var DELAY_MS = 2500
 function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms) }) }
 
 
@@ -1360,7 +1442,9 @@ async function enrichItem(item){
     + ' IMPORTANT: Respond with pure JSON only. No markdown. No backtick fences. No ```json. Start directly with { end with }.'
 
   try{
+    var _t2=Date.now()
     var raw = await callGemini(prompt, 'ENRICH ' + (item.domain_code||item.topic_code||''))
+    atlasLogUsage({tool:'intel_scraper',call_type:'enrich_item',model:(getConfig().model||'gemini-3.1-flash-lite'),input_tokens:0,output_tokens:0,latency_ms:Date.now()-_t2})
     var extracted = extractItems(raw, item.domain_code||item.topic_code||'', item.domain_name||item.topic_name||'', 'enrich')
     if(extracted.length > 0){
       var enriched = extracted[0]
