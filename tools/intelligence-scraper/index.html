@@ -673,7 +673,12 @@ function getDomainTTLState(code, runType) {
 
 function renderDomainGrid(){
   var db = getIntelDB()
-  document.getElementById('domainGrid').innerHTML = DOMAINS.map(function(d){
+  // Show banner if scrape_runs table is empty (no TTL data yet)
+  var hasRunData = Object.keys(RUN_RECORDS).length > 0
+  var banner = hasRunData ? '' :
+    '<div style="font-size:11px;padding:8px 10px;background:rgba(255,182,0,0.12);border:1px solid rgba(255,182,0,0.3);border-radius:6px;margin-bottom:10px;color:#92400e">'
+    + ' No scraper run records found. Domain locking will activate after the first run with the new scraper. Trigger a manual run from GitHub Actions to populate.</div>'
+  document.getElementById('domainGrid').innerHTML = banner + DOMAINS.map(function(d){
     var ttlState = getDomainTTLState(d.code, 'domain')
     var locked = ttlState.locked
     var items = (db[d.code] || []).length
