@@ -485,3 +485,184 @@ Supabase table update only — no code change needed.
 - `getCfgBool` helper used but verify setCfgBool called correctly everywhere
 - Layer config panels — verify all 9 layers render without errors
 - BOM numbers need validation against real HP pricing after DB cleanup
+
+---
+
+## Sprint 4 Plan — TSAP Financial Model (June 2026)
+
+### Context
+HP (Himachal Pradesh / HAICE) is the proxy engagement for all large TSAP (Territory Sovereign AI Programme) builds. DGCA is a vertical/sectoral engagement — fundamentally different proposition structure. All TSAP tooling should be built with HP as the reference case but generalised for any territory.
+
+### Sprint 4A — TSAP Financial Model (standalone tool)
+**Location:** `tools/tsap-financial-model/index.html`
+**Linked to:** SASC output (reads ROM from Supabase per engagement), PEI
+
+**Six tabs:**
+
+**Tab 1: Programme Cost (demand side)**
+- 5-year phased CapEx + OpEx + UC dev + people
+- Pulls from SASC BOM as base, editable overrides
+- Year by year breakdown (Year 1 Foundation, Year 2 UC Wave 1, etc.)
+
+**Tab 2: Funding Sources (supply side)**
+- Central schemes: IndiaAI Mission, Smart Cities, NHM, PMFBY, NDRF, BharatNet
+- State budget: own capital + revenue allocation
+- External/multilateral: World Bank, ADB, JICA, Green Climate Fund
+- PPP: VGF, revenue share model
+- Editable % coverage per scheme per component
+- Scheme eligibility matrix (which component maps to which scheme)
+
+**Tab 3: Funding Gap & Net Commitment**
+- Year by year: demand vs supply vs gap
+- Territory's actual annual net outflow after scheme funding
+
+**Tab 4: What-If Scenarios**
+- Named scenarios (Base / Optimistic / Conservative / Custom)
+- Levers: programme duration, UC scope, MDC T-shirt, scheme coverage %, PPP model, team model (managed vs customer-operated)
+- Side-by-side scenario comparison
+- Scenarios saveable to Supabase per engagement
+
+**Tab 5: Cash Flow**
+- Monthly/quarterly drawdown
+- Milestone payment schedule
+- Funding commitment timeline
+- Central scheme disbursement timing
+
+**Tab 6: Value Case / ROI**
+- Economic benefits (jobs created, GDP uplift, efficiency savings)
+- Payback period
+- Benefit-cost ratio
+- Political salience metrics (citizens impacted, departments enabled)
+
+### Key design decisions (confirmed)
+- Standalone tool (not SASC screen 5) — customer-facing, more flexibility
+- Scenarios are saveable to Supabase per engagement
+- Both demand AND supply side modelled — the HP net commitment (after scheme funding) is the headline number for government conversations
+- What-if analysis is core — "if you apply for Smart Cities Mission + VGF, HP's net commitment drops from Rs. 85 Cr to Rs. 52 Cr"
+
+### Sprint 4B (after 4A) — Territory AI Programme Profiler
+Structured profile for a territory: admin overview, existing digital infra, key govt depts as UC consumers, budget cycle, AI readiness score, natural resource differentiators
+
+### Sprint 4C (after 4B) — UC Prioritisation Matrix
+Rank UCs by: impact, feasibility, speed to value, political salience
+Feeds into phased delivery plan in Tab 1
+
+### Sprint 5 — Pitch Report Generator
+Takes SASC + Financial Model + Territory Profile → client-ready document
+
+---
+
+## Cost Optimisation Status (June 2026)
+
+### All optimisations deployed:
+1. Scraper: gemini-2.0-flash (cheaper grounding model)
+2. Scraper: 8 search domains (was 22)
+3. Scraper: 3 global topics x 1 call (was 5 x 3)
+4. Scraper: RSS Phase 2 batched (5 items per Gemini call)
+5. Scraper: short_description in semantic contexts (60% fewer tokens)
+6. Scraper: weekly schedule (Sunday 2am IST)
+7. Scraper: TTL per domain from app_config (skips recently scraped)
+8. Scraper: content hash dedup (prevents syndication re-ingestion)
+9. Scraper: publishedAfter constraint (only new content since last run)
+10. Scraper: usage logging to api_usage_log (batch flush at end of run)
+11. PEI: 30-day cache (pei_cache table)
+12. PEI: maxOutputTokens 4096 (was 8192)
+13. Intel Scraper portal: TTL-aware domain grid (locked tiles, dates shown)
+14. Settings: Usage tab (cost/token dashboard by tool + model)
+
+### Supabase tables added:
+- scrape_runs — TTL tracking per domain/topic
+- pei_cache — 30-day PEI cache
+- api_usage_log — usage logging with cost_usd
+- app_config — TTL parameters + model pricing (all configurable)
+- semantic_contexts.short_description — compact context descriptions
+
+### Estimated monthly cost after optimisations:
+- Before: ~Rs. 6,000/month (June spike from debug runs)
+- After: ~Rs. 300-500/month steady state
+- Reduction: ~90-95%
+
+### Note on scraper schedule:
+- Workflow cron: `30 20 * * 0` (Sunday 2am IST)
+- Old daily schedule still firing until GitHub Actions cache expires
+- TTL working — Jun 9 run took only 4 min (most domains skipped)
+- scrape_runs table now has data — domain locking visible in portal
+
+---
+
+## ATLAS Platform — Current Build State (June 2026)
+
+### SASC (tools/sasc/index.html)
+4-screen flow working end to end:
+1. Scope & DC → 2. Stack layers → 3. Workload Profiler → 4. BOM + ROM
+
+BOM + ROM has 3 tabs: Bill of Materials | People Model | ROM Summary
+
+Key fix: getSB() uses atlas_global_cfg (matches all other ATLAS tools)
+Key fix: Sizing based on RPS not tokens (benchmark_results uses rps_at_Xs)
+
+Pending (next SASC sprint):
+- Per-UC GPU override flag
+- BOM number validation after DB cleanup
+- People model deeper review
+
+### New Supabase tables for SASC:
+- ai_models (10 models seeded)
+- gpu_configs (8 configs seeded)
+- benchmark_results (15 rows, RPS-based)
+- uc_interaction_types (12 types seeded)
+
+---
+
+## Session Update — June 11 2026 (afternoon)
+
+### TSAP Financial Model — Sprint 4A (built, deployed)
+**Location:** `tools/tsap-financial-model/index.html` — live
+
+**Full build includes:**
+- Demand side derived from SASC output (reads `docket_items` for engagement) × unit costs from `tsap_unit_costs` Supabase table
+- Supply side with full financial instrument modelling: per funding source — type (grant/loan/scheme/VGF/equity/inkind), amount, start/end year. Loans: interest rate, tenure, grace period, moratorium, repayment type → EMI + total interest + NPV calculated
+- Revenue model (Track 2): Bear/Base/Bull, market Y1 + CAGR, capture %, ramp %, gross margin, GST rate, territory GST share — all editable
+- Cash flow (quarterly): outflows (CapEx phased, OpEx, UC dev, people, loan EMIs), inflows (scheme drawdown, Track 2 gross profit), derived: peak cash, break-even quarter, NPV, IRR
+- 6 tabs: Programme Cost | Funding Sources | Funding Gap | Revenue Model | Cash Flow | What-If
+- 7 Chart.js charts inline
+- What-if scenarios (Base/Optimistic/Conservative) saveable to Supabase per engagement
+- Linked to engagement via `?eng=xxx` URL param
+
+**Supabase tables created:**
+- `tsap_unit_costs` — 43 rows seeded from HAICE FM v2.1 (capex 12, opex 12, ucdev 5, people 10, revenue 11). UNIQUE constraint on `item_code`. Run `tsap_unit_costs_seed.sql` to seed.
+- `tsap_funding_sources` — per engagement, full instrument fields
+- `tsap_scenarios` — saveable what-if snapshots per engagement. UNIQUE on (engagement_id, name).
+
+**Navigation:**
+- ATLAS portal Pre-Sales stage: TSAP FM card added to TOOLS + STAGES + NAV categories
+- SASC ROM Summary tab: teal "Financial Model →" button opens FM with `?eng=xxx`
+
+### Pending feedback on FM (to be actioned next session):
+1. **Multi-currency (critical):** All numbers must show in INR/USD/AED with live exchange rates — seamless conversion between all three. This is a full requirement, not optional.
+2. More feedback coming from Arvind's review — collecting all items before next build pass.
+
+### Settings page — fixes applied (index.html)
+**All changes are in root `index.html` (not tools/settings/index.html which is standalone/unused)**
+
+- `gemini-2.0-flash` added to `ATLAS_MODEL_REGISTRY` + all 7 model tier dropdowns
+- API Usage section added at bottom of Settings (Load Usage button → reads `usage_last_30d`)
+- TSAP Unit Costs section added (Load Unit Costs button → inline-editable table, saves to Supabase on blur)
+- TSAP FM added to TOOLS object, STAGES presales tools list, and NAV categories presales list
+- Spillover bug fixed (h+= code was appended after </html> — trimmed cleanly)
+
+**Key learning:** Settings in ATLAS portal is the `showSettings()` function in `index.html` — NOT the standalone `tools/settings/index.html`. All future Settings changes go into `index.html`.
+
+### Scraper status
+- `scrape_runs` table exists but is empty — runs #36–#40 happened before new scraper was deployed
+- Intel Scraper portal shows yellow banner when `scrape_runs` is empty: "Trigger a manual run from GitHub Actions to populate"
+- After next manual trigger, domain locking will work correctly
+- GitHub Actions cron: `30 20 * * 0` (Sunday 2am IST) — old daily schedule still firing until cache expires
+
+### Supabase tables added this session (run these SQLs if not yet done):
+- `scraper_ttl_schema.sql` — scrape_runs, pei_cache, content_hash column
+- `scraper_app_config.sql` — app_config with TTL + pricing params
+- `api_usage_schema.sql` — api_usage_log, usage_monthly_summary view, usage_last_30d view (FIXED: no date_trunc index)
+- `semantic_contexts_short_desc.sql` — short_description column + 23 row updates
+- `tsap_schema.sql` — tsap_unit_costs, tsap_funding_sources, tsap_scenarios
+- `tsap_unit_costs_seed.sql` — seeds 43 unit costs (run this after tsap_schema.sql)
