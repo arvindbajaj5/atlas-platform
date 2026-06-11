@@ -666,3 +666,56 @@ Pending (next SASC sprint):
 - `semantic_contexts_short_desc.sql` — short_description column + 23 row updates
 - `tsap_schema.sql` — tsap_unit_costs, tsap_funding_sources, tsap_scenarios
 - `tsap_unit_costs_seed.sql` — seeds 43 unit costs (run this after tsap_schema.sql)
+
+---
+
+## Session Update — June 11 2026 (evening)
+
+### Alignment Sprint — Phases 1-5 completed and live
+
+All 5 files deployed and verified live on GitHub.
+
+**Phase 1 — index.html bug fixes:**
+- Removed duplicate `tsap-fm` entry in TOOLS object
+- Removed duplicate `gemini-2.0-flash` in `ATLAS_MODEL_REGISTRY`
+- Removed duplicate `gemini-2.0-flash` option from all 7 tier selects
+- No spillover after `</html>` confirmed
+
+**Phase 2 — Supabase schema (atlas_alignment.sql run):**
+- `exchange_rate_history` table created with (currency_pair, effective_date) unique index
+- FX rates seeded: USD/INR=84.50, USD/EUR=0.92, EUR/INR=91.85
+- `app_config` entries added: fx_usd_inr, fx_usd_eur, fx_eur_inr, currency_primary, currency_procurement, currency_reporting
+
+**Phase 3 — Masthead standardised:**
+- All tools: `atlas-nav-btn` CSS applied, back buttons use `window.location.href='../../'`
+- TSAP FM: new standard atlas-hdr masthead (ATLAS brand + tool name + engagement badge + KPI row + Portal button)
+- SASC, Intel Scraper, PEI: back buttons standardised
+
+**Phase 4 — Usage logging:**
+- `atlasLogUsage()` shared function injected into PEI, Intel Scraper, TSAP FM
+- PEI: logs after each `savePEICache` (tool='pei', call_type='pei_generate')
+- Intel: logs after each `callGemini` enrichment (tool='intel_scraper', call_type='enrich_item')
+- Uses `app_config` price_* entries for cost calculation
+
+**Phase 5 — Currency foundation:**
+- `FX_RATES`, `loadFXRates()`, `renderCurrencySelector()`, `setCurrency()` in TSAP FM
+- `fmtCr()` and `fmtCrFull()` are currency-aware: INR=Rs Cr, USD=$M, EUR=EUR M
+- Currency selector bar rendered next to tabs, rates loaded from Supabase `app_config` at init
+
+### Supabase state — 42 tables confirmed
+Key unknown/legacy tables (DO NOT delete without review):
+- `profiler_*` (5 tables, has seed data) — likely Customer AI Readiness Profiler tool
+- `financing_models`, `financing_rules` — old FM attempt, 10+19 rows
+- `l1_configurations` — unknown, 0 rows (safe to delete)
+- `sales_actions` — possibly RAC tool, 1 row
+- `transactions` — unknown, 0 rows (safe to delete)
+
+### Decisions deferred to Phase 6+:
+- Database cleanup (transactional data wipe)
+- Test run: scraper → PEI → engagement → SASC → FM
+- Supabase migration for JSON-based tools (Deal Analysis, RAC, AI Inferencing Factory)
+- TSAP FM: full feedback review + additional changes from Arvind
+
+### Platform documentation produced this session:
+- `ATLAS_Platform_Definition_v1.0.docx` — lifecycle model, architecture, all tools, design principles
+- `ATLAS_Intelligence_Strategy_v1.0.docx` — model assignment, token optimisation, TTL, dedup, agentic roadmap
