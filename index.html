@@ -761,10 +761,14 @@ function showSettings(){
     +'<div class="card-sub">Export all ATLAS data for backup</div>'
     +'<button class="btn btn-secondary btn-sm" onclick="exportData()">Export All Data (JSON)</button></div>'
     +'<div class="card" style="max-width:680px;margin-top:12px"><div class="card-title"> API Usage (last 30 days)</div><div id="settings-usage-content" style="color:var(--mid);font-size:12px">Click Load Usage to view.</div><button class="btn btn-sm" style="margin-top:8px" onclick="loadSettingsUsage()">Load Usage</button></div>'
-    +'<div class="card" style="max-width:680px;margin-top:12px"><div class="card-title"> TSAP Unit Costs</div><div id="settings-uc-content" style="color:var(--mid);font-size:12px">Click Load Unit Costs to view.</div><button class="btn btn-sm" style="margin-top:8px" onclick="loadSettingsUC()">Load Unit Costs</button></div>'
+        +'<div class="card" style="max-width:680px;margin-top:12px"><div class="card-title">&#127912; Image Generation</div><div style="font-size:12px;color:var(--mid);margin-bottom:14px">Used to generate engagement cover images. API keys are reused from AI Providers above.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px"><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Model</label><select id="cfg-img-model" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveImgGenField()"><option value="gemini-2.0-flash-preview-image-generation">Gemini 2.0 Flash (image)</option><option value="gemini-imagen-3" disabled>Gemini Imagen 3 (coming soon)</option><option value="claude-opus-4-6" disabled>Claude Opus 4.6 (coming soon)</option></select></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Default style</label><select id="cfg-img-style" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveImgGenField()"><option value="abstract_geometric">Abstract geometric</option><option value="architectural">Architectural</option><option value="data_viz">Data visualization</option></select></div></div><div style="font-size:11px;color:var(--mid);padding:8px 10px;background:var(--light);border-radius:4px">All generated images follow ATLAS brand guidelines: navy/blue/teal palette, no people, no logos, no watermarks, safe for government and enterprise use.</div></div>'
+  +'<div class="card" style="max-width:680px;margin-top:12px"><div class="card-title">&#127970; Company Identity</div><div style="font-size:12px;color:var(--mid);margin-bottom:14px">These values appear on all generated documents. ATLAS is the platform name and never appears in customer documents.</div><div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">Brand</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px"><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Brand name</label><input id="cfg-brand-name" type="text" placeholder="e.g. Acme AI" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-brand-name\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Short name (header/footer)</label><input id="cfg-brand-short" type="text" placeholder="e.g. Acme" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-brand-short\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Logo (Drive file ID)</label><input id="cfg-brand-logo" type="text" placeholder="Drive file ID of logo PNG" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-brand-logo\')"></div></div><div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">Parent Company / HQ</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px"><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Legal name</label><input id="cfg-parent-name" type="text" placeholder="Full registered entity name" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-parent-name\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Website</label><input id="cfg-parent-website" type="text" placeholder="https://..." style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-parent-website\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Address line 1</label><input id="cfg-parent-addr1" type="text" placeholder="Street / Building" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-parent-addr1\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Address line 2</label><input id="cfg-parent-addr2" type="text" placeholder="Area / District" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-parent-addr2\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">City / State</label><input id="cfg-parent-city" type="text" placeholder="e.g. Singapore 018956" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-parent-city\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Country</label><input id="cfg-parent-country" type="text" placeholder="e.g. Singapore" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-parent-country\')"></div></div><div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">Local Entity (India)</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px"><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Legal name</label><input id="cfg-local-name" type="text" placeholder="India entity legal name" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-local-name\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Address line 1</label><input id="cfg-local-addr1" type="text" placeholder="Street / Building" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-local-addr1\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Address line 2</label><input id="cfg-local-addr2" type="text" placeholder="Area / District" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-local-addr2\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">City / State / PIN</label><input id="cfg-local-city" type="text" placeholder="e.g. Mumbai, Maharashtra 400001" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-local-city\')"></div></div><div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">Document Defaults</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px"><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Default author</label><input id="cfg-doc-author" type="text" placeholder="e.g. Arvind Bajaj" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-doc-author\')"></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Default classification</label><select id="cfg-doc-class" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-doc-class\')"><option value="Confidential">Confidential</option><option value="Restricted">Restricted</option><option value="Internal">Internal</option><option value="Public">Public</option></select></div><div><label style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:3px">Documents folder (Drive ID)</label><input id="cfg-doc-root" type="text" placeholder="15nv-5E1HJES-uPXVJ1jI6f0LDjzRnmEq" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit" onblur="saveCompanyField(\'cfg-doc-root\')"></div></div><button class="btn btn-sm" onclick="saveCompanyIdentity()">Save all</button><span id="co-save-msg" style="font-size:11px;color:var(--teal);margin-left:10px"></span></div>'
+  +'<div class="card" style="max-width:680px;margin-top:12px"><div class="card-title"> TSAP Unit Costs</div><div id="settings-uc-content" style="color:var(--mid);font-size:12px">Click Load Unit Costs to view.</div><button class="btn btn-sm" style="margin-top:8px" onclick="loadSettingsUC()">Load Unit Costs</button></div>'
 
   var gcfg2=(function(){try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}}})()
   if(gcfg2.sbUrl) document.getElementById('cfg-sb-url').value=gcfg2.sbUrl
+  if(gcfg2.sbUrl) loadCompanyIdentity()
+  if(gcfg2.sbUrl) loadImgGenSettings()
   if(gcfg2.sbKey) document.getElementById('cfg-sb-key').value=gcfg2.sbKey
   var logo=localStorage.getItem('atlas_logo')
   var prev=document.getElementById('logo-preview')
@@ -957,6 +961,87 @@ window.addEventListener('DOMContentLoaded',function(){
     }catch(e){localStorage.removeItem('atlas_user')}
   }
 })
+
+function _coSB(){try{var g=JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}');return{url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}}catch(e){return{url:'',key:''}}}
+var CO_FIELD_MAP = {"cfg-brand-name": "brand_name", "cfg-brand-short": "brand_name_short", "cfg-brand-logo": "brand_logo_drive_id", "cfg-parent-name": "parent_company_name", "cfg-parent-website": "parent_company_website", "cfg-parent-addr1": "parent_company_addr1", "cfg-parent-addr2": "parent_company_addr2", "cfg-parent-city": "parent_company_city", "cfg-parent-country": "parent_company_country", "cfg-local-name": "local_company_name", "cfg-local-addr1": "local_company_addr1", "cfg-local-addr2": "local_company_addr2", "cfg-local-city": "local_company_city", "cfg-doc-author": "doc_author_default", "cfg-doc-class": "doc_classification", "cfg-doc-root": "doc_root_folder_id"}
+
+async function saveCompanyField(elId) {
+  var sb = _coSB(); if (!sb.url) return
+  var key = CO_FIELD_MAP[elId]; if (!key) return
+  var el = document.getElementById(elId); if (!el) return
+  await fetch(sb.url+'/rest/v1/app_config?key=eq.'+key, {
+    method:'PATCH',
+    headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},
+    body:JSON.stringify({value:el.value.trim(), updated_at:new Date().toISOString()})
+  })
+}
+
+async function saveCompanyIdentity() {
+  var sb = _coSB()
+  if (!sb.url) { document.getElementById('co-save-msg').textContent='Configure Supabase first'; return }
+  var ids = Object.keys(CO_FIELD_MAP)
+  var ok = true
+  for (var i=0; i<ids.length; i++) {
+    var el = document.getElementById(ids[i]); if (!el) continue
+    var r = await fetch(sb.url+'/rest/v1/app_config?key=eq.'+CO_FIELD_MAP[ids[i]], {
+      method:'PATCH',
+      headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},
+      body:JSON.stringify({value:el.value.trim(), updated_at:new Date().toISOString()})
+    })
+    if (!r.ok) ok = false
+  }
+  var msg = document.getElementById('co-save-msg')
+  if (msg) { msg.textContent = ok ? 'Saved' : 'Some fields failed'; setTimeout(function(){msg.textContent=''},3000) }
+}
+
+async function loadCompanyIdentity() {
+  var sb = _coSB(); if (!sb.url) return
+  try {
+    var keys = Object.values(CO_FIELD_MAP).join(',')
+    var r = await fetch(sb.url+'/rest/v1/app_config?key=in.('+keys+')&limit=30', {
+      headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}
+    })
+    if (!r.ok) return
+    var rows = await r.json()
+    var map = {}
+    rows.forEach(function(row){ map[row.key] = row.value||'' })
+    var rev = {}
+    Object.keys(CO_FIELD_MAP).forEach(function(id){ rev[CO_FIELD_MAP[id]] = id })
+    Object.keys(map).forEach(function(k){
+      var el = document.getElementById(rev[k]); if (el && map[k]) el.value = map[k]
+    })
+  } catch(e) {}
+}
+
+async function saveImgGenField() {
+  var sb = (function(){try{var g=JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}');return{url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}}catch(e){return{url:'',key:''}}})()
+  if (!sb.url) return
+  var fields = [{key:'image_gen_model',id:'cfg-img-model'},{key:'image_gen_style',id:'cfg-img-style'}]
+  for (var i=0;i<fields.length;i++) {
+    var el = document.getElementById(fields[i].id); if (!el) continue
+    fetch(sb.url+'/rest/v1/app_config?key=eq.'+fields[i].key, {
+      method:'PATCH',
+      headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},
+      body:JSON.stringify({value:el.value, updated_at:new Date().toISOString()})
+    })
+  }
+}
+
+async function loadImgGenSettings() {
+  var sb = (function(){try{var g=JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}');return{url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}}catch(e){return{url:'',key:''}}})()
+  if (!sb.url) return
+  try {
+    var r = await fetch(sb.url+'/rest/v1/app_config?key=in.(image_gen_model,image_gen_style)', {
+      headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}
+    })
+    if (!r.ok) return
+    var rows = await r.json()
+    rows.forEach(function(row) {
+      var el = document.getElementById(row.key==='image_gen_model'?'cfg-img-model':'cfg-img-style')
+      if (el && row.value) el.value = row.value
+    })
+  } catch(e) {}
+}
 </script>
 </body>
 </html>
