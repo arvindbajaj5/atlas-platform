@@ -471,6 +471,17 @@ async function openEngagement(eng) {
     ? (await sbGet('docket_items', 'docket_id=eq.' + docketId + '&order=sort_order.asc,created_at.asc')) || []
     : []
 
+  // Derive territory preset key from stored states
+  if (eng.territory_states && eng.territory_states.length) {
+    var stateStr = JSON.stringify(eng.territory_states.slice().sort())
+    if (typeof atlasMap !== 'undefined') {
+      Object.keys(atlasMap.PRESETS).forEach(function(k) {
+        var pStates = JSON.stringify(atlasMap.PRESETS[k].states.slice().sort())
+        if (pStates === stateStr) eng._territoryPreset = k
+      })
+    }
+  }
+
   // Load customer
   var cust = ALL_CUSTOMERS.find(function(c){ return c.id === eng.customer_id }) || {}
   CURRENT_ENG._cust = cust
@@ -603,6 +614,9 @@ function renderOverview() {
 
     // Cover image card
     + '<div id="cover-img-card">' + (typeof atlasCoverImage !== 'undefined' ? atlasCoverImage.renderCoverImageCard(eng) : '<div class="card" style="margin-bottom:12px;padding:12px 14px"><div class="card-title">Engagement Cover Image</div><div style="font-size:12px;color:var(--mid)">Loading...</div></div>') + '</div>'
+
+    // Territory card
+    + '<div id="territory-card">' + (typeof atlasMap !== 'undefined' ? atlasMap.renderTerritoryCard(eng) : '') + '</div>'
 
     // Recent actions
     + '<div class="section-hdr" style="margin-top:4px"><div class="section-title">Open actions</div>'
