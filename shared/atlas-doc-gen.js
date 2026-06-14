@@ -1068,7 +1068,9 @@ var atlasCoverImage = (function() {
   function _getGeminiKey() {
     try {
       var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}')
-      return g.geminiKey || g.gemini_key || ''
+      // Portal stores as key_gemini, also copies to geminiKey and atlas_gemini_key
+      return g.geminiKey || g['key_gemini'] || g.gemini_key
+             || localStorage.getItem('atlas_gemini_key') || ''
     } catch(e) { return '' }
   }
 
