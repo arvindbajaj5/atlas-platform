@@ -1099,27 +1099,37 @@ var atlasCoverImage = (function() {
     var apiKey = _getGeminiKey()
     if (!apiKey) return { success: false, error: 'No Gemini API key configured in Settings' }
 
-    var model = 'gemini-2.0-flash-preview-image-generation'
+    // Model precedence: gemini-3.1-flash-image (latest)   gemini-2.5-flash-image   gemini-2.0-flash-exp
+    var model = 'gemini-3.1-flash-image'
     var prompt = buildPrompt(engType, custSector, style, feedback)
 
     if (onProgress) onProgress('Generating draft image...')
 
     try {
-      var r = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
-          })
-        }
-      )
+      // Try models in order   fall back if 404
+      var MODELS_TO_TRY = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image', 'gemini-2.0-flash-exp']
+      var r = null, lastErr = ''
+      for (var mi = 0; mi < MODELS_TO_TRY.length; mi++) {
+        var tryModel = MODELS_TO_TRY[mi]
+        r = await fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models/' + tryModel + ':generateContent?key=' + apiKey,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+            })
+          }
+        )
+        if (r.ok) { model = tryModel; break }
+        var errData2 = await r.json().catch(function(){ return {} })
+        lastErr = 'API error ' + r.status + ': ' + (errData2.error ? errData2.error.message : r.statusText)
+        if (r.status !== 404) break  // only retry on 404 (model not found)
+      }
 
-      if (!r.ok) {
-        var errData = await r.json().catch(function(){ return {} })
-        return { success: false, error: 'API error ' + r.status + ': ' + (errData.error ? errData.error.message : r.statusText) }
+      if (!r || !r.ok) {
+        return { success: false, error: lastErr || 'All image models unavailable' }
       }
 
       var data = await r.json()
@@ -1260,7 +1270,17 @@ async function atlasCoverImageGenerate(engId, engType, custSect) {
   if (msg) msg.style.color = 'var(--mid)'
   if (preview) preview.innerHTML = '<div style="font-size:12px;color:var(--mid)">Generating draft...</div>'
 
-  var result = await atlasCoverImage.generateDraft(engType, custSect, style, feedback, function(p) {
+  // Append territory geographic context to prompt if set on engagement
+  var feedbackFull = feedback
+  if (typeof atlasMap !== 'undefined' && typeof CURRENT_ENG !== 'undefined' && CURRENT_ENG) {
+    var tCtx = CURRENT_ENG._territoryPreset
+      ? atlasMap.buildMapPromptContext(CURRENT_ENG._territoryPreset)
+      : (CURRENT_ENG.territory_states && CURRENT_ENG.territory_states.length
+          ? atlasMap.buildMapPromptContext({ states: CURRENT_ENG.territory_states, hubs: CURRENT_ENG.territory_hubs || [] })
+          : '')
+    if (tCtx) feedbackFull = (feedback ? feedback + ' ' : '') + tCtx
+  }
+  var result = await atlasCoverImage.generateDraft(engType, custSect, style, feedbackFull, function(p) {
     if (msg) msg.textContent = p
   })
 
@@ -1321,4 +1341,287 @@ async function atlasCoverImageClear(engId) {
   var msg = document.getElementById('cover-img-msg')
   if (msg) { msg.textContent = 'Cover image removed'; msg.style.color = 'var(--mid)' }
   if (CURRENT_ENG) CURRENT_ENG.cover_image_status = 'none'
+}
+
+
+// ===========================================================================
+// Territory Map Generator (appended)
+// ===========================================================================
+
+// ==========================================================================
+// ATLAS Territory Map Generator
+// Appended to atlas-doc-gen.js
+// Uses simplified path data for India states   no external API needed
+// ==========================================================================
+
+var atlasMap = (function() {
+
+  //    Brand colours                                                          
+  var C = {
+    india:       '#E5E7EB',  // India fill (non-highlighted states)
+    indiaBorder: '#9CA3AF',  // India internal borders
+    outline:     '#6B7280',  // India outer border
+    highlight:   '#00B290',  // Highlighted state fill (teal)
+    highlightB:  '#007A63',  // Highlighted state border
+    hub:         '#002870',  // Hub dot
+    spoke:       '#1C38F5',  // Spoke dot
+    edge:        '#00B290',  // Edge dot
+    label:       '#002870',  // State label text
+    city:        '#374151',  // City label text
+    bg:          '#FFFFFF'   // Background
+  }
+
+  //    Simplified state path data (Mercator projection, normalised 0-1000)   
+  // These are hand-simplified outlines sufficient for document inserts
+  // Points: [x,y] in a 1000x1200 canvas (India fits roughly 150,50 to 950,1150)
+
+  var STATE_PATHS = {
+    // North India
+    'Jammu and Kashmir':  'M 185 85 L 280 75 L 340 90 L 360 135 L 320 160 L 260 175 L 220 160 L 185 130 Z',
+    'Ladakh':             'M 340 90 L 450 80 L 490 110 L 460 155 L 390 170 L 360 135 Z',
+    'Himachal Pradesh':   'M 280 160 L 360 150 L 390 170 L 370 215 L 320 225 L 280 205 L 265 180 Z',
+    'Punjab':             'M 220 160 L 280 160 L 280 205 L 255 220 L 215 210 L 200 185 Z',
+    'Haryana':            'M 255 220 L 310 215 L 320 225 L 315 265 L 285 275 L 255 265 L 245 240 Z',
+    'Uttarakhand':        'M 320 225 L 390 215 L 415 235 L 400 275 L 355 285 L 320 270 L 315 250 Z',
+    'Uttar Pradesh':      'M 285 275 L 400 260 L 490 275 L 510 320 L 480 370 L 400 385 L 320 375 L 280 340 L 270 300 Z',
+    'Delhi':              'M 280 255 L 295 255 L 298 270 L 283 272 Z',
+    'Rajasthan':          'M 155 215 L 260 210 L 280 275 L 270 350 L 245 390 L 190 410 L 145 380 L 130 320 L 140 265 Z',
+    'Bihar':              'M 480 275 L 560 268 L 580 295 L 570 335 L 510 350 L 480 330 L 470 305 Z',
+    'Jharkhand':          'M 480 330 L 565 330 L 590 365 L 565 405 L 510 415 L 475 395 L 468 360 Z',
+    'West Bengal':        'M 565 268 L 620 262 L 645 290 L 640 355 L 615 400 L 575 415 L 565 380 L 580 340 L 570 295 Z',
+    'Sikkim':             'M 620 248 L 645 245 L 648 262 L 628 268 Z',
+    'Arunachal Pradesh':  'M 700 190 L 835 185 L 845 225 L 790 255 L 720 260 L 690 240 L 695 210 Z',
+    'Assam':              'M 645 262 L 700 255 L 790 255 L 810 280 L 790 310 L 720 320 L 650 310 L 635 285 Z',
+    'Meghalaya':          'M 650 310 L 720 315 L 730 345 L 685 355 L 645 340 L 640 320 Z',
+    'Manipur':            'M 770 310 L 810 305 L 825 340 L 800 370 L 760 360 L 755 330 Z',
+    'Nagaland':           'M 790 260 L 840 265 L 845 295 L 815 305 L 785 295 L 780 270 Z',
+    'Mizoram':            'M 720 345 L 760 340 L 775 375 L 750 405 L 710 395 L 700 365 Z',
+    'Tripura':            'M 675 345 L 710 345 L 715 380 L 685 390 L 665 370 L 668 350 Z',
+    'Madhya Pradesh':     'M 245 340 L 390 325 L 480 340 L 490 395 L 455 440 L 360 455 L 270 445 L 235 405 L 232 370 Z',
+    'Chhattisgarh':       'M 460 380 L 570 370 L 590 410 L 575 465 L 530 490 L 470 480 L 445 445 L 450 405 Z',
+    'Odisha':             'M 530 395 L 610 385 L 640 415 L 625 475 L 575 505 L 525 495 L 510 450 L 515 415 Z',
+    'Gujarat':            'M 130 350 L 215 340 L 240 365 L 235 420 L 200 460 L 165 470 L 125 440 L 110 400 L 118 365 Z',
+    'Maharashtra':        'M 225 415 L 355 400 L 440 415 L 465 460 L 440 510 L 375 540 L 290 535 L 230 510 L 205 465 L 212 435 Z',
+    'Telangana':          'M 420 450 L 520 445 L 540 490 L 510 535 L 450 545 L 405 510 L 400 475 Z',
+    'Andhra Pradesh':     'M 440 510 L 570 500 L 605 540 L 590 590 L 540 615 L 470 610 L 425 575 L 415 545 L 440 525 Z',
+    'Karnataka':          'M 300 540 L 415 520 L 445 555 L 440 620 L 390 660 L 325 655 L 280 620 L 268 575 L 275 550 Z',
+    'Goa':               'M 255 590 L 280 585 L 285 605 L 260 610 Z',
+    'Kerala':             'M 310 655 L 365 650 L 375 700 L 355 760 L 315 775 L 285 740 L 278 690 Z',
+    'Tamil Nadu':         'M 400 620 L 510 610 L 530 655 L 510 725 L 460 770 L 400 775 L 355 740 L 355 685 L 375 645 Z',
+    // Small UTs omitted for simplicity at this scale
+  }
+
+  //    Territory presets                                                      
+  var PRESETS = {
+    hp: {
+      states: ['Himachal Pradesh'],
+      label:  'Himachal Pradesh',
+      hubs: [
+        { name:'Bilaspur',    lat:31.33, lng:76.75, type:'hub'   },
+        { name:'Shimla',      lat:31.10, lng:77.17, type:'spoke' },
+        { name:'Dharamshala', lat:32.22, lng:76.32, type:'spoke' },
+        { name:'Mandi',       lat:31.71, lng:76.93, type:'spoke' },
+        { name:'Solan',       lat:30.91, lng:77.09, type:'spoke' }
+      ]
+    },
+    ne_india: {
+      states: ['Arunachal Pradesh','Assam','Manipur','Meghalaya',
+               'Mizoram','Nagaland','Sikkim','Tripura'],
+      label:  'North East India',
+      hubs: [
+        { name:'Guwahati',  lat:26.14, lng:91.74, type:'hub'   },
+        { name:'Imphal',    lat:24.82, lng:93.94, type:'spoke' },
+        { name:'Shillong',  lat:25.57, lng:91.88, type:'spoke' },
+        { name:'Aizawl',    lat:23.73, lng:92.72, type:'spoke' },
+        { name:'Kohima',    lat:25.67, lng:94.11, type:'spoke' },
+        { name:'Agartala',  lat:23.83, lng:91.28, type:'spoke' },
+        { name:'Itanagar',  lat:27.09, lng:93.62, type:'spoke' },
+        { name:'Gangtok',   lat:27.33, lng:88.61, type:'spoke' }
+      ]
+    },
+    all_india: {
+      states: [],
+      label:  'All India',
+      hubs: [
+        { name:'New Delhi',  lat:28.61, lng:77.21, type:'hub'   },
+        { name:'Mumbai',     lat:19.08, lng:72.88, type:'spoke' },
+        { name:'Hyderabad',  lat:17.38, lng:78.49, type:'spoke' },
+        { name:'Bengaluru',  lat:12.97, lng:77.59, type:'spoke' },
+        { name:'Chennai',    lat:13.08, lng:80.27, type:'spoke' }
+      ]
+    }
+  }
+
+  //    Coordinate to SVG projection                                           
+  // Simple linear projection: India bbox lat 7-37, lng 67-97   1000x1200 canvas
+  function _project(lat, lng) {
+    var x = (lng - 67) / (97 - 67) * 1000
+    var y = (37 - lat) / (37 - 7)  * 1200
+    return { x: x, y: y }
+  }
+
+  //    Render SVG map                                                         
+  function renderSVG(preset, opts) {
+    opts = opts || {}
+    var w        = opts.width  || 400
+    var h        = opts.height || 480
+    var showDots = opts.showDots !== false
+    var showLabels = opts.showLabels !== false
+
+    var territory = typeof preset === 'string' ? PRESETS[preset] : preset
+    var highlighted = territory ? territory.states : []
+    var hubs        = (territory && territory.hubs) || []
+
+    var svg = '<svg viewBox="0 0 1000 1200" xmlns="http://www.w3.org/2000/svg" '
+      + 'width="' + w + '" height="' + h + '" '
+      + 'style="font-family:Roboto,sans-serif;background:' + C.bg + '">'
+      + '<rect width="1000" height="1200" fill="' + C.bg + '"/>'
+
+    // Draw all states
+    Object.keys(STATE_PATHS).forEach(function(name) {
+      var isH = highlighted.length === 0 || highlighted.indexOf(name) >= 0
+      var fill   = isH ? C.highlight : C.india
+      var stroke = isH ? C.highlightB : C.indiaBorder
+      var opacity = isH ? '0.75' : '1'
+      svg += '<path d="' + STATE_PATHS[name] + '" '
+        + 'fill="' + fill + '" fill-opacity="' + opacity + '" '
+        + 'stroke="' + stroke + '" stroke-width="' + (isH ? 1.5 : 0.8) + '"/>'
+    })
+
+    // State labels for highlighted states
+    if (showLabels && highlighted.length > 0 && highlighted.length <= 8) {
+      highlighted.forEach(function(name) {
+        if (!STATE_PATHS[name]) return
+        // Compute rough centroid from path bounds
+        var nums = (STATE_PATHS[name].match(/-?[\d.]+/g) || []).map(Number)
+        var xs = nums.filter(function(_,i){ return i%2===0 })
+        var ys = nums.filter(function(_,i){ return i%2===1 })
+        var cx = xs.reduce(function(a,b){return a+b},0)/xs.length
+        var cy = ys.reduce(function(a,b){return a+b},0)/ys.length
+        var shortName = name.replace('Pradesh','Pr.').replace('Arunachal','A.').replace('Maharashtra','MH')
+        svg += '<text x="' + cx + '" y="' + cy + '" '
+          + 'font-size="18" fill="' + C.label + '" font-weight="700" '
+          + 'text-anchor="middle" dominant-baseline="middle">' + shortName + '</text>'
+      })
+    }
+
+    // Hub/spoke dots and labels
+    if (showDots) {
+      hubs.forEach(function(hub) {
+        var pt = _project(hub.lat, hub.lng)
+        var r     = hub.type === 'hub' ? 12 : 8
+        var col   = hub.type === 'hub' ? C.hub : hub.type === 'edge' ? C.edge : C.spoke
+        var labelOffset = hub.type === 'hub' ? -18 : -13
+        svg += '<circle cx="' + pt.x + '" cy="' + pt.y + '" r="' + r + '" fill="' + col + '" opacity="0.9"/>'
+        if (hub.type === 'hub') {
+          svg += '<circle cx="' + pt.x + '" cy="' + pt.y + '" r="' + (r+5) + '" fill="none" stroke="' + col + '" stroke-width="2" opacity="0.4"/>'
+        }
+        if (showLabels) {
+          svg += '<text x="' + (pt.x+r+6) + '" y="' + (pt.y+4) + '" '
+            + 'font-size="16" fill="' + C.city + '" font-weight="' + (hub.type==='hub'?700:500) + '">'
+            + hub.name + '</text>'
+        }
+      })
+    }
+
+    // Subtle "INDIA" watermark label
+    svg += '<text x="500" y="950" font-size="40" fill="#9CA3AF" opacity="0.4" '
+      + 'text-anchor="middle" font-weight="300" letter-spacing="8">INDIA</text>'
+
+    svg += '</svg>'
+    return svg
+  }
+
+  //    Render as data URL (for embedding)                                    
+  function renderDataUrl(preset, opts) {
+    var svg = renderSVG(preset, opts)
+    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)))
+  }
+
+  //    Render to DOM element                                                  
+  function renderToElement(elementId, preset, opts) {
+    var el = document.getElementById(elementId)
+    if (!el) return
+    el.innerHTML = renderSVG(preset, opts)
+  }
+
+  //    Cover image prompt enhancement                                        
+  function buildMapPromptContext(territory) {
+    if (!territory) return ''
+    var preset = typeof territory === 'string' ? PRESETS[territory] : territory
+    if (!preset) return ''
+    var stateList = preset.states.length > 0
+      ? preset.states.join(', ')
+      : 'all of India'
+    var hubNames = (preset.hubs || [])
+      .filter(function(h){ return h.type === 'hub' })
+      .map(function(h){ return h.name })
+      .join(', ')
+    return 'Geographic context: This engagement covers ' + stateList
+      + (hubNames ? '. Key hub location: ' + hubNames : '') + '. '
+      + 'Subtly incorporate an abstract outline of this region of India '
+      + 'as a background element -- not a literal map, but a geometric suggestion of the geography.'
+  }
+
+  //    Docket: territory selector card                                       
+  function renderTerritoryCard(eng) {
+    var states  = (eng && eng.territory_states) ? JSON.stringify(eng.territory_states) : '[]'
+    var hubs    = (eng && eng.territory_hubs)   ? JSON.stringify(eng.territory_hubs)   : '[]'
+    var hasTerritory = eng && eng.territory_states && eng.territory_states.length > 0
+    var currentPreset = eng ? (eng._territoryPreset || 'none') : 'none'
+
+    return '<div class="card" style="margin-bottom:12px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+      + '<div class="card-title" style="margin-bottom:0">Territory</div>'
+      + (hasTerritory ? '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#E1F5EE;color:#085041;font-weight:700">Set</span>'
+                      : '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--light);color:var(--mid)">Not set</span>')
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--mid);margin-bottom:10px">Defines which states are highlighted on territory maps in documents.</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+      + '<button onclick="setEngTerritory(\'hp\')" class="btn btn-sm '      + (currentPreset==='hp'       ? 'btn-teal' : '') + '">&#127965; Himachal Pradesh</button>'
+      + '<button onclick="setEngTerritory(\'ne_india\')" class="btn btn-sm ' + (currentPreset==='ne_india' ? 'btn-teal' : '') + '">&#127963; NE India (8 states)</button>'
+      + '<button onclick="setEngTerritory(\'all_india\')" class="btn btn-sm '+ (currentPreset==='all_india'? 'btn-teal' : '') + '">&#127758; All India</button>'
+      + '<button onclick="setEngTerritory(null)" class="btn btn-sm btn-ghost">&#215; Clear</button>'
+      + '</div>'
+      + (hasTerritory
+          ? '<div id="territory-map-preview" style="border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--light);padding:4px">'
+            + renderSVG(eng._territoryPreset || { states: eng.territory_states, hubs: eng.territory_hubs || [] }, { width: 280, height: 336 })
+            + '</div>'
+          : '<div style="font-size:12px;color:var(--mid);font-style:italic">Select a territory above to preview map</div>')
+      + '</div>'
+  }
+
+  return {
+    renderSVG:             renderSVG,
+    renderDataUrl:         renderDataUrl,
+    renderToElement:       renderToElement,
+    buildMapPromptContext: buildMapPromptContext,
+    renderTerritoryCard:   renderTerritoryCard,
+    PRESETS:               PRESETS,
+    STATE_PATHS:           STATE_PATHS,
+    COLOURS:               C
+  }
+})()
+
+//    Global docket handler                                                  
+async function setEngTerritory(presetKey) {
+  if (!CURRENT_ENG) return
+  var sb = getSB(); if (!sb.url) return
+  var preset = presetKey ? atlasMap.PRESETS[presetKey] : null
+  var states = preset ? preset.states : null
+  var hubs   = preset ? preset.hubs   : null
+
+  await fetch(sb.url + '/rest/v1/engagements?id=eq.' + CURRENT_ENG.id, {
+    method: 'PATCH',
+    headers: { apikey:sb.key, Authorization:'Bearer '+sb.key, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    body: JSON.stringify({
+      territory_states: states,
+      territory_hubs:   hubs,
+      updated_at: new Date().toISOString()
+    })
+  })
+  CURRENT_ENG.territory_states  = states
+  CURRENT_ENG.territory_hubs    = hubs
+  CURRENT_ENG._territoryPreset  = presetKey
+  renderDocket()
 }
