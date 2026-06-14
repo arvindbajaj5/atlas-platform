@@ -1042,17 +1042,21 @@ var atlasDocGen = (function() {
 //    ATLAS Cover Image Generator                                            
 // Part of atlas-doc-gen.js   appended to module
 
+// ===========================================================================
+// ATLAS Cover Image Generator v2   Supabase Storage
+// ===========================================================================
+
 var atlasCoverImage = (function() {
 
   var STYLE_LABELS = {
     abstract_geometric: 'abstract geometric pattern with flowing data streams and circuit-like networks',
     architectural:      'architectural perspective showing technology infrastructure and data centres',
-    data_viz:           'data visualization with interconnected nodes, network topology and flowing information streams'
+    data_viz:           'data visualization with interconnected nodes, network topology and flowing information'
   }
 
   var ENG_TYPE_CONTEXT = {
-    tsap:       'sovereign territory AI centre, national digital infrastructure, government transformation programme',
-    vertical:   'sector-specific AI deployment, domain expertise, regulatory technology platform',
+    tsap:       'sovereign territory AI centre, national digital infrastructure, government transformation',
+    vertical:   'sector-specific AI platform, domain expertise, regulatory technology',
     enterprise: 'enterprise AI platform, business intelligence, operational transformation',
     csp:        'cloud and AI infrastructure, high-performance computing, inferencing at scale',
     generic:    'artificial intelligence platform, technology innovation, digital capability'
@@ -1068,12 +1072,24 @@ var atlasCoverImage = (function() {
   function _getGeminiKey() {
     try {
       var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}')
-      // Portal stores as key_gemini, also copies to geminiKey and atlas_gemini_key
       return g.geminiKey || g['key_gemini'] || g.gemini_key
              || localStorage.getItem('atlas_gemini_key') || ''
     } catch(e) { return '' }
   }
 
+  function _storagePath(engId, version) {
+    return 'cover_images/' + engId + '/v' + version + '.png'
+  }
+
+  function _storageUrl(sbUrl, path) {
+    return sbUrl + '/storage/v1/object/public/atlas-assets/' + path
+  }
+
+  function _thumbnailUrl(sbUrl, path) {
+    return sbUrl + '/storage/v1/render/image/public/atlas-assets/' + path + '?width=400&height=300&resize=contain'
+  }
+
+  //    Build generation prompt                                               
   function buildPrompt(engType, custSector, style, feedback) {
     var styleDesc = STYLE_LABELS[style] || STYLE_LABELS.abstract_geometric
     var context   = ENG_TYPE_CONTEXT[engType] || ENG_TYPE_CONTEXT.generic
@@ -1087,27 +1103,25 @@ var atlasCoverImage = (function() {
       + 'Customer sector: ' + (custSector || 'government') + '. '
       + 'Strict requirements: no people, no faces, no body parts, no text, no labels, no logos, '
       + 'no watermarks, no copyrighted symbols, no flags, no recognisable brand marks. '
-      + 'The image must be safe for use in sovereign AI proposals to government ministries. '
+      + 'Safe for use in sovereign AI proposals to government ministries. '
       + 'Landscape orientation, high contrast, visually striking.'
-    if (feedback && feedback.trim()) {
-      prompt += ' Additional direction from reviewer: ' + feedback.trim()
-    }
+    if (feedback && feedback.trim()) prompt += ' Direction: ' + feedback.trim()
     return prompt
   }
 
+  //    Generate draft via Gemini                                             
   async function generateDraft(engType, custSector, style, feedback, onProgress) {
     var apiKey = _getGeminiKey()
     if (!apiKey) return { success: false, error: 'No Gemini API key configured in Settings' }
 
-    var model = 'gemini-3.1-flash-image'
     var prompt = buildPrompt(engType, custSector, style, feedback)
+    if (onProgress) onProgress('Generating image...')
 
-    if (onProgress) onProgress('Generating draft image...')
+    var MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image', 'gemini-2.0-flash-exp']
+    var r = null, lastErr = '', usedModel = ''
 
-    try {
-      var MODELS = ['gemini-3.1-flash-image','gemini-2.5-flash-image','gemini-2.0-flash-exp']
-      var r = null, lastErr = ''
-      for (var mi=0; mi<MODELS.length; mi++) {
+    for (var mi = 0; mi < MODELS.length; mi++) {
+      try {
         r = await fetch(
           'https://generativelanguage.googleapis.com/v1beta/models/' + MODELS[mi] + ':generateContent?key=' + apiKey,
           {
@@ -1119,139 +1133,242 @@ var atlasCoverImage = (function() {
             })
           }
         )
-        if (r.ok) { model = MODELS[mi]; break }
+        if (r.ok) { usedModel = MODELS[mi]; break }
         var ed = await r.json().catch(function(){ return {} })
         lastErr = 'API error ' + r.status + ': ' + (ed.error ? ed.error.message : r.statusText)
         if (r.status !== 404) break
-      }
-      if (!r || !r.ok) return { success: false, error: lastErr || 'Image generation unavailable' }
+      } catch(e) { lastErr = e.message; break }
+    }
 
-      var data = await r.json()
-      var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts
-      if (!parts) return { success: false, error: 'No content in response' }
+    if (!r || !r.ok) return { success: false, error: lastErr || 'Image generation unavailable' }
 
-      var imagePart = parts.find(function(p) { return p.inlineData && p.inlineData.mimeType && p.inlineData.mimeType.startsWith('image/') })
-      if (!imagePart) return { success: false, error: 'No image in response. Model may not support image generation.' }
+    var data = await r.json()
+    var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts
+    if (!parts) return { success: false, error: 'No content in response' }
 
-      return {
-        success:   true,
-        base64:    imagePart.inlineData.data,
-        mimeType:  imagePart.inlineData.mimeType,
-        dataUrl:   'data:' + imagePart.inlineData.mimeType + ';base64,' + imagePart.inlineData.data
-      }
+    var imgPart = parts.find(function(p) { return p.inlineData && p.inlineData.mimeType && p.inlineData.mimeType.startsWith('image/') })
+    if (!imgPart) return { success: false, error: 'No image in response. Model: ' + usedModel }
 
-    } catch(e) {
-      return { success: false, error: e.message }
+    return {
+      success:  true,
+      base64:   imgPart.inlineData.data,
+      mimeType: imgPart.inlineData.mimeType,
+      dataUrl:  'data:' + imgPart.inlineData.mimeType + ';base64,' + imgPart.inlineData.data,
+      model:    usedModel
     }
   }
 
-  async function saveToEngagement(engId, base64, mimeType, driveRootId) {
-    // Convert base64 to blob, download locally (Drive upload via MCP not available in browser)
-    // Also save reference in engagements table
-    var ext = mimeType === 'image/png' ? 'png' : 'jpg'
-    var filename = 'cover_image_v' + Date.now() + '.' + ext
+  //    Upload base64 image to Supabase Storage                               
+  async function uploadToStorage(base64, mimeType, engId, version) {
+    var sb = _getSB(); if (!sb.url) return { success: false, error: 'No Supabase config' }
+    var path = _storagePath(engId, version)
 
-    // Trigger browser download
-    var link = document.createElement('a')
-    link.href = 'data:' + mimeType + ';base64,' + base64
-    link.download = filename
-    link.click()
+    // Convert base64 to Uint8Array
+    var binary = atob(base64)
+    var bytes  = new Uint8Array(binary.length)
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    var blob = new Blob([bytes], { type: mimeType })
 
-    // Update engagement record (drive_id null for now   user uploads manually)
-    var sb = _getSB()
-    if (sb.url && engId) {
-      await fetch(sb.url + '/rest/v1/engagements?id=eq.' + engId, {
-        method: 'PATCH',
-        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ cover_image_status: 'approved', updated_at: new Date().toISOString() })
-      })
-    }
-
-    return { filename: filename, downloaded: true }
-  }
-
-  async function loadEngagementImage(engId) {
-    var sb = _getSB()
-    if (!sb.url || !engId) return null
     try {
-      var r = await fetch(sb.url + '/rest/v1/engagements?id=eq.' + engId + '&select=cover_image_drive_id,cover_image_status', {
-        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+      var r = await fetch(sb.url + '/storage/v1/object/atlas-assets/' + path, {
+        method:  'POST',
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': mimeType, 'x-upsert': 'true' },
+        body:    blob
       })
-      if (!r.ok) return null
-      var rows = await r.json()
-      return rows && rows[0] ? rows[0] : null
+      if (!r.ok) {
+        var err = await r.json().catch(function(){ return {} })
+        return { success: false, error: 'Upload failed: ' + (err.message || r.status) }
+      }
+      return { success: true, path: path, url: _storageUrl(sb.url, path), thumbUrl: _thumbnailUrl(sb.url, path) }
+    } catch(e) { return { success: false, error: e.message } }
+  }
+
+  //    Upload local file to Supabase Storage                                 
+  async function uploadFileToStorage(file, engId, version) {
+    var sb = _getSB(); if (!sb.url) return { success: false, error: 'No Supabase config' }
+    var path = _storagePath(engId, version)
+    try {
+      var r = await fetch(sb.url + '/storage/v1/object/atlas-assets/' + path, {
+        method:  'POST',
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': file.type, 'x-upsert': 'true' },
+        body:    file
+      })
+      if (!r.ok) {
+        var err = await r.json().catch(function(){ return {} })
+        return { success: false, error: 'Upload failed: ' + (err.message || r.status) }
+      }
+      return { success: true, path: path, url: _storageUrl(sb.url, path), thumbUrl: _thumbnailUrl(sb.url, path) }
+    } catch(e) { return { success: false, error: e.message } }
+  }
+
+  //    Save approved image to engagement                                     
+  async function saveToEngagement(engId, path, url, version, source) {
+    var sb = _getSB(); if (!sb.url) return false
+    // Get current versions array
+    var r = await fetch(sb.url + '/rest/v1/engagements?id=eq.' + engId + '&select=cover_image_versions', {
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+    })
+    var rows = r.ok ? await r.json() : []
+    var versions = (rows[0] && rows[0].cover_image_versions) || []
+    versions.push({
+      version:    version,
+      path:       path,
+      url:        url,
+      source:     source || 'ai_generated',
+      created_at: new Date().toISOString()
+    })
+    var r2 = await fetch(sb.url + '/rest/v1/engagements?id=eq.' + engId, {
+      method:  'PATCH',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body:    JSON.stringify({
+        cover_image_path:     path,
+        cover_image_status:   'approved',
+        cover_image_versions: versions,
+        updated_at:           new Date().toISOString()
+      })
+    })
+    return r2.ok
+  }
+
+  //    Get next version number                                                
+  function _nextVersion(eng) {
+    var versions = (eng && eng.cover_image_versions) || []
+    return versions.length + 1
+  }
+
+  //    Load engagement image state                                            
+  async function loadEngagementImage(engId) {
+    var sb = _getSB(); if (!sb.url) return null
+    try {
+      var r = await fetch(
+        sb.url + '/rest/v1/engagements?id=eq.' + engId
+        + '&select=cover_image_path,cover_image_status,cover_image_versions',
+        { headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key } }
+      )
+      var rows = r.ok ? await r.json() : []
+      return rows[0] || null
     } catch(e) { return null }
   }
 
-  //    Cover Image Card UI (rendered in Docket Overview)                      
-  function renderCoverImageCard(eng, onUpdate) {
-    var engId    = eng ? eng.id : ''
-    var engType  = eng ? (eng.type || 'generic') : 'generic'
-    var custSect = eng && eng._cust ? (eng._cust.type || 'government') : 'government'
-    var status   = eng ? (eng.cover_image_status || 'none') : 'none'
+  //    Restore a previous version                                             
+  async function restoreVersion(engId, versionEntry) {
+    var sb = _getSB(); if (!sb.url) return false
+    var r = await fetch(sb.url + '/rest/v1/engagements?id=eq.' + engId, {
+      method:  'PATCH',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body:    JSON.stringify({
+        cover_image_path:   versionEntry.path,
+        cover_image_status: 'approved',
+        updated_at:         new Date().toISOString()
+      })
+    })
+    return r.ok
+  }
+
+  //    Render Cover Image card                                                
+  function renderCoverImageCard(eng) {
+    var sb        = _getSB()
+    var engId     = eng ? eng.id : ''
+    var engType   = eng ? (eng.type || 'generic') : 'generic'
+    var custSect  = eng && eng._cust ? (eng._cust.type || 'government') : 'government'
+    var status    = eng ? (eng.cover_image_status || 'none') : 'none'
+    var curPath   = eng ? (eng.cover_image_path || '') : ''
+    var versions  = eng ? (eng.cover_image_versions || []) : []
+    var curUrl    = (curPath && sb.url) ? _thumbnailUrl(sb.url, curPath) : ''
+    var nextVer   = _nextVersion(eng)
 
     var statusBadge = {
-      none:     '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#F1EFE8;color:#6B7280">Not set</span>',
+      none:     '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--light);color:var(--mid)">Not set</span>',
       draft:    '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#FFF3CD;color:#856404">Draft</span>',
-      approved: '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#E1F5EE;color:#085041">Approved</span>'
+      approved: '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#E1F5EE;color:#085041;font-weight:700">Approved v' + versions.length + '</span>'
     }[status] || ''
 
-    return '<div class="card" style="margin-bottom:12px">'
+    var html = '<div class="card" style="margin-bottom:12px">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
       + '<div class="card-title" style="margin-bottom:0">Engagement Cover Image ' + statusBadge + '</div>'
       + '</div>'
-      + '<div style="font-size:12px;color:var(--mid);margin-bottom:12px">Generated once, reused across all documents for this engagement. Gives the engagement a consistent visual identity.</div>'
+      + '<div style="font-size:12px;color:var(--mid);margin-bottom:12px">One image per engagement   reused on every document cover. Stored in Supabase.</div>'
 
-      // Preview area
-      + '<div id="cover-img-preview" style="width:100%;height:180px;background:var(--light);border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;overflow:hidden">'
-      + (status === 'approved' || status === 'draft'
-          ? '<div style="font-size:12px;color:var(--mid)">Image saved. Download from Drive or regenerate below.</div>'
-          : '<div style="font-size:12px;color:var(--mid)">No cover image yet. Generate one below.</div>')
-      + '</div>'
+    //    Current image preview   
+    html += '<div id="cover-img-preview" style="width:100%;height:180px;background:var(--light);border:1px solid var(--border);border-radius:6px;margin-bottom:12px;overflow:hidden;display:flex;align-items:center;justify-content:center">'
+    if (curUrl) {
+      html += '<img src="' + curUrl + '" style="width:100%;height:100%;object-fit:cover" '
+        + 'onerror="this.parentElement.innerHTML=\'<div style=&quot;font-size:12px;color:var(--mid);padding:12px&quot;>Image not found in storage</div>\'">'
+    } else {
+      html += '<div style="font-size:12px;color:var(--mid)">No cover image yet</div>'
+    }
+    html += '</div>'
 
-      // Style selector
-      + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">'
-      + '<label style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;white-space:nowrap">Style:</label>'
-      + '<select id="cover-img-style" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit">'
+    //    Generate section   
+    html += '<div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Generate with AI</div>'
+      + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'
+      + '<label style="font-size:11px;color:var(--mid);white-space:nowrap">Style:</label>'
+      + '<select id="cover-img-style" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;flex:1">'
       + '<option value="abstract_geometric">Abstract geometric</option>'
       + '<option value="architectural">Architectural</option>'
       + '<option value="data_viz">Data visualization</option>'
       + '</select>'
       + '</div>'
-
-      // Feedback input
-      + '<div style="margin-bottom:10px">'
-      + '<label style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;display:block;margin-bottom:4px">Feedback / direction</label>'
-      + '<input id="cover-img-feedback" type="text" placeholder="e.g. Make it darker, add mountain silhouettes, more abstract..." '
-      + 'style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit">'
-      + '</div>'
-
-      // Status message
-      + '<div id="cover-img-msg" style="font-size:12px;color:var(--mid);margin-bottom:10px;min-height:18px"></div>'
-
-      // Action buttons
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      + '<input id="cover-img-feedback" type="text" placeholder="Feedback / direction (optional)..." '
+      + 'style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;margin-bottom:8px;box-sizing:border-box">'
+      + '<div id="cover-img-msg" style="font-size:12px;color:var(--mid);margin-bottom:8px;min-height:16px"></div>'
+      + '<div style="display:flex;gap:6px">'
       + '<button class="btn btn-primary btn-sm" onclick="atlasCoverImageGenerate(\'' + engId + '\',\'' + engType + '\',\'' + custSect + '\')">&#10024; Generate draft</button>'
-      + (status === 'draft'
-          ? '<button class="btn btn-teal btn-sm" onclick="atlasCoverImageApprove(\'' + engId + '\')">&#10003; Use this</button>'
-          : '')
-      + '<button class="btn btn-ghost btn-sm" onclick="atlasCoverImageClear(\'' + engId + '\')">&#215; No graphic</button>'
+      + '<button id="cover-img-approve-btn" class="btn btn-teal btn-sm" onclick="atlasCoverImageApprove(\'' + engId + '\',' + nextVer + ')" style="display:none">&#10003; Use this</button>'
       + '</div>'
       + '</div>'
+
+    //    Upload section   
+    html += '<div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Upload from file</div>'
+      + '<div style="display:flex;gap:8px;align-items:center">'
+      + '<label class="btn btn-sm" style="cursor:pointer">&#128206; Choose image'
+      + '<input type="file" accept="image/png,image/jpeg,image/webp" style="display:none" '
+      + 'onchange="atlasCoverImageUpload(this,\'' + engId + '\',' + nextVer + ')">'
+      + '</label>'
+      + '<div id="cover-upload-msg" style="font-size:12px;color:var(--mid)"></div>'
+      + '</div>'
+      + '</div>'
+
+    //    Version history   
+    if (versions.length > 0) {
+      html += '<div style="border-top:1px solid var(--border);padding-top:12px">'
+        + '<div style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Version history</div>'
+      versions.slice().reverse().forEach(function(v) {
+        var isCurrent = v.path === curPath
+        var date = v.created_at ? new Date(v.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : ''
+        var srcLabel = { ai_generated:'AI generated', uploaded:'Uploaded' }[v.source] || v.source || ''
+        var thumbUrl = sb.url ? _thumbnailUrl(sb.url, v.path) : ''
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">'
+          + (thumbUrl ? '<img src="' + thumbUrl + '" style="width:48px;height:36px;object-fit:cover;border-radius:3px;border:' + (isCurrent?'2px solid var(--teal)':'1px solid var(--border)') + '" onerror="this.style.display=\'none\'">' : '')
+          + '<div style="flex:1">'
+          + '<div style="font-size:12px;font-weight:' + (isCurrent?700:400) + ';color:var(--dark)">v' + v.version + (isCurrent?' <span style="font-size:10px;color:var(--teal)">(current)</span>':'') + '</div>'
+          + '<div style="font-size:11px;color:var(--mid)">' + srcLabel + (date ? ' &bull; ' + date : '') + '</div>'
+          + '</div>'
+          + (!isCurrent ? '<button class="btn btn-sm btn-ghost" onclick="atlasCoverImageRestore(\'' + engId + '\',' + JSON.stringify(v).replace(/"/g,'&quot;') + ')" style="font-size:11px">Restore</button>' : '')
+          + '</div>'
+      })
+      html += '</div>'
+    }
+
+    html += '</div>'
+    return html
   }
 
   return {
     generateDraft:         generateDraft,
+    uploadToStorage:       uploadToStorage,
+    uploadFileToStorage:   uploadFileToStorage,
     saveToEngagement:      saveToEngagement,
     loadEngagementImage:   loadEngagementImage,
+    restoreVersion:        restoreVersion,
     renderCoverImageCard:  renderCoverImageCard,
-    buildPrompt:           buildPrompt,
-    STYLE_LABELS:          STYLE_LABELS,
-    ENG_TYPE_CONTEXT:      ENG_TYPE_CONTEXT
+    buildPrompt:           buildPrompt
   }
 })()
 
-//    Global handler functions (called from Docket HTML)                     
+//    Global handlers (called from Docket HTML)                              
 var _coverDraftData = null
 
 async function atlasCoverImageGenerate(engId, engType, custSect) {
@@ -1259,83 +1376,113 @@ async function atlasCoverImageGenerate(engId, engType, custSect) {
   var feedback = (document.getElementById('cover-img-feedback') || {}).value || ''
   var msg      = document.getElementById('cover-img-msg')
   var preview  = document.getElementById('cover-img-preview')
+  var approveBtn = document.getElementById('cover-img-approve-btn')
 
-  if (msg) msg.textContent = 'Generating... this takes 10-20 seconds'
-  if (msg) msg.style.color = 'var(--mid)'
-  if (preview) preview.innerHTML = '<div style="font-size:12px;color:var(--mid)">Generating draft...</div>'
+  if (msg) { msg.textContent = 'Generating... 15-20 seconds'; msg.style.color = 'var(--mid)' }
+  if (approveBtn) approveBtn.style.display = 'none'
 
-  // Append territory context if available
+  // Add territory context
   var feedbackFull = feedback
   if (typeof atlasMap !== 'undefined' && typeof CURRENT_ENG !== 'undefined' && CURRENT_ENG) {
     var tCtx = CURRENT_ENG._territoryPreset
       ? atlasMap.buildMapPromptContext(CURRENT_ENG._territoryPreset)
       : (CURRENT_ENG.territory_states && CURRENT_ENG.territory_states.length
-          ? atlasMap.buildMapPromptContext({states:CURRENT_ENG.territory_states, hubs:CURRENT_ENG.territory_hubs||[]})
+          ? atlasMap.buildMapPromptContext({ states: CURRENT_ENG.territory_states, hubs: CURRENT_ENG.territory_hubs || [] })
           : '')
     if (tCtx) feedbackFull = (feedback ? feedback + ' ' : '') + tCtx
   }
-  var result = await atlasCoverImage.generateDraft(engType, custSect, style, feedbackFull, function(p) {
-    if (msg) msg.textContent = p
-  })
+
+  var result = await atlasCoverImage.generateDraft(engType, custSect, style, feedbackFull)
 
   if (!result.success) {
-    if (msg) { msg.textContent = 'Error: ' + result.error; msg.style.color = 'var(--orange)' }
+    if (msg) { msg.textContent = result.error; msg.style.color = 'var(--orange)' }
     return
   }
 
-  // Show preview
   _coverDraftData = result
-  if (preview) {
-    preview.innerHTML = '<img src="' + result.dataUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:5px">'
-  }
-  if (msg) { msg.textContent = 'Draft ready. Happy with it? Click "Use this" or add feedback and regenerate.'; msg.style.color = 'var(--teal)' }
-
-  // Update status to draft in Supabase
-  var sb = (function(){try{var g=JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}');return{url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}}catch(e){return{url:'',key:''}}})()
-  if (sb.url && engId) {
-    fetch(sb.url + '/rest/v1/engagements?id=eq.' + engId, {
-      method: 'PATCH',
-      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ cover_image_status: 'draft', updated_at: new Date().toISOString() })
-    })
-  }
+  if (preview) preview.innerHTML = '<img src="' + result.dataUrl + '" style="width:100%;height:100%;object-fit:cover">'
+  if (msg) { msg.textContent = 'Draft ready. Happy with it? Click Use this.'; msg.style.color = 'var(--teal)' }
+  if (approveBtn) approveBtn.style.display = 'inline-flex'
 }
 
-async function atlasCoverImageApprove(engId) {
+async function atlasCoverImageApprove(engId, version) {
   if (!_coverDraftData) {
     var msg = document.getElementById('cover-img-msg')
     if (msg) { msg.textContent = 'Generate a draft first'; msg.style.color = 'var(--orange)' }
     return
   }
-  var result = await atlasCoverImage.saveToEngagement(engId, _coverDraftData.base64, _coverDraftData.mimeType)
   var msg = document.getElementById('cover-img-msg')
-  if (msg) {
-    msg.textContent = 'Saved as ' + result.filename + '. Upload this file to Drive then set its ID in the engagement.'
-    msg.style.color = 'var(--teal)'
+  if (msg) { msg.textContent = 'Uploading to Supabase...'; msg.style.color = 'var(--mid)' }
+
+  var upload = await atlasCoverImage.uploadToStorage(_coverDraftData.base64, _coverDraftData.mimeType, engId, version)
+  if (!upload.success) {
+    if (msg) { msg.textContent = 'Upload failed: ' + upload.error; msg.style.color = 'var(--orange)' }
+    return
   }
-  // Refresh docket
-  if (typeof renderDocket === 'function') {
-    if (CURRENT_ENG) CURRENT_ENG.cover_image_status = 'approved'
-    renderDocket()
+
+  var saved = await atlasCoverImage.saveToEngagement(engId, upload.path, upload.url, version, 'ai_generated')
+  if (saved) {
+    if (msg) { msg.textContent = 'Saved as v' + version; msg.style.color = 'var(--teal)' }
+    _coverDraftData = null
+    if (CURRENT_ENG) {
+      CURRENT_ENG.cover_image_path   = upload.path
+      CURRENT_ENG.cover_image_status = 'approved'
+      if (!CURRENT_ENG.cover_image_versions) CURRENT_ENG.cover_image_versions = []
+      CURRENT_ENG.cover_image_versions.push({ version: version, path: upload.path, url: upload.url, source: 'ai_generated', created_at: new Date().toISOString() })
+    }
+    setTimeout(function(){ if (typeof renderDocket === 'function') renderDocket() }, 500)
+  } else {
+    if (msg) { msg.textContent = 'Failed to save metadata'; msg.style.color = 'var(--orange)' }
+  }
+}
+
+async function atlasCoverImageUpload(input, engId, version) {
+  if (!input.files || !input.files[0]) return
+  var file = input.files[0]
+  var uploadMsg = document.getElementById('cover-upload-msg')
+  if (uploadMsg) { uploadMsg.textContent = 'Uploading...'; uploadMsg.style.color = 'var(--mid)' }
+
+  var upload = await atlasCoverImage.uploadFileToStorage(file, engId, version)
+  if (!upload.success) {
+    if (uploadMsg) { uploadMsg.textContent = 'Upload failed: ' + upload.error; uploadMsg.style.color = 'var(--orange)' }
+    return
+  }
+
+  var saved = await atlasCoverImage.saveToEngagement(engId, upload.path, upload.url, version, 'uploaded')
+  if (saved) {
+    if (uploadMsg) { uploadMsg.textContent = 'Saved as v' + version; uploadMsg.style.color = 'var(--teal)' }
+    if (CURRENT_ENG) {
+      CURRENT_ENG.cover_image_path   = upload.path
+      CURRENT_ENG.cover_image_status = 'approved'
+      if (!CURRENT_ENG.cover_image_versions) CURRENT_ENG.cover_image_versions = []
+      CURRENT_ENG.cover_image_versions.push({ version: version, path: upload.path, url: upload.url, source: 'uploaded', created_at: new Date().toISOString() })
+    }
+    setTimeout(function(){ if (typeof renderDocket === 'function') renderDocket() }, 500)
+  }
+}
+
+async function atlasCoverImageRestore(engId, versionEntry) {
+  var ok = await atlasCoverImage.restoreVersion(engId, versionEntry)
+  if (ok) {
+    if (CURRENT_ENG) CURRENT_ENG.cover_image_path = versionEntry.path
+    if (typeof renderDocket === 'function') renderDocket()
   }
 }
 
 async function atlasCoverImageClear(engId) {
   var sb = (function(){try{var g=JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}');return{url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}}catch(e){return{url:'',key:''}}})()
-  if (sb.url && engId) {
-    await fetch(sb.url + '/rest/v1/engagements?id=eq.' + engId, {
-      method: 'PATCH',
-      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ cover_image_status: 'none', cover_image_drive_id: null, updated_at: new Date().toISOString() })
-    })
-  }
+  if (!sb.url) return
+  await fetch(sb.url + '/rest/v1/engagements?id=eq.' + engId, {
+    method: 'PATCH',
+    headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ cover_image_path: null, cover_image_status: 'none', updated_at: new Date().toISOString() })
+  })
   _coverDraftData = null
-  var preview = document.getElementById('cover-img-preview')
-  if (preview) preview.innerHTML = '<div style="font-size:12px;color:var(--mid)">No cover image. Documents will use a colour block.</div>'
-  var msg = document.getElementById('cover-img-msg')
-  if (msg) { msg.textContent = 'Cover image removed'; msg.style.color = 'var(--mid)' }
-  if (CURRENT_ENG) CURRENT_ENG.cover_image_status = 'none'
+  if (CURRENT_ENG) { CURRENT_ENG.cover_image_path = null; CURRENT_ENG.cover_image_status = 'none' }
+  if (typeof renderDocket === 'function') renderDocket()
 }
+
+
 
 // ===========================================================================
 // Territory Map Generator v2   real GeoJSON projection
