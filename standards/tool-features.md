@@ -1,265 +1,290 @@
 # tool-features.md
 # ATLAS Tool Features & Inventory
-# Version: 1.0 | Last Updated: 2026-05-13
+# Version: 2.0 | Last Updated: 2026-06-14
 
 ---
 
 ## Overview
 
-This file is the canonical reference for all ATLAS tools — what each tool does, its current feature set, status, GitHub path, and Drive location. Use this file to orient Claude at the start of any session involving tool development, updates, or document generation.
+This file is the canonical reference for all ATLAS tools — what each tool does, its current status, GitHub path, Supabase tables it reads/writes, and known gaps. Use this at the start of any session involving tool development, integration, or document generation.
+
+**Platform URL:** https://arvindbajaj5.github.io/atlas-platform/
+**Stack:** GitHub Pages (frontend), Supabase (database), Google Drive (documents)
+**Auth model:** 4 roles — Business Head, Sales & Sales Support, Pre-Sales, Operations
+**Supabase connectivity:** All tools read `atlas_global_cfg` from localStorage using `sbUrl`/`sbKey` property names. Never use `atlas_global` or `sb_url`/`sb_key` — this breaks connectivity silently.
 
 ---
 
-## Tool Inventory
+## Lifecycle Stage → Tool Mapping
 
-### 1. ATLAS Portal
-**GitHub Path:** `index.html`
-**Status:** ✅ Live
-**Role:** Business Head, Sales & Sales Support, Pre-Sales, Operations (role-gated)
-**Description:** Main launch page for the ATLAS platform. Displays all tools, project library, lifecycle bar, and platform stats. Links to each tool via GitHub Pages URLs.
-
-**Features:**
-- Role-gated access (4 roles: Business Head, Sales & Sales Support, Pre-Sales, Operations)
-- 8-stage lifecycle bar (Prospect → Renew) with tool-to-stage mapping
-- Project library (Supabase-backed)
-- Stats bar: projects, opportunities, tools live, coming soon
-- Tool launcher with `?project=<id>` context passing
-- Company logo upload via Settings (Business Head only), stored as base64
-- Engineering To-Do panel
-- Settings panel with platform info
-
----
-
-### 2. Portfolio Portal (AI Portfolio Portal)
-**GitHub Path:** `tools/portfolio-portal/index.html`
-**Status:** ✅ Live
-**Role:** Sales & Sales Support, Business Head
-**Description:** Opportunity creation and portfolio item activation tool. Allows sales to define an opportunity and select relevant portfolio items from the 26-item catalogue.
-
-**Features:**
-- 26 portfolio items across 5 lifecycle phases (Explore, Pilot, Train, Run, Govern & Scale)
-- 2×2 customer segmentation (4 archetypes: Q1–Q4)
-- Opportunity creation with customer, segment, complexity
-- Portfolio item activation per opportunity
-- Export opportunity to RAC pipeline (localStorage handoff)
-- Import from/to RAC Tool
-
----
-
-### 3. RAC Pipeline Tool
-**GitHub Path:** `tools/rac-tool/index.html`
-**Status:** ✅ Live v2.0
-**Role:** Sales & Sales Support, Business Head
-**Description:** Revenue, Activity, and Coverage pipeline management tool. Tracks all opportunities through 8 pipeline stages with Kanban, List, and Dashboard views.
-
-**Features:**
-- 8-stage pipeline: Prospect → Qualify → Instantiate → Size → Propose → Win → Deliver → Renew
-- Kanban, List, and Dashboard views
-- Opportunity drawer with stage progress, next actions, portfolio items, activity feed
-- Multi-currency support: USD, INR, EUR, GBP, AED, SGD
-- Stage-specific next actions with tool deep-links
-- Import from Portfolio Portal (localStorage)
-- Weighted pipeline value calculation
-- Charts: pipeline by stage, by type, by size, by domain
-- Vision Doc and COMPASS flags per opportunity
-- PPTX and XLSX export *(status: to be tested)*
-
-**Pending:** Export testing (PPTX + XLSX)
-
----
-
-### 4. Domain Configurator
-**GitHub Path:** `tools/domain-configurator/index.html`
-**Status:** ✅ Live v2
-**Role:** Pre-Sales, Business Head
-**Description:** Requirement capture and project definition tool. Outputs a Project Definition File (JSON + MD) consumed by all downstream tools.
-
-**Features:**
-- Domain selection (Geospatial, Defence, Enterprise AI, HPC, Sovereign Platform)
-- Use case capture (up to 40, with category, priority, model type)
-- Persona definition
-- Architecture tier selection (Tier 1–4)
-- Volumetrics input (users, RPS, tokens, latency SLA, model sizes)
-- Commercial parameters (currency, size, channel, procurement route)
-- Flag setting (vision doc, COMPASS, air-gap, classified, modular DC)
-- Export: JSON project definition file + Markdown summary
-- Requirements Document generation *(planned — not yet built)*
-- Project Brief generation *(planned — not yet built)*
-
----
-
-### 5. AI Inferencing Factory
-**GitHub Path:** `tools/inferencing-factory/index.html`
-**Status:** ✅ Live v2.2
-**Role:** Pre-Sales, Business Head
-**Description:** Hardware sizing and BOM generation tool for AI inferencing workloads. Domain-aware with 40 pre-loaded NE India GeoAI use cases.
-
-**Features:**
-- Workload sizing by use case type (LLM, Vision, Multimodal, Satellite/EO)
-- GPU and server BOM generation
-- Storage, networking, cooling BOM
-- Power and space estimates
-- Commercial parameters (margin, currency, AMC)
-- GeoAI import (JSON upload of use case set)
-- 40 NE India use cases pre-loaded
-- PPTX BOM export
-- Profiler view
-- Technical Architecture Document (TAD) generation *(planned — not yet built)*
-
----
-
-### 6. Deal Analysis Tool
-**GitHub Path:** `tools/deal-analysis/index.html`
-**Status:** ✅ Live (as-is; pending updates TBD)
-**Role:** Sales & Sales Support, Business Head
-**Description:** Full deal lifecycle financial analysis tool for HPC/supercomputer deals.
-
-**Features:**
-- 13 tabs: Dashboard, Deal Overview, Channel, Key Financials, Milestones, Cash Flow, Profitability, Penalty, Delivery Planning, Risk Analysis, IFRS 15, Forex, Settings
-- Multi-currency (deal, supply, reporting)
-- Milestone-based payment schedule (6 cash-in, 10 cash-out)
-- Cumulative cash flow chart
-- Peak cash requirement, negative cash duration metrics
-- What-if penalty scenarios
-- IFRS 15 revenue recognition (point-in-time and POC)
-- Forex rate projection
-- Delivery planning with delay tracking
-- BG commission, risk contingency, transport costs
-- JSON save/load
-- Logo upload via Settings
-- PPTX export with cash profile and cash curve
-- Sample scenario: $60M deal (DEAL-2026-0042)
-
-**Pending updates:** Not yet defined — deferred.
-
----
-
-### 7. Vision Document Factory
-**GitHub Path:** `tools/vision-document/index.html`
-**Status:** ✅ Live
-**Role:** Pre-Sales, Business Head
-**Description:** Claude API-powered vision document generator. Standalone tool — generates the first document in an engagement, before project definition data exists.
-
-**Features:**
-- Customer context input (name, sector, challenge, objectives)
-- Domain selection
-- Claude API call generating structured vision document
-- Sections: Executive Summary, Strategic Context, Vision Statement, Proposed Solution, Benefits, Next Steps
-- Export as .txt / copy to clipboard
-- Draft watermark
-
----
-
-### 8. Benchmark Tool
-**GitHub Path:** `tools/benchmark-tool/index.html`
-**Status:** ✅ Live
-**Role:** Pre-Sales, Business Head
-**Description:** GPU/hardware performance benchmark reference and comparison tool.
-
-**Features:**
-- Benchmark database (reference data)
-- GPU performance comparison across model types
-- Throughput, latency, and power efficiency metrics
-- Filter by model size, GPU class, workload type
-
----
-
-### 9. AI Sovereignty Index
-**GitHub Path:** `tools/ai-sovereignty-index/index.html`
-**Status:** ✅ Live v2.1
-**Role:** Pre-Sales, Business Head
-**Description:** Strategic evaluation tool scoring AI proposals across Sovereignty (ASI), Supremacy (API), and Platform Vitality (PVS) over a 6-year lifecycle.
-
-**Features:**
-- LASI composite scoring (weighted: Y1=10%, Y3=30%, Y6=60%)
-- Three dimensions: ASI (40%), API (40%), PVS (20%)
-- Year 1, 3, 6 scoring inputs per dimension
-- Strategic Growth Vector (bubble chart with trajectory arrows)
-- Dimension Radar chart (Y1/Y3/Y6 overlay)
-- Multi-proposal comparison table (ranked by LASI)
-- Classifications: Strategic Champion, Secure Niche, Tactical Dependency, Standard Market
-- Session save/load (JSON)
-- PPTX export
-- XLSX export
-- **Evaluation Report** (Claude API — generates 600–800 word strategic report with Executive Summary, Positioning, Trajectory, Risks, Recommendations, Investment Verdict)
-
----
-
-### 10. COMPASS
-**GitHub Path:** `tools/compass/index.html`
-**Status:** ✅ Live v2.0
-**Role:** Pre-Sales, Business Head
-**Description:** Token governance, workload scheduling, and latency OLA framework tool for Sovereign AI Platform engagements.
-
-**Features:**
-- Token governance framework
-- Workload scheduling model
-- Latency OLA definition
-- National metrics reporting framework
-- Hub-spoke-edge architecture reference
-- Indigo sub-brand palette
-
----
-
-### 11. HPC Monitoring
-**GitHub Path:** `tools/hpc-monitoring/index.html`
-**Status:** ✅ Live
-**Role:** Operations, Business Head
-**Description:** Live cluster performance monitoring dashboard.
-
-**Features:**
-- GPU utilisation, memory, temperature monitoring
-- Job queue status
-- Node health overview
-- Alert indicators
-
----
-
-## Planned / Not Yet Built
-
-| Tool | Description | Priority |
-|---|---|---|
-| Requirements Document (in Domain Configurator) | Auto-generate requirements doc from project definition | Medium |
-| Project Brief (in Domain Configurator) | Auto-generate project brief from project definition | Medium |
-| TAD (in Inferencing Factory) | Technical Architecture Document from BOM | Medium |
-| Solution Presentation PPTX (in Portfolio Portal) | Customer-facing solution deck | On Hold |
-| Second Brain domain files | geospatial.md, defence.md, enterprise.md | Medium |
-| tool-features.md v1.1 | Visualisation standards update | Low |
-
----
-
-## GitHub Pages URL Convention
-
-Base URL: `https://[username].github.io/atlas-platform/`
-
-| Tool | URL Path |
+| Stage | Tools |
 |---|---|
-| Portal | `/` |
-| Portfolio Portal | `/tools/portfolio-portal/` |
-| RAC Pipeline | `/tools/rac-tool/` |
-| Domain Configurator | `/tools/domain-configurator/` |
-| Inferencing Factory | `/tools/inferencing-factory/` |
-| Deal Analysis | `/tools/deal-analysis/` |
-| Vision Document | `/tools/vision-document/` |
-| Benchmark Tool | `/tools/benchmark-tool/` |
-| AI Sovereignty Index | `/tools/ai-sovereignty-index/` |
-| COMPASS | `/tools/compass/` |
-| HPC Monitoring | `/tools/hpc-monitoring/` |
+| 1. Intelligence | Intelligence Scraper (background + portal), PEI Tool, Second Brain |
+| 2. Engagement | Engagement Docket |
+| 3. Pre-Sales (HL) | SASC, TSAP Financial Model |
+| 4. Pre-Sales (DL) | AI Inferencing Factory (planned rebuild) |
+| 5. Sales | RAC Pipeline, Deal Analysis (JSON-based, pending Supabase migration) |
+| 6. Operations | COMPASS, HPC Monitoring (planned) |
 
 ---
 
-## Role Access Matrix
+## Tool 1: ATLAS Portal
 
-| Tool | Business Head | Sales & Sales Support | Pre-Sales | Operations |
-|---|---|---|---|---|
-| Portal | ✅ Full | ✅ Full | ✅ Full | ✅ Full |
-| Portfolio Portal | ✅ | ✅ | — | — |
-| RAC Pipeline | ✅ | ✅ | Read | — |
-| Domain Configurator | ✅ | — | ✅ | — |
-| Inferencing Factory | ✅ | — | ✅ | — |
-| Deal Analysis | ✅ | ✅ | — | Read |
-| Vision Document | ✅ | — | ✅ | — |
-| Benchmark Tool | ✅ | — | ✅ | — |
-| AI Sovereignty Index | ✅ | — | ✅ | — |
-| COMPASS | ✅ | — | ✅ | — |
-| HPC Monitoring | ✅ | — | — | ✅ |
+**Path:** `index.html`
+**Status:** ✅ Live
+**Supabase tables:** `intelligence_items`, `tsap_unit_costs`, `usage_last_30d` (view)
+
+**Features:**
+- Role-gated nav (4 roles)
+- Tool launcher with stage grouping
+- Settings panel: API keys, Supabase config, model tiers (7 task types), exchange rates, API usage dashboard, TSAP unit costs (inline editable)
+- `gemini-2.0-flash` in ATLAS_MODEL_REGISTRY and all 7 tier selects (no duplicates — fixed June 2026)
+- TSAP FM in Pre-Sales stage
+
+**Known issues:** None currently
+
+---
+
+## Tool 2: Intelligence Scraper (Background — GitHub Actions)
+
+**Path:** `scripts/scrape-intelligence.js` + `.github/workflows/scrape_intelligence.yml`
+**Status:** ✅ Live
+**Schedule:** Weekly cron — Sunday 2:00 AM IST (30 20 * * 0)
+**Supabase tables:** `intelligence_items`, `scrape_runs`, `semantic_contexts`, `api_usage_log`, `app_config`, `feed_library`
+
+**Features:**
+- Two-phase pipeline: Phase 1 keyword pre-filter (free) → Phase 2 Gemini semantic matching (batched 5:1)
+- 8 search domains + 3 global topics, all using `gemini-2.0-flash` with search grounding
+- TTL-based domain skipping: adaptive TTL (7d → 14d → 21d) after empty runs
+- Content hash deduplication (3 layers: URL, title normalisation, content hash)
+- "Published after" constraint in grounding prompt
+- All API calls logged to `api_usage_log` (flushed at end of run)
+- scrape_runs starts empty — needs one manual trigger to populate domain locking indicators
+
+**Model:** `gemini-2.0-flash` (search grounding support, $0.10/$0.40 per 1M tokens)
+
+---
+
+## Tool 3: Intelligence Scraper (Portal — On-demand)
+
+**Path:** `tools/intelligence-scraper/index.html`
+**Status:** ✅ Live
+**Supabase tables:** `intelligence_items`, `scrape_runs`, `app_config`, `api_usage_log`, `scraping_metadata`, `uc_queue`
+
+**Features:**
+- Domain grid: last scraped date, items added, TTL lock status (locked tiles greyed)
+- Same two-phase pipeline as background scraper
+- Usage logging via `atlasLogUsage()` after each Gemini call
+- **Test DB panel** (added June 2026): Load / Reload / Wipe buttons
+  - Master data from `standards/test-data/intelligence_items_master.json` in GitHub
+  - All test rows tagged: `source_type='test'`, `is_real=false`, `scraped_by='test-master-v1'`
+  - Wipe only deletes `source_type=test AND is_real=false` — real data safe
+
+---
+
+## Tool 4: PEI Tool (Pre-Engagement Intelligence)
+
+**Path:** `tools/pei-tool/index.html`
+**Status:** ✅ Live
+**Supabase tables:** `intelligence_items`, `pei_cache`
+
+**Features:**
+- Generates structured intelligence brief for a named organisation
+- Model: `gemini-3.5-flash` (customer-facing quality; `maxOutputTokens: 4096`)
+- 30-day cache: offers cached version if regenerated within 30 days
+- Queries `intelligence_items` for domain-matched signals
+- Usage logging: `atlasLogUsage()` after `savePEICache()` call
+- Standard `atlas-nav-btn` back button → `window.location.href='../../'`
+
+---
+
+## Tool 5: Second Brain
+
+**Path:** `tools/second-brain/index.html`
+**Status:** ✅ Live
+**Supabase tables:** `intelligence_items`, `uc_library`, `uc_queue`, `engagements`, `docket_items`
+
+**Features:**
+- Processes intelligence items into structured signals
+- **UC Suggestion from Intel** (added June 2026):
+  - "+ Suggest UC" button on every intel detail modal
+  - Pre-fills Enrich UC modal from intel item (title, opportunity, summary, domain)
+  - Saves with `status='suggested'`, `suggested_by='second_brain'`, `suggested_from=<intel_id>`
+- **UC Review Queue** (added June 2026):
+  - Shows all `status='suggested'` UCs at top of UC tab
+  - Per UC: Approve (→ `status='active'`) | Enrich (open modal, save marks active) | Reject (→ `status='rejected'` + reason)
+  - Queue refreshes automatically after each action
+- Modal mode indicator: shows "Saving as Suggested" vs "Enriching suggestion" context
+- `enrichModalMode` div in modal HTML for mode display
+
+---
+
+## Tool 6: Engagement Docket
+
+**Path:** `tools/engagement-docket/index.html`
+**Status:** ✅ Live (rebuilt June 2026)
+**Supabase tables:** `customers`, `engagements`, `engagement_dockets`, `docket_items`, `uc_library`
+
+**Features:**
+- Sidebar: customers list + engagements nested, + buttons to create new
+- Full docket header: engagement name, customer, owner, type/status badges, SASC + FM shortcut buttons
+- **6 tabs:**
+  - **Overview:** KPI row (UCs, open actions, outputs, strategy), customer profile grid, strategy snapshot, top 3 open actions
+  - **Use Cases:** UC cards from `uc_library` (name, cluster, complexity, status: agreed/proposed/scratched). UC modal with cluster filter + search across 69 active UCs. Agree/Scratch/Remove per UC
+  - **Actions:** Grouped by Open / Blocked / Done. Owner badge, due date, overdue highlight. Add/Edit/Complete/Delete
+  - **Strategy:** Position / Key pitch / Watch points. Edit modal. Upserts to `docket_items` as `section='strategy'`
+  - **Outputs:** All `section='output'` docket items. Links to SASC/FM/PEI with `?eng=` param
+  - **History:** All docket items sorted newest first
+- New customer + new engagement creation with auto `docket_id` generation
+- Reads `engagements.docket_id` (new column); falls back to `engagement_dockets` for older records
+
+**Data model — pointer-based (no data copies):**
+- `section`: profile | strategy | uc | action | output | note | agreement
+- `ref_table`: pointer to source table (uc_library, intelligence_items, pei_cache, etc.)
+- `ref_id`: pointer to source row
+- `sort_order`: display ordering
+
+---
+
+## Tool 7: SASC (Sovereign AI Stack Configurator)
+
+**Path:** `tools/sasc/index.html`
+**Status:** ✅ Live
+**Supabase tables:** `uc_library`, `docket_items`, `engagements`, `ai_models`, `gpu_configs`, `benchmark_results`, `uc_interaction_types`, `uc_workload_profiles`, `pricing_params`, `fx_rates`, `people_params`
+
+**Features:**
+- 4-screen flow: Scope & DC → Stack Layers → Workload Profiler → BOM + ROM
+- **UC selector** (updated June 2026): loads from `uc_library` with `status='active'` — all 69 UCs
+  - Pre-selects UCs already in docket via `docket_items.ref_id` pointers
+  - Cluster filter buttons (All / Agriculture / Water / Emergency / Aircraft Safety / Crew Safety etc.)
+  - UC cards show `uc_name` + complexity badge (colour-coded: teal=simple, grey=medium, orange=complex, purple=research)
+  - Shows "X of 69 selected" count
+- **Live FX rates** (added June 2026): tries `frankfurter.app` first (4s timeout), falls back to Supabase `fx_rates`
+  - On successful live fetch: saves fresh rates to `app_config` + appends to `exchange_rate_history`
+  - `saveFxRatesToConfig()` runs in background — non-blocking
+- RPS-based compute sizing (not token-based) using `benchmark_results` table
+- People model: auto-suggested from scope + UC count, COLA + ramp, T&M/Fixed/Hybrid
+- ROM Summary tab: "Financial Model →" button (teal) → opens TSAP FM with `?eng=`
+- **Scope:** Not TSAP-only — works for TSAP, CSP, AI Lab, Inferencing Provider, Enterprise. Engagement type drives UC filter, tokenomics mode, BOM framing.
+
+**FX default rates (as of June 2026):** USD/INR=95.76, USD/EUR=0.865, EUR/INR=110.70
+
+---
+
+## Tool 8: TSAP Financial Model
+
+**Path:** `tools/tsap-financial-model/index.html`
+**Status:** ✅ Live
+**Supabase tables:** `engagements`, `docket_items`, `tsap_unit_costs`, `tsap_funding_sources`, `tsap_scenarios`
+
+**Features:**
+- 6 tabs: Programme Cost | Funding Sources | Funding Gap | Revenue Model | Cash Flow | What-If
+- Demand derived from SASC output × unit costs from `tsap_unit_costs` (50 rows)
+- Supply: full loan instrument modelling (EMI, grace, moratorium, repayment type)
+- Revenue (Track 2): Bear/Base/Bull, CAGR, capture %, ramp, gross margin, GST
+- Cash flow: quarterly, peak cash, break-even quarter, NPV, IRR (Chart.js)
+- What-if scenarios saveable to `tsap_scenarios` per engagement
+- **Currency selector** (added June 2026): INR / USD / EUR — rendered next to tab bar
+- **Live FX rates** (added June 2026): same frankfurter.app → app_config fallback pattern as SASC
+- `fmtCr()` and `fmtCrFull()` currency-aware: INR=Rs Cr, USD=$M, EUR=EUR M
+- Standard atlas-hdr masthead with ATLAS brand, engagement badge, KPI row, Portal back button
+
+**Note:** Unit costs in `tsap_unit_costs` apply across SASC and AI Inferencing Factory — not TSAP-specific despite table name.
+
+---
+
+## Tool 9: RAC Pipeline Tool
+
+**Path:** `tools/rac-tool/index.html`
+**Status:** ⚠️ Live but JSON-based (Supabase migration pending)
+**Current storage:** localStorage / JSON
+
+**Features:**
+- Opportunity tracking across sales stages
+- Revenue, account, contribution reporting
+- Pending: migrate to Supabase `sales_actions` table and new schema
+
+---
+
+## Tool 10: Deal Analysis Tool
+
+**Path:** `tools/deal-analysis/index.html`
+**Status:** ⚠️ Live but JSON-based (Supabase migration pending)
+**Current storage:** localStorage / JSON
+
+**Features:**
+- 12-tab deal analysis with Chart.js charts
+- PPTX export via pptxgenjs
+- AMC phase modelling, cash flow, IFRS 15, forex
+- Pending: migrate to Supabase
+
+---
+
+## Tool 11: AI Inferencing Factory
+
+**Path:** `tools/inferencing/index.html`
+**Status:** ⚠️ Live (v2.2) but requires redesign
+**Current storage:** JSON / in-memory
+
+**Features (current v2.2):**
+- Token economy model + pricing
+- GPU sizing from benchmark profiles
+- Revenue model (Track 2): Bear/Base/Bull
+
+**Planned redesign:**
+- Takes SASC BOM output as starting point (not standalone)
+- Goes deeper: benchmark run design + script generation
+- Near-final technical price (not ROM)
+- Full token economy pricing model (input/output cost per token by model)
+- Supabase-backed
+
+---
+
+## Tool 12: COMPASS
+
+**Path:** `tools/compass/index.html`
+**Status:** ✅ Live (standalone)
+**Features:** Token governance across 6 pillars — Latency OLA, Token Economy/MOAT, Load Intelligence, Transparency/Provenance, Behavioural Nudge, Sovereign Metrics
+
+---
+
+## Shared Standards
+
+### Masthead (all tools)
+```css
+.atlas-hdr — standard navy header, 52px height, sticky
+.atlas-brand — "ATL<span>A</span>S" with orange A
+.atlas-tool-name — tool identifier badge
+.atlas-nav-btn — ghost button, rgba white border
+.atlas-ver — version pill, orange on dark background
+```
+Back buttons: always `window.location.href='../../'` — never `history.back()`
+
+### Supabase connectivity
+```js
+// Always use this pattern — never atlas_global or sb_url/sb_key
+var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}')
+var sb = { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
+```
+
+### Usage logging
+`atlasLogUsage(params)` — shared function in PEI, Intel Scraper, TSAP FM
+Logs to `api_usage_log`: tool, call_type, provider, model, input_tokens, output_tokens, cost_usd, latency_ms
+
+### Currency architecture
+- **USD:** Procurement / cost side
+- **EUR:** Internal reporting
+- **INR:** Customer-facing (Indian numbering: Cr / Lakh)
+- Live rates via frankfurter.app, fallback via Supabase `app_config`
+
+---
+
+## Pending — Next Sprint
+
+| Item | Priority |
+|---|---|
+| AI Inferencing Factory redesign | High |
+| RAC Pipeline → Supabase migration | Medium |
+| Deal Analysis → Supabase migration | Medium |
+| HPC Monitoring tool | Low |
+| Operations carve-out | Low |
