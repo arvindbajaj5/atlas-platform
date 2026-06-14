@@ -218,15 +218,60 @@ function showToast(msg, duration) {
 
 // -- Currency formatting -------------------------------------------------------
 var SASC_CURRENCY = localStorage.getItem('sasc_currency') || 'USD'
-var FX_RATES = { USD: 1, INR: 84.20, EUR: 0.93 }
+var FX_RATES = { USD: 1, INR: 95.76, EUR: 0.865, EUR_INR: 110.7, _source: 'config', _date: '' }
 
 async function loadFxRates() {
+  try {
+    var ctrl = new AbortController()
+    var timeout = setTimeout(function(){ ctrl.abort() }, 4000)
+    var r = await fetch('https://api.frankfurter.app/latest?from=USD&to=INR,EUR', { signal: ctrl.signal })
+    clearTimeout(timeout)
+    if (r.ok) {
+      var data = await r.json()
+      if (data && data.rates) {
+        if (data.rates.INR) FX_RATES.INR = data.rates.INR
+        if (data.rates.EUR) FX_RATES.EUR = data.rates.EUR
+        if (FX_RATES.INR && FX_RATES.EUR) FX_RATES.EUR_INR = Math.round(FX_RATES.INR / FX_RATES.EUR * 100) / 100
+        FX_RATES._source = 'live'
+        FX_RATES._date = data.date || new Date().toISOString().slice(0,10)
+        saveFxRatesToConfig()
+        return
+      }
+    }
+  } catch(e) {}
   var rows = await sbFetch('fx_rates', 'from_currency=eq.USD&order=effective_date.desc', 20)
   if (rows && rows.length) {
-    rows.forEach(function(r) {
-      FX_RATES[r.to_currency] = r.rate
-    })
+    rows.forEach(function(r) { FX_RATES[r.to_currency] = r.rate })
+    FX_RATES._source = 'supabase'
   }
+}
+
+async function saveFxRatesToConfig() {
+  var sb = getSB(); if (!sb.url) return
+  var today = FX_RATES._date || new Date().toISOString().slice(0,10)
+  var patches = [
+    { key: 'fx_usd_inr', value: String(FX_RATES.INR) },
+    { key: 'fx_usd_eur', value: String(FX_RATES.EUR) },
+    { key: 'fx_eur_inr', value: String(FX_RATES.EUR_INR || '') },
+    { key: 'fx_updated_at', value: today }
+  ]
+  patches.forEach(function(p) {
+    fetch(sb.url + '/rest/v1/app_config?key=eq.' + p.key, {
+      method: 'PATCH',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ value: p.value, updated_at: new Date().toISOString() })
+    }).catch(function(){})
+  })
+  var histRows = [
+    { currency_pair: 'USD_INR', rate: FX_RATES.INR, effective_date: today, source: 'frankfurter_api', notes: 'Auto-fetched' },
+    { currency_pair: 'USD_EUR', rate: FX_RATES.EUR, effective_date: today, source: 'frankfurter_api', notes: 'Auto-fetched' },
+    { currency_pair: 'EUR_INR', rate: FX_RATES.EUR_INR, effective_date: today, source: 'frankfurter_api', notes: 'Derived' }
+  ]
+  fetch(sb.url + '/rest/v1/exchange_rate_history', {
+    method: 'POST',
+    headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+    body: JSON.stringify(histRows)
+  }).catch(function(){})
 }
 
 function fmtMoney(usdVal, currency) {
@@ -694,12 +739,14 @@ async function init() {
       document.getElementById('hdr-eng-label').innerHTML =
         '<strong>' + esc(SASC_DATA.customerName) + '</strong> &mdash; ' + esc(SASC_DATA.engName)
     }
-    // Load UC docket items
+    // Load UCs from uc_library (status=active) + pre-select from docket
+    var libraryUCs = await sbFetch('uc_library', 'status=eq.active&order=cluster.asc,uc_name.asc', 200)
+    ALL_UCS = libraryUCs || []
     if (SASC_DATA.docketId) {
-      var docketItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_type=eq.uc', 50)
-      ALL_UCS = docketItems || []
-      if (!SASC_DATA.selectedUCs.length && ALL_UCS.length) {
-        SASC_DATA.selectedUCs = ALL_UCS.map(function(u) { return u.id })
+      var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_type=eq.use_case', 100)
+      var docketRefs = (docketUCItems || []).map(function(d) { return d.ref_id }).filter(Boolean)
+      if (!SASC_DATA.selectedUCs.length && docketRefs.length) {
+        SASC_DATA.selectedUCs = docketRefs
       }
     }
   } else {
@@ -712,6 +759,11 @@ async function init() {
   // Adjust layers by scope on first load
   adjustLayersByScope(SASC_DATA.scope)
 
+  renderStep(1)
+}
+
+function setSASCUCFilter(cluster) {
+  SASC_DATA.ucClusterFilter = cluster
   renderStep(1)
 }
 
@@ -799,18 +851,36 @@ function renderScreen1() {
 
   var ucHtml = ''
   if (ALL_UCS.length) {
-    ucHtml = '<div class="card"><div class="card-title">Use cases from docket</div>'
-      + '<div class="card-sub">Select which UCs to include in this configuration</div>'
-      + '<div class="uc-grid">'
-      + ALL_UCS.map(function(u) {
-          var sel = s.selectedUCs.indexOf(u.id) >= 0
-          return '<div class="uc-pill ' + (sel ? 'selected' : 'unselected') + '" data-id="' + u.id + '" onclick="toggleUC(this.dataset.idset.id)>'
-            + (sel ? '&#10003; ' : '') + esc(u.title || 'UC') + '</div>'
-        }).join('')
-      + '</div></div>'
+    var allClusters = []
+    ALL_UCS.forEach(function(u) { if (u.cluster && allClusters.indexOf(u.cluster) < 0) allClusters.push(u.cluster) })
+    allClusters.sort()
+    var ucFilter = SASC_DATA.ucClusterFilter || 'all'
+    var visibleUCs = ucFilter === 'all' ? ALL_UCS : ALL_UCS.filter(function(u) { return u.cluster === ucFilter })
+    var selCount = s.selectedUCs.length
+    var ucFilterBtns = '<button onclick="setSASCUCFilter(\'all\')" style="padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:' + (ucFilter==='all'?700:500) + ';border:1px solid ' + (ucFilter==='all'?'var(--navy)':'var(--border)') + ';background:' + (ucFilter==='all'?'var(--navy)':'transparent') + ';color:' + (ucFilter==='all'?'#fff':'var(--mid)') + '">All (' + ALL_UCS.length + ')</button>'
+    ucFilterBtns += allClusters.map(function(c) {
+      var cnt = ALL_UCS.filter(function(u){ return u.cluster===c }).length
+      var on = ucFilter === c
+      return '<button onclick="setSASCUCFilter(\'' + c + '\')" style="padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:' + (on?700:500) + ';border:1px solid ' + (on?'var(--navy)':'var(--border)') + ';background:' + (on?'var(--navy)':'transparent') + ';color:' + (on?'#fff':'var(--mid)') + '">' + esc(c) + ' (' + cnt + ')</button>'
+    }).join('')
+    var ucCards = visibleUCs.map(function(u) {
+      var sel = s.selectedUCs.indexOf(u.id) >= 0
+      var cmap = {simple:'var(--teal)',medium:'var(--mid)',complex:'var(--orange)',research:'#8B5CF6'}
+      var cc = u.complexity ? (cmap[u.complexity] || 'var(--mid)') : ''
+      return '<div class="uc-pill ' + (sel ? 'selected' : 'unselected') + '" data-id="' + u.id + '" onclick="toggleUC(this.dataset.id)">'
+        + (sel ? '&#10003; ' : '') + esc(u.uc_name || 'UC')
+        + (u.complexity ? '<span style="font-size:9px;margin-left:4px;color:' + cc + '">' + u.complexity + '</span>' : '')
+        + '</div>'
+    }).join('')
+    ucHtml = '<div class="card">'
+      + '<div class="card-title">Use Cases <span style="font-size:11px;font-weight:400;color:var(--mid)">(' + selCount + ' of ' + ALL_UCS.length + ' selected)</span></div>'
+      + '<div class="card-sub" style="margin-bottom:8px">Select UCs for this configuration from the active UC Library.</div>'
+      + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">' + ucFilterBtns + '</div>'
+      + '<div class="uc-grid">' + ucCards + '</div>'
+      + '</div>'
   } else {
     ucHtml = '<div class="card" style="border-left:3px solid var(--amber)">'
-      + '<div class="card-sub">&#9888; No UC items in docket. Add UCs from the UC Library first, or continue without -- compute sizing will use defaults.</div></div>'
+      + '<div class="card-sub">&#9888; No active UCs in UC Library. Approve UCs in Second Brain first.</div></div>'
   }
 
   var scopeOpts = [
