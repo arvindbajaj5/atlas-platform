@@ -210,6 +210,7 @@ input:focus,select:focus{border-color:var(--blue);}
     </div>
   </div>
 
+  <div id="test-db-panel" style="background:#F8F9FA;border:1px solid #E5E7EB;border-radius:6px;padding:6px 16px;margin-bottom:12px;font-family:inherit"></div>
   <div class="domain-grid" id="domainGrid"></div>
 
   <!-- NEWS TOPICS -->
@@ -251,14 +252,95 @@ input:focus,select:focus{border-color:var(--blue);}
   <div id="resultsSection" style="display:none">
     <div class="section-hdr">
       <span>&#9989; Intelligence Items</span>
-      <span id="resultsCount" style="font-size:11px;color:var(--mid)"></span>
-    </div>
-    <div id="resultsDom"></div>
-  </div>
+    
+//    Test DB Manager                                                            
+var TEST_MASTER_URL = 'https://raw.githubusercontent.com/arvindbajaj5/atlas-platform/main/standards/test-data/intelligence_items_master.json'
 
-</div>
+async function checkTestDBStatus() {
+  var el = document.getElementById('test-db-panel')
+  if (!el) return
+  var cfg = getConfig()
+  if (!cfg.sbUrl || !cfg.sbKey) { renderTestDBPanel('unknown'); return }
+  try {
+    var r = await fetch(cfg.sbUrl + '/rest/v1/intelligence_items?source_type=eq.test&select=id&limit=1', {
+      headers: { apikey: cfg.sbKey, Authorization: 'Bearer ' + cfg.sbKey }
+    })
+    if (r.ok) {
+      var rows = await r.json()
+      renderTestDBPanel(rows.length > 0 ? 'loaded' : 'empty')
+    }
+  } catch(e) { renderTestDBPanel('unknown') }
+}
 
-<script charset="utf-8">//    atlasLogUsage (shared, injected into tools that call AI APIs)             
+async function loadTestDB() {
+  var cfg = getConfig()
+  if (!cfg.sbUrl || !cfg.sbKey) { showTestMsg('Configure Supabase first', 'error'); return }
+  showTestMsg('Fetching master data from GitHub...', 'loading')
+  try {
+    var r = await fetch(TEST_MASTER_URL + '?t=' + Date.now())
+    if (!r.ok) { showTestMsg('Master JSON not found. Run export SQL first.', 'error'); return }
+    var items = await r.json()
+    if (!Array.isArray(items) || !items.length) { showTestMsg('Master data is empty', 'error'); return }
+    showTestMsg('Loading ' + items.length + ' test items...', 'loading')
+    var loaded = 0
+    for (var i = 0; i < items.length; i += 20) {
+      var batch = items.slice(i, i + 20)
+      var resp = await fetch(cfg.sbUrl + '/rest/v1/intelligence_items', {
+        method: 'POST',
+        headers: { apikey: cfg.sbKey, Authorization: 'Bearer ' + cfg.sbKey, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+        body: JSON.stringify(batch)
+      })
+      if (resp.ok) loaded += batch.length
+    }
+    showTestMsg('Loaded ' + loaded + ' test items', 'success')
+    renderTestDBPanel('loaded')
+  } catch(e) { showTestMsg('Error: ' + e.message, 'error') }
+}
+
+async function wipeTestDB() {
+  var cfg = getConfig()
+  if (!cfg.sbUrl || !cfg.sbKey) return
+  if (!confirm('Wipe all test data? Real scraped data is safe.')) return
+  showTestMsg('Wiping...', 'loading')
+  try {
+    var r = await fetch(cfg.sbUrl + '/rest/v1/intelligence_items?source_type=eq.test&is_real=eq.false', {
+      method: 'DELETE',
+      headers: { apikey: cfg.sbKey, Authorization: 'Bearer ' + cfg.sbKey, Prefer: 'return=minimal' }
+    })
+    if (r.ok) { showTestMsg('Test data wiped', 'success'); renderTestDBPanel('empty') }
+    else showTestMsg('Wipe failed', 'error')
+  } catch(e) { showTestMsg('Error: ' + e.message, 'error') }
+}
+
+async function reloadTestDB() { await wipeTestDB(); await loadTestDB() }
+
+function showTestMsg(msg, type) {
+  var el = document.getElementById('test-db-msg')
+  if (!el) return
+  var colors = { loading: '#6B7280', success: '#00B290', error: '#FF5539' }
+  el.textContent = msg; el.style.color = colors[type] || '#111827'
+}
+
+function renderTestDBPanel(status) {
+  var panel = document.getElementById('test-db-panel')
+  if (!panel) return
+  var statusColor = status === 'loaded' ? '#00B290' : status === 'empty' ? '#6B7280' : '#FFB600'
+  var statusLabel = status === 'loaded' ? 'Test data loaded' : status === 'empty' ? 'No test data' : 'Unknown'
+  panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+    + '<div style="display:flex;align-items:center;gap:8px">'
+    + '<span style="font-size:11px;font-weight:700;color:#002870">Test DB</span>'
+    + '<span style="font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;background:' + statusColor + '22;color:' + statusColor + '">' + statusLabel + '</span>'
+    + '<span id="test-db-msg" style="font-size:11px;color:#6B7280"></span>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px">'
+    + '<button onclick="loadTestDB()" class="atlas-nav-btn" style="border-color:#00B290;color:#00B290;font-size:10px;padding:3px 10px">Load</button>'
+    + '<button onclick="reloadTestDB()" class="atlas-nav-btn" style="font-size:10px;padding:3px 10px">Reload</button>'
+    + '<button onclick="wipeTestDB()" class="atlas-nav-btn" style="border-color:#FF5539;color:#FF5539;font-size:10px;padding:3px 10px">Wipe</button>'
+    + '<a href="https://github.com/arvindbajaj5/atlas-platform/blob/main/standards/test-data/intelligence_items_master.json" target="_blank" class="atlas-nav-btn" style="font-size:10px;padding:3px 10px">Master</a>'
+    + '</div></div>'
+}
+
+//    atlasLogUsage (shared, injected into tools that call AI APIs)             
 function atlasGetCfg2() { try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}} }
 var _UC_PRICING = null
 async function _loadPricing() {
@@ -1760,6 +1842,7 @@ function clearIntelligence(){
 }
 
 window.addEventListener('DOMContentLoaded', function(){
+  checkTestDBStatus()
   loadTTLConfig().then(function(){
     return loadRunRecords()
   }).then(function(){
@@ -1811,6 +1894,12 @@ async function getSupabaseUrls(domainCode){
       headers:{'apikey':sb.key,'Authorization':'Bearer '+sb.key}
     })
     if(r.ok){ var rows = await r.json(); return new Set(rows.map(function(x){return (x.source_url||'').toLowerCase().trim()})) }
+  }catch(e){}
+  return new Set()
+}
+
+
+r.ok){ var rows = await r.json(); return new Set(rows.map(function(x){return (x.source_url||'').toLowerCase().trim()})) }
   }catch(e){}
   return new Set()
 }
