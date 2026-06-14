@@ -315,10 +315,9 @@ textarea{resize:vertical;min-height:60px}
   </div>
 </div>
 
-<div id="toast" class="toast"></div>
-
-<script charset="utf-8">
-//    Config                                                                     
+<div id=
+//    Config            
+<script charset="utf-8">                                                         
 function getSB() {
   try {
     var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}')
@@ -599,6 +598,9 @@ function renderOverview() {
     + '</div>'
 
     + '</div>'
+
+    // Cover image card
+    + '<div id="cover-img-card">' + (typeof atlasCoverImage !== 'undefined' ? atlasCoverImage.renderCoverImageCard(eng) : '<div class="card" style="margin-bottom:12px;padding:12px 14px"><div class="card-title">Engagement Cover Image</div><div style="font-size:12px;color:var(--mid)">Upload shared/atlas-doc-gen.js to enable cover image generation.</div></div>') + '</div>'
 
     // Recent actions
     + '<div class="section-hdr" style="margin-top:4px"><div class="section-title">Open actions</div>'
@@ -1082,6 +1084,11 @@ document.querySelectorAll('.modal-overlay').forEach(function(el) {
 
 //    Boot                                                                       
 init()
-</script>
+                                              
+init()
+
+function atlasCoverImageGenerate() { alert("Upload shared/atlas-doc-gen.js to enable this feature.") }
+function atlasCoverImageApprove() { alert("Upload shared/atlas-doc-gen.js to enable this feature.") }
+function atlasCoverImageClear() { alert("Upload shared/atlas-doc-gen.js to enable this feature.") }</script>
 </body>
 </html>
