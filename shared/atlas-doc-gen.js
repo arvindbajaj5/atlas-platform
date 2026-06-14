@@ -1319,14 +1319,18 @@ var atlasCoverImage = (function() {
       + '</div>'
       + '</div>'
 
-    //    Upload section   
+        // Upload section   preview before explicit save
     html += '<div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px">'
       + '<div style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Upload from file</div>'
-      + '<div style="display:flex;gap:8px;align-items:center">'
+      + '<div id="cover-upload-preview" style="display:none;width:100%;height:140px;background:var(--light);border:1px solid var(--border);border-radius:6px;margin-bottom:8px;overflow:hidden">'
+      + '<img id="cover-upload-img" style="width:100%;height:100%;object-fit:cover">'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
       + '<label class="btn btn-sm" style="cursor:pointer">&#128206; Choose image'
       + '<input type="file" accept="image/png,image/jpeg,image/webp" style="display:none" '
-      + 'onchange="atlasCoverImageUpload(this,\'' + engId + '\',' + nextVer + ')">'
+      + 'onchange="atlasCoverImagePreviewUpload(this,\'' + engId + '\',' + nextVer + ')">'
       + '</label>'
+      + '<button id="cover-upload-save-btn" class="btn btn-teal btn-sm" onclick="atlasCoverImageSaveUpload(\'' + engId + '\',' + nextVer + ')" style="display:none">&#10003; Save as v' + nextVer + '</button>'
       + '<div id="cover-upload-msg" style="font-size:12px;color:var(--mid)"></div>'
       + '</div>'
       + '</div>'
@@ -1436,21 +1440,42 @@ async function atlasCoverImageApprove(engId, version) {
   }
 }
 
-async function atlasCoverImageUpload(input, engId, version) {
-  if (!input.files || !input.files[0]) return
-  var file = input.files[0]
-  var uploadMsg = document.getElementById('cover-upload-msg')
-  if (uploadMsg) { uploadMsg.textContent = 'Uploading...'; uploadMsg.style.color = 'var(--mid)' }
+var _uploadFile = null
 
-  var upload = await atlasCoverImage.uploadFileToStorage(file, engId, version)
+function atlasCoverImagePreviewUpload(input, engId, version) {
+  if (!input.files || !input.files[0]) return
+  _uploadFile = input.files[0]
+  var reader = new FileReader()
+  reader.onload = function(e) {
+    var pd = document.getElementById('cover-upload-preview')
+    var pi = document.getElementById('cover-upload-img')
+    var sb2 = document.getElementById('cover-upload-save-btn')
+    var m  = document.getElementById('cover-upload-msg')
+    if (pi)  pi.src = e.target.result
+    if (pd)  pd.style.display = 'block'
+    if (sb2) sb2.style.display = 'inline-flex'
+    if (m)   m.textContent = ''
+  }
+  reader.readAsDataURL(_uploadFile)
+}
+
+async function atlasCoverImageSaveUpload(engId, version) {
+  if (!_uploadFile) return
+  var msg = document.getElementById('cover-upload-msg')
+  var btn = document.getElementById('cover-upload-save-btn')
+  if (msg) { msg.textContent = 'Uploading...'; msg.style.color = 'var(--mid)' }
+  if (btn) btn.disabled = true
+
+  var upload = await atlasCoverImage.uploadFileToStorage(_uploadFile, engId, version)
   if (!upload.success) {
-    if (uploadMsg) { uploadMsg.textContent = 'Upload failed: ' + upload.error; uploadMsg.style.color = 'var(--orange)' }
+    if (msg) { msg.textContent = 'Upload failed: ' + upload.error; msg.style.color = 'var(--orange)' }
+    if (btn) btn.disabled = false
     return
   }
 
   var saved = await atlasCoverImage.saveToEngagement(engId, upload.path, upload.url, version, 'uploaded')
   if (saved) {
-    if (uploadMsg) { uploadMsg.textContent = 'Saved as v' + version; uploadMsg.style.color = 'var(--teal)' }
+    _uploadFile = null
     if (CURRENT_ENG) {
       CURRENT_ENG.cover_image_path   = upload.path
       CURRENT_ENG.cover_image_status = 'approved'
@@ -1458,7 +1483,14 @@ async function atlasCoverImageUpload(input, engId, version) {
       CURRENT_ENG.cover_image_versions.push({ version: version, path: upload.path, url: upload.url, source: 'uploaded', created_at: new Date().toISOString() })
     }
     setTimeout(function(){ if (typeof renderDocket === 'function') renderDocket() }, 500)
+  } else {
+    if (msg) { msg.textContent = 'Failed to save'; msg.style.color = 'var(--orange)' }
+    if (btn) btn.disabled = false
   }
+}
+
+async function atlasCoverImageUpload(input, engId, version) {
+  atlasCoverImagePreviewUpload(input, engId, version)
 }
 
 async function atlasCoverImageRestore(engId, versionEntry) {
@@ -1483,46 +1515,68 @@ async function atlasCoverImageClear(engId) {
 }
 
 // ===========================================================================
-// Territory Map v2 - SOI Compliant (Survey of India boundaries)
-// ===========================================================================
-
-// ===========================================================================
-// ATLAS Territory Map v2 - SOI Compliant
-// Map boundaries as per Survey of India (surveyofindia.gov.in)
-// Attribution line shown in UI only; not embedded in documents.
+// Territory Map v3   Wikipedia Political Map of India (CC BY-SA 3.0)
+// Correct SOI-compliant boundaries: full J&K, Aksai Chin, Arunachal Pradesh
+// Map image: Wikimedia Commons, File:Political_map_of_India_EN.svg
+// Highlight overlay: SVG layer positioned on top of the map image
+// Attribution shown in UI card only, NOT in document SVG output
 // ===========================================================================
 
 var atlasMap = (function() {
 
-  var C = {
-    india:      '#E5E7EB',
-    indiaBdr:   '#9CA3AF',
-    stateBdr:   '#C8CACD',
-    highlight:  '#00B290',
-    highlightB: '#007A63',
-    hub:        '#002870',
-    spoke:      '#1C38F5',
-    edge:       '#00B290',
-    label:      '#002870',
-    city:       '#374151',
-    bg:         '#FFFFFF'
+  // Wikipedia political map of India   CC BY-SA 3.0
+  // Uses India's official claim line for J&K, Aksai Chin, Arunachal Pradesh
+  // Loaded at runtime from Wikimedia CDN   stable public URL
+  var MAP_IMG_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Political_map_of_India_EN.svg/500px-Political_map_of_India_EN.svg.png'
+
+  // The Wikipedia SVG renders at 500px wide x ~586px tall (ratio 1:1.172)
+  // We render at a target of 260x305px for the docket card
+  // Calibration: map image covers lng 68.0-98.0 / lat 6.5-38.0
+  // px = (lng-68)/(98-68)*500  py = (38-lat)/(38-6.5)*500*1.172
+  // At display size 260x305: scale factor 0.52 on x, 0.52 on y
+
+  // Highlight region definitions: approximate polygons in image-pixel space
+  // at the 500x586 native resolution, then scaled to display size
+  //
+  // To convert lng/lat   native pixel (500x586 image):
+  //   nx = (lng - 68) / 30 * 500
+  //   ny = (38 - lat) / 31.5 * 586
+  //
+  // Then at display size W x H (e.g. 260x305):
+  //   dx = nx / 500 * W
+  //   dy = ny / 586 * H
+
+  function _nativePx(lng, lat, W, H) {
+    var nx = (lng - 68) / 30 * 500
+    var ny = (38 - lat) / 31.5 * 586
+    return [parseFloat((nx / 500 * W).toFixed(1)), parseFloat((ny / 586 * H).toFixed(1))]
   }
 
-  // SOI-compliant paths (hand-calibrated to Survey of India boundary)
-  // Canvas: 600x700, Bbox: lng 66.5-97.5, lat 7.5-37.5
-  var PATHS = {
-    outer:     'M 42.6,347.7 L 46.5 333.7 L 67.7 326.7 L 77.4 350.0 L 71.6 373.3 L 42.6 361.7 L 31.0 319.7 L 19.4 310.3 L 67.7 233.3 L 96.8 198.3 L 110.3 140.0 L 135.5 105.0 L 154.8 70.0 L 125.8 23.3 L 145.2 9.3 L 212.9 9.3 L 232.3 23.3 L 261.3 46.7 L 271.0 70.0 L 309.7 93.3 L 338.7 116.7 L 358.1 105.0 L 406.5 128.3 L 445.2 163.3 L 483.9 186.7 L 503.2 179.7 L 522.6 186.7 L 551.6 193.7 L 580.6 198.3 L 598.1 210.0 L 590.3 233.3 L 574.8 256.7 L 561.3 291.7 L 541.9 315.0 L 522.6 326.7 L 509.0 338.3 L 493.5 361.7 L 503.2 326.7 L 489.7 315.0 L 474.2 303.3 L 451.0 361.7 L 425.8 350.0 L 406.5 361.7 L 387.1 373.3 L 358.1 420.0 L 329.0 455.0 L 271.0 560.0 L 212.9 686.0 L 187.7 672.0 L 168.4 653.3 L 154.8 630.0 L 141.3 606.7 L 135.5 525.0 L 121.9 443.3 L 116.1 408.3 L 106.5 373.3 L 58.1 361.7 L 42.6 347.7 Z',
-    hp:        'M 174.2,100.3 L 203.2 93.3 L 232.3 105.0 L 238.1 128.3 L 241.9 151.7 L 212.9 175.0 L 193.5 163.3 L 174.2 151.7 L 164.5 128.3 Z',
-    ne_india:  'M 445.2,226.3 L 493.5 182.0 L 532.3 186.7 L 580.6 198.3 L 594.2 217.0 L 590.3 245.0 L 571.0 268.3 L 561.3 291.7 L 541.9 315.0 L 522.6 326.7 L 509.0 338.3 L 489.7 350.0 L 474.2 338.3 L 483.9 315.0 L 445.2 280.0 L 435.5 245.0 Z',
-    jk_ladakh: 'M 125.8,23.3 L 149.0 9.3 L 241.9 11.7 L 271.0 46.7 L 232.3 93.3 L 183.9 105.0 L 145.2 70.0 Z',
-    all_india: 'M 42.6,347.7 L 46.5 333.7 L 67.7 326.7 L 77.4 350.0 L 71.6 373.3 L 42.6 361.7 L 31.0 319.7 L 19.4 310.3 L 67.7 233.3 L 96.8 198.3 L 110.3 140.0 L 135.5 105.0 L 154.8 70.0 L 125.8 23.3 L 145.2 9.3 L 212.9 9.3 L 232.3 23.3 L 261.3 46.7 L 271.0 70.0 L 309.7 93.3 L 338.7 116.7 L 358.1 105.0 L 406.5 128.3 L 445.2 163.3 L 483.9 186.7 L 503.2 179.7 L 522.6 186.7 L 551.6 193.7 L 580.6 198.3 L 598.1 210.0 L 590.3 233.3 L 574.8 256.7 L 561.3 291.7 L 541.9 315.0 L 522.6 326.7 L 509.0 338.3 L 493.5 361.7 L 503.2 326.7 L 489.7 315.0 L 474.2 303.3 L 451.0 361.7 L 425.8 350.0 L 406.5 361.7 L 387.1 373.3 L 358.1 420.0 L 329.0 455.0 L 271.0 560.0 L 212.9 686.0 L 187.7 672.0 L 168.4 653.3 L 154.8 630.0 L 141.3 606.7 L 135.5 525.0 L 121.9 443.3 L 116.1 408.3 L 106.5 373.3 L 58.1 361.7 L 42.6 347.7 Z',
-    stateLines:'M 164.5,116.7 L 241.9 105.0 L 241.9 175.0 L 164.5 175.0 Z M 135.5,105.0 L 183.9 140.0 L 164.5 163.3 L 135.5 163.3 Z M 154.8,163.3 L 212.9 163.3 L 212.9 210.0 L 154.8 210.0 Z M 58.1,186.7 L 212.9 186.7 L 212.9 315.0 L 67.7 315.0 Z M 212.9,163.3 L 348.4 163.3 L 348.4 291.7 L 212.9 291.7 Z M 145.2,280.0 L 309.7 280.0 L 309.7 373.3 L 145.2 373.3 Z M 116.1,373.3 L 271.0 373.3 L 271.0 478.3 L 145.2 478.3 Z M 329.0,233.3 L 416.1 233.3 L 416.1 303.3 L 329.0 303.3 Z M 367.7,233.3 L 439.4 233.3 L 439.4 373.3 L 387.1 373.3 Z M 290.3,303.3 L 387.1 303.3 L 387.1 443.3 L 290.3 443.3 Z M 203.2,420.0 L 348.4 420.0 L 348.4 548.3 L 203.2 490.0 Z M 145.2,478.3 L 232.3 478.3 L 232.3 583.3 L 154.8 583.3 Z M 125.8,23.3 L 271.0 23.3 L 271.0 105.0 L 125.8 105.0 Z M 445.2,233.3 L 571.0 233.3 L 571.0 280.0 L 454.8 256.7 Z M 483.9,186.7 L 590.3 186.7 L 590.3 233.3 L 483.9 233.3 Z M 445.2,256.7 L 503.2 256.7 L 503.2 291.7 L 445.2 291.7 Z M 522.6,233.3 L 561.3 233.3 L 561.3 280.0 L 522.6 280.0 Z M 512.9,280.0 L 551.6 280.0 L 551.6 319.7 L 512.9 319.7 Z M 493.5,303.3 L 522.6 303.3 L 522.6 350.0 L 493.5 350.0 Z M 474.2,303.3 L 503.2 303.3 L 503.2 350.0 L 474.2 350.0 Z M 416.1,210.0 L 435.5 210.0 L 435.5 233.3 L 416.1 233.3 Z'
+  function _polyPts(coords, W, H) {
+    return coords.map(function(c) {
+      var p2 = _nativePx(c[0], c[1], W, H)
+      return p2[0] + ',' + p2[1]
+    }).join(' ')
+  }
+
+  // Highlight polygons   approximate state regions
+  var HIGHLIGHT_COORDS = {
+    hp: [
+      [75.5,33.2],[77.0,33.5],[78.5,33.0],[79.0,31.5],
+      [77.5,30.0],[76.5,30.5],[75.5,31.0],[75.0,32.0]
+    ],
+    ne_india: [
+      [89.5,27.8],[91.5,29.5],[93.5,29.5],[96.5,29.0],[97.2,28.2],
+      [97.0,27.0],[96.0,26.0],[95.5,25.0],[94.5,24.0],
+      [93.5,23.5],[92.8,23.0],[91.8,22.5],[91.0,23.0],
+      [91.5,24.0],[89.5,25.5],[89.0,27.0]
+    ]
   }
 
   var PRESETS = {
     hp: {
       states: ['Himachal Pradesh'],
-      highlightPath: 'hp',
+      highlightKey: 'hp',
       label: 'Himachal Pradesh',
       hubs: [
         {name:'Bilaspur',   lat:31.33, lng:76.75, type:'hub'},
@@ -1535,7 +1589,7 @@ var atlasMap = (function() {
     ne_india: {
       states: ['Arunachal Pradesh','Assam','Manipur','Meghalaya',
                'Mizoram','Nagaland','Sikkim','Tripura'],
-      highlightPath: 'ne_india',
+      highlightKey: 'ne_india',
       label: 'North East India',
       hubs: [
         {name:'Guwahati',  lat:26.14, lng:91.74, type:'hub'},
@@ -1550,7 +1604,7 @@ var atlasMap = (function() {
     },
     all_india: {
       states: [],
-      highlightPath: null,
+      highlightKey: null,
       label: 'All India',
       hubs: [
         {name:'New Delhi', lat:28.61, lng:77.21, type:'hub'},
@@ -1562,72 +1616,64 @@ var atlasMap = (function() {
     }
   }
 
-  var _W = 600, _H = 700
-  var _LNG_MIN = 66.5, _LNG_MAX = 97.5, _LAT_MAX = 37.5, _LAT_MIN = 7.5
+  // Render the composite: Wikipedia map img + SVG overlay
+  function renderHTML(preset, opts) {
+    opts = opts || {}
+    var W = opts.width  || 260
+    var H = opts.height || 305
 
-  function _proj(lng, lat) {
-    return [
-      parseFloat(((_W * (lng - _LNG_MIN) / (_LNG_MAX - _LNG_MIN)).toFixed(1))),
-      parseFloat((_H * (_LAT_MAX - lat) / (_LAT_MAX - _LAT_MIN)).toFixed(1))
-    ]
+    var territory   = typeof preset === 'string' ? PRESETS[preset] : preset
+    var hubs        = territory ? (territory.hubs || []) : []
+    var highlightKey = territory ? (territory.highlightKey || null) : null
+    var highlightCoords = highlightKey ? HIGHLIGHT_COORDS[highlightKey] : null
+
+    // Build SVG overlay (transparent bg, sits on top of img)
+    var svgParts = []
+
+    // Highlight polygon
+    if (highlightCoords) {
+      svgParts.push('<polygon points="' + _polyPts(highlightCoords, W, H) + '"'
+        + ' fill="#00B290" fill-opacity="0.55" stroke="#007A63" stroke-width="1.5" stroke-linejoin="round"/>')
+    }
+
+    // Hub and spoke dots
+    hubs.forEach(function(hub) {
+      var p2  = _nativePx(hub.lng, hub.lat, W, H)
+      var r   = hub.type === 'hub' ? 6 : 4
+      var col = hub.type === 'hub' ? '#002870' : '#1C38F5'
+      svgParts.push('<circle cx="' + p2[0] + '" cy="' + p2[1] + '" r="' + r + '" fill="' + col + '" opacity="0.9"/>')
+      if (hub.type === 'hub') {
+        svgParts.push('<circle cx="' + p2[0] + '" cy="' + p2[1] + '" r="' + (r+4) + '" fill="none" stroke="' + col + '" stroke-width="1.5" opacity="0.35"/>')
+      }
+      // Label   offset right, clip to canvas
+      var lx = Math.min(p2[0] + r + 4, W - 2)
+      svgParts.push('<text x="' + lx + '" y="' + (p2[1]+3) + '"'
+        + ' font-size="' + (hub.type==='hub'?10:8) + '"'
+        + ' fill="#374151" font-weight="' + (hub.type==='hub'?700:400) + '"'
+        + ' font-family="Roboto,sans-serif">' + hub.name + '</text>')
+    })
+
+    var svgOverlay = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '"'
+      + ' viewBox="0 0 ' + W + ' ' + H + '" style="position:absolute;top:0;left:0;pointer-events:none">'
+      + svgParts.join('') + '</svg>'
+
+    // Composite: container with relative positioning
+    return '<div style="position:relative;width:' + W + 'px;height:' + H + 'px;display:inline-block">'
+      + '<img src="' + MAP_IMG_URL + '" width="' + W + '" height="' + H + '"'
+      + ' style="display:block;object-fit:fill"'
+      + ' onerror="this.style.display=\'none\'">'
+      + svgOverlay
+      + '</div>'
   }
 
+  // Alias renderSVG for backward compat   returns composite HTML
   function renderSVG(preset, opts) {
-    opts = opts || {}
-    var w = opts.width  || 340
-    var h = opts.height || 395
-    var showDots   = opts.showDots   !== false
-    var showLabels = opts.showLabels !== false
-
-    var territory = typeof preset === 'string' ? PRESETS[preset] : preset
-    var hubs = territory ? (territory.hubs || []) : []
-    var highlightPath = territory ? (territory.highlightPath || null) : null
-
-    var svg = '<svg viewBox="0 0 ' + _W + ' ' + _H + '" xmlns="http://www.w3.org/2000/svg"'
-      + ' width="' + w + '" height="' + h + '"'
-      + ' style="background:' + C.bg + ';font-family:Roboto,sans-serif">'
-      + '<rect width="' + _W + '" height="' + _H + '" fill="' + C.bg + '"/>'
-
-    // India base fill
-    svg += '<path d="' + PATHS.outer + '" fill="' + C.india + '" stroke="' + C.indiaBdr + '" stroke-width="1" stroke-linejoin="round"/>'
-
-    // State boundary lines
-    svg += '<path d="' + PATHS.stateLines + '" fill="none" stroke="' + C.stateBdr + '" stroke-width="0.5" stroke-dasharray="2,2"/>'
-
-    // Highlight overlay
-    if (highlightPath && PATHS[highlightPath]) {
-      svg += '<path d="' + PATHS[highlightPath] + '" fill="' + C.highlight + '" fill-opacity="0.7" stroke="' + C.highlightB + '" stroke-width="1.5" stroke-linejoin="round"/>'
-    }
-
-    // Hub/spoke dots
-    if (showDots) {
-      hubs.forEach(function(hub) {
-        var p2 = _proj(hub.lng, hub.lat)
-        var r   = hub.type === 'hub' ? 7 : 4
-        var col = hub.type === 'hub' ? C.hub : hub.type === 'edge' ? C.edge : C.spoke
-        svg += '<circle cx="' + p2[0] + '" cy="' + p2[1] + '" r="' + r + '" fill="' + col + '" opacity="0.9"/>'
-        if (hub.type === 'hub') {
-          svg += '<circle cx="' + p2[0] + '" cy="' + p2[1] + '" r="' + (r+5) + '" fill="none" stroke="' + col + '" stroke-width="1.5" opacity="0.35"/>'
-        }
-        if (showLabels) {
-          svg += '<text x="' + (p2[0]+r+5) + '" y="' + (p2[1]+3) + '" font-size="' + (hub.type==='hub'?11:9) + '" fill="' + C.city + '" font-weight="' + (hub.type==='hub'?700:400) + '">' + hub.name + '</text>'
-        }
-      })
-    }
-
-    // INDIA watermark
-    svg += '<text x="300" y="640" font-size="22" fill="#9CA3AF" opacity="0.35" text-anchor="middle" letter-spacing="6" font-weight="300">INDIA</text>'
-
-    svg += '</svg>'
-    return svg
+    return renderHTML(preset, opts)
   }
 
   function renderToElement(id, preset, opts) {
-    var el = document.getElementById(id); if (el) el.innerHTML = renderSVG(preset, opts)
-  }
-
-  function renderDataUrl(preset, opts) {
-    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(renderSVG(preset, opts))))
+    var el = document.getElementById(id)
+    if (el) el.innerHTML = renderHTML(preset, opts)
   }
 
   function buildMapPromptContext(territory) {
@@ -1649,26 +1695,32 @@ var atlasMap = (function() {
     return '<div class="card" style="margin-bottom:12px">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
       + '<div class="card-title" style="margin-bottom:0">Territory</div>'
-      + (hasTerritory ? '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#E1F5EE;color:#085041;font-weight:700">Set</span>'
-                      : '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--light);color:var(--mid)">Not set</span>')
+      + (hasTerritory
+          ? '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#E1F5EE;color:#085041;font-weight:700">Set</span>'
+          : '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--light);color:var(--mid)">Not set</span>')
       + '</div>'
       + '<div style="font-size:12px;color:var(--mid);margin-bottom:10px">Highlights states on territory maps in all generated documents.</div>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
-      + '<button onclick="setEngTerritory(\'hp\')" class="btn btn-sm" style="' + (preset==='hp'?'background:var(--teal);color:#fff;border-color:var(--teal)':'') + '">Himachal Pradesh</button>'
-      + '<button onclick="setEngTerritory(\'ne_india\')" class="btn btn-sm" style="' + (preset==='ne_india'?'background:var(--teal);color:#fff;border-color:var(--teal)':'') + '">NE India (8 states)</button>'
-      + '<button onclick="setEngTerritory(\'all_india\')" class="btn btn-sm" style="' + (preset==='all_india'?'background:var(--teal);color:#fff;border-color:var(--teal)':'') + '">All India</button>'
+      + '<button onclick="setEngTerritory(\'hp\')" class="btn btn-sm"'
+        + (preset==='hp'?' style="background:var(--teal);color:#fff;border-color:var(--teal)"':' style=""') + '>Himachal Pradesh</button>'
+      + '<button onclick="setEngTerritory(\'ne_india\')" class="btn btn-sm"'
+        + (preset==='ne_india'?' style="background:var(--teal);color:#fff;border-color:var(--teal)"':' style=""') + '>NE India (8 states)</button>'
+      + '<button onclick="setEngTerritory(\'all_india\')" class="btn btn-sm"'
+        + (preset==='all_india'?' style="background:var(--teal);color:#fff;border-color:var(--teal)"':' style=""') + '>All India</button>'
       + '<button onclick="setEngTerritory(null)" class="btn btn-sm btn-ghost">Clear</button>'
       + '</div>'
       + (showMap
-          ? '<div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;display:inline-block;background:#fafafa">'
-            + renderSVG(preset || {states:eng.territory_states,hubs:eng.territory_hubs||[],highlightPath:null}, {width:260,height:302})
+          ? '<div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;display:inline-block;background:#f9f9f9">'
+              + renderHTML(preset || {states:eng.territory_states,hubs:eng.territory_hubs||[],highlightKey:null})
             + '</div>'
-            + '<div style="font-size:9px;color:var(--mid);margin-top:4px">Map outline as per Survey of India (surveyofindia.gov.in)</div>'
+            + '<div style="font-size:9px;color:var(--mid);margin-top:4px">'
+            + 'Map: <a href="https://commons.wikimedia.org/wiki/File:Political_map_of_India_EN.svg" target="_blank" style="color:var(--mid)">Wikimedia Commons</a>, CC BY-SA 3.0. Boundaries as per Survey of India.'
+            + '</div>'
           : '<div style="font-size:12px;color:var(--mid);font-style:italic">Select a territory above to preview</div>')
       + '</div>'
   }
 
-  return { renderSVG, renderToElement, renderDataUrl, buildMapPromptContext, renderTerritoryCard, PRESETS, PATHS }
+  return { renderSVG, renderHTML, renderToElement, buildMapPromptContext, renderTerritoryCard, PRESETS }
 })()
 
 async function setEngTerritory(presetKey) {
