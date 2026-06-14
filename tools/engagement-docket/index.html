@@ -315,9 +315,10 @@ textarea{resize:vertical;min-height:60px}
   </div>
 </div>
 
-<div id=
-//    Config            
-<script charset="utf-8">                                                         
+<div id="toast" class="toast"></div>
+
+<script charset="utf-8">
+// -- Config                               
 function getSB() {
   try {
     var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}')
