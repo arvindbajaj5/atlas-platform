@@ -219,6 +219,7 @@ textarea{resize:vertical;min-height:70px;}
 <div class="modal-overlay" id="enrichModal">
   <div class="modal" style="max-width:600px">
     <div class="modal-title">&#128161; Enrich Use Case</div>
+    <div id="enrichModalMode"></div>
     <input type="hidden" id="enrichUCId">
     <input type="hidden" id="enrichQueueId">
     <div style="background:var(--light);border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--mid)" id="enrichSourceInfo"></div>
@@ -316,6 +317,97 @@ textarea{resize:vertical;min-height:70px;}
 </div>
 
 <script charset="utf-8">
+
+//    UC Suggestion from Intel                                                   
+var _suggestIntelId = null
+var _suggestMode = 'save'
+
+function suggestUCFromIntelModal() {
+  var btn = document.getElementById('im-suggest-uc-btn')
+  if (!btn) return
+  var intelId = btn.dataset.id
+  var intelTitle = btn.dataset.title || ''
+  var intelDomain = btn.dataset.domain || ''
+  var intelOpp = btn.dataset.opp || ''
+  var intelSummary = btn.dataset.summary || ''
+  _suggestIntelId = intelId
+  _suggestMode = 'suggest'
+  closeModal('intelModal')
+  openEnrichModal('', intelTitle, intelOpp, intelTitle, intelId, intelDomain)
+  var prob = document.getElementById('enrichProblem')
+  var desc = document.getElementById('enrichDescription')
+  if (prob && !prob.value && intelOpp)    prob.value = intelOpp
+  if (desc && !desc.value && intelSummary) desc.value = intelSummary
+  var modeEl = document.getElementById('enrichModalMode')
+  if (modeEl) modeEl.innerHTML = '<div style="font-size:11px;padding:4px 10px;background:rgba(0,178,144,0.1);border:1px solid rgba(0,178,144,0.3);border-radius:5px;color:var(--teal);margin-bottom:10px">Saving as <strong>Suggested</strong> \u2014 will appear in UC review queue for approval before going live</div>'
+}
+
+async function loadUCReviewQueue() {
+  var el = document.getElementById('uc-review-queue')
+  if (!el) return
+  var items = await sbFetch('uc_library', 'status=eq.suggested&order=created_at.desc')
+  if (!items || !items.length) {
+    el.innerHTML = ''
+    return
+  }
+  var html = '<div style="background:rgba(0,178,144,0.06);border:1px solid rgba(0,178,144,0.2);border-radius:6px;padding:10px 12px;margin-bottom:12px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--teal);margin-bottom:8px"> ' + items.length + ' UC suggestion' + (items.length > 1 ? 's' : '') + ' pending review</div>'
+  items.forEach(function(uc) {
+    html += '<div style="border:1px solid var(--border);border-radius:5px;padding:8px 10px;margin-bottom:6px;background:var(--white)">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+      + '<div style="flex:1">'
+      + '<div style="font-size:12px;font-weight:600">' + esc(uc.uc_name) + '</div>'
+      + (uc.cluster ? '<div style="font-size:10px;color:var(--mid)">' + esc(uc.cluster) + '</div>' : '')
+      + (uc.description ? '<div style="font-size:11px;color:var(--mid);margin-top:4px">' + esc(uc.description.slice(0, 100)) + (uc.description.length > 100 ? '...' : '') + '</div>' : '')
+      + '</div>'
+      + '<div style="display:flex;gap:4px;flex-shrink:0">'
+      + '<button onclick="approveUCSuggestion(\'' + uc.id + '\')" style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;border:none;background:var(--teal);color:#fff;cursor:pointer">Approve</button>'
+      + '<button onclick="enrichUCSuggestion(\'' + uc.id + '\')" style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;border:1px solid var(--navy);background:transparent;color:var(--navy);cursor:pointer">Enrich</button>'
+      + '<button onclick="rejectUCSuggestion(\'' + uc.id + '\')" style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;border:1px solid var(--orange);background:transparent;color:var(--orange);cursor:pointer">Reject</button>'
+      + '</div></div></div>'
+  })
+  html += '</div>'
+  el.innerHTML = html
+}
+
+async function approveUCSuggestion(id) {
+  var ok = await sbPatch('uc_library', 'id=eq.' + id, { status: 'active', approved_by: 'second_brain_review', approved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+  if (ok) { loadUCReviewQueue(); cachedUC = []; loadUC() }
+  else alert('Failed to approve.')
+}
+
+async function rejectUCSuggestion(id) {
+  var reason = prompt('Reason for rejection (optional):')
+  var ok = await sbPatch('uc_library', 'id=eq.' + id, { status: 'rejected', rejection_reason: reason || 'Rejected via review queue', updated_at: new Date().toISOString() })
+  if (ok) loadUCReviewQueue()
+}
+
+async function enrichUCSuggestion(id) {
+  var items = await sbFetch('uc_library', 'id=eq.' + id, 1)
+  if (!items || !items.length) return
+  var uc = items[0]
+  document.getElementById('enrichUCId').value = id
+  document.getElementById('enrichQueueId').value = ''
+  document.getElementById('enrichName').value = uc.uc_name || ''
+  document.getElementById('enrichCluster').value = uc.cluster || ''
+  document.getElementById('enrichDomains').value = (uc.domain_codes || []).join(', ')
+  document.getElementById('enrichMaturity').value = uc.maturity || 'emerging'
+  document.getElementById('enrichProblem').value = uc.problem_statement || ''
+  document.getElementById('enrichBenefit').value = uc.benefit || ''
+  document.getElementById('enrichDescription').value = uc.description || ''
+  document.getElementById('enrichData').value = uc.data_requirements || ''
+  document.getElementById('enrichTech').value = uc.technical_requirements || ''
+  document.getElementById('enrichModelType').value = uc.model_type || ''
+  document.getElementById('enrichHardware').value = uc.hardware_profile || ''
+  document.getElementById('enrichRegulatory').value = uc.regulatory || ''
+  document.getElementById('enrichEffort').value = uc.estimated_effort || ''
+  _suggestMode = 'save'
+  var modeEl = document.getElementById('enrichModalMode')
+  if (modeEl) modeEl.innerHTML = '<div style="font-size:11px;padding:4px 10px;background:rgba(28,56,245,0.08);border-radius:5px;color:var(--blue);margin-bottom:10px">Enriching suggestion \u2014 saving will mark it <strong>active</strong></div>'
+  document.getElementById('enrichModal').style.display = 'flex'
+}
+
+
 // \u2500\u2500 Domain taxonomy \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 var DOMAINS = [
   {code:'GOV-GOV', name:'Government & Governance',        icon:'&#127963;', cluster:'standalone'},
@@ -356,7 +448,6 @@ var showAllAges = false
 var counts = {}
 
 // \u2500\u2500 Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function getCfg(){ try{ return JSON.parse(localStorage.getItem('atlas_sb2_cfg')||'{}') }catch(e){ return {} } }
 
 // \u2500\u2500 ATLAS Model Registry (embedded) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
@@ -1066,6 +1157,7 @@ function toggleExp(id){
 
 // \u2500\u2500 Use Cases Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function loadUC(){
+  loadUCReviewQueue()
   var e = currentEntry
   var el = document.getElementById('tabUc')
   if(!el) return
@@ -1093,10 +1185,11 @@ function renderUCItems(){
   var libraryItems = items.filter(function(i){return i._source==='library'})
   var queueItems = items.filter(function(i){return i._source==='queue'})
   // Add UC + manual button header
-  var headerHtml = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+  var headerHtml = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
     +'<div style="font-size:13px;font-weight:700;color:var(--navy)">Use Cases &mdash; '+currentEntry.name+'</div>'
-    +'<button class="btn btn-primary btn-sm" onclick="openManualUC()">+ Add UC Manually</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="openManualUC()">+ Add UC</button>'
     +'</div>'
+    +'<div id="uc-review-queue"></div>'
 
   if(!items.length){
     el.innerHTML = headerHtml + '<div class="empty-state"><div class="icon">&#128161;</div><h3>No Use Cases Yet</h3><p>Use cases are suggested automatically during enrichment, or can be added manually using the button above.</p></div>'
@@ -1369,8 +1462,12 @@ async function saveEnrichedUC(){
     uc_name: name,
     cluster: document.getElementById('enrichCluster').value.trim()||null,
     domain_codes: domainCodes,
-    source: queueId ? 'enriched_from_queue' : 'manual',
-    status: 'active',
+    source: queueId ? 'enriched_from_queue' : (_suggestMode === 'suggest' ? 'intel_suggestion' : 'manual'),
+    status: _suggestMode === 'suggest' ? 'suggested' : 'active',
+    suggested_by: _suggestMode === 'suggest' ? 'second_brain' : null,
+    suggested_from: _suggestMode === 'suggest' ? _suggestIntelId : null,
+    approved_by: _suggestMode === 'save' ? 'manual_entry' : null,
+    approved_at: _suggestMode === 'save' ? new Date().toISOString() : null,
     problem_statement: document.getElementById('enrichProblem').value.trim()||null,
     benefit: document.getElementById('enrichBenefit').value.trim()||null,
     description: document.getElementById('enrichDescription').value.trim()||null,
@@ -1401,8 +1498,10 @@ async function saveEnrichedUC(){
   }
   if(ok){
     closeModal('enrichModal')
+    _suggestMode = 'save'; _suggestIntelId = null
     cachedUC = []
     await loadUC()
+    loadUCReviewQueue()
   } else {
     alert('Failed to save. Check Supabase connection.')
   }
