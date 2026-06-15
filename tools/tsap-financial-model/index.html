@@ -692,26 +692,46 @@ async function loadGeminiTextModel() {
 
 // JSON repair
 function repairJSON(str) {
-  return str
-    .replace(/^```json\s*/,"")
-    .replace(/```\s*$/,"")
+  var s = str
+    // Strip markdown fences
+    .replace(/^```json\s*/,"").replace(/```\s*$/,"")
+    // Control chars and line breaks inside strings
     .replace(/\r\n/g," ").replace(/\r/g," ").replace(/\n/g," ").replace(/\t/g," ")
     .replace(/[\x00-\x1F\x7F]/g," ")
+    // Fix true|false copied literally from schema
     .replace(/": true\|false/g,'": false')
     .replace(/": "true\|false"/g,'": false')
+    // Fix Indian number format: 1,50,000 or 1,50,00,000
+    // Regex: digit followed by comma followed by 2-3 digits (Indian grouping)
+    .replace(/(\d),(\d{2,3})(,|\s|"|\})/g, function(m,a,b,c){ return a+b+c })
+    .replace(/(\d),(\d{2,3})(,|\s|"|\})/g, function(m,a,b,c){ return a+b+c })
+    // Remove trailing commas before } or ]
     .replace(/,([\s]*[}\]])/g,"$1")
+    // Fix unquoted boolean values that arent real booleans
+    .replace(/": boolean/g,'": false')
+  return s
 }
 
 var TP_TOKENS = { s1_prompt:0, s1_response:0, s2_prompt:0, s2_response:0 }
 var TP_TIMER  = { start:null, elapsed:0, interval:null }
 
-function tpTimerStart() {
+function tpTimerStart(estimatedPromptTokens) {
   TP_TIMER.start = Date.now(); TP_TIMER.elapsed = 0
+  TP_TIMER._estPrompt = estimatedPromptTokens || 0
   if (TP_TIMER.interval) clearInterval(TP_TIMER.interval)
   TP_TIMER.interval = setInterval(function() {
     TP_TIMER.elapsed = Math.floor((Date.now()-TP_TIMER.start)/1000)
-    var el = document.getElementById("tp-timer-display")
-    if (el) el.textContent = (TP_TIMER.elapsed>=60?Math.floor(TP_TIMER.elapsed/60)+"m ":"")+(TP_TIMER.elapsed%60)+"s"
+    // Timer display
+    var tel = document.getElementById("tp-timer-display")
+    if (tel) tel.textContent = (TP_TIMER.elapsed>=60?Math.floor(TP_TIMER.elapsed/60)+"m ":"")+(TP_TIMER.elapsed%60)+"s"
+    // Estimated token display   grows as response streams in
+    // Gemini ~40 tokens/sec for flash models; prompt tokens known upfront
+    var kel = document.getElementById("tp-token-live")
+    if (kel) {
+      var estResponse = Math.min(TP_TIMER.elapsed * 40, 4096)
+      var estTotal = TP_TIMER._estPrompt + estResponse
+      kel.textContent = "~" + estTotal.toLocaleString("en-IN") + " tokens"
+    }
   }, 1000)
 }
 
@@ -724,13 +744,13 @@ function tpTokenDisplay() {
   var total = TP_TOKENS.s1_prompt+TP_TOKENS.s1_response+TP_TOKENS.s2_prompt+TP_TOKENS.s2_response
   if (!total) return ""
   var costRs = (total/1000000*0.075*84).toFixed(2)
-  return '<div style="font-size:10px;color:var(--mid);padding:5px 0;margin-bottom:8px">'
-    + "Tokens: "
-    + (TP_TOKENS.s1_prompt?"S1 "+(TP_TOKENS.s1_prompt+TP_TOKENS.s1_response).toLocaleString("en-IN"):"")
-    + (TP_TOKENS.s2_prompt?" | S2 "+(TP_TOKENS.s2_prompt+TP_TOKENS.s2_response).toLocaleString("en-IN"):"")
-    + " | Total: "+total.toLocaleString("en-IN")
-    + " | ~Rs "+costRs
-    + "</div>"
+  return '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;margin-bottom:10px;flex-wrap:wrap">'
+    + '<span style="font-size:10px;color:var(--mid)">Actual tokens used:</span>'
+    + (TP_TOKENS.s1_prompt?'<span style="font-size:11px;font-weight:600;color:var(--navy)">S1: '+(TP_TOKENS.s1_prompt+TP_TOKENS.s1_response).toLocaleString("en-IN")+"</span>":"")
+    + (TP_TOKENS.s2_prompt?'<span style="font-size:11px;font-weight:600;color:var(--navy)">S2: '+(TP_TOKENS.s2_prompt+TP_TOKENS.s2_response).toLocaleString("en-IN")+"</span>":"")
+    + '<span style="font-size:11px;font-weight:700;color:var(--teal)">Total: '+total.toLocaleString("en-IN")+"</span>"
+    + '<span style="font-size:11px;color:var(--mid)">~Rs '+costRs+"</span>"
+    + '</div>'
 }
 
 async function geminiGenerate(prompt, useSearch, tokenKey) {
@@ -853,8 +873,9 @@ function buildS1Prompt(territory) {
 
 //    Stage 1 API call                                                          
 async function callS1(territory) {
-  tpTimerStart()
-  var result = await geminiGenerate(buildS1Prompt(territory), true, "s1")
+  var prompt = buildS1Prompt(territory)
+  tpTimerStart(Math.round(prompt.length / 4))  // estimate: chars/4   tokens
+  var result = await geminiGenerate(prompt, true, "s1")
   tpTimerStop()
   return result
 }
@@ -927,8 +948,9 @@ function buildS2Prompt(territory, s1data, objectives, freeText) {
 }
 
 async function callS2(territory, s1data, objectives, freeText) {
-  tpTimerStart()
-  var result = await geminiGenerate(buildS2Prompt(territory, s1data, objectives, freeText), false, "s2")
+  var prompt = buildS2Prompt(territory, s1data, objectives, freeText)
+  tpTimerStart(Math.round(prompt.length / 4))
+  var result = await geminiGenerate(prompt, false, "s2")
   tpTimerStop()
   return result
 }
@@ -1010,9 +1032,12 @@ function tpLoading(msg) {
     + '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
     + '<div style="font-size:14px;color:var(--mid)">' + msg + '</div>'
     + '</div>'
-    + '<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--light);border-radius:6px;width:fit-content">'
-    + '<span style="font-size:11px;color:var(--mid)">Elapsed:</span>'
-    + '<span id="tp-timer-display" style="font-size:14px;font-weight:700;color:var(--navy);font-family:monospace;min-width:36px">0s</span>'
+    + '<div style="display:flex;align-items:center;gap:16px;padding:10px 16px;background:var(--light);border-radius:6px;width:fit-content">'
+    + '<span style="font-size:11px;color:var(--mid)">Elapsed</span>'
+    + '<span id="tp-timer-display" style="font-size:15px;font-weight:700;color:var(--navy);font-family:monospace;min-width:40px">0s</span>'
+    + '<div style="width:1px;height:20px;background:var(--border)"></div>'
+    + '<span style="font-size:11px;color:var(--mid)">Tokens (est.)</span>'
+    + '<span id="tp-token-live" style="font-size:15px;font-weight:700;color:var(--teal);font-family:monospace">calculating...</span>'
     + '</div>'
     + '</div>'
 }
