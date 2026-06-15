@@ -660,6 +660,43 @@ function getGeminiKey() {
   } catch(e) { return '' }
 }
 
+// Try models in order, return first successful response
+var TP_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash']
+
+async function geminiGenerate(prompt, useSearch) {
+  var key = getGeminiKey()
+  if (!key) return { ok: false, error: 'No Gemini API key in Settings' }
+  var tools = useSearch ? [{ google_search: {} }] : undefined
+  for (var i = 0; i < TP_MODELS.length; i++) {
+    try {
+      var body = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+      }
+      if (tools) body.tools = tools
+      var r = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/' + TP_MODELS[i] + ':generateContent?key=' + key,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      )
+      if (r.ok) {
+        var data = await r.json()
+        var text = ''
+        var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts
+        if (parts) parts.forEach(function(p){ if (p.text) text += p.text })
+        var m = text.match(/\{[\s\S]*\}/)
+        if (!m) return { ok: false, error: 'No JSON in response from ' + TP_MODELS[i] }
+        return { ok: true, data: JSON.parse(m[0]), model: TP_MODELS[i] }
+      }
+      if (r.status !== 404 && r.status !== 400) {
+        var ed = await r.json().catch(function(){ return {} })
+        return { ok: false, error: 'API ' + r.status + ': ' + (ed.error ? ed.error.message : r.statusText) }
+      }
+      // 404/400 = model not found, try next
+    } catch(e) { return { ok: false, error: e.message } }
+  }
+  return { ok: false, error: 'All Gemini models unavailable' }
+}
+
 //    Stage 1 Gemini prompt                                                     
 function buildS1Prompt(territory) {
   return 'Generate a comprehensive territory intelligence profile for ' + territory + ', India.\n'
@@ -738,34 +775,7 @@ function buildS1Prompt(territory) {
 
 //    Stage 1 API call                                                          
 async function callS1(territory) {
-  var key = getGeminiKey()
-  if (!key) return { ok: false, error: 'No Gemini API key in Settings' }
-  var prompt = buildS1Prompt(territory)
-  try {
-    var r = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          tools: [{ google_search: {} }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
-        })
-      }
-    )
-    if (!r.ok) {
-      var ed = await r.json().catch(function(){ return {} })
-      return { ok: false, error: 'API ' + r.status + ': ' + (ed.error ? ed.error.message : r.statusText) }
-    }
-    var data = await r.json()
-    var text = ''
-    var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts
-    if (parts) parts.forEach(function(p){ if (p.text) text += p.text })
-    var m = text.match(/\{[\s\S]*\}/)
-    if (!m) return { ok: false, error: 'No JSON in Gemini response' }
-    return { ok: true, data: JSON.parse(m[0]) }
-  } catch(e) { return { ok: false, error: e.message } }
+  return geminiGenerate(buildS1Prompt(territory), true)  // true = use web search
 }
 
 //    Stage 2 Gemini prompt                                                     
@@ -836,33 +846,7 @@ function buildS2Prompt(territory, s1data, objectives, freeText) {
 }
 
 async function callS2(territory, s1data, objectives, freeText) {
-  var key = getGeminiKey()
-  if (!key) return { ok: false, error: 'No Gemini API key in Settings' }
-  var prompt = buildS2Prompt(territory, s1data, objectives, freeText)
-  try {
-    var r = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 3000 }
-        })
-      }
-    )
-    if (!r.ok) {
-      var ed = await r.json().catch(function(){ return {} })
-      return { ok: false, error: 'API ' + r.status + ': ' + (ed.error ? ed.error.message : r.statusText) }
-    }
-    var data = await r.json()
-    var text = ''
-    var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts
-    if (parts) parts.forEach(function(p){ if (p.text) text += p.text })
-    var m = text.match(/\{[\s\S]*\}/)
-    if (!m) return { ok: false, error: 'No JSON in response' }
-    return { ok: true, data: JSON.parse(m[0]) }
-  } catch(e) { return { ok: false, error: e.message } }
+  return geminiGenerate(buildS2Prompt(territory, s1data, objectives, freeText), false)  // no web search
 }
 
 
@@ -1067,7 +1051,7 @@ async function tpStartS1() {
     profile: result.data,
     generated_at: now.toISOString(),
     expires_at: exp.toISOString(),
-    model_used: 'gemini-2.0-flash'
+    model_used: 'gemini-2.5-flash'
   })
   TP.stage = 's1_done'
   switchTab('profile')
