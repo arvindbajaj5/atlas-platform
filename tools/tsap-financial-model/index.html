@@ -690,43 +690,82 @@ async function loadGeminiTextModel() {
   } catch(e) {}
 }
 
-async function geminiGenerate(prompt, useSearch) {
+// JSON repair
+function repairJSON(str) {
+  return str
+    .replace(/^```json\s*/,"")
+    .replace(/```\s*$/,"")
+    .replace(/\r\n/g," ").replace(/\r/g," ").replace(/\n/g," ").replace(/\t/g," ")
+    .replace(/[\x00-\x1F\x7F]/g," ")
+    .replace(/": true\|false/g,'": false')
+    .replace(/": "true\|false"/g,'": false')
+    .replace(/,([\s]*[}\]])/g,"$1")
+}
+
+var TP_TOKENS = { s1_prompt:0, s1_response:0, s2_prompt:0, s2_response:0 }
+var TP_TIMER  = { start:null, elapsed:0, interval:null }
+
+function tpTimerStart() {
+  TP_TIMER.start = Date.now(); TP_TIMER.elapsed = 0
+  if (TP_TIMER.interval) clearInterval(TP_TIMER.interval)
+  TP_TIMER.interval = setInterval(function() {
+    TP_TIMER.elapsed = Math.floor((Date.now()-TP_TIMER.start)/1000)
+    var el = document.getElementById("tp-timer-display")
+    if (el) el.textContent = (TP_TIMER.elapsed>=60?Math.floor(TP_TIMER.elapsed/60)+"m ":"")+(TP_TIMER.elapsed%60)+"s"
+  }, 1000)
+}
+
+function tpTimerStop() {
+  if (TP_TIMER.interval) { clearInterval(TP_TIMER.interval); TP_TIMER.interval=null }
+  return TP_TIMER.elapsed
+}
+
+function tpTokenDisplay() {
+  var total = TP_TOKENS.s1_prompt+TP_TOKENS.s1_response+TP_TOKENS.s2_prompt+TP_TOKENS.s2_response
+  if (!total) return ""
+  var costRs = (total/1000000*0.075*84).toFixed(2)
+  return '<div style="font-size:10px;color:var(--mid);padding:5px 0;margin-bottom:8px">'
+    + "Tokens: "
+    + (TP_TOKENS.s1_prompt?"S1 "+(TP_TOKENS.s1_prompt+TP_TOKENS.s1_response).toLocaleString("en-IN"):"")
+    + (TP_TOKENS.s2_prompt?" | S2 "+(TP_TOKENS.s2_prompt+TP_TOKENS.s2_response).toLocaleString("en-IN"):"")
+    + " | Total: "+total.toLocaleString("en-IN")
+    + " | ~Rs "+costRs
+    + "</div>"
+}
+
+async function geminiGenerate(prompt, useSearch, tokenKey) {
   var key = getGeminiKey()
-  if (!key) return { ok: false, error: 'No Gemini API key in Settings' }
-  var tools = useSearch ? [{ google_search: {} }] : undefined
-  for (var i = 0; i < TP_MODELS.length; i++) {
+  if (!key) return { ok:false, error:"No Gemini API key in Settings" }
+  var tools = useSearch ? [{ google_search:{} }] : undefined
+  for (var i=0; i<TP_MODELS.length; i++) {
     try {
-      var body = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
-      }
+      var body = { contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.2,maxOutputTokens:4096} }
       if (tools) body.tools = tools
       var r = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/' + TP_MODELS[i] + ':generateContent?key=' + key,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+        "https://generativelanguage.googleapis.com/v1beta/models/"+TP_MODELS[i]+":generateContent?key="+key,
+        { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }
       )
       if (r.ok) {
         var data = await r.json()
-        var text = ''
+        if (data.usageMetadata && tokenKey) {
+          TP_TOKENS[tokenKey+"_prompt"]   = data.usageMetadata.promptTokenCount    || 0
+          TP_TOKENS[tokenKey+"_response"] = data.usageMetadata.candidatesTokenCount|| 0
+        }
+        var text = ""
         var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts
-        if (parts) parts.forEach(function(p){ if (p.text) text += p.text })
+        if (parts) parts.forEach(function(p){ if(p.text) text+=p.text })
         var m = text.match(/\{[\s\S]*\}/)
-        if (!m) return { ok: false, error: 'No JSON in response from ' + TP_MODELS[i] }
-        // Sanitise control characters that Gemini sometimes embeds in JSON strings
-        var clean = m[0]
-          .replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ')
-          .replace(/\t/g, ' ')
-          .replace(/[\x00-\x1F\x7F]/g, ' ')
-        return { ok: true, data: JSON.parse(clean), model: TP_MODELS[i] }
+        if (!m) return { ok:false, error:"No JSON in response from "+TP_MODELS[i] }
+        try { return { ok:true, data:JSON.parse(repairJSON(m[0])), model:TP_MODELS[i] } }
+        catch(e2) { return { ok:false, error:"JSON parse: "+e2.message } }
       }
-      if (r.status !== 404 && r.status !== 400) {
+      if (r.status!==404 && r.status!==400) {
         var ed = await r.json().catch(function(){ return {} })
-        return { ok: false, error: 'API ' + r.status + ': ' + (ed.error ? ed.error.message : r.statusText) }
+        return { ok:false, error:"API "+r.status+": "+(ed.error?ed.error.message:r.statusText) }
       }
-      // 404/400 = model not found, try next
-    } catch(e) { return { ok: false, error: e.message } }
+    } catch(e) { return { ok:false, error:e.message } }
   }
-  return { ok: false, error: 'All Gemini models unavailable' }
+  return { ok:false, error:"All Gemini models unavailable" }
 }
 
 //    Stage 1 Gemini prompt                                                     
@@ -743,25 +782,32 @@ function buildS1Prompt(territory) {
     + '    "macro": {\n'
     + '      "gsdp_cr": number, "gsdp_growth_pct": number,\n'
     + '      "per_capita_inr": number, "vs_national_pct": number,\n'
-    + '      "fiscal_health": "surplus|balanced|deficit"\n'
+    + '      "fiscal_health": "one of: surplus, balanced, deficit"\n'
     + '    },\n'
     + '    "energy": {\n'
-    + '      "installed_mw": number, "status": "surplus|balanced|deficit",\n'
+    + '      "installed_mw": number, "status": "one of: surplus, balanced, deficit",\n'
     + '      "grid_hrs": number, "renewable_pct": number,\n'
     + '      "industrial_tariff": number, "national_avg_tariff": 7.5,\n'
-    + '      "tariff_index_pct": number, "dc_feasibility": "high|medium|low",\n'
+    + '      "tariff_index_pct": number, "dc_feasibility": "one of: high, medium, low",\n'
+    + '      "green_energy_index": number 0-100,\n'
+    + '      "carbon_intensity_gco2": grams CO2 per kWh,\n'
+    + '      "vs_national_carbon_pct": number vs national avg 700,\n'
+    + '      "hydel_mw": number, "solar_mw": number, "wind_mw": number,\n'
+    + '      "green_24x7_feasibility": "one of: high, medium, low",\n'
+    + '      "stranded_renewable_mw": number,\n'
+    + '      "green_corridor": boolean,\n'
     + '      "notes": "string"\n'
     + '    },\n'
     + '    "water": {\n'
-    + '      "rainfall_mm": number, "stress_index": "low|medium|high|critical",\n'
-    + '      "perennial_rivers": ["list"], "dc_cooling": "high|medium|low",\n'
+    + '      "rainfall_mm": number, "stress_index": "one of: low, medium, high, critical",\n'
+    + '      "perennial_rivers": ["list"], "dc_cooling": "one of: high, medium, low",\n'
     + '      "industrial_cost_per_kl": number, "national_avg_water_cost": 45,\n'
     + '      "water_cost_index_pct": number\n'
     + '    },\n'
     + '    "land": {\n'
-    + '      "area_sqkm": number, "topography": "plains|hilly|coastal|mixed",\n'
+    + '      "area_sqkm": number, "topography": "one of: plains, hilly, coastal, mixed",\n'
     + '      "industrial_parks": number, "sez_count": number,\n'
-    + '      "govt_land": "high|medium|low", "construction_ease": "easy|moderate|challenging",\n'
+    + '      "govt_land": "one of: high, medium, low", "construction_ease": "one of: easy, moderate, challenging",\n'
     + '      "cost_per_acre_lakh": number, "national_avg_land_cost": 50,\n'
     + '      "land_cost_index_pct": number\n'
     + '    },\n'
@@ -769,22 +815,22 @@ function buildS1Prompt(territory) {
     + '      "population_lakh": number, "literacy_pct": number,\n'
     + '      "urban_pct": number, "unemployment_pct": number,\n'
     + '      "graduates_per_lakh": number, "engineers_per_year": number,\n'
-    + '      "migration": "net_in|net_out|balanced",\n'
+    + '      "migration": "one of: net_in, net_out, balanced",\n'
     + '      "avg_engineer_salary_lakh": number, "national_avg_salary": 8.5,\n'
-    + '      "salary_index_pct": number, "skilled_labour": "abundant|adequate|scarce"\n'
+    + '      "salary_index_pct": number, "skilled_labour": "one of: abundant, adequate, scarce"\n'
     + '    },\n'
     + '    "digital": {\n'
     + '      "internet_pct": number, "ofc_km": number,\n'
-    + '      "nkn": true|false, "smart_cities": number,\n'
+    + '      "nkn": boolean, "smart_cities": number,\n'
     + '      "bharatnet_pct": number, "govt_dcs": number,\n'
-    + '      "swan": "operational|partial|planned"\n'
+    + '      "swan": "one of: operational, partial, planned"\n'
     + '    }\n'
     + '  },\n'
     + '  "policy": {\n'
     + '    "raw": ["list of named policies and budget allocations"],\n'
     + '    "useable": [\n'
     + '      {"point": "What this specific policy enables for AI deployment",\n'
-    + '       "source": "Policy name", "impact": "high|medium|low"}\n'
+    + '       "source": "Policy name", "impact": "one of: high, medium, low"}\n'
     + '    ]\n'
     + '  },\n'
     + '  "programmes": {\n'
@@ -807,7 +853,10 @@ function buildS1Prompt(territory) {
 
 //    Stage 1 API call                                                          
 async function callS1(territory) {
-  return geminiGenerate(buildS1Prompt(territory), true)  // true = use web search
+  tpTimerStart()
+  var result = await geminiGenerate(buildS1Prompt(territory), true, "s1")
+  tpTimerStop()
+  return result
 }
 
 //    Stage 2 Gemini prompt                                                     
@@ -878,7 +927,10 @@ function buildS2Prompt(territory, s1data, objectives, freeText) {
 }
 
 async function callS2(territory, s1data, objectives, freeText) {
-  return geminiGenerate(buildS2Prompt(territory, s1data, objectives, freeText), false)  // no web search
+  tpTimerStart()
+  var result = await geminiGenerate(buildS2Prompt(territory, s1data, objectives, freeText), false, "s2")
+  tpTimerStop()
+  return result
 }
 
 
@@ -953,9 +1005,15 @@ function renderProfileTab() {
 }
 
 function tpLoading(msg) {
-  return '<div style="padding:32px 0;display:flex;align-items:center;gap:16px">'
+  return '<div style="padding:32px 0">'
+    + '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">'
     + '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
     + '<div style="font-size:14px;color:var(--mid)">' + msg + '</div>'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--light);border-radius:6px;width:fit-content">'
+    + '<span style="font-size:11px;color:var(--mid)">Elapsed:</span>'
+    + '<span id="tp-timer-display" style="font-size:14px;font-weight:700;color:var(--navy);font-family:monospace;min-width:36px">0s</span>'
+    + '</div>'
     + '</div>'
 }
 
@@ -1128,7 +1186,7 @@ function tpS1View() {
   html += tpSectionHeader('HARD STATS', 'Objective data   macroeconomics, 4Ws, digital infrastructure', '#002870')
 
   // Cost indices strip
-  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">'
+  html += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">'
   html += tpCostTile('&#9889; Energy Tariff', e.industrial_tariff ? 'Rs '+e.industrial_tariff+'/unit' : 'N/A',
     e.tariff_index_pct, e.dc_feasibility ? 'DC: '+e.dc_feasibility : null, 'lower is better')
   html += tpCostTile('&#128167; Water Cost', w.industrial_cost_per_kl ? 'Rs '+w.industrial_cost_per_kl+'/kL' : 'N/A',
@@ -1137,6 +1195,17 @@ function tpS1View() {
     k.salary_index_pct, k.skilled_labour||null, 'lower is better')
   html += tpCostTile('&#127968; Land Cost', l.cost_per_acre_lakh ? 'Rs '+l.cost_per_acre_lakh+'L/acre' : 'N/A',
     l.land_cost_index_pct, 'Govt land: '+(l.govt_land||'N/A'), 'lower is better')
+
+  var gei=e.green_energy_index||0
+  var gRag=gei>=70?'rag-green':gei>=40?'rag-amber':'rag-red'
+  var gBg={'rag-green':'#E1F5EE','rag-amber':'#FFF8E7','rag-red':'#FEE2E2'}[gRag]
+  var gCol={'rag-green':'var(--teal)','rag-amber':'var(--amber)','rag-red':'var(--orange)'}[gRag]
+  html += '<div style="background:'+gBg+';border-radius:8px;padding:12px 14px;border-left:4px solid '+gCol+'">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">&#127807; Green Energy</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:4px">'+(gei||'N/A')+'/100</div>'
+    + '<div style="font-size:11px;font-weight:700;color:'+gCol+'">'+(e.carbon_intensity_gco2?e.carbon_intensity_gco2+' gCO2/kWh':'N/A')+'</div>'
+    + '<div style="font-size:10px;color:var(--mid);margin-top:3px">24x7: '+(e.green_24x7_feasibility||'N/A')+(e.stranded_renewable_mw?' | Stranded: '+e.stranded_renewable_mw+'MW':'')+'</div>'
+    + '</div>'
   html += '</div>'
 
   // Stats grid
@@ -1464,6 +1533,7 @@ function tpS3Result() {
     + '<button onclick="tpExportWord()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#128196; Word</button>'
     + '<button onclick="tpExportPPT()" style="padding:5px 12px;border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#128190; PPT</button>'
     + '</div>'
+    + tpTokenDisplay()
 
   // Headline recommendation
   if (TP.s2.headline_recommendation) {
