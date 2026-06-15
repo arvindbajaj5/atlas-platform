@@ -88,6 +88,14 @@ const TTL_GLOBAL_DAYS   = 7
 const TTL_EXTEND_DAYS   = 14   // extended TTL when last run added 0 items
 const TTL_EXTEND_EMPTY  = 21   // further extended if 2+ consecutive empty runs
 
+// TTL_CFG populated by loadTTLConfig() from app_config, or falls back to constants
+var TTL_CFG = {
+  domain: TTL_DOMAIN_DAYS,
+  news:   TTL_NEWS_DAYS,
+  rss:    TTL_NEWS_DAYS,
+  global: TTL_GLOBAL_DAYS
+}
+
 //    Content fingerprint (no API call needed)                                   
 function contentFingerprint(title, summary) {
   var combined = (title + ' ' + (summary||'')).toLowerCase()
@@ -638,6 +646,25 @@ Start { end }. No markdown.`
 }
 
 //    Main                                                                       
+async function loadTTLConfig() {
+  // Load TTL overrides from app_config (keys: ttl_domain_days, ttl_news_days, etc.)
+  try {
+    var rows = await sbFetch('app_config', "key=in.(ttl_domain_days,ttl_news_days,ttl_rss_days,ttl_global_days)", 10)
+    if (!rows || !rows.length) return
+    rows.forEach(function(row) {
+      var v = parseInt(row.value)
+      if (isNaN(v) || v < 1) return
+      if (row.key === 'ttl_domain_days') TTL_CFG.domain = v
+      if (row.key === 'ttl_news_days')   TTL_CFG.news   = v
+      if (row.key === 'ttl_rss_days')    TTL_CFG.rss    = v
+      if (row.key === 'ttl_global_days') TTL_CFG.global = v
+    })
+    console.log('  TTL config: domain=' + TTL_CFG.domain + 'd news=' + TTL_CFG.news + 'd rss=' + TTL_CFG.rss + 'd global=' + TTL_CFG.global + 'd')
+  } catch(e) {
+    console.log('  WARN: Could not load TTL config from app_config, using defaults')
+  }
+}
+
 async function main() {
   const start = Date.now()
   let total = 0
