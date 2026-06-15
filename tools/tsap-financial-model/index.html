@@ -246,6 +246,10 @@ function getSB() {
   var g = atlasGetGlobal()
   return { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
 }
+async function sbFetch(table, params, limit) {
+  return sbGet(table, params, limit)
+}
+
 async function sbGet(table, params, limit) {
   var sb = getSB(); if (!sb.url) return []
   try {
