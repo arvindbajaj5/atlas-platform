@@ -1138,6 +1138,8 @@ async function tpStartS1() {
   if (!territory) return
   TP.territory = territory
   TP._rawIntel = null
+  // Ensure archetypes loaded before proceeding (prevents loadTPData re-render interference)
+  if (!TP.archetypes.length) await loadTPData()
 
   // Check for cached raw intel first
   var slug  = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
@@ -1396,7 +1398,10 @@ function ragText(pct) {
 //    Profile tab entry                                                          
 function renderProfileTab() {
   if (!TP.archetypes.length) {
-    loadTPData().then(function(){ switchTab('profile') })
+    loadTPData().then(function(){
+      // Only re-render if not mid-search or mid-extraction (would destroy timer)
+      if (TP.stage === 'home') switchTab('profile')
+    })
     return tpLoading('Loading reference data...')
   }
   if (TP.stage === 'home')       return tpHome()
