@@ -693,23 +693,25 @@ async function loadGeminiTextModel() {
 // JSON repair
 function repairJSON(str) {
   var s = str
-    // Strip markdown fences
     .replace(/^```json\s*/,"").replace(/```\s*$/,"")
-    // Control chars and whitespace
     .replace(/\r\n/g," ").replace(/\r/g," ").replace(/\n/g," ").replace(/\t/g," ")
     .replace(/[\x00-\x1F\x7F]/g," ")
-    // Fix true|false and boolean literals copied from schema
+    // Fix true|false literals from schema
     .replace(/": true\|false/g,'": false')
     .replace(/": "true\|false"/g,'": false')
     .replace(/": boolean/g,'": false')
-    // Fix Indian number format: 2,05,000 or 1,50,00,000
+    // Fix Indian number format: 2,57,000 etc (two passes)
     .replace(/(\d),(\d{2,3})(?=,|\s|"|\})/g, function(m,a,b){ return a+b })
     .replace(/(\d),(\d{2,3})(?=,|\s|"|\})/g, function(m,a,b){ return a+b })
-    // Add missing comma between closing } and next key (Gemini omits this)
+    // Quote unquoted string values: ": word -> ": "word"
+    .replace(/": ([a-zA-Z][a-zA-Z_-]*)([,\s\}])/g, function(m,w,t) {
+      return (w==="true"||w==="false"||w==="null") ? '": '+w+t : '": "'+w+'"'+t
+    })
+    // Add missing comma between closing } and next key
     .replace(/\}\s*"/g, '}, "')
-    // Add missing comma between value and next key when separated by spaces
+    // Add missing comma between value and next key (spaces from stripped newlines)
     .replace(/([\d"tfn])\s{2,}"/g, function(m,c){ return c+', "' })
-    // Remove trailing commas before } or ]
+    // Remove trailing commas
     .replace(/,([\s]*[}\]])/g,"$1")
   return s
 }
