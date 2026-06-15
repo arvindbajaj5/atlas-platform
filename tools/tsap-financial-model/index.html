@@ -108,6 +108,7 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
 </div>
 
 <div class="tab-bar">
+  <button class="tab-btn" data-tab="profile"  onclick="switchTab('profile')">&#127919; Territory Profile</button>
   <button class="tab-btn" data-tab="cost"     onclick="switchTab('cost')">Programme Cost</button>
   <button class="tab-btn" data-tab="supply"   onclick="switchTab('supply')">Funding Sources</button>
   <button class="tab-btn" data-tab="gap"      onclick="switchTab('gap')">Funding Gap</button>
@@ -126,6 +127,18 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
 <script charset="utf-8">//    atlasLogUsage (shared, injected into tools that call AI APIs)             
 function atlasGetCfg2() { try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}} }
 var _UC_PRICING = null
+async function sbInsert(table, data) {
+  var sb = getSB(); if (!sb.url) return null
+  try {
+    var r = await fetch(sb.url + '/rest/v1/' + table, {
+      method:'POST',
+      headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},
+      body:JSON.stringify(data)
+    })
+    return r.ok
+  } catch(e) { return false }
+}
+
 async function _loadPricing() {
   if (_UC_PRICING) return _UC_PRICING
   var g=atlasGetCfg2(); var sb={url:g.sbUrl||g.sb_url||'',key:g.sbKey||g.sb_key||''}
@@ -602,6 +615,7 @@ function switchTab(tab) {
 }
 
 function renderTab(tab) {
+  if (tab === 'profile')  return renderProfileTab()
   if (tab === 'cost')     return renderCostTab()
   if (tab === 'supply')   return renderSupplyTab()
   if (tab === 'gap')      return renderGapTab()
@@ -623,6 +637,351 @@ function updateHeader() {
 }
 
 //    TAB 1: Programme Cost                                                      
+
+//                                                                           
+// Territory Profile Tab   AI Readiness Profiler
+//                                                                           
+
+var PROFILE_STATE = {
+  step: 0,
+  answers: {},    // question_id -> option_id
+  questions: [],
+  options: [],
+  archetypes: [],
+  archetype_dims: [],
+  loaded: false,
+  running: false,
+  result: null
+}
+
+async function loadProfilerData() {
+  if (PROFILE_STATE.loaded) return
+  var [qs, opts, archs, dims] = await Promise.all([
+    sbFetch('profiler_questions', 'order=sort_order.asc', 50),
+    sbFetch('profiler_options',   'order=question_id.asc,sort_order.asc', 200),
+    sbFetch('profiler_archetypes','order=id.asc', 20),
+    sbFetch('profiler_archetype_dims', 'order=archetype_id.asc', 200)
+  ])
+  PROFILE_STATE.questions     = qs   || []
+  PROFILE_STATE.options       = opts || []
+  PROFILE_STATE.archetypes    = archs || []
+  PROFILE_STATE.archetype_dims = dims || []
+  PROFILE_STATE.loaded = true
+}
+
+function profilerDimScore(optId, dimName) {
+  var opt = PROFILE_STATE.options.find(function(o){ return o.id === optId })
+  if (!opt) return 0
+  var key = dimName.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')
+  return parseFloat(opt[key] || opt[dimName] || 0) || 0
+}
+
+function profilerCosineSimilarity(a, b, keys) {
+  var dot=0, mA=0, mB=0
+  keys.forEach(function(k){
+    var av=a[k]||0, bv=b[k]||0
+    dot+=av*bv; mA+=av*av; mB+=bv*bv
+  })
+  if (!mA||!mB) return 0
+  return dot/(Math.sqrt(mA)*Math.sqrt(mB))
+}
+
+function profilerMatch() {
+  var dimNames = []
+  PROFILE_STATE.archetype_dims.forEach(function(d){
+    if (dimNames.indexOf(d.dimension)<0) dimNames.push(d.dimension)
+  })
+  var profile = {}
+  dimNames.forEach(function(d){ profile[d]=0 })
+  var answered = Object.keys(PROFILE_STATE.answers).length
+  if (!answered) return { profile:profile, dimNames:dimNames, all:[], best:null }
+
+  Object.keys(PROFILE_STATE.answers).forEach(function(qId){
+    var optId = PROFILE_STATE.answers[qId]
+    dimNames.forEach(function(d){
+      profile[d] += profilerDimScore(optId, d)
+    })
+  })
+  dimNames.forEach(function(d){ profile[d] /= answered })
+
+  var archVecs = {}
+  PROFILE_STATE.archetypes.forEach(function(a){
+    archVecs[a.id]={}; dimNames.forEach(function(d){ archVecs[a.id][d]=0 })
+  })
+  PROFILE_STATE.archetype_dims.forEach(function(d){
+    if(archVecs[d.archetype_id]) archVecs[d.archetype_id][d.dimension]=parseFloat(d.score)||0
+  })
+
+  var scores = PROFILE_STATE.archetypes.map(function(a){
+    return { arch:a, score:profilerCosineSimilarity(profile, archVecs[a.id], dimNames), vector:archVecs[a.id] }
+  }).sort(function(a,b){ return b.score-a.score })
+
+  return { profile:profile, dimNames:dimNames, all:scores, best:scores[0] }
+}
+
+function renderProfileTab() {
+  if (!PROFILE_STATE.loaded) {
+    loadProfilerData().then(function(){ switchTab('profile') })
+    return '<div style="padding:24px;color:var(--mid);display:flex;align-items:center;gap:10px">'
+      + '<div style="width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite"></div>'
+      + 'Loading profiler data...</div>'
+  }
+
+  var qs = PROFILE_STATE.questions
+  if (!qs.length) {
+    return '<div style="padding:24px"><div style="background:var(--light);border-radius:8px;padding:20px;color:var(--mid);font-size:13px">'
+      + '&#9888; No profiler questions found in Supabase. Check profiler_questions table.</div></div>'
+  }
+
+  // Show result if we have one
+  if (PROFILE_STATE.result) return renderProfileResult()
+
+  // Show question flow
+  if (PROFILE_STATE.running) return renderProfileQuestion()
+
+  // Show intro / archetype overview
+  return renderProfileIntro()
+}
+
+function renderProfileIntro() {
+  var archs = PROFILE_STATE.archetypes
+  var icons = {Q1:'&#127807;',Q2:'&#127970;',Q3:'&#9881;',Q4:'&#127758;'}
+  var answeredCount = Object.keys(PROFILE_STATE.answers).length
+  var total = PROFILE_STATE.questions.length
+
+  var html = '<div style="padding:20px 0">'
+    + '<div style="background:linear-gradient(135deg,var(--navy) 0%,#003fa8 100%);border-radius:8px;padding:20px 24px;color:#fff;margin-bottom:16px">'
+    + '<div style="font-size:16px;font-weight:700;margin-bottom:6px">Territory AI Readiness Profiler</div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,0.75);line-height:1.5">Answer ' + total + ' questions about this territory. We match it against reference archetypes and generate a radar chart with an actions playbook.</div>'
+    + '</div>'
+
+  // Archetype cards
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
+    + archs.map(function(a){
+        return '<div style="padding:12px 14px;background:var(--light);border-radius:6px;border-left:3px solid var(--navy)">'
+          + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:3px">' + (icons[a.id]||'') + ' ' + esc(a.name||a.id) + '</div>'
+          + '<div style="font-size:11px;color:var(--mid);line-height:1.4">' + esc(a.description||'') + '</div>'
+          + '</div>'
+      }).join('')
+    + '</div>'
+
+  html += '<div style="display:flex;gap:10px;align-items:center">'
+    + '<button onclick="startProfilerInFM()" style="padding:9px 20px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">'
+    + (answeredCount > 0 ? '&#8635; Retake (' + answeredCount + '/' + total + ' answered)' : '&#9654; Start profiler')
+    + '</button>'
+    + '</div></div>'
+
+  return html
+}
+
+function startProfilerInFM() {
+  PROFILE_STATE.step = 0
+  PROFILE_STATE.answers = {}
+  PROFILE_STATE.running = true
+  PROFILE_STATE.result  = null
+  switchTab('profile')
+}
+
+function renderProfileQuestion() {
+  var qs    = PROFILE_STATE.questions
+  var step  = PROFILE_STATE.step
+  var q     = qs[step]
+  if (!q) { finishProfiler(); return renderProfileResult() }
+
+  var opts     = PROFILE_STATE.options.filter(function(o){ return o.question_id===q.id })
+  var selected = PROFILE_STATE.answers[q.id]
+  var progress = Math.round(step/qs.length*100)
+
+  var html = '<div style="padding:20px 0">'
+    // Progress
+    + '<div style="height:3px;background:var(--border);border-radius:2px;margin-bottom:16px">'
+    + '<div style="width:' + progress + '%;height:100%;background:var(--navy);border-radius:2px;transition:width .3s"></div></div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Question ' + (step+1) + ' of ' + qs.length + '</div>'
+
+    // Question card
+    + '<div style="background:#fff;border:1.5px solid var(--navy);border-radius:8px;padding:18px 20px;margin-bottom:12px">'
+    + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Q' + (step+1) + '</div>'
+    + '<div style="font-size:14px;font-weight:500;margin-bottom:14px;line-height:1.5">' + esc(q.text||q.question||'') + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:7px">'
+    + opts.map(function(o){
+        var isSel = o.id===selected
+        return '<div onclick="profilerPickFM(\'' + q.id + '\',\'' + o.id + '\')" '
+          + 'style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:6px;border:1.5px solid '
+          + (isSel?'var(--navy)':'var(--border)') + ';background:' + (isSel?'rgba(0,40,112,0.05)':'#fff') + ';cursor:pointer">'
+          + '<div style="width:14px;height:14px;border-radius:50%;border:2px solid ' + (isSel?'var(--navy)':'var(--border)') + ';flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;background:' + (isSel?'var(--navy)':'#fff') + '">'
+          + (isSel?'<div style="width:5px;height:5px;border-radius:50%;background:#fff"></div>':'')
+          + '</div>'
+          + '<span style="font-size:12px;line-height:1.4">' + esc(o.text||'') + '</span>'
+          + '</div>'
+      }).join('')
+    + '</div></div>'
+
+    // Nav
+    + '<div style="display:flex;justify-content:space-between">'
+    + '<button onclick="profilerBackFM()" style="padding:7px 14px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer;' + (step===0?'opacity:.4;pointer-events:none':'') + '">&#8592; Back</button>'
+    + (selected
+      ? '<button onclick="profilerNextFM()" style="padding:7px 16px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">Next &#8594;</button>'
+      : '<button onclick="profilerNextFM()" style="padding:7px 14px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer;color:var(--mid)">Skip</button>')
+    + '</div></div>'
+  return html
+}
+
+function profilerPickFM(qId, optId) {
+  PROFILE_STATE.answers[qId] = optId
+  switchTab('profile')
+}
+function profilerNextFM() {
+  PROFILE_STATE.step++
+  if (PROFILE_STATE.step >= PROFILE_STATE.questions.length) { finishProfiler() }
+  switchTab('profile')
+}
+function profilerBackFM() {
+  if (PROFILE_STATE.step > 0) { PROFILE_STATE.step--; switchTab('profile') }
+}
+
+function finishProfiler() {
+  PROFILE_STATE.running = false
+  PROFILE_STATE.result  = profilerMatch()
+  // Write matched archetype to FM data for use in other tabs
+  if (PROFILE_STATE.result && PROFILE_STATE.result.best) {
+    FM_DATA.territory_archetype      = PROFILE_STATE.result.best.arch.id
+    FM_DATA.territory_archetype_name = PROFILE_STATE.result.best.arch.name || PROFILE_STATE.result.best.arch.id
+    FM_DATA.territory_match_score    = Math.round(PROFILE_STATE.result.best.score * 100)
+  }
+  // Save run
+  saveProfilerRun()
+}
+
+async function saveProfilerRun() {
+  var result = PROFILE_STATE.result
+  if (!result || !result.best) return
+  var run = {
+    id: 'RUN-' + Date.now(),
+    engagement_id: FM_DATA.engId || null,
+    answers: PROFILE_STATE.answers,
+    matched_archetype: result.best.arch.id,
+    match_score: Math.round(result.best.score*100),
+    dimension_scores: result.profile,
+    created_at: new Date().toISOString()
+  }
+  await sbInsert('profiler_runs', run)
+}
+
+function renderProfileResult() {
+  var result = PROFILE_STATE.result || profilerMatch()
+  if (!result || !result.best) return renderProfileIntro()
+
+  var best     = result.best
+  var arch     = best.arch
+  var profile  = result.profile
+  var dimNames = result.dimNames
+  var pct      = Math.round(best.score*100)
+  var icons    = {Q1:'&#127807;',Q2:'&#127970;',Q3:'&#9881;',Q4:'&#127758;'}
+
+  var html = '<div style="padding:20px 0">'
+    // Matched archetype banner
+    + '<div style="background:var(--navy);border-radius:8px;padding:16px 20px;color:#fff;margin-bottom:14px">'
+    + '<div style="font-size:10px;color:rgba(255,255,255,0.6);margin-bottom:4px">MATCHED ARCHETYPE</div>'
+    + '<div style="font-size:18px;font-weight:900;margin-bottom:4px">' + (icons[arch.id]||'') + ' ' + esc(arch.name||arch.id) + '</div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:8px">' + esc(arch.description||'') + '</div>'
+    + '<div style="font-size:11px;color:var(--teal)">Match confidence: ' + pct + '%</div>'
+    + '</div>'
+
+  // Radar + dim scores
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
+
+  // Radar
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">Dimension radar</div>'
+    + '<canvas id="fm-profiler-radar" height="200"></canvas>'
+    + '</div>'
+
+  // Dim scores
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">Your scores</div>'
+    + dimNames.map(function(d){
+        var sc = Math.min(1,Math.max(0,profile[d]||0))
+        var p2 = Math.round(sc*100)
+        var lbl= d.length>18 ? d.substring(0,16)+'..' : d
+        return '<div style="margin-bottom:8px">'
+          + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">'
+          + '<span style="color:var(--mid)">' + esc(lbl) + '</span>'
+          + '<span style="font-weight:700;color:var(--navy)">' + p2 + '</span>'
+          + '</div>'
+          + '<div style="height:3px;background:var(--border);border-radius:2px">'
+          + '<div style="width:' + p2 + '%;height:100%;background:var(--teal);border-radius:2px"></div>'
+          + '</div></div>'
+      }).join('')
+    + '</div>'
+
+  html += '</div>'
+
+  // All archetype matches
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">All archetype matches</div>'
+    + '<div style="display:flex;flex-direction:column;gap:7px">'
+    + result.all.map(function(m,i){
+        var sc2 = Math.round(m.score*100)
+        var isBest = i===0
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;background:' + (isBest?'rgba(0,40,112,0.06)':'var(--light)') + ';border:1.5px solid ' + (isBest?'var(--navy)':'transparent') + '">'
+          + '<span style="font-size:13px;width:22px">' + (icons[m.arch.id]||'') + '</span>'
+          + '<span style="flex:1;font-size:12px;font-weight:' + (isBest?700:400) + '">' + esc(m.arch.name||m.arch.id) + '</span>'
+          + '<div style="width:100px;height:4px;background:var(--border);border-radius:2px"><div style="width:' + sc2 + '%;height:100%;background:' + (isBest?'var(--navy)':'var(--teal)') + ';border-radius:2px"></div></div>'
+          + '<span style="font-size:11px;font-weight:600;color:' + (isBest?'var(--navy)':'var(--mid)') + ';width:32px;text-align:right">' + sc2 + '%</span>'
+          + '</div>'
+      }).join('')
+    + '</div></div>'
+
+  // Actions
+  if (arch.actions || arch.challenges) {
+    var items = []
+    try { items = items.concat(JSON.parse(arch.actions||'[]')) } catch(e){}
+    try { items = items.concat(JSON.parse(arch.challenges||'[]')) } catch(e){}
+    if (items.length) {
+      html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">Playbook for this archetype</div>'
+        + '<div style="display:flex;flex-direction:column;gap:7px">'
+        + items.map(function(item){
+            return '<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.4">'
+              + '<div style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:5px"></div>'
+              + esc(item) + '</div>'
+          }).join('')
+        + '</div></div>'
+    }
+  }
+
+  // Retake
+  html += '<button onclick="startProfilerInFM()" style="padding:7px 14px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8635; Retake</button>'
+
+  html += '</div>'
+
+  // Draw radar after render
+  setTimeout(function(){
+    var ctx = document.getElementById('fm-profiler-radar')
+    if (!ctx || !dimNames.length) return
+    try {
+      new Chart(ctx, {
+        type:'radar',
+        data:{
+          labels: dimNames.map(function(d){ return d.length>10?d.substring(0,9)+'..':d }),
+          datasets:[
+            { label:'Your profile', data:dimNames.map(function(d){ return Math.round((profile[d]||0)*100) }),
+              fill:true, backgroundColor:'rgba(0,178,144,0.2)', borderColor:'#00B290', pointBackgroundColor:'#00B290' },
+            { label:esc(arch.name||arch.id), data:dimNames.map(function(d){
+                var row = PROFILE_STATE.archetype_dims.find(function(x){ return x.archetype_id===arch.id&&x.dimension===d })
+                return row ? Math.round(parseFloat(row.score||0)*100) : 0
+              }), fill:true, backgroundColor:'rgba(0,40,112,0.1)', borderColor:'#002870', pointBackgroundColor:'#002870', borderDash:[4,4] }
+          ]
+        },
+        options:{ responsive:true, scales:{ r:{ min:0,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:9}} } },
+          plugins:{ legend:{ position:'bottom', labels:{font:{size:10}} } } }
+      })
+    } catch(e){}
+  }, 80)
+
+  return html
+}
+
 function renderCostTab() {
   var capex   = calcCapex()
   var opex    = calcOpex()
