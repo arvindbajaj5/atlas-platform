@@ -776,8 +776,15 @@ async function geminiGenerate(prompt, useSearch, tokenKey) {
         if (parts) parts.forEach(function(p){ if(p.text) text+=p.text })
         var m = text.match(/\{[\s\S]*\}/)
         if (!m) return { ok:false, error:"No JSON in response from "+TP_MODELS[i] }
-        try { return { ok:true, data:JSON.parse(repairJSON(m[0])), model:TP_MODELS[i] } }
-        catch(e2) { return { ok:false, error:"JSON parse: "+e2.message } }
+        var repaired = repairJSON(m[0])
+        try { return { ok:true, data:JSON.parse(repaired), model:TP_MODELS[i] } }
+        catch(e2) {
+          // Log the raw text around the error position for diagnosis
+          var pos = parseInt((e2.message.match(/position (\d+)/)||[0,500])[1])
+          var snippet = repaired.substring(Math.max(0,pos-80), pos+80)
+          console.error("JSON error at pos "+pos+":", snippet)
+          return { ok:false, error:"JSON parse: "+e2.message+" | Near: "+snippet }
+        }
       }
       if (r.status!==404 && r.status!==400) {
         var ed = await r.json().catch(function(){ return {} })
