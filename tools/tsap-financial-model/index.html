@@ -648,7 +648,7 @@ function updateHeader() {
 
 
 // ==============================================================================
-// Territory Intelligence Profiler v2 — 3-Stage AI-powered engine
+// Territory Intelligence Profiler v2   3-Stage AI-powered engine
 // ==============================================================================
 
 //    Gemini key helper                                                         
@@ -945,8 +945,8 @@ function tpLoading(msg) {
 
 async function loadTPData() {
   var [archs, dims] = await Promise.all([
-    sbFetch('profiler_archetypes', 'type=eq.territory&order=id.asc'),
-    sbFetch('profiler_archetype_dims', 'archetype_type=eq.territory&order=archetype_id.asc')
+    sbFetch('profiler_archetypes', 'type=eq.territory&order=code.asc'),
+    sbFetch('profiler_archetype_dims', 'archetype_type=eq.territory&order=archetype_code.asc')
   ])
   TP.archetypes     = archs || []
   TP.archetype_dims = dims  || []
@@ -1418,15 +1418,18 @@ function tpS3Result() {
   var dims = Object.keys(dimScores)
   var archVecs = {}
   TP.archetypes.forEach(function(a){
-    archVecs[a.id]={}; dims.forEach(function(d){ archVecs[a.id][d]=0 })
+    var key = a.code || a.id
+    archVecs[key]={}; dims.forEach(function(d){ archVecs[key][d]=0 })
   })
   TP.archetype_dims.forEach(function(d){
-    if(archVecs[d.archetype_id]) archVecs[d.archetype_id][d.dimension]=parseFloat(d.score)||0
+    var dk = d.archetype_code || d.archetype_id; if(archVecs[dk]) archVecs[dk][d.dimension]=parseFloat(d.score)||0
   })
   var matches = TP.archetypes.map(function(a){
+    var key = a.code || a.id
     var dot=0,mA=0,mB=0
     dims.forEach(function(d){
-      var av=(dimScores[d]||0),bv=(archVecs[a.id][d]||0)
+      // Normalise user 0-100 to 1-5 scale to match DB reference vectors
+      var av=((dimScores[d]||0)/100)*4+1, bv=(archVecs[key]&&archVecs[key][d]||0)
       dot+=av*bv;mA+=av*av;mB+=bv*bv
     })
     return { arch:a, score:(mA&&mB)?dot/(Math.sqrt(mA)*Math.sqrt(mB)):0 }
@@ -1538,7 +1541,8 @@ function tpS3Result() {
     + '<div style="display:flex;flex-direction:column;gap:8px">'
     + dims.map(function(d){
         var sc = Math.round(dimScores[d]||0)
-        var ref = best ? Math.round(archVecs[best.arch.id][d]||0) : 0
+        var bestKey2 = best ? (best.arch.code||best.arch.id) : null
+        var ref = best ? Math.round(((archVecs[bestKey2]&&archVecs[bestKey2][d])||0)*20) : 0
         var lbl = dimLabels[d] || d
         return '<div>'
           + '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">'
@@ -1582,7 +1586,8 @@ function tpS3Result() {
     if (TP.radarChart) { try{ TP.radarChart.destroy() }catch(e){} }
     var labels  = dims.map(function(d){ return dimLabels[d]||d })
     var userData = dims.map(function(d){ return Math.round(dimScores[d]||0) })
-    var archData = best ? dims.map(function(d){ return Math.round(archVecs[best.arch.id][d]||0) }) : []
+    var bestKey = best ? (best.arch.code||best.arch.id) : null
+    var archData = best ? dims.map(function(d){ return Math.round(((archVecs[bestKey]&&archVecs[bestKey][d])||0)*20) }) : []
     TP.radarChart = new Chart(ctx, {
       type:'radar',
       data:{ labels:labels, datasets:[
@@ -1700,7 +1705,7 @@ async function tpSaveResult() {
     territory_id:   slug,
     answers:        { objectives: TP.objectives, free_text: TP.freeText },
     dim_scores:     TP.s2.dim_scores,
-    archetype_id:   (TP.archetypes.find(function(a,_,arr){ return arr.sort && arr[0] }) || {}).id || null,
+    archetype_code: null, // populated by matchmaking
     created_at:     new Date().toISOString()
   }
   await sbInsert('territory_assessments', row)
