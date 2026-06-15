@@ -661,7 +661,34 @@ function getGeminiKey() {
 }
 
 // Try models in order, return first successful response
-var TP_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash']
+// Primary model from Settings (app_config: gemini_text_model or atlas_global_cfg: geminiTextModel)
+// Fallback chain runs automatically if primary is unavailable
+var TP_MODELS_FALLBACK = ['gemini-2.0-flash-lite', 'gemini-1.5-flash']
+var TP_MODELS = ['gemini-2.5-flash'].concat(TP_MODELS_FALLBACK)  // default, overridden on load
+
+async function loadGeminiTextModel() {
+  // 1. Check localStorage first (set immediately by Settings page on change)
+  try {
+    var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}')
+    if (g.geminiTextModel) {
+      TP_MODELS = [g.geminiTextModel].concat(TP_MODELS_FALLBACK.filter(function(m){ return m !== g.geminiTextModel }))
+      return
+    }
+  } catch(e) {}
+  // 2. Fall back to app_config in Supabase
+  var sb = getSB(); if (!sb.url) return
+  try {
+    var r = await fetch(sb.url+'/rest/v1/app_config?key=eq.gemini_text_model&limit=1', {
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+    })
+    if (!r.ok) return
+    var rows = await r.json()
+    if (rows && rows[0] && rows[0].value) {
+      var primary = rows[0].value
+      TP_MODELS = [primary].concat(TP_MODELS_FALLBACK.filter(function(m){ return m !== primary }))
+    }
+  } catch(e) {}
+}
 
 async function geminiGenerate(prompt, useSearch) {
   var key = getGeminiKey()
@@ -685,7 +712,12 @@ async function geminiGenerate(prompt, useSearch) {
         if (parts) parts.forEach(function(p){ if (p.text) text += p.text })
         var m = text.match(/\{[\s\S]*\}/)
         if (!m) return { ok: false, error: 'No JSON in response from ' + TP_MODELS[i] }
-        return { ok: true, data: JSON.parse(m[0]), model: TP_MODELS[i] }
+        // Sanitise control characters that Gemini sometimes embeds in JSON strings
+        var clean = m[0]
+          .replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ')
+          .replace(/\t/g, ' ')
+          .replace(/[\x00-\x1F\x7F]/g, ' ')
+        return { ok: true, data: JSON.parse(clean), model: TP_MODELS[i] }
       }
       if (r.status !== 404 && r.status !== 400) {
         var ed = await r.json().catch(function(){ return {} })
@@ -928,6 +960,7 @@ function tpLoading(msg) {
 }
 
 async function loadTPData() {
+  await loadGeminiTextModel()  // ensure model is set before any Gemini calls
   var [archs, dims] = await Promise.all([
     sbFetch('profiler_archetypes', 'type=eq.territory&order=code.asc'),
     sbFetch('profiler_archetype_dims', 'archetype_type=eq.territory&order=archetype_code.asc')
