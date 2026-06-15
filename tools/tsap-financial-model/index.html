@@ -690,20 +690,26 @@ async function loadGeminiTextModel() {
   } catch(e) {}
 }
 
-// JSON repair
+//                                                                            
+// Territory Profiler   Resilient Stage 1 Engine v2
+// Architecture: Search   Cache raw text   Extract sections independently
+// Each section extracted separately, failures don't crash others
+//                                                                            
+
+//    JSON repair                                                             
 function repairJSON(str) {
   var s = str
     .replace(/^```json\s*/,"").replace(/```\s*$/,"")
     .replace(/\r\n/g," ").replace(/\r/g," ").replace(/\n/g," ").replace(/\t/g," ")
     .replace(/[\x00-\x1F\x7F]/g," ")
-    // Fix true|false literals from schema
+    // Fix true|false literals copied from schema
     .replace(/": true\|false/g,'": false')
     .replace(/": "true\|false"/g,'": false')
     .replace(/": boolean/g,'": false')
-    // Fix Indian number format: 2,57,000 etc (two passes)
+    // Fix Indian number format: 2,57,000 (two passes)
     .replace(/(\d),(\d{2,3})(?=,|\s|"|\})/g, function(m,a,b){ return a+b })
     .replace(/(\d),(\d{2,3})(?=,|\s|"|\})/g, function(m,a,b){ return a+b })
-    // Quote unquoted string values: ": word -> ": "word"
+    // Quote unquoted string values (not true/false/null)
     .replace(/": ([a-zA-Z][a-zA-Z_-]*)([,\s\}])/g, function(m,w,t) {
       return (w==="true"||w==="false"||w==="null") ? '": '+w+t : '": "'+w+'"'+t
     })
@@ -712,11 +718,12 @@ function repairJSON(str) {
     // Add missing comma between value and next key (spaces from stripped newlines)
     .replace(/([\d"tfn])\s{2,}"/g, function(m,c){ return c+', "' })
     // Remove trailing commas
-    .replace(/,([\s]*[}\]])/g,"$1")
+    .replace(/,(\s*[}\]])/g,"$1")
   return s
 }
 
-var TP_TOKENS = { s1_prompt:0, s1_response:0, s2_prompt:0, s2_response:0 }
+//    Timer + token state                                                     
+var TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
 var TP_TIMER  = { start:null, elapsed:0, interval:null }
 
 function tpTimerStart(estimatedPromptTokens) {
@@ -725,16 +732,12 @@ function tpTimerStart(estimatedPromptTokens) {
   if (TP_TIMER.interval) clearInterval(TP_TIMER.interval)
   TP_TIMER.interval = setInterval(function() {
     TP_TIMER.elapsed = Math.floor((Date.now()-TP_TIMER.start)/1000)
-    // Timer display
     var tel = document.getElementById("tp-timer-display")
     if (tel) tel.textContent = (TP_TIMER.elapsed>=60?Math.floor(TP_TIMER.elapsed/60)+"m ":"")+(TP_TIMER.elapsed%60)+"s"
-    // Estimated token display   grows as response streams in
-    // Gemini ~40 tokens/sec for flash models; prompt tokens known upfront
     var kel = document.getElementById("tp-token-live")
     if (kel) {
-      var estResponse = Math.min(TP_TIMER.elapsed * 40, 4096)
-      var estTotal = TP_TIMER._estPrompt + estResponse
-      kel.textContent = "~" + estTotal.toLocaleString("en-IN") + " tokens"
+      var estTotal = TP_TIMER._estPrompt + Math.min(TP_TIMER.elapsed*40, 4096)
+      kel.textContent = "~"+estTotal.toLocaleString("en-IN")+" tokens"
     }
   }, 1000)
 }
@@ -745,52 +748,43 @@ function tpTimerStop() {
 }
 
 function tpTokenDisplay() {
-  var total = TP_TOKENS.s1_prompt+TP_TOKENS.s1_response+TP_TOKENS.s2_prompt+TP_TOKENS.s2_response
+  var total = TP_TOKENS.s1_raw+TP_TOKENS.s1_extract+TP_TOKENS.s2_prompt+TP_TOKENS.s2_response
   if (!total) return ""
   var costRs = (total/1000000*0.075*84).toFixed(2)
   return '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;margin-bottom:10px;flex-wrap:wrap">'
-    + '<span style="font-size:10px;color:var(--mid)">Actual tokens used:</span>'
-    + (TP_TOKENS.s1_prompt?'<span style="font-size:11px;font-weight:600;color:var(--navy)">S1: '+(TP_TOKENS.s1_prompt+TP_TOKENS.s1_response).toLocaleString("en-IN")+"</span>":"")
-    + (TP_TOKENS.s2_prompt?'<span style="font-size:11px;font-weight:600;color:var(--navy)">S2: '+(TP_TOKENS.s2_prompt+TP_TOKENS.s2_response).toLocaleString("en-IN")+"</span>":"")
+    + '<span style="font-size:10px;color:var(--mid)">Actual tokens:</span>'
+    + (TP_TOKENS.s1_raw?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Search: '+TP_TOKENS.s1_raw.toLocaleString("en-IN")+"</span>":"")
+    + (TP_TOKENS.s1_extract?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Extract: '+TP_TOKENS.s1_extract.toLocaleString("en-IN")+"</span>":"")
+    + (TP_TOKENS.s2_prompt?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Profile: '+(TP_TOKENS.s2_prompt+TP_TOKENS.s2_response).toLocaleString("en-IN")+"</span>":"")
     + '<span style="font-size:11px;font-weight:700;color:var(--teal)">Total: '+total.toLocaleString("en-IN")+"</span>"
     + '<span style="font-size:11px;color:var(--mid)">~Rs '+costRs+"</span>"
     + '</div>'
 }
 
-async function geminiGenerate(prompt, useSearch, tokenKey) {
+//    Gemini call helper                                                      
+async function geminiCall(prompt, useSearch, maxTokens) {
   var key = getGeminiKey()
   if (!key) return { ok:false, error:"No Gemini API key in Settings" }
-  var tools = useSearch ? [{ google_search:{} }] : undefined
   for (var i=0; i<TP_MODELS.length; i++) {
     try {
-      var body = { contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.2,maxOutputTokens:4096} }
-      if (tools) body.tools = tools
+      var body = {
+        contents:[{parts:[{text:prompt}]}],
+        generationConfig:{ temperature:0.1, maxOutputTokens: maxTokens||2048 }
+      }
+      if (useSearch) body.tools = [{ google_search:{} }]
       var r = await fetch(
         "https://generativelanguage.googleapis.com/v1beta/models/"+TP_MODELS[i]+":generateContent?key="+key,
         { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }
       )
       if (r.ok) {
         var data = await r.json()
-        if (data.usageMetadata && tokenKey) {
-          TP_TOKENS[tokenKey+"_prompt"]   = data.usageMetadata.promptTokenCount    || 0
-          TP_TOKENS[tokenKey+"_response"] = data.usageMetadata.candidatesTokenCount|| 0
-        }
         var text = ""
-        var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts
+        var parts = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts
         if (parts) parts.forEach(function(p){ if(p.text) text+=p.text })
-        var m = text.match(/\{[\s\S]*\}/)
-        if (!m) return { ok:false, error:"No JSON in response from "+TP_MODELS[i] }
-        var repaired = repairJSON(m[0])
-        try { return { ok:true, data:JSON.parse(repaired), model:TP_MODELS[i] } }
-        catch(e2) {
-          // Log the raw text around the error position for diagnosis
-          var pos = parseInt((e2.message.match(/position (\d+)/)||[0,500])[1])
-          var snippet = repaired.substring(Math.max(0,pos-80), pos+80)
-          console.error("JSON error at pos "+pos+":", snippet)
-          return { ok:false, error:"JSON parse: "+e2.message+" | Near: "+snippet }
-        }
+        var tokens = (data.usageMetadata&&data.usageMetadata.totalTokenCount)||0
+        return { ok:true, text:text, tokens:tokens, model:TP_MODELS[i] }
       }
-      if (r.status!==404 && r.status!==400) {
+      if (r.status!==404&&r.status!==400) {
         var ed = await r.json().catch(function(){ return {} })
         return { ok:false, error:"API "+r.status+": "+(ed.error?ed.error.message:r.statusText) }
       }
@@ -799,107 +793,480 @@ async function geminiGenerate(prompt, useSearch, tokenKey) {
   return { ok:false, error:"All Gemini models unavailable" }
 }
 
-//    Stage 1 Gemini prompt                                                     
-function buildS1Prompt(territory) {
-  return 'Generate a comprehensive territory intelligence profile for ' + territory + ', India.\n'
-    + 'Use web search for current data. Return ONLY valid JSON, no markdown, no preamble.\n\n'
-    + 'IMPORTANT: For "policy_useable" and "programmes_useable", convert raw policy/scheme names\n'
-    + 'into concrete, actionable points for AI deployment. Not the policy name -- what it ENABLES.\n\n'
-    + '{\n'
-    + '  "territory": "' + territory + '",\n'
-    + '  "state_code": "2-letter code",\n'
-    + '  "headline": "One powerful sentence on the AI opportunity for this territory",\n'
-    + '  "hard_stats": {\n'
-    + '    "macro": {\n'
-    + '      "gsdp_cr": number, "gsdp_growth_pct": number,\n'
-    + '      "per_capita_inr": number, "vs_national_pct": number,\n'
-    + '      "fiscal_health": "one of: surplus, balanced, deficit"\n'
-    + '    },\n'
-    + '    "energy": {\n'
-    + '      "installed_mw": number, "status": "one of: surplus, balanced, deficit",\n'
-    + '      "grid_hrs": number, "renewable_pct": number,\n'
-    + '      "industrial_tariff": number, "national_avg_tariff": 7.5,\n'
-    + '      "tariff_index_pct": number, "dc_feasibility": "one of: high, medium, low",\n'
-    + '      "green_energy_index": number 0-100,\n'
-    + '      "carbon_intensity_gco2": grams CO2 per kWh,\n'
-    + '      "vs_national_carbon_pct": number vs national avg 700,\n'
-    + '      "hydel_mw": number, "solar_mw": number, "wind_mw": number,\n'
-    + '      "green_24x7_feasibility": "one of: high, medium, low",\n'
-    + '      "stranded_renewable_mw": number,\n'
-    + '      "green_corridor": boolean,\n'
-    + '      "notes": "string"\n'
-    + '    },\n'
-    + '    "water": {\n'
-    + '      "rainfall_mm": number, "stress_index": "one of: low, medium, high, critical",\n'
-    + '      "perennial_rivers": ["list"], "dc_cooling": "one of: high, medium, low",\n'
-    + '      "industrial_cost_per_kl": number, "national_avg_water_cost": 45,\n'
-    + '      "water_cost_index_pct": number\n'
-    + '    },\n'
-    + '    "land": {\n'
-    + '      "area_sqkm": number, "topography": "one of: plains, hilly, coastal, mixed",\n'
-    + '      "industrial_parks": number, "sez_count": number,\n'
-    + '      "govt_land": "one of: high, medium, low", "construction_ease": "one of: easy, moderate, challenging",\n'
-    + '      "cost_per_acre_lakh": number, "national_avg_land_cost": 50,\n'
-    + '      "land_cost_index_pct": number\n'
-    + '    },\n'
-    + '    "workers": {\n'
-    + '      "population_lakh": number, "literacy_pct": number,\n'
-    + '      "urban_pct": number, "unemployment_pct": number,\n'
-    + '      "graduates_per_lakh": number, "engineers_per_year": number,\n'
-    + '      "migration": "one of: net_in, net_out, balanced",\n'
-    + '      "avg_engineer_salary_lakh": number, "national_avg_salary": 8.5,\n'
-    + '      "salary_index_pct": number, "skilled_labour": "one of: abundant, adequate, scarce"\n'
-    + '    },\n'
-    + '    "digital": {\n'
-    + '      "internet_pct": number, "ofc_km": number,\n'
-    + '      "nkn": boolean, "smart_cities": number,\n'
-    + '      "bharatnet_pct": number, "govt_dcs": number,\n'
-    + '      "swan": "one of: operational, partial, planned"\n'
-    + '    }\n'
-    + '  },\n'
-    + '  "policy": {\n'
-    + '    "raw": ["list of named policies and budget allocations"],\n'
-    + '    "useable": [\n'
-    + '      {"point": "What this specific policy enables for AI deployment",\n'
-    + '       "source": "Policy name", "impact": "one of: high, medium, low"}\n'
-    + '    ]\n'
-    + '  },\n'
-    + '  "programmes": {\n'
-    + '    "raw": ["list of central and state schemes active"],\n'
-    + '    "useable": [\n'
-    + '      {"point": "How this scheme can be leveraged for AI initiative",\n'
-    + '       "source": "Scheme name", "type": "funding|infrastructure|mandate|capacity"}\n'
-    + '    ]\n'
-    + '  },\n'
-    + '  "geography": {\n'
-    + '    "advantages": ["list 3-4"],\n'
-    + '    "constraints": ["list 2-3"]\n'
-    + '  },\n'
-    + '  "known_issues": {\n'
-    + '    "social": ["list 3"],\n'
-    + '    "economic": ["list 3"]\n'
-    + '  }\n'
-    + '}'
+//    Stage 1a: Raw intelligence search                                      
+function buildRawIntelPrompt(territory) {
+  return 'Research '+territory+', India for an AI deployment feasibility study.\n'
+    + 'Use web search to find CURRENT data on the following topics.\n'
+    + 'Write as plain factual paragraphs. No JSON. No bullet points. No formatting.\n'
+    + 'Just accurate facts and numbers in prose.\n\n'
+    + 'Topics to research:\n'
+    + '1. Economy: GSDP in crores, growth rate, per capita income vs national average, fiscal health (surplus/deficit)\n'
+    + '2. Power/Energy: Installed capacity MW, power surplus or deficit, grid reliability hours/day, '
+    +    'industrial tariff Rs/unit vs national average ~Rs7.5/unit, renewable percentage especially hydel and solar, '
+    +    'green energy index, carbon intensity gCO2/kWh, stranded renewable capacity MW\n'
+    + '3. Water: Annual rainfall mm, major perennial rivers, groundwater stress level, '
+    +    'industrial water cost per kilolitre, feasibility for data centre cooling\n'
+    + '4. Land: Total area sqkm, topography (plains/hilly/coastal), number of industrial parks and SEZs, '
+    +    'government land availability, construction ease, land cost per acre in lakhs\n'
+    + '5. Workforce: Population in lakhs, literacy percentage, urban percentage, unemployment rate, '
+    +    'engineering graduates per year, average engineer salary lakhs per annum, migration trend (in/out/balanced)\n'
+    + '6. Digital infrastructure: Internet penetration percentage, optical fibre cable km, '
+    +    'NKN presence yes/no, number of smart cities, BharatNet village coverage percentage, '
+    +    'government data centres count, SWAN status\n'
+    + '7. Policy and governance: Named AI and digital policies announced, IT budget in crores, '
+    +    'central scheme eligibility (DONER, NE Fund, Special Category etc), e-governance maturity, '
+    +    'political stability, key government departments that would use AI\n'
+    + '8. Active programmes and schemes: Central and state schemes active that could fund or support AI initiatives\n'
+    + '9. Geography: Key natural advantages for AI/tech industry, key geographic constraints or challenges\n'
+    + '10. AI opportunity areas: Which domains (Agriculture, Water, Emergency, Health, Education, Urban, '
+    +    'Transport, Governance, Tourism, Industry, Defence) are most relevant and why\n'
+    + '\nBe specific with numbers. Mention sources where possible. Aim for comprehensive coverage.'
 }
 
-//    Stage 1 API call                                                          
-async function callS1(territory) {
-  var prompt = buildS1Prompt(territory)
-  tpTimerStart(Math.round(prompt.length / 4))  // estimate: chars/4   tokens
-  var result = await geminiGenerate(prompt, true, "s1")
+//    Section extraction prompts                                              
+var SECTION_SCHEMAS = {
+  macro: '{"gsdp_cr":number,"gsdp_growth_pct":number,"per_capita_inr":number,"vs_national_pct":number,"fiscal_health":"surplus or balanced or deficit"}',
+  energy: '{"installed_mw":number,"status":"surplus or balanced or deficit","grid_hrs":number,"renewable_pct":number,"industrial_tariff":number,"tariff_index_pct":number,"dc_feasibility":"high or medium or low","green_energy_index":number,"carbon_intensity_gco2":number,"vs_national_carbon_pct":number,"hydel_mw":number,"solar_mw":number,"wind_mw":number,"green_24x7_feasibility":"high or medium or low","stranded_renewable_mw":number,"green_corridor":true or false}',
+  water: '{"rainfall_mm":number,"stress_index":"low or medium or high or critical","perennial_rivers":["name1","name2"],"dc_cooling":"high or medium or low","industrial_cost_per_kl":number,"water_cost_index_pct":number}',
+  land: '{"area_sqkm":number,"topography":"plains or hilly or coastal or mixed","industrial_parks":number,"sez_count":number,"govt_land":"high or medium or low","construction_ease":"easy or moderate or challenging","cost_per_acre_lakh":number,"land_cost_index_pct":number}',
+  workers: '{"population_lakh":number,"literacy_pct":number,"urban_pct":number,"unemployment_pct":number,"graduates_per_lakh":number,"engineers_per_year":number,"migration":"net_in or net_out or balanced","avg_engineer_salary_lakh":number,"salary_index_pct":number,"skilled_labour":"abundant or adequate or scarce"}',
+  digital: '{"internet_pct":number,"ofc_km":number,"nkn":true or false,"smart_cities":number,"bharatnet_pct":number,"govt_dcs":number,"swan":"operational or partial or planned"}',
+  policy: '{"raw":["policy name 1","policy name 2"],"useable":[{"point":"what this enables for AI deployment","source":"policy name","impact":"high or medium or low"}]}',
+  programmes: '{"raw":["scheme name 1","scheme name 2"],"useable":[{"point":"how to leverage for AI","source":"scheme name","type":"funding or infrastructure or mandate or capacity"}]}',
+  geography: '{"advantages":["advantage 1","advantage 2"],"constraints":["constraint 1"],"known_issues":{"social":["issue 1"],"economic":["issue 1"]}}',
+  opportunities: '{"ai_opportunities":[{"domain":"Agriculture","relevance":"high or medium or low","score":0,"rationale":"2 sentences","example_ucs":["uc1","uc2"]}],"headline":"one sentence on the AI opportunity"}'
+}
+
+function buildSectionPrompt(sectionName, rawText, territory) {
+  var schema = SECTION_SCHEMAS[sectionName]
+  return 'From the research text below about '+territory+', extract ONLY the '+sectionName+' data.\n'
+    + 'Output ONLY valid JSON matching this exact schema. No explanation. No markdown.\n'
+    + 'Rules: All string values must be in double quotes. Numbers must be plain decimals (no commas). '
+    + 'Use null for any value not found in the text. For boolean fields use true or false without quotes.\n\n'
+    + 'Schema:\n'+schema+'\n\n'
+    + 'Research text:\n'+rawText.substring(0, 6000)
+}
+
+//    Parse a section response                                                
+function parseSectionResponse(text) {
+  // Try all JSON blocks in the response, take the last valid one
+  var blocks = []
+  var re = /\{[\s\S]*?\}/g
+  var m
+  while ((m = re.exec(text)) !== null) blocks.push(m[0])
+  // Also try the whole text as one block
+  var fullMatch = text.match(/\{[\s\S]*\}/)
+  if (fullMatch) blocks.push(fullMatch[0])
+
+  // Try each block from last to first (last is usually best)
+  for (var i = blocks.length-1; i >= 0; i--) {
+    try {
+      var repaired = repairJSON(blocks[i])
+      var data = JSON.parse(repaired)
+      return { ok:true, data:data }
+    } catch(e) { continue }
+  }
+  return { ok:false, error:"No valid JSON found in response" }
+}
+
+//    Extract one section                                                     
+async function tpExtractOneSection(sectionName, rawText, territory) {
+  var prompt = buildSectionPrompt(sectionName, rawText, territory)
+  var result = await geminiCall(prompt, false, 1024)
+  if (!result.ok) return { ok:false, section:sectionName, error:result.error, raw:rawText }
+  TP_TOKENS.s1_extract += result.tokens
+  var parsed = parseSectionResponse(result.text)
+  if (!parsed.ok) return { ok:false, section:sectionName, error:parsed.error, raw_response:result.text }
+  return { ok:true, section:sectionName, data:parsed.data }
+}
+
+//    Stage 1b: Extract all sections from raw text                           
+// Runs sections in two parallel batches to avoid rate limits
+async function tpExtractSections(rawText, territory) {
+  var SECTIONS = ['macro','energy','water','land','workers','digital','policy','programmes','geography','opportunities']
+  var BATCH1 = SECTIONS.slice(0,5)
+  var BATCH2 = SECTIONS.slice(5)
+
+  // Batch 1
+  var results1 = await Promise.all(BATCH1.map(function(s) {
+    return tpExtractOneSection(s, rawText, territory)
+  }))
+
+  // Small delay between batches to avoid rate limiting
+  await new Promise(function(res){ setTimeout(res, 1000) })
+
+  // Batch 2
+  var results2 = await Promise.all(BATCH2.map(function(s) {
+    return tpExtractOneSection(s, rawText, territory)
+  }))
+
+  return results1.concat(results2)
+}
+
+//    Build TP.s1 from section results                                       
+function buildS1FromSections(results, territory) {
+  var sections = {}
+  var failed   = {}
+
+  results.forEach(function(r) {
+    if (r.ok) sections[r.section] = r.data
+    else      failed[r.section]   = { error:r.error, raw_response:r.raw_response||'' }
+  })
+
+  // Build the TP.s1 structure that tpS1View and buildS2Prompt expect
+  var m  = sections.macro       || {}
+  var e  = sections.energy      || {}
+  var w  = sections.water       || {}
+  var l  = sections.land        || {}
+  var k  = sections.workers     || {}
+  var d  = sections.digital     || {}
+  var po = sections.policy      || {}
+  var pr = sections.programmes  || {}
+  var ge = sections.geography   || {}
+  var op = sections.opportunities || {}
+
+  return {
+    territory:   territory,
+    headline:    op.headline || null,
+    hard_stats:  { macro:m, energy:e, water:w, land:l, workers:k, digital:d },
+    policy:      po,
+    programmes:  pr,
+    geography:   ge,
+    ai_opportunities: op.ai_opportunities || [],
+    _sections:   sections,
+    _failed:     failed,
+    _complete:   Object.keys(failed).length === 0
+  }
+}
+
+//    Progressive render during extraction                                   
+function tpRenderExtractionProgress() {
+  var sections = TP._extracting || {}
+  var SECTION_LABELS = {
+    macro:'Macroeconomics', energy:'Energy', water:'Water', land:'Land',
+    workers:'Workforce', digital:'Digital', policy:'Policy',
+    programmes:'Programmes', geography:'Geography', opportunities:'AI Opportunities'
+  }
+  var rows = Object.keys(SECTION_LABELS).map(function(k) {
+    var st = sections[k] || 'pending'
+    var dot = st==='done'?'&#9989;':st==='error'?'&#10060;':st==='loading'?'&#9680;':'&#9711;'
+    var col = st==='done'?'var(--teal)':st==='error'?'var(--orange)':st==='loading'?'var(--navy)':'var(--mid)'
+    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
+      + '<span style="font-size:14px">'+dot+'</span>'
+      + '<span style="font-size:12px;color:'+col+'">'+SECTION_LABELS[k]+'</span>'
+      + '</div>'
+  }).join('')
+
+  return '<div style="padding:24px 0">'
+    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:6px">Extracting territory intelligence...</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:16px">'+esc(TP.territory)+'</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-bottom:16px">'
+    + rows + '</div>'
+    + '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;width:fit-content">'
+    + '<span style="font-size:11px;color:var(--mid)">Elapsed:</span>'
+    + '<span id="tp-timer-display" style="font-size:14px;font-weight:700;color:var(--navy);font-family:monospace;min-width:36px">0s</span>'
+    + '<div style="width:1px;height:20px;background:var(--border)"></div>'
+    + '<span style="font-size:11px;color:var(--mid)">Tokens (est.):</span>'
+    + '<span id="tp-token-live" style="font-size:14px;font-weight:700;color:var(--teal);font-family:monospace">calculating...</span>'
+    + '</div></div>'
+}
+
+//    Loading state (for search phase)                                      
+function tpLoading(msg) {
+  return '<div style="padding:32px 0">'
+    + '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">'
+    + '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
+    + '<div style="font-size:14px;color:var(--mid)">' + msg + '</div>'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;width:fit-content">'
+    + '<span style="font-size:11px;color:var(--mid)">Elapsed:</span>'
+    + '<span id="tp-timer-display" style="font-size:14px;font-weight:700;color:var(--navy);font-family:monospace;min-width:36px">0s</span>'
+    + '<div style="width:1px;height:20px;background:var(--border)"></div>'
+    + '<span style="font-size:11px;color:var(--mid)">Tokens (est.):</span>'
+    + '<span id="tp-token-live" style="font-size:14px;font-weight:700;color:var(--teal);font-family:monospace">calculating...</span>'
+    + '</div></div>'
+}
+
+//    Failed sections repair UI                                               
+function tpRenderFailedSections(failed) {
+  if (!failed || !Object.keys(failed).length) return ''
+  var SECTION_LABELS = {
+    macro:'Macroeconomics', energy:'Energy', water:'Water', land:'Land',
+    workers:'Workforce', digital:'Digital', policy:'Policy',
+    programmes:'Programmes', geography:'Geography', opportunities:'AI Opportunities'
+  }
+  var html = '<div style="background:#FEF3C7;border:1px solid var(--amber);border-radius:8px;padding:14px 18px;margin-bottom:14px">'
+    + '<div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:10px">'
+    + '&#9888; '+Object.keys(failed).length+' section(s) could not be extracted   data shown below is partial'
+    + '</div>'
+    + Object.keys(failed).map(function(k) {
+        var f = failed[k]
+        var label = SECTION_LABELS[k] || k
+        return '<div style="background:#fff;border-radius:6px;padding:10px 12px;margin-bottom:8px">'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+          + '<span style="font-size:12px;font-weight:600;color:var(--orange)">&#10060; '+label+'</span>'
+          + '<div style="display:flex;gap:6px">'
+          + '<button onclick="tpRetrySection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--navy);background:transparent;border-radius:4px;cursor:pointer;color:var(--navy)">&#8635; Re-extract</button>'
+          + '<button onclick="tpEditSection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);background:transparent;border-radius:4px;cursor:pointer">&#9997; Edit manually</button>'
+          + '<button onclick="tpSkipSection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);background:transparent;border-radius:4px;cursor:pointer;color:var(--mid)">Skip</button>'
+          + '</div></div>'
+          + '<div style="font-size:10px;color:var(--mid)">Error: '+esc(f.error||'Parse failed')+'</div>'
+          + '</div>'
+      }).join('')
+    + '</div>'
+  return html
+}
+
+//    Retry one section                                                      
+async function tpRetrySection(sectionName) {
+  if (!TP.s1 || !TP._rawIntel) return
+  // Show spinner in that section's button
+  var btn = event && event.target
+  if (btn) { btn.textContent = '...'; btn.disabled = true }
+
+  var result = await tpExtractOneSection(sectionName, TP._rawIntel, TP.territory)
+  if (result.ok) {
+    // Merge into TP.s1
+    delete TP.s1._failed[sectionName]
+    TP.s1._sections[sectionName] = result.data
+    // Update hard_stats
+    var hsMap = { macro:'macro', energy:'energy', water:'water', land:'land', workers:'workers', digital:'digital' }
+    if (hsMap[sectionName]) TP.s1.hard_stats[sectionName] = result.data
+    if (sectionName==='policy')       TP.s1.policy = result.data
+    if (sectionName==='programmes')   TP.s1.programmes = result.data
+    if (sectionName==='geography')    TP.s1.geography = result.data
+    if (sectionName==='opportunities'){ TP.s1.ai_opportunities = result.data.ai_opportunities||[]; TP.s1.headline = result.data.headline }
+    TP.s1._complete = Object.keys(TP.s1._failed).length === 0
+    // Save updated profile to Supabase
+    tpSaveProfile()
+  } else {
+    TP.s1._failed[sectionName].error = result.error
+  }
+  switchTab('profile')
+}
+
+//    Edit section manually                                                  
+function tpEditSection(sectionName) {
+  var SECTION_LABELS = { macro:'Macroeconomics', energy:'Energy', water:'Water', land:'Land',
+    workers:'Workforce', digital:'Digital', policy:'Policy', programmes:'Programmes',
+    geography:'Geography', opportunities:'AI Opportunities' }
+  var existing = TP.s1&&TP.s1._sections&&TP.s1._sections[sectionName]
+  var schema    = SECTION_SCHEMAS[sectionName]
+  var prefill   = existing ? JSON.stringify(existing, null, 2) : schema
+
+  var modal = document.createElement('div')
+  modal.id  = 'tp-edit-modal'
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center'
+  modal.innerHTML = '<div style="background:#fff;border-radius:10px;padding:20px 24px;width:560px;max-height:80vh;overflow-y:auto">'
+    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px">Edit   '+SECTION_LABELS[sectionName]+'</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px">Edit the JSON below and click Save. Must be valid JSON.</div>'
+    + '<textarea id="tp-edit-json" style="width:100%;height:280px;font-family:monospace;font-size:11px;padding:10px;border:1.5px solid var(--border);border-radius:6px;resize:vertical">'+esc(prefill)+'</textarea>'
+    + '<div id="tp-edit-error" style="font-size:11px;color:var(--orange);margin-top:6px;min-height:18px"></div>'
+    + '<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">'
+    + '<button onclick="document.getElementById(\'tp-edit-modal\').remove()" style="padding:7px 14px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">Cancel</button>'
+    + '<button onclick="tpSaveSection(\''+sectionName+'\')" style="padding:7px 16px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">&#10003; Save section</button>'
+    + '</div></div>'
+  document.body.appendChild(modal)
+}
+
+function tpSaveSection(sectionName) {
+  var ta  = document.getElementById('tp-edit-json')
+  var err = document.getElementById('tp-edit-error')
+  if (!ta) return
+  try {
+    var data = JSON.parse(repairJSON(ta.value))
+    // Apply to TP.s1
+    delete TP.s1._failed[sectionName]
+    TP.s1._sections[sectionName] = data
+    var hsMap = { macro:'macro', energy:'energy', water:'water', land:'land', workers:'workers', digital:'digital' }
+    if (hsMap[sectionName]) TP.s1.hard_stats[sectionName] = data
+    if (sectionName==='policy')       TP.s1.policy = data
+    if (sectionName==='programmes')   TP.s1.programmes = data
+    if (sectionName==='geography')    TP.s1.geography = data
+    if (sectionName==='opportunities'){ TP.s1.ai_opportunities = data.ai_opportunities||[]; TP.s1.headline = data.headline }
+    TP.s1._complete = Object.keys(TP.s1._failed).length === 0
+    tpSaveProfile()
+    document.getElementById('tp-edit-modal').remove()
+    switchTab('profile')
+  } catch(e) {
+    if (err) err.textContent = 'Invalid JSON: '+e.message
+  }
+}
+
+function tpSkipSection(sectionName) {
+  if (TP.s1&&TP.s1._failed) {
+    delete TP.s1._failed[sectionName]
+    TP.s1._sections[sectionName] = {}
+  }
+  switchTab('profile')
+}
+
+//    Save profile to Supabase                                               
+async function tpSaveProfile() {
+  if (!TP.s1) return
+  var slug = TP.territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
+  await sbInsert('territory_profiles', {
+    id:           slug,
+    territory:    TP.territory,
+    profile:      TP.s1,
+    raw_intel:    TP._rawIntel||null,
+    generated_at: new Date().toISOString(),
+    expires_at:   new Date(Date.now()+90*24*60*60*1000).toISOString(),
+    model_used:   'gemini-2.5-flash'
+  })
+}
+
+//    callS2                                                                 
+async function callS2(territory, s1data, objectives, freeText) {
+  var prompt = buildS2Prompt(territory, s1data, objectives, freeText)
+  tpTimerStart(Math.round(prompt.length/4))
+  var result = await geminiCall(prompt, false, 3000)
   tpTimerStop()
-  return result
+  if (!result.ok) return { ok:false, error:result.error }
+  TP_TOKENS.s2_prompt   = Math.round(result.tokens*0.6)
+  TP_TOKENS.s2_response = Math.round(result.tokens*0.4)
+  var parsed = parseSectionResponse(result.text)
+  if (!parsed.ok) return { ok:false, error:"S2 parse: "+parsed.error }
+  return { ok:true, data:parsed.data }
 }
 
-//    Stage 2 Gemini prompt                                                     
+//    Main entry: start Stage 1                                              
+async function tpStartS1() {
+  var inp = document.getElementById('tp-territory-input')
+  var territory = inp ? inp.value.trim() : ''
+  if (!territory) return
+  TP.territory = territory
+  TP._rawIntel = null
+
+  // Check for cached raw intel first
+  var slug  = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
+  var cached = await sbFetch('territory_profiles', 'id=eq.'+encodeURIComponent(slug), 1)
+  if (cached && cached[0] && cached[0].raw_intel) {
+    var exp = cached[0].expires_at ? new Date(cached[0].expires_at) : null
+    if (!exp || exp > new Date()) {
+      // We have fresh raw intel   skip search, go straight to extraction
+      TP._rawIntel = cached[0].raw_intel
+      if (cached[0].profile) {
+        // Full profile cached too
+        TP.s1    = cached[0].profile
+        TP.stage = 's1_done'
+        switchTab('profile')
+        return
+      }
+      // Raw intel cached but no profile   re-extract
+      await tpRunExtraction(territory, TP._rawIntel, slug)
+      return
+    }
+  }
+
+  // No cache   run search
+  TP.stage = 's1_loading'
+  switchTab('profile')
+
+  var prompt = buildRawIntelPrompt(territory)
+  tpTimerStart(Math.round(prompt.length/4))
+
+  var result = await geminiCall(prompt, true, 4096)
+  tpTimerStop()
+
+  if (!result.ok) {
+    TP.stage = 'home'
+    switchTab('profile')
+    setTimeout(function(){ alert('Search failed: '+result.error) }, 100)
+    return
+  }
+
+  TP_TOKENS.s1_raw = result.tokens
+  TP._rawIntel     = result.text
+
+  // Cache raw intel immediately
+  await sbInsert('territory_profiles', {
+    id:        slug, territory:territory,
+    raw_intel: result.text, raw_cached_at: new Date().toISOString(),
+    profile:   null, generated_at: new Date().toISOString(),
+    expires_at: new Date(Date.now()+90*24*60*60*1000).toISOString(),
+    model_used: 'gemini-2.5-flash'
+  })
+
+  await tpRunExtraction(territory, result.text, slug)
+}
+
+async function tpRunExtraction(territory, rawText, slug) {
+  // Show extraction progress screen
+  TP._extracting = {}
+  TP.stage = 's1_extracting'
+  switchTab('profile')
+  tpTimerStart(0)
+
+  // Run extraction batches, updating UI as each completes
+  var SECTIONS = ['macro','energy','water','land','workers','digital','policy','programmes','geography','opportunities']
+  SECTIONS.forEach(function(s){ TP._extracting[s] = 'pending' })
+  switchTab('profile')
+
+  // Batch 1 (parallel)
+  var BATCH1 = SECTIONS.slice(0,5)
+  BATCH1.forEach(function(s){ TP._extracting[s]='loading'; switchTab('profile') })
+  var results1 = await Promise.all(BATCH1.map(function(s){
+    return tpExtractOneSection(s, rawText, territory).then(function(r){
+      TP._extracting[s] = r.ok ? 'done' : 'error'
+      switchTab('profile')
+      return r
+    })
+  }))
+
+  await new Promise(function(res){ setTimeout(res,800) })
+
+  // Batch 2 (parallel)
+  var BATCH2 = SECTIONS.slice(5)
+  BATCH2.forEach(function(s){ TP._extracting[s]='loading'; switchTab('profile') })
+  var results2 = await Promise.all(BATCH2.map(function(s){
+    return tpExtractOneSection(s, rawText, territory).then(function(r){
+      TP._extracting[s] = r.ok ? 'done' : 'error'
+      switchTab('profile')
+      return r
+    })
+  }))
+
+  tpTimerStop()
+
+  TP.s1    = buildS1FromSections(results1.concat(results2), territory)
+  TP.stage = 's1_done'
+
+  // Cache the profile
+  tpSaveProfile()
+
+  switchTab('profile')
+}
+
+async function tpLoadCached(id) {
+  var rows = await sbFetch('territory_profiles','id=eq.'+encodeURIComponent(id),1)
+  if (!rows||!rows[0]) return
+  var row = rows[0]
+  TP.territory = row.territory
+  TP._rawIntel = row.raw_intel || null
+  if (row.profile) {
+    TP.s1 = row.profile
+    // Ensure _failed exists
+    if (!TP.s1._failed) TP.s1._failed = {}
+    TP.stage = 's1_done'
+    switchTab('profile')
+  } else if (row.raw_intel) {
+    // Have raw but no profile   re-extract
+    var slug = id
+    await tpRunExtraction(row.territory, row.raw_intel, slug)
+  }
+}
+
+
 function buildS2Prompt(territory, s1data, objectives, freeText) {
   // Condensed s1 summary   only strategically relevant metrics
-  var e = s1data.hard_stats.energy || {}
-  var w = s1data.hard_stats.water  || {}
-  var l = s1data.hard_stats.land   || {}
-  var k = s1data.hard_stats.workers|| {}
-  var m = s1data.hard_stats.macro  || {}
-  var d = s1data.hard_stats.digital|| {}
+  var hs = s1data.hard_stats || {}
+  var e = hs.energy  || {}
+  var w = hs.water   || {}
+  var l = hs.land    || {}
+  var k = hs.workers || {}
+  var m = hs.macro   || {}
+  var d = hs.digital || {}
 
   var condensed = {
     territory:    territory,
@@ -1029,7 +1396,8 @@ function renderProfileTab() {
     return tpLoading('Loading reference data...')
   }
   if (TP.stage === 'home')       return tpHome()
-  if (TP.stage === 's1_loading') return tpLoading('Searching for intelligence on ' + esc(TP.territory) + '...<br><small style="color:rgba(255,255,255,.6)">Gemini is searching the web for current data. ~20 seconds.</small>')
+  if (TP.stage === 's1_loading')     return tpLoading('Searching for intelligence on ' + esc(TP.territory) + '... (~20 seconds)')
+  if (TP.stage === 's1_extracting') return tpRenderExtractionProgress()
   if (TP.stage === 's1_done')    return tpS1View()
   if (TP.stage === 's2_form')    return tpS2Form()
   if (TP.stage === 's2_loading') return tpLoading('Profiling territory against your objectives...<br><small style="color:rgba(255,255,255,.6)">~15 seconds</small>')
@@ -1088,7 +1456,7 @@ function tpHome() {
     + '<input id="tp-territory-input" type="text" placeholder="e.g. Himachal Pradesh, Assam, Maharashtra..." '
     + 'style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit" '
     + 'onkeydown="if(event.key===\'Enter\')tpStartS1()">'
-    + '<button onclick="tpStartS1()" style="padding:9px 18px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">&#9889; Generate</button>'
+    + '<button onclick="tpStartS1()" style="padding:9px 18px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">&#9889; Search & Generate</button>'
     + '</div></div>'
 
   // Past profiles
@@ -1202,6 +1570,11 @@ function tpS1View() {
   var prg = p.programmes || {}
 
   var html = '<div style="padding:16px 0">'
+
+  // Failed sections repair banner
+  if (p._failed && Object.keys(p._failed).length) {
+    html += tpRenderFailedSections(p._failed)
+  }
 
   // Header row
   html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
