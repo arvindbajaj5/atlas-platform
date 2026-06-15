@@ -614,12 +614,8 @@ function switchTab(tab) {
     b.style.borderBottom = on ? '2px solid var(--orange)' : '2px solid transparent'
     b.style.color        = on ? 'var(--orange)' : 'var(--mid)'
   })
-  // If TP profiler is actively running, don't re-render profile tab (would reset timer)
-  var tpActive = tab === 'profile' && (TP.stage === 's1_loading' || TP.stage === 's1_extracting' || TP.stage === 's2_loading')
-  if (!tpActive) {
-    document.getElementById('tab-content').innerHTML = renderTab(tab)
-    initCharts(tab)
-  }
+  document.getElementById('tab-content').innerHTML = renderTab(tab)
+  initCharts(tab)
 }
 
 function renderTab(tab) {
@@ -1348,6 +1344,7 @@ async function callS2(territory, s1data, objectives, freeText) {
 // Territory Profiler State + Render Engine
 //                                                                               
 
+var TP_INIT_DONE = false  // set true when init() completes
 var TP = {
   stage: 'home',         // home | s1_loading | s1_done | s2_form | s2_loading | s3
   territory: '',
@@ -2849,9 +2846,9 @@ async function init() {
 
   if (ENGAGEMENT_NAME) document.getElementById('eng-status').textContent = ENGAGEMENT_NAME
   updateHeader()
-  // Don't switchTab if Territory Profiler is actively searching or extracting
-  var tpBusy = TP.stage === 's1_loading' || TP.stage === 's1_extracting' || TP.stage === 's2_loading'
-  if (!tpBusy) switchTab(ACTIVE_TAB || 'cost')
+  TP_INIT_DONE = true
+  // Only switch to default tab if TP profiler hasn't started running yet
+  if (TP.stage === 'home') switchTab(ACTIVE_TAB || 'cost')
 }
 
 async function selectEngagement(id) {
