@@ -1516,50 +1516,46 @@ async function atlasCoverImageClear(engId) {
 
 // ===========================================================================
 // Territory Map v3   Wikipedia Political Map of India (CC BY-SA 3.0)
-// Correct SOI-compliant boundaries: full J&K, Aksai Chin, Arunachal Pradesh
-// Map image: Wikimedia Commons, File:Political_map_of_India_EN.svg
-// Highlight overlay: SVG layer positioned on top of the map image
-// Attribution shown in UI card only, NOT in document SVG output
+// Boundary source: Wikimedia Commons, Political_map_of_India_EN.svg
+// Includes India's official claims: full J&K, Aksai Chin, Arunachal Pradesh
+// Overlay calibrated to match the Wikipedia PNG projection
+// Attribution shown in Docket card UI only. Not embedded in document SVGs.
 // ===========================================================================
 
 var atlasMap = (function() {
 
-  // Wikipedia political map of India   CC BY-SA 3.0
-  // Uses India's official claim line for J&K, Aksai Chin, Arunachal Pradesh
-  // Loaded at runtime from Wikimedia CDN   stable public URL
+  // Wikipedia political map of India PNG (500x586px)
+  // CC BY-SA 3.0, reflects India's official territorial claims
   var MAP_IMG_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Political_map_of_India_EN.svg/500px-Political_map_of_India_EN.svg.png'
 
-  // The Wikipedia SVG renders at 500px wide x ~586px tall (ratio 1:1.172)
-  // We render at a target of 260x305px for the docket card
-  // Calibration: map image covers lng 68.0-98.0 / lat 6.5-38.0
-  // px = (lng-68)/(98-68)*500  py = (38-lat)/(38-6.5)*500*1.172
-  // At display size 260x305: scale factor 0.52 on x, 0.52 on y
+  // Projection calibrated to match the Wikipedia PNG
+  // Reference points: Mumbai(72.9,19.1) (165,345), Kolkata(88.4,22.6) (338,295)
+  // at native 500x586 image size
+  // px_per_deg_lng = (338-165)/(88.4-72.9) = 11.16
+  // py_per_deg_lat = (345-295)/(22.6-19.1) = 14.3
+  // x = (lng - 88.4) * 11.16 + 338
+  // y = (22.6 - lat) * 14.3 + 295
+  function _imgPx(lng, lat) {
+    return [
+      (lng - 88.4) * 11.16 + 338,
+      (22.6 - lat) * 14.3 + 295
+    ]
+  }
 
-  // Highlight region definitions: approximate polygons in image-pixel space
-  // at the 500x586 native resolution, then scaled to display size
-  //
-  // To convert lng/lat   native pixel (500x586 image):
-  //   nx = (lng - 68) / 30 * 500
-  //   ny = (38 - lat) / 31.5 * 586
-  //
-  // Then at display size W x H (e.g. 260x305):
-  //   dx = nx / 500 * W
-  //   dy = ny / 586 * H
-
-  function _nativePx(lng, lat, W, H) {
-    var nx = (lng - 68) / 30 * 500
-    var ny = (38 - lat) / 31.5 * 586
-    return [parseFloat((nx / 500 * W).toFixed(1)), parseFloat((ny / 586 * H).toFixed(1))]
+  function _dispPx(lng, lat, W, H) {
+    var p = _imgPx(lng, lat)
+    return [parseFloat((p[0] / 500 * W).toFixed(1)), parseFloat((p[1] / 586 * H).toFixed(1))]
   }
 
   function _polyPts(coords, W, H) {
     return coords.map(function(c) {
-      var p2 = _nativePx(c[0], c[1], W, H)
-      return p2[0] + ',' + p2[1]
+      var p = _dispPx(c[0], c[1], W, H)
+      return p[0] + ',' + p[1]
     }).join(' ')
   }
 
-  // Highlight polygons   approximate state regions
+  // Approximate highlight polygons for each territory
+  // Points as [lng, lat]   follow state borders approximately
   var HIGHLIGHT_COORDS = {
     hp: [
       [75.5,33.2],[77.0,33.5],[78.5,33.0],[79.0,31.5],
@@ -1616,74 +1612,58 @@ var atlasMap = (function() {
     }
   }
 
-  // Render the composite: Wikipedia map img + SVG overlay
   function renderHTML(preset, opts) {
     opts = opts || {}
     var W = opts.width  || 260
     var H = opts.height || 305
 
-    var territory   = typeof preset === 'string' ? PRESETS[preset] : preset
-    var hubs        = territory ? (territory.hubs || []) : []
+    var territory    = typeof preset === 'string' ? PRESETS[preset] : preset
+    var hubs         = territory ? (territory.hubs || []) : []
     var highlightKey = territory ? (territory.highlightKey || null) : null
-    var highlightCoords = highlightKey ? HIGHLIGHT_COORDS[highlightKey] : null
+    var coords       = highlightKey ? HIGHLIGHT_COORDS[highlightKey] : null
 
-    // Build SVG overlay (transparent bg, sits on top of img)
     var svgParts = []
 
     // Highlight polygon
-    if (highlightCoords) {
-      svgParts.push('<polygon points="' + _polyPts(highlightCoords, W, H) + '"'
-        + ' fill="#00B290" fill-opacity="0.55" stroke="#007A63" stroke-width="1.5" stroke-linejoin="round"/>')
+    if (coords) {
+      svgParts.push('<polygon points="' + _polyPts(coords, W, H) + '" fill="#00B290" fill-opacity="0.55" stroke="#007A63" stroke-width="1.5" stroke-linejoin="round"/>')
     }
 
-    // Hub and spoke dots
+    // Dots + labels
     hubs.forEach(function(hub) {
-      var p2  = _nativePx(hub.lng, hub.lat, W, H)
+      var p   = _dispPx(hub.lng, hub.lat, W, H)
       var r   = hub.type === 'hub' ? 6 : 4
       var col = hub.type === 'hub' ? '#002870' : '#1C38F5'
-      svgParts.push('<circle cx="' + p2[0] + '" cy="' + p2[1] + '" r="' + r + '" fill="' + col + '" opacity="0.9"/>')
+      svgParts.push('<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + r + '" fill="' + col + '" opacity="0.9"/>')
       if (hub.type === 'hub') {
-        svgParts.push('<circle cx="' + p2[0] + '" cy="' + p2[1] + '" r="' + (r+4) + '" fill="none" stroke="' + col + '" stroke-width="1.5" opacity="0.35"/>')
+        svgParts.push('<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + (r+4) + '" fill="none" stroke="' + col + '" stroke-width="1.5" opacity="0.35"/>')
       }
-      // Label   offset right, clip to canvas
-      var lx = Math.min(p2[0] + r + 4, W - 2)
-      svgParts.push('<text x="' + lx + '" y="' + (p2[1]+3) + '"'
-        + ' font-size="' + (hub.type==='hub'?10:8) + '"'
-        + ' fill="#374151" font-weight="' + (hub.type==='hub'?700:400) + '"'
-        + ' font-family="Roboto,sans-serif">' + hub.name + '</text>')
+      var lx = Math.min(p[0] + r + 4, W - 40)
+      svgParts.push('<text x="' + lx + '" y="' + (p[1]+3) + '" font-size="' + (hub.type==='hub'?10:8) + '" fill="#374151" font-weight="' + (hub.type==='hub'?700:400) + '" font-family="Roboto,sans-serif">' + hub.name + '</text>')
     })
 
-    var svgOverlay = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '"'
-      + ' viewBox="0 0 ' + W + ' ' + H + '" style="position:absolute;top:0;left:0;pointer-events:none">'
-      + svgParts.join('') + '</svg>'
+    var overlay = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" style="position:absolute;top:0;left:0;pointer-events:none">' + svgParts.join('') + '</svg>'
 
-    // Composite: container with relative positioning
     return '<div style="position:relative;width:' + W + 'px;height:' + H + 'px;display:inline-block">'
-      + '<img src="' + MAP_IMG_URL + '" width="' + W + '" height="' + H + '"'
-      + ' style="display:block;object-fit:fill"'
-      + ' onerror="this.style.display=\'none\'">'
-      + svgOverlay
+      + '<img src="' + MAP_IMG_URL + '" width="' + W + '" height="' + H + '" style="display:block;object-fit:fill" onerror="this.parentElement.innerHTML=\'<div style=padding:10px;color:#aaa>Map unavailable</div>\'">'
+      + overlay
       + '</div>'
   }
 
-  // Alias renderSVG for backward compat   returns composite HTML
-  function renderSVG(preset, opts) {
-    return renderHTML(preset, opts)
-  }
+  function renderSVG(preset, opts) { return renderHTML(preset, opts) }
 
   function renderToElement(id, preset, opts) {
-    var el = document.getElementById(id)
-    if (el) el.innerHTML = renderHTML(preset, opts)
+    var el = document.getElementById(id); if (el) el.innerHTML = renderHTML(preset, opts)
   }
 
   function buildMapPromptContext(territory) {
     if (!territory) return ''
-    var p3 = typeof territory === 'string' ? PRESETS[territory] : territory
-    if (!p3) return ''
-    var stateList = p3.states && p3.states.length ? p3.states.join(', ') : 'all of India'
-    var hubNames  = (p3.hubs||[]).filter(function(h){return h.type==='hub'}).map(function(h){return h.name}).join(', ')
+    var p2 = typeof territory === 'string' ? PRESETS[territory] : territory
+    if (!p2) return ''
+    var stateList = p2.states && p2.states.length ? p2.states.join(', ') : 'all of India'
+    var hubNames  = (p2.hubs||[]).filter(function(h){return h.type==='hub'}).map(function(h){return h.name}).join(', ')
     return 'Geographic context: This engagement covers ' + stateList
-      + (hubNames ? '. Key hub location: ' + hubNames : '') + '. '
+      + (hubNames ? '. Key hub: ' + hubNames : '') + '. '
       + 'Subtly incorporate an abstract suggestion of this Indian region as a background element.'
   }
 
@@ -1695,32 +1675,25 @@ var atlasMap = (function() {
     return '<div class="card" style="margin-bottom:12px">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
       + '<div class="card-title" style="margin-bottom:0">Territory</div>'
-      + (hasTerritory
-          ? '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#E1F5EE;color:#085041;font-weight:700">Set</span>'
-          : '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--light);color:var(--mid)">Not set</span>')
+      + (hasTerritory ? '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#E1F5EE;color:#085041;font-weight:700">Set</span>' : '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--light);color:var(--mid)">Not set</span>')
       + '</div>'
       + '<div style="font-size:12px;color:var(--mid);margin-bottom:10px">Highlights states on territory maps in all generated documents.</div>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
-      + '<button onclick="setEngTerritory(\'hp\')" class="btn btn-sm"'
-        + (preset==='hp'?' style="background:var(--teal);color:#fff;border-color:var(--teal)"':' style=""') + '>Himachal Pradesh</button>'
-      + '<button onclick="setEngTerritory(\'ne_india\')" class="btn btn-sm"'
-        + (preset==='ne_india'?' style="background:var(--teal);color:#fff;border-color:var(--teal)"':' style=""') + '>NE India (8 states)</button>'
-      + '<button onclick="setEngTerritory(\'all_india\')" class="btn btn-sm"'
-        + (preset==='all_india'?' style="background:var(--teal);color:#fff;border-color:var(--teal)"':' style=""') + '>All India</button>'
+      + '<button onclick="setEngTerritory(\'hp\')" class="btn btn-sm" style="' + (preset==='hp'?'background:var(--teal);color:#fff;border-color:var(--teal)':'') + '">Himachal Pradesh</button>'
+      + '<button onclick="setEngTerritory(\'ne_india\')" class="btn btn-sm" style="' + (preset==='ne_india'?'background:var(--teal);color:#fff;border-color:var(--teal)':'') + '">NE India (8 states)</button>'
+      + '<button onclick="setEngTerritory(\'all_india\')" class="btn btn-sm" style="' + (preset==='all_india'?'background:var(--teal);color:#fff;border-color:var(--teal)':'') + '">All India</button>'
       + '<button onclick="setEngTerritory(null)" class="btn btn-sm btn-ghost">Clear</button>'
       + '</div>'
       + (showMap
           ? '<div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;display:inline-block;background:#f9f9f9">'
               + renderHTML(preset || {states:eng.territory_states,hubs:eng.territory_hubs||[],highlightKey:null})
             + '</div>'
-            + '<div style="font-size:9px;color:var(--mid);margin-top:4px">'
-            + 'Map: <a href="https://commons.wikimedia.org/wiki/File:Political_map_of_India_EN.svg" target="_blank" style="color:var(--mid)">Wikimedia Commons</a>, CC BY-SA 3.0. Boundaries as per Survey of India.'
-            + '</div>'
+            + '<div style="font-size:9px;color:var(--mid);margin-top:4px">Map: <a href="https://commons.wikimedia.org/wiki/File:Political_map_of_India_EN.svg" target="_blank" style="color:var(--mid)">Wikimedia Commons</a>, CC BY-SA 3.0. Boundaries as per Survey of India.</div>'
           : '<div style="font-size:12px;color:var(--mid);font-style:italic">Select a territory above to preview</div>')
       + '</div>'
   }
 
-  return { renderSVG, renderHTML, renderToElement, buildMapPromptContext, renderTerritoryCard, PRESETS }
+  return { renderSVG: renderSVG, renderHTML: renderHTML, renderToElement: renderToElement, buildMapPromptContext: buildMapPromptContext, renderTerritoryCard: renderTerritoryCard, PRESETS: PRESETS }
 })()
 
 async function setEngTerritory(presetKey) {
@@ -1730,11 +1703,7 @@ async function setEngTerritory(presetKey) {
   await fetch(sb.url + '/rest/v1/engagements?id=eq.' + CURRENT_ENG.id, {
     method: 'PATCH',
     headers: {apikey:sb.key, Authorization:'Bearer '+sb.key, 'Content-Type':'application/json', Prefer:'return=minimal'},
-    body: JSON.stringify({
-      territory_states: preset ? preset.states : null,
-      territory_hubs:   preset ? preset.hubs   : null,
-      updated_at: new Date().toISOString()
-    })
+    body: JSON.stringify({territory_states:preset?preset.states:null, territory_hubs:preset?preset.hubs:null, updated_at:new Date().toISOString()})
   })
   CURRENT_ENG.territory_states = preset ? preset.states : null
   CURRENT_ENG.territory_hubs   = preset ? preset.hubs   : null
