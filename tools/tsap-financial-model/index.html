@@ -646,345 +646,1070 @@ function updateHeader() {
 // Territory Profile Tab   AI Readiness Profiler
 //                                                                           
 
-var PROFILE_STATE = {
-  step: 0,
-  answers: {},    // question_id -> option_id
-  questions: [],
-  options: [],
+
+// ==============================================================================
+// Territory Intelligence Profiler v2 — 3-Stage AI-powered engine
+// ==============================================================================
+
+//    Gemini key helper                                                         
+function getGeminiKey() {
+  try {
+    var g = atlasGetGlobal()
+    return g.geminiKey || g['key_gemini'] || g.gemini_key
+           || localStorage.getItem('atlas_gemini_key') || ''
+  } catch(e) { return '' }
+}
+
+//    Stage 1 Gemini prompt                                                     
+function buildS1Prompt(territory) {
+  return 'Generate a comprehensive territory intelligence profile for ' + territory + ', India.\n'
+    + 'Use web search for current data. Return ONLY valid JSON, no markdown, no preamble.\n\n'
+    + 'IMPORTANT: For "policy_useable" and "programmes_useable", convert raw policy/scheme names\n'
+    + 'into concrete, actionable points for AI deployment. Not the policy name -- what it ENABLES.\n\n'
+    + '{\n'
+    + '  "territory": "' + territory + '",\n'
+    + '  "state_code": "2-letter code",\n'
+    + '  "headline": "One powerful sentence on the AI opportunity for this territory",\n'
+    + '  "hard_stats": {\n'
+    + '    "macro": {\n'
+    + '      "gsdp_cr": number, "gsdp_growth_pct": number,\n'
+    + '      "per_capita_inr": number, "vs_national_pct": number,\n'
+    + '      "fiscal_health": "surplus|balanced|deficit"\n'
+    + '    },\n'
+    + '    "energy": {\n'
+    + '      "installed_mw": number, "status": "surplus|balanced|deficit",\n'
+    + '      "grid_hrs": number, "renewable_pct": number,\n'
+    + '      "industrial_tariff": number, "national_avg_tariff": 7.5,\n'
+    + '      "tariff_index_pct": number, "dc_feasibility": "high|medium|low",\n'
+    + '      "notes": "string"\n'
+    + '    },\n'
+    + '    "water": {\n'
+    + '      "rainfall_mm": number, "stress_index": "low|medium|high|critical",\n'
+    + '      "perennial_rivers": ["list"], "dc_cooling": "high|medium|low",\n'
+    + '      "industrial_cost_per_kl": number, "national_avg_water_cost": 45,\n'
+    + '      "water_cost_index_pct": number\n'
+    + '    },\n'
+    + '    "land": {\n'
+    + '      "area_sqkm": number, "topography": "plains|hilly|coastal|mixed",\n'
+    + '      "industrial_parks": number, "sez_count": number,\n'
+    + '      "govt_land": "high|medium|low", "construction_ease": "easy|moderate|challenging",\n'
+    + '      "cost_per_acre_lakh": number, "national_avg_land_cost": 50,\n'
+    + '      "land_cost_index_pct": number\n'
+    + '    },\n'
+    + '    "workers": {\n'
+    + '      "population_lakh": number, "literacy_pct": number,\n'
+    + '      "urban_pct": number, "unemployment_pct": number,\n'
+    + '      "graduates_per_lakh": number, "engineers_per_year": number,\n'
+    + '      "migration": "net_in|net_out|balanced",\n'
+    + '      "avg_engineer_salary_lakh": number, "national_avg_salary": 8.5,\n'
+    + '      "salary_index_pct": number, "skilled_labour": "abundant|adequate|scarce"\n'
+    + '    },\n'
+    + '    "digital": {\n'
+    + '      "internet_pct": number, "ofc_km": number,\n'
+    + '      "nkn": true|false, "smart_cities": number,\n'
+    + '      "bharatnet_pct": number, "govt_dcs": number,\n'
+    + '      "swan": "operational|partial|planned"\n'
+    + '    }\n'
+    + '  },\n'
+    + '  "policy": {\n'
+    + '    "raw": ["list of named policies and budget allocations"],\n'
+    + '    "useable": [\n'
+    + '      {"point": "What this specific policy enables for AI deployment",\n'
+    + '       "source": "Policy name", "impact": "high|medium|low"}\n'
+    + '    ]\n'
+    + '  },\n'
+    + '  "programmes": {\n'
+    + '    "raw": ["list of central and state schemes active"],\n'
+    + '    "useable": [\n'
+    + '      {"point": "How this scheme can be leveraged for AI initiative",\n'
+    + '       "source": "Scheme name", "type": "funding|infrastructure|mandate|capacity"}\n'
+    + '    ]\n'
+    + '  },\n'
+    + '  "geography": {\n'
+    + '    "advantages": ["list 3-4"],\n'
+    + '    "constraints": ["list 2-3"]\n'
+    + '  },\n'
+    + '  "known_issues": {\n'
+    + '    "social": ["list 3"],\n'
+    + '    "economic": ["list 3"]\n'
+    + '  }\n'
+    + '}'
+}
+
+//    Stage 1 API call                                                          
+async function callS1(territory) {
+  var key = getGeminiKey()
+  if (!key) return { ok: false, error: 'No Gemini API key in Settings' }
+  var prompt = buildS1Prompt(territory)
+  try {
+    var r = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+        })
+      }
+    )
+    if (!r.ok) {
+      var ed = await r.json().catch(function(){ return {} })
+      return { ok: false, error: 'API ' + r.status + ': ' + (ed.error ? ed.error.message : r.statusText) }
+    }
+    var data = await r.json()
+    var text = ''
+    var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts
+    if (parts) parts.forEach(function(p){ if (p.text) text += p.text })
+    var m = text.match(/\{[\s\S]*\}/)
+    if (!m) return { ok: false, error: 'No JSON in Gemini response' }
+    return { ok: true, data: JSON.parse(m[0]) }
+  } catch(e) { return { ok: false, error: e.message } }
+}
+
+//    Stage 2 Gemini prompt                                                     
+function buildS2Prompt(territory, s1data, objectives, freeText) {
+  // Condensed s1 summary   only strategically relevant metrics
+  var e = s1data.hard_stats.energy || {}
+  var w = s1data.hard_stats.water  || {}
+  var l = s1data.hard_stats.land   || {}
+  var k = s1data.hard_stats.workers|| {}
+  var m = s1data.hard_stats.macro  || {}
+  var d = s1data.hard_stats.digital|| {}
+
+  var condensed = {
+    territory:    territory,
+    gsdp_growth:  m.gsdp_growth_pct,
+    per_capita_vs_national: m.vs_national_pct,
+    fiscal:       m.fiscal_health,
+    power_status: e.status,
+    power_tariff: e.industrial_tariff,
+    tariff_index: e.tariff_index_pct,
+    dc_power:     e.dc_feasibility,
+    water_stress: w.stress_index,
+    dc_cooling:   w.dc_cooling,
+    land_govt:    l.govt_land,
+    construction: l.construction_ease,
+    land_index:   l.land_cost_index_pct,
+    literacy:     k.literacy_pct,
+    engineers:    k.engineers_per_year,
+    migration:    k.migration,
+    salary_index: k.salary_index_pct,
+    skilled_labour: k.skilled_labour,
+    internet:     d.internet_pct,
+    ofc_km:       d.ofc_km,
+    policy_points: (s1data.policy.useable || []).map(function(p){ return p.point }),
+    programme_points: (s1data.programmes.useable || []).map(function(p){ return p.point }),
+    geo_advantages: s1data.geography.advantages,
+    geo_constraints: s1data.geography.constraints
+  }
+
+  return 'You are a senior AI strategy consultant. Based on the territory intelligence below,\n'
+    + 'generate a strategic territory profile for ' + territory + ', India.\n\n'
+    + 'TERRITORY INTELLIGENCE:\n' + JSON.stringify(condensed, null, 2) + '\n\n'
+    + 'CLIENT OBJECTIVES FOR AI IN THIS TERRITORY:\n'
+    + objectives.map(function(o,i){ return (i+1)+'. '+o }).join('\n') + '\n\n'
+    + (freeText ? 'ADDITIONAL CONTEXT FROM THE TEAM:\n' + freeText + '\n\n' : '')
+    + 'Generate a profile as JSON. Be specific, cite the relevant metrics.\n'
+    + 'Return ONLY valid JSON, no markdown.\n\n'
+    + '{\n'
+    + '  "working_in_favour": [\n'
+    + '    {"point": "Specific strength that supports AI objectives", "metric": "the data that proves it", "confidence": "high|medium", "relevance_to": ["objective names"]}\n'
+    + '  ],\n'
+    + '  "needs_attention": [\n'
+    + '    {"point": "Specific gap or risk", "severity": "critical|moderate|minor", "mitigation": "practical suggestion", "relevance_to": ["objective names"]}\n'
+    + '  ],\n'
+    + '  "objective_viability": [\n'
+    + '    {"objective": "exact objective name", "viability": "excellent|strong|viable|challenging|not_recommended", "score": 0-100, "rationale": "2 sentences max"}\n'
+    + '  ],\n'
+    + '  "dim_scores": {\n'
+    + '    "infrastructure_readiness": 0-100,\n'
+    + '    "fiscal_capacity": 0-100,\n'
+    + '    "ai_opportunity_density": 0-100,\n'
+    + '    "workforce_readiness": 0-100,\n'
+    + '    "political_commercial": 0-100,\n'
+    + '    "central_strategic_value": 0-100\n'
+    + '  },\n'
+    + '  "headline_recommendation": "One sentence capturing the strategic play for this territory"\n'
+    + '}'
+}
+
+async function callS2(territory, s1data, objectives, freeText) {
+  var key = getGeminiKey()
+  if (!key) return { ok: false, error: 'No Gemini API key in Settings' }
+  var prompt = buildS2Prompt(territory, s1data, objectives, freeText)
+  try {
+    var r = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 3000 }
+        })
+      }
+    )
+    if (!r.ok) {
+      var ed = await r.json().catch(function(){ return {} })
+      return { ok: false, error: 'API ' + r.status + ': ' + (ed.error ? ed.error.message : r.statusText) }
+    }
+    var data = await r.json()
+    var text = ''
+    var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts
+    if (parts) parts.forEach(function(p){ if (p.text) text += p.text })
+    var m = text.match(/\{[\s\S]*\}/)
+    if (!m) return { ok: false, error: 'No JSON in response' }
+    return { ok: true, data: JSON.parse(m[0]) }
+  } catch(e) { return { ok: false, error: e.message } }
+}
+
+
+//                                                                               
+// Territory Profiler State + Render Engine
+//                                                                               
+
+var TP = {
+  stage: 'home',         // home | s1_loading | s1_done | s2_form | s2_loading | s3
+  territory: '',
+  s1: null,              // Stage 1 profile (from Supabase cache or fresh Gemini call)
+  s2: null,              // Stage 2 AI profile
+  objectives: [],        // selected objectives (max 5)
+  freeText: '',
+  overrides: {           // user edits to AI-generated points
+    working: [],         // array of {text, removed}
+    attention: []
+  },
   archetypes: [],
   archetype_dims: [],
-  loaded: false,
-  running: false,
-  result: null
+  radarChart: null
 }
 
-async function loadProfilerData() {
-  if (PROFILE_STATE.loaded) return
-  var [qs, opts, archs, dims] = await Promise.all([
-    sbFetch('profiler_questions', 'order=sort_order.asc', 50),
-    sbFetch('profiler_options',   'order=question_id.asc,sort_order.asc', 200),
-    sbFetch('profiler_archetypes','order=id.asc', 20),
-    sbFetch('profiler_archetype_dims', 'order=archetype_id.asc', 200)
+var OBJECTIVES = [
+  { group:'INFRASTRUCTURE & COMPUTE',  items:['Sovereign AI Centre of Excellence','High-Performance Computing Hub','Edge AI & Rural Connectivity'] },
+  { group:'ECONOMIC SECTORS',          items:['Agricultural Modernisation & Food Security','Industrial & Manufacturing AI','Tourism & Cultural Heritage','Energy Grid & Renewable Optimisation','MSME & Informal Economy AI'] },
+  { group:'CITIZEN SERVICES',          items:['e-Governance & Citizen Service Delivery','Revenue, Land Records & Cadastral','Transport & Logistics Optimisation','Urban Planning & Smart City','Housing & Urban Development'] },
+  { group:'SOCIAL SECTORS',            items:['Healthcare AI & Telemedicine','Education & Skill Development AI','Women & Child Development AI','Tribal & Remote Community Services'] },
+  { group:'ENVIRONMENT & SAFETY',      items:['Disaster & Emergency Management','Water Resource Management','Environmental Monitoring & Climate','Forest & Wildlife Management'] },
+  { group:'SECURITY & STRATEGIC',      items:['Defence & Border Security AI','Law Enforcement & Crime Analytics','Critical Infrastructure Protection'] }
+]
+
+// RAG threshold helpers
+function ragClass(val, lo, hi) {
+  // val: actual value, lo: green threshold, hi: red threshold
+  if (val === null || val === undefined) return 'rag-grey'
+  if (val <= lo) return 'rag-green'
+  if (val >= hi) return 'rag-red'
+  return 'rag-amber'
+}
+function indexRag(pct) {
+  // pct vs national avg: <85% = green (cheaper), 85-115% = amber, >115% = red (costlier)
+  if (!pct) return 'rag-grey'
+  if (pct <= 85) return 'rag-green'
+  if (pct >= 115) return 'rag-red'
+  return 'rag-amber'
+}
+function arrow(pct) {
+  if (!pct) return ''
+  if (pct <= 85) return '&#9660; '
+  if (pct >= 115) return '&#9650; '
+  return '&#8212; '
+}
+function ragText(pct) {
+  if (!pct) return 'N/A'
+  return arrow(pct) + pct + '% of natl avg'
+}
+
+//    Profile tab entry                                                          
+function renderProfileTab() {
+  if (!TP.archetypes.length) {
+    loadTPData().then(function(){ switchTab('profile') })
+    return tpLoading('Loading reference data...')
+  }
+  if (TP.stage === 'home')       return tpHome()
+  if (TP.stage === 's1_loading') return tpLoading('Searching for intelligence on ' + esc(TP.territory) + '...<br><small style="color:rgba(255,255,255,.6)">Gemini is searching the web for current data. ~20 seconds.</small>')
+  if (TP.stage === 's1_done')    return tpS1View()
+  if (TP.stage === 's2_form')    return tpS2Form()
+  if (TP.stage === 's2_loading') return tpLoading('Profiling territory against your objectives...<br><small style="color:rgba(255,255,255,.6)">~15 seconds</small>')
+  if (TP.stage === 's3')         return tpS3Result()
+  return tpHome()
+}
+
+function tpLoading(msg) {
+  return '<div style="padding:32px 0;display:flex;align-items:center;gap:16px">'
+    + '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
+    + '<div style="font-size:14px;color:var(--mid)">' + msg + '</div>'
+    + '</div>'
+}
+
+async function loadTPData() {
+  var [archs, dims] = await Promise.all([
+    sbFetch('profiler_archetypes', 'type=eq.territory&order=id.asc'),
+    sbFetch('profiler_archetype_dims', 'archetype_type=eq.territory&order=archetype_id.asc')
   ])
-  PROFILE_STATE.questions     = qs   || []
-  PROFILE_STATE.options       = opts || []
-  PROFILE_STATE.archetypes    = archs || []
-  PROFILE_STATE.archetype_dims = dims || []
-  PROFILE_STATE.loaded = true
+  TP.archetypes     = archs || []
+  TP.archetype_dims = dims  || []
 }
 
-function profilerDimScore(optId, dimName) {
-  var opt = PROFILE_STATE.options.find(function(o){ return o.id === optId })
-  if (!opt) return 0
-  var key = dimName.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')
-  return parseFloat(opt[key] || opt[dimName] || 0) || 0
+//    HOME                                                                       
+function tpHome() {
+  var icons = {T1:'&#127965;',T2:'&#127807;',T3:'&#128681;',T4:'&#127970;',T5:'&#127758;'}
+  var html = '<div style="padding:16px 0">'
+
+  // Hero
+  html += '<div style="background:linear-gradient(135deg,var(--navy) 0%,#003fa8 100%);border-radius:10px;padding:22px 26px;margin-bottom:16px;color:#fff">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin-bottom:6px">ATLAS   Territory Intelligence Profiler</div>'
+    + '<div style="font-size:18px;font-weight:900;margin-bottom:8px">AI-powered territory analysis</div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,.7);line-height:1.6;max-width:550px">'
+    + 'Three-stage intelligence engine: objective data (4Ws, macros, digital)   policy and programme levers   AI-generated strategic profile matched to your objectives   archetype comparison.'
+    + '</div>'
+    + '</div>'
+
+  // Input + archetypes
+  html += '<div style="display:grid;grid-template-columns:1fr 280px;gap:14px">'
+
+  html += '<div>'
+    + '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:12px">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px">Generate territory intelligence</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px">Enter any Indian state or UT. We search for current macroeconomic, energy, water, land, workforce and policy data.</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<input id="tp-territory-input" type="text" placeholder="e.g. Himachal Pradesh, Assam, Maharashtra..." '
+    + 'style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit" '
+    + 'onkeydown="if(event.key===\'Enter\')tpStartS1()">'
+    + '<button onclick="tpStartS1()" style="padding:9px 18px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">&#9889; Generate</button>'
+    + '</div></div>'
+
+  // Past profiles
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px 18px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">Cached profiles</div>'
+    + '<div id="tp-past-list" style="font-size:12px;color:var(--mid);font-style:italic">Loading...</div>'
+    + '</div>'
+
+  html += '</div>'
+
+  // Archetypes sidebar
+  html += '<div><div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px 18px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">Territory archetypes</div>'
+    + TP.archetypes.map(function(a){
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+          + '<div style="font-size:12px;font-weight:700;color:var(--navy)">' + (icons[a.id]||'') + ' ' + esc(a.name||a.id) + '</div>'
+          + '<div style="font-size:10px;color:var(--mid);line-height:1.4;margin-top:2px">' + esc((a.description||'').substring(0,80)) + (a.description&&a.description.length>80?'...':'') + '</div>'
+          + '</div>'
+      }).join('')
+    + '</div></div>'
+
+  html += '</div></div>'
+  // Load past profiles async
+  setTimeout(tpLoadPast, 100)
+  return html
 }
 
-function profilerCosineSimilarity(a, b, keys) {
-  var dot=0, mA=0, mB=0
-  keys.forEach(function(k){
-    var av=a[k]||0, bv=b[k]||0
-    dot+=av*bv; mA+=av*av; mB+=bv*bv
-  })
-  if (!mA||!mB) return 0
-  return dot/(Math.sqrt(mA)*Math.sqrt(mB))
+async function tpLoadPast() {
+  var el = document.getElementById('tp-past-list')
+  if (!el) return
+  var rows = await sbFetch('territory_profiles', 'order=generated_at.desc', 8)
+  if (!rows || !rows.length) { el.innerHTML = '<span style="font-size:11px;color:var(--mid);font-style:italic">No profiles yet</span>'; return }
+  el.innerHTML = rows.map(function(r){
+    var date = r.generated_at ? new Date(r.generated_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) : ''
+    var exp  = r.expires_at ? new Date(r.expires_at) : null
+    var stale = exp && exp < new Date()
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="tpLoadCached(\'' + esc(r.id) + '\')">'
+      + '<div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--navy)">' + esc(r.territory) + '</div>'
+      + '<div style="font-size:10px;color:var(--mid)">' + date + (stale?' &bull; <span style="color:var(--amber)">stale</span>':'') + '</div></div>'
+      + '<span style="font-size:12px;color:var(--mid)">&#8250;</span></div>'
+  }).join('')
 }
 
-function profilerMatch() {
-  var dimNames = []
-  PROFILE_STATE.archetype_dims.forEach(function(d){
-    if (dimNames.indexOf(d.dimension)<0) dimNames.push(d.dimension)
-  })
-  var profile = {}
-  dimNames.forEach(function(d){ profile[d]=0 })
-  var answered = Object.keys(PROFILE_STATE.answers).length
-  if (!answered) return { profile:profile, dimNames:dimNames, all:[], best:null }
+async function tpLoadCached(id) {
+  var rows = await sbFetch('territory_profiles', 'id=eq.' + encodeURIComponent(id), 1)
+  if (!rows || !rows[0]) return
+  var row = rows[0]
+  TP.territory = row.territory
+  TP.s1        = row.profile
+  TP.stage     = 's1_done'
+  switchTab('profile')
+}
 
-  Object.keys(PROFILE_STATE.answers).forEach(function(qId){
-    var optId = PROFILE_STATE.answers[qId]
-    dimNames.forEach(function(d){
-      profile[d] += profilerDimScore(optId, d)
-    })
-  })
-  dimNames.forEach(function(d){ profile[d] /= answered })
+async function tpStartS1() {
+  var inp = document.getElementById('tp-territory-input')
+  var territory = inp ? inp.value.trim() : ''
+  if (!territory) return
+  TP.territory = territory
+  TP.stage     = 's1_loading'
+  switchTab('profile')
 
+  // Check cache first
+  var slug = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
+  var cached = await sbFetch('territory_profiles', 'id=eq.'+encodeURIComponent(slug), 1)
+  if (cached && cached[0]) {
+    var exp = cached[0].expires_at ? new Date(cached[0].expires_at) : null
+    if (!exp || exp > new Date()) {
+      TP.s1 = cached[0].profile; TP.stage = 's1_done'; switchTab('profile'); return
+    }
+  }
+
+  var result = await callS1(territory)
+  if (!result.ok) {
+    TP.stage = 'home'
+    switchTab('profile')
+    setTimeout(function(){ alert('Stage 1 failed: ' + result.error) }, 100)
+    return
+  }
+  TP.s1 = result.data
+
+  // Cache
+  var now = new Date()
+  var exp = new Date(now.getTime() + 90*24*60*60*1000)
+  sbInsert('territory_profiles', {
+    id: slug, territory: territory,
+    state_code: result.data.state_code || null,
+    profile: result.data,
+    generated_at: now.toISOString(),
+    expires_at: exp.toISOString(),
+    model_used: 'gemini-2.0-flash'
+  })
+  TP.stage = 's1_done'
+  switchTab('profile')
+}
+
+
+//                                                                               
+// Stage 1: Territory Intelligence Dashboard
+//                                                                               
+
+function tpS1View() {
+  var p = TP.s1; if (!p) return tpHome()
+  var e = p.hard_stats && p.hard_stats.energy   || {}
+  var w = p.hard_stats && p.hard_stats.water    || {}
+  var l = p.hard_stats && p.hard_stats.land     || {}
+  var k = p.hard_stats && p.hard_stats.workers  || {}
+  var m = p.hard_stats && p.hard_stats.macro    || {}
+  var d = p.hard_stats && p.hard_stats.digital  || {}
+  var geo = p.geography || {}
+  var pol = p.policy    || {}
+  var prg = p.programmes || {}
+
+  var html = '<div style="padding:16px 0">'
+
+  // Header row
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    + '<div><div style="font-size:16px;font-weight:900;color:var(--navy)">' + esc(p.territory||TP.territory) + '</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-top:2px">Territory Intelligence   Stage 1 of 3</div></div>'
+    + '<button onclick="tpGoS2()" style="padding:9px 18px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Set Objectives &#8594;</button>'
+    + '</div>'
+
+  // Headline
+  if (p.headline) {
+    html += '<div style="background:var(--navy);border-radius:8px;padding:14px 18px;color:#fff;margin-bottom:14px">'
+      + '<div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Intelligence Headline</div>'
+      + '<div style="font-size:14px;font-weight:500;line-height:1.5">' + esc(p.headline) + '</div>'
+      + '</div>'
+  }
+
+  //    HARD STATS                                                              
+  html += tpSectionHeader('HARD STATS', 'Objective data   macroeconomics, 4Ws, digital infrastructure', '#002870')
+
+  // Cost indices strip
+  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">'
+  html += tpCostTile('&#9889; Energy Tariff', e.industrial_tariff ? 'Rs '+e.industrial_tariff+'/unit' : 'N/A',
+    e.tariff_index_pct, e.dc_feasibility ? 'DC: '+e.dc_feasibility : null, 'lower is better')
+  html += tpCostTile('&#128167; Water Cost', w.industrial_cost_per_kl ? 'Rs '+w.industrial_cost_per_kl+'/kL' : 'N/A',
+    w.water_cost_index_pct, 'Stress: '+(w.stress_index||'N/A'), 'lower is better')
+  html += tpCostTile('&#128119; Labour Cost', k.avg_engineer_salary_lakh ? 'Rs '+k.avg_engineer_salary_lakh+'L pa' : 'N/A',
+    k.salary_index_pct, k.skilled_labour||null, 'lower is better')
+  html += tpCostTile('&#127968; Land Cost', l.cost_per_acre_lakh ? 'Rs '+l.cost_per_acre_lakh+'L/acre' : 'N/A',
+    l.land_cost_index_pct, 'Govt land: '+(l.govt_land||'N/A'), 'lower is better')
+  html += '</div>'
+
+  // Stats grid
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">'
+
+  // Macro
+  html += tpStatCard('Macroeconomics', [
+    { label:'GSDP', val: m.gsdp_cr ? 'Rs '+Number(m.gsdp_cr).toLocaleString('en-IN')+' Cr' : 'N/A', rag:'' },
+    { label:'Growth', val: m.gsdp_growth_pct ? m.gsdp_growth_pct+'%' : 'N/A', rag: m.gsdp_growth_pct >= 7 ? 'rag-green' : m.gsdp_growth_pct >= 5 ? 'rag-amber' : 'rag-red' },
+    { label:'Per capita vs national', val: m.vs_national_pct ? m.vs_national_pct+'%' : 'N/A', rag: indexRag(m.vs_national_pct) },
+    { label:'Fiscal health', val: m.fiscal_health||'N/A', rag: m.fiscal_health==='surplus'?'rag-green':m.fiscal_health==='balanced'?'rag-amber':'rag-red' }
+  ])
+
+  // Energy
+  html += tpStatCard('Energy (Watts)', [
+    { label:'Installed capacity', val: e.installed_mw ? Number(e.installed_mw).toLocaleString('en-IN')+' MW' : 'N/A', rag:'' },
+    { label:'Status', val: e.status||'N/A', rag: e.status==='surplus'?'rag-green':e.status==='balanced'?'rag-amber':'rag-red' },
+    { label:'Grid reliability', val: e.grid_hrs ? e.grid_hrs+'h/day' : 'N/A', rag: e.grid_hrs>=22?'rag-green':e.grid_hrs>=18?'rag-amber':'rag-red' },
+    { label:'Renewable mix', val: e.renewable_pct ? e.renewable_pct+'%' : 'N/A', rag: e.renewable_pct>=40?'rag-green':e.renewable_pct>=20?'rag-amber':'rag-red' },
+    { label:'Industrial tariff vs avg', val: ragText(e.tariff_index_pct), rag: indexRag(e.tariff_index_pct) },
+    { label:'DC power feasibility', val: e.dc_feasibility||'N/A', rag: e.dc_feasibility==='high'?'rag-green':e.dc_feasibility==='medium'?'rag-amber':'rag-red' }
+  ])
+
+  // Water
+  html += tpStatCard('Water', [
+    { label:'Annual rainfall', val: w.rainfall_mm ? w.rainfall_mm+' mm' : 'N/A', rag: w.rainfall_mm>=800?'rag-green':w.rainfall_mm>=400?'rag-amber':'rag-red' },
+    { label:'Stress index', val: w.stress_index||'N/A', rag: w.stress_index==='low'?'rag-green':w.stress_index==='medium'?'rag-amber':'rag-red' },
+    { label:'Rivers', val: (w.perennial_rivers||[]).slice(0,3).join(', ')||'N/A', rag:'' },
+    { label:'DC cooling', val: w.dc_cooling||'N/A', rag: w.dc_cooling==='high'?'rag-green':w.dc_cooling==='medium'?'rag-amber':'rag-red' },
+    { label:'Water cost vs avg', val: ragText(w.water_cost_index_pct), rag: indexRag(w.water_cost_index_pct) }
+  ])
+
+  // Land
+  html += tpStatCard('Land (Acres)', [
+    { label:'Area', val: l.area_sqkm ? Number(l.area_sqkm).toLocaleString('en-IN')+' km ' : 'N/A', rag:'' },
+    { label:'Topography', val: l.topography||'N/A', rag: l.topography==='plains'?'rag-green':l.topography==='mixed'?'rag-amber':'rag-red' },
+    { label:'Industrial parks / SEZs', val: (l.industrial_parks||0)+' / '+(l.sez_count||0), rag: (l.industrial_parks||0)>2?'rag-green':(l.industrial_parks||0)>0?'rag-amber':'rag-red' },
+    { label:'Govt land avail.', val: l.govt_land||'N/A', rag: l.govt_land==='high'?'rag-green':l.govt_land==='medium'?'rag-amber':'rag-red' },
+    { label:'Construction ease', val: l.construction_ease||'N/A', rag: l.construction_ease==='easy'?'rag-green':l.construction_ease==='moderate'?'rag-amber':'rag-red' },
+    { label:'Land cost vs avg', val: ragText(l.land_cost_index_pct), rag: indexRag(l.land_cost_index_pct) }
+  ])
+
+  // Workers
+  html += tpStatCard('Workers', [
+    { label:'Population', val: k.population_lakh ? k.population_lakh+' lakh' : 'N/A', rag:'' },
+    { label:'Literacy', val: k.literacy_pct ? k.literacy_pct+'%' : 'N/A', rag: k.literacy_pct>=80?'rag-green':k.literacy_pct>=65?'rag-amber':'rag-red' },
+    { label:'Engineers/yr', val: k.engineers_per_year ? Number(k.engineers_per_year).toLocaleString('en-IN') : 'N/A', rag: k.engineers_per_year>=5000?'rag-green':k.engineers_per_year>=1000?'rag-amber':'rag-red' },
+    { label:'Migration', val: k.migration||'N/A', rag: k.migration==='net_in'?'rag-green':k.migration==='balanced'?'rag-amber':'rag-red' },
+    { label:'Skilled labour', val: k.skilled_labour||'N/A', rag: k.skilled_labour==='abundant'?'rag-green':k.skilled_labour==='adequate'?'rag-amber':'rag-red' },
+    { label:'Salary vs avg', val: ragText(k.salary_index_pct), rag: indexRag(k.salary_index_pct) }
+  ])
+
+  // Digital
+  html += tpStatCard('Digital', [
+    { label:'Internet penetration', val: d.internet_pct ? d.internet_pct+'%' : 'N/A', rag: d.internet_pct>=60?'rag-green':d.internet_pct>=35?'rag-amber':'rag-red' },
+    { label:'OFC backbone', val: d.ofc_km ? Number(d.ofc_km).toLocaleString('en-IN')+' km' : 'N/A', rag: d.ofc_km>=10000?'rag-green':d.ofc_km>=2000?'rag-amber':'rag-red' },
+    { label:'NKN presence', val: d.nkn?'Yes':'No', rag: d.nkn?'rag-green':'rag-red' },
+    { label:'Smart cities', val: d.smart_cities||'0', rag: d.smart_cities>0?'rag-green':'rag-amber' },
+    { label:'BharatNet coverage', val: d.bharatnet_pct ? d.bharatnet_pct+'%' : 'N/A', rag: d.bharatnet_pct>=70?'rag-green':d.bharatnet_pct>=40?'rag-amber':'rag-red' },
+    { label:'Govt DCs', val: d.govt_dcs||'0', rag: d.govt_dcs>0?'rag-green':'rag-amber' }
+  ])
+
+  html += '</div>'
+
+  // Geography
+  if ((geo.advantages||[]).length || (geo.constraints||[]).length) {
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
+    if ((geo.advantages||[]).length) {
+      html += '<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px 14px">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--teal);text-transform:uppercase;margin-bottom:8px">&#9989; Geography Advantages</div>'
+        + (geo.advantages||[]).map(function(a){ return '<div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)">'+esc(a)+'</div>' }).join('')
+        + '</div>'
+    }
+    if ((geo.constraints||[]).length) {
+      html += '<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px 14px">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;margin-bottom:8px">&#9888; Constraints</div>'
+        + (geo.constraints||[]).map(function(a){ return '<div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)">'+esc(a)+'</div>' }).join('')
+        + '</div>'
+    }
+    html += '</div>'
+  }
+
+  //    POLICY                                                                  
+  html += tpSectionHeader('POLICY', 'Named policies converted to AI deployment enablers', '#5B21B6')
+  html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">'
+  var polItems = (pol.useable||[])
+  if (polItems.length) {
+    html += polItems.map(function(item){
+      var impCol = item.impact==='high'?'var(--teal)':item.impact==='medium'?'var(--amber)':'var(--mid)'
+      return '<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:11px 14px;border-left:3px solid '+impCol+'">'
+        + '<div style="font-size:11px;color:var(--mid);margin-bottom:3px">Source: '+esc(item.source||'')+'</div>'
+        + '<div style="font-size:12px;line-height:1.4">'+esc(item.point||'')+'</div>'
+        + '<div style="font-size:10px;color:'+impCol+';font-weight:700;margin-top:4px;text-transform:uppercase">'+esc(item.impact||'')+'</div>'
+        + '</div>'
+    }).join('')
+  } else {
+    html += '<div style="font-size:12px;color:var(--mid);grid-column:1/-1">No policy data available</div>'
+  }
+  html += '</div>'
+
+  //    PROGRAMMES                                                              
+  html += tpSectionHeader('PROGRAMMES', 'Central and state schemes converted to AI leverage points', '#065A82')
+  html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px">'
+  var prgItems = (prg.useable||[])
+  if (prgItems.length) {
+    var typeCol = { funding:'var(--teal)', infrastructure:'var(--blue)', mandate:'var(--orange)', capacity:'var(--amber)' }
+    html += prgItems.map(function(item){
+      var col = typeCol[item.type] || 'var(--mid)'
+      return '<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:11px 14px;border-left:3px solid '+col+'">'
+        + '<div style="font-size:10px;font-weight:700;color:'+col+';text-transform:uppercase;margin-bottom:3px">'+esc(item.type||'programme')+'</div>'
+        + '<div style="font-size:11px;color:var(--mid);margin-bottom:3px">'+esc(item.source||'')+'</div>'
+        + '<div style="font-size:12px;line-height:1.4">'+esc(item.point||'')+'</div>'
+        + '</div>'
+    }).join('')
+  } else {
+    html += '<div style="font-size:12px;color:var(--mid);grid-column:1/-1">No programme data available</div>'
+  }
+  html += '</div>'
+
+  // CTA
+  html += '<div style="background:#E1F5EE;border-radius:8px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">'
+    + '<div><div style="font-size:13px;font-weight:700;color:var(--navy)">Stage 1 complete. Set your objectives to generate the territory profile.</div>'
+    + '<div style="font-size:11px;color:var(--mid)">Select up to 5 objectives. Gemini will auto-profile the territory against them.</div></div>'
+    + '<button onclick="tpGoS2()" style="padding:9px 18px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0">Set Objectives &#8594;</button>'
+    + '</div>'
+
+  html += '</div>'
+  return html
+}
+
+function tpSectionHeader(title, sub, col) {
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid '+(col||'var(--border)')+'">'
+    + '<div style="width:4px;height:28px;background:'+(col||'var(--navy)')+';border-radius:2px"></div>'
+    + '<div><div style="font-size:12px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;color:'+(col||'var(--navy)')+'">'+title+'</div>'
+    + '<div style="font-size:10px;color:var(--mid)">'+sub+'</div></div>'
+    + '</div>'
+}
+
+function tpCostTile(label, value, indexPct, detail, direction) {
+  var rag = indexRag(indexPct)
+  var bgMap = { 'rag-green':'#E1F5EE', 'rag-amber':'#FFF8E7', 'rag-red':'#FEE2E2', 'rag-grey':'var(--light)' }
+  var colMap = { 'rag-green':'var(--teal)', 'rag-amber':'var(--amber)', 'rag-red':'var(--orange)', 'rag-grey':'var(--mid)' }
+  var bg  = bgMap[rag]  || 'var(--light)'
+  var col = colMap[rag] || 'var(--mid)'
+  return '<div style="background:'+bg+';border-radius:8px;padding:12px 14px;border-left:4px solid '+col+'">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">'+label+'</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:4px">'+esc(value)+'</div>'
+    + (indexPct ? '<div style="font-size:11px;font-weight:700;color:'+col+'">'+arrow(indexPct)+indexPct+'% of national avg</div>' : '')
+    + (detail ? '<div style="font-size:10px;color:var(--mid);margin-top:3px">'+esc(detail)+'</div>' : '')
+    + '</div>'
+}
+
+function tpStatCard(title, rows) {
+  return '<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px 14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px">'+esc(title)+'</div>'
+    + rows.map(function(r){
+        var dot = r.rag ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+
+          (r.rag==='rag-green'?'var(--teal)':r.rag==='rag-amber'?'var(--amber)':r.rag==='rag-red'?'var(--orange)':'var(--mid)')+
+          ';margin-right:5px;flex-shrink:0;margin-top:2px"></span>' : ''
+        return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:3px 0;border-bottom:1px solid var(--border);gap:8px">'
+          + '<span style="font-size:11px;color:var(--mid);flex-shrink:0">'+esc(r.label)+'</span>'
+          + '<span style="font-size:11px;font-weight:500;text-align:right;display:flex;align-items:flex-start">'+dot+esc(String(r.val))+'</span>'
+          + '</div>'
+      }).join('')
+    + '</div>'
+}
+
+function tpGoS2() { TP.stage = 's2_form'; switchTab('profile') }
+
+
+//                                                                               
+// Stage 2: Objectives + AI Profile Form
+//                                                                               
+
+function tpS2Form() {
+  var sel = TP.objectives || []
+  var html = '<div style="padding:16px 0">'
+
+  html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">'
+    + '<button onclick="TP.stage=\'s1_done\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Back to intelligence</button>'
+    + '<div style="font-size:14px;font-weight:700;color:var(--navy)">' + esc(TP.territory) + '   Set Objectives</div>'
+    + '<div style="font-size:11px;color:var(--mid)">Select up to 5 objectives</div>'
+    + '<span style="margin-left:auto;font-size:12px;font-weight:700;color:' + (sel.length>=5?'var(--orange)':'var(--teal)') + '">' + sel.length + '/5 selected</span>'
+    + '</div>'
+
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
+
+  // Objectives panel
+  html += '<div>'
+  OBJECTIVES.forEach(function(group) {
+    html += '<div style="margin-bottom:12px">'
+      + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);padding:6px 10px;background:var(--light);border-radius:4px;margin-bottom:6px">'+esc(group.group)+'</div>'
+      + group.items.map(function(item) {
+          var isSel = sel.indexOf(item) >= 0
+          var blocked = !isSel && sel.length >= 5
+          return '<div onclick="tpToggleObj(\'' + item.replace(/'/g,"\\'") + '\')" '
+            + 'style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;border:1.5px solid '
+            + (isSel?'var(--navy)':blocked?'var(--border)':'var(--border)')
+            + ';background:' + (isSel?'rgba(0,40,112,.06)':'#fff')
+            + ';cursor:' + (blocked?'not-allowed':'pointer')
+            + ';opacity:' + (blocked?'.45':'1')
+            + ';margin-bottom:4px">'
+            + '<div style="width:14px;height:14px;border-radius:3px;flex-shrink:0;border:1.5px solid '
+            + (isSel?'var(--navy)':'var(--border)')
+            + ';background:' + (isSel?'var(--navy)':'#fff')
+            + ';display:flex;align-items:center;justify-content:center">'
+            + (isSel?'<span style="color:#fff;font-size:9px;font-weight:700">&#10003;</span>':'')
+            + '</div>'
+            + '<span style="font-size:12px;font-weight:' + (isSel?600:400) + '">' + esc(item) + '</span>'
+            + '</div>'
+        }).join('')
+      + '</div>'
+  })
+  html += '</div>'
+
+  // Context panel
+  html += '<div>'
+    + '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:10px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">Selected objectives</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Max 5. Use the context box for anything outside the list.</div>'
+    + '<div style="display:flex;flex-direction:column;gap:5px;min-height:60px">'
+    + (sel.length ? sel.map(function(o,i){
+        return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 8px;background:var(--light);border-radius:4px">'
+          + '<span style="font-size:10px;font-weight:700;color:var(--navy);width:14px">' + (i+1) + '</span>'
+          + '<span style="flex:1">' + esc(o) + '</span>'
+          + '<span onclick="tpToggleObj(\'' + o.replace(/'/g,"\\'") + '\')" style="cursor:pointer;color:var(--mid);font-size:14px">&#215;</span>'
+          + '</div>'
+      }).join('') : '<div style="font-size:11px;color:var(--mid);font-style:italic">No objectives selected yet</div>')
+    + '</div></div>'
+
+    + '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:10px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">Additional context <span style="font-weight:400;color:var(--mid)">(optional)</span></div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Anything your team knows that the AI should factor in   ground truth, specific constraints, political dynamics, client conversations.</div>'
+    + '<textarea id="tp-free-text" rows="8" '
+    + 'style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;line-height:1.5"'
+    + ' placeholder="e.g. The CM has personally committed to making this the AI capital of Himachal. Budget is pre-approved in the supplementary estimates. Site in Bilaspur is surveyed and has 10MW available from HPSEBL grid connection...">'
+    + esc(TP.freeText||'') + '</textarea>'
+    + '</div>'
+
+    + (sel.length > 0
+      ? '<button onclick="tpRunS2()" style="width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">&#9889; Generate territory profile &#8594;</button>'
+      : '<button disabled style="width:100%;padding:11px;background:var(--border);color:var(--mid);border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:not-allowed">Select at least 1 objective first</button>')
+
+  html += '</div>'
+  html += '</div></div>'
+  return html
+}
+
+function tpToggleObj(name) {
+  var idx = TP.objectives.indexOf(name)
+  if (idx >= 0) {
+    TP.objectives.splice(idx, 1)
+  } else {
+    if (TP.objectives.length >= 5) return
+    TP.objectives.push(name)
+  }
+  switchTab('profile')
+}
+
+async function tpRunS2() {
+  var ft = document.getElementById('tp-free-text')
+  TP.freeText = ft ? ft.value : ''
+  TP.stage = 's2_loading'
+  switchTab('profile')
+
+  var result = await callS2(TP.territory, TP.s1, TP.objectives, TP.freeText)
+  if (!result.ok) {
+    TP.stage = 's2_form'; switchTab('profile')
+    setTimeout(function(){ alert('Stage 2 failed: ' + result.error) }, 100)
+    return
+  }
+  TP.s2 = result.data
+  TP.overrides.working   = (TP.s2.working_in_favour || []).map(function(p){ return { text: p.point, metric: p.metric, confidence: p.confidence, removed: false } })
+  TP.overrides.attention = (TP.s2.needs_attention   || []).map(function(p){ return { text: p.point, severity: p.severity, mitigation: p.mitigation, removed: false } })
+  TP.stage = 's3'
+  switchTab('profile')
+}
+
+//                                                                               
+// Stage 3: Matchmaking Results
+//                                                                               
+
+function tpS3Result() {
+  if (!TP.s2) { TP.stage = 's2_form'; return tpS2Form() }
+  var icons = {T1:'&#127965;',T2:'&#127807;',T3:'&#128681;',T4:'&#127970;',T5:'&#127758;'}
+  var dimLabels = {
+    infrastructure_readiness: 'Infrastructure', fiscal_capacity: 'Fiscal Capacity',
+    ai_opportunity_density: 'AI Opportunity', workforce_readiness: 'Workforce',
+    political_commercial: 'Political & Commercial', central_strategic_value: 'Central Strategic'
+  }
+  var viabCol = { excellent:'var(--teal)',strong:'var(--teal)',viable:'var(--amber)',challenging:'var(--orange)',not_recommended:'var(--orange)' }
+  var viabBg  = { excellent:'#E1F5EE',strong:'#E1F5EE',viable:'#FFF8E7',challenging:'#FEE2E2',not_recommended:'#FEE2E2' }
+
+  // Compute archetype match
+  var dimScores = TP.s2.dim_scores || {}
+  var dims = Object.keys(dimScores)
   var archVecs = {}
-  PROFILE_STATE.archetypes.forEach(function(a){
-    archVecs[a.id]={}; dimNames.forEach(function(d){ archVecs[a.id][d]=0 })
+  TP.archetypes.forEach(function(a){
+    archVecs[a.id]={}; dims.forEach(function(d){ archVecs[a.id][d]=0 })
   })
-  PROFILE_STATE.archetype_dims.forEach(function(d){
+  TP.archetype_dims.forEach(function(d){
     if(archVecs[d.archetype_id]) archVecs[d.archetype_id][d.dimension]=parseFloat(d.score)||0
   })
+  var matches = TP.archetypes.map(function(a){
+    var dot=0,mA=0,mB=0
+    dims.forEach(function(d){
+      var av=(dimScores[d]||0),bv=(archVecs[a.id][d]||0)
+      dot+=av*bv;mA+=av*av;mB+=bv*bv
+    })
+    return { arch:a, score:(mA&&mB)?dot/(Math.sqrt(mA)*Math.sqrt(mB)):0 }
+  }).sort(function(a,b){return b.score-a.score})
+  var best = matches[0]
+  var pct  = best ? Math.round(best.score*100) : 0
 
-  var scores = PROFILE_STATE.archetypes.map(function(a){
-    return { arch:a, score:profilerCosineSimilarity(profile, archVecs[a.id], dimNames), vector:archVecs[a.id] }
-  }).sort(function(a,b){ return b.score-a.score })
+  var html = '<div style="padding:16px 0">'
 
-  return { profile:profile, dimNames:dimNames, all:scores, best:scores[0] }
-}
-
-function renderProfileTab() {
-  if (!PROFILE_STATE.loaded) {
-    loadProfilerData().then(function(){ switchTab('profile') })
-    return '<div style="padding:24px;color:var(--mid);display:flex;align-items:center;gap:10px">'
-      + '<div style="width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite"></div>'
-      + 'Loading profiler data...</div>'
-  }
-
-  var qs = PROFILE_STATE.questions
-  if (!qs.length) {
-    return '<div style="padding:24px"><div style="background:var(--light);border-radius:8px;padding:20px;color:var(--mid);font-size:13px">'
-      + '&#9888; No profiler questions found in Supabase. Check profiler_questions table.</div></div>'
-  }
-
-  // Show result if we have one
-  if (PROFILE_STATE.result) return renderProfileResult()
-
-  // Show question flow
-  if (PROFILE_STATE.running) return renderProfileQuestion()
-
-  // Show intro / archetype overview
-  return renderProfileIntro()
-}
-
-function renderProfileIntro() {
-  var archs = PROFILE_STATE.archetypes
-  var icons = {Q1:'&#127807;',Q2:'&#127970;',Q3:'&#9881;',Q4:'&#127758;'}
-  var answeredCount = Object.keys(PROFILE_STATE.answers).length
-  var total = PROFILE_STATE.questions.length
-
-  var html = '<div style="padding:20px 0">'
-    + '<div style="background:linear-gradient(135deg,var(--navy) 0%,#003fa8 100%);border-radius:8px;padding:20px 24px;color:#fff;margin-bottom:16px">'
-    + '<div style="font-size:16px;font-weight:700;margin-bottom:6px">Territory AI Readiness Profiler</div>'
-    + '<div style="font-size:12px;color:rgba(255,255,255,0.75);line-height:1.5">Answer ' + total + ' questions about this territory. We match it against reference archetypes and generate a radar chart with an actions playbook.</div>'
+  // Nav
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    + '<button onclick="TP.stage=\'s1_done\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Intelligence</button>'
+    + '<button onclick="TP.stage=\'s2_form\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#9997; Objectives</button>'
+    + '<div style="font-size:14px;font-weight:700;color:var(--navy);flex:1">' + esc(TP.territory) + '   Territory Profile</div>'
+    + '<button onclick="tpExportWord()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#128196; Word</button>'
+    + '<button onclick="tpExportPPT()" style="padding:5px 12px;border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#128190; PPT</button>'
     + '</div>'
 
-  // Archetype cards
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
-    + archs.map(function(a){
-        return '<div style="padding:12px 14px;background:var(--light);border-radius:6px;border-left:3px solid var(--navy)">'
-          + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:3px">' + (icons[a.id]||'') + ' ' + esc(a.name||a.id) + '</div>'
-          + '<div style="font-size:11px;color:var(--mid);line-height:1.4">' + esc(a.description||'') + '</div>'
-          + '</div>'
-      }).join('')
-    + '</div>'
-
-  html += '<div style="display:flex;gap:10px;align-items:center">'
-    + '<button onclick="startProfilerInFM()" style="padding:9px 20px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">'
-    + (answeredCount > 0 ? '&#8635; Retake (' + answeredCount + '/' + total + ' answered)' : '&#9654; Start profiler')
-    + '</button>'
-    + '</div></div>'
-
-  return html
-}
-
-function startProfilerInFM() {
-  PROFILE_STATE.step = 0
-  PROFILE_STATE.answers = {}
-  PROFILE_STATE.running = true
-  PROFILE_STATE.result  = null
-  switchTab('profile')
-}
-
-function renderProfileQuestion() {
-  var qs    = PROFILE_STATE.questions
-  var step  = PROFILE_STATE.step
-  var q     = qs[step]
-  if (!q) { finishProfiler(); return renderProfileResult() }
-
-  var opts     = PROFILE_STATE.options.filter(function(o){ return o.question_id===q.id })
-  var selected = PROFILE_STATE.answers[q.id]
-  var progress = Math.round(step/qs.length*100)
-
-  var html = '<div style="padding:20px 0">'
-    // Progress
-    + '<div style="height:3px;background:var(--border);border-radius:2px;margin-bottom:16px">'
-    + '<div style="width:' + progress + '%;height:100%;background:var(--navy);border-radius:2px;transition:width .3s"></div></div>'
-    + '<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Question ' + (step+1) + ' of ' + qs.length + '</div>'
-
-    // Question card
-    + '<div style="background:#fff;border:1.5px solid var(--navy);border-radius:8px;padding:18px 20px;margin-bottom:12px">'
-    + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Q' + (step+1) + '</div>'
-    + '<div style="font-size:14px;font-weight:500;margin-bottom:14px;line-height:1.5">' + esc(q.text||q.question||'') + '</div>'
-    + '<div style="display:flex;flex-direction:column;gap:7px">'
-    + opts.map(function(o){
-        var isSel = o.id===selected
-        return '<div onclick="profilerPickFM(\'' + q.id + '\',\'' + o.id + '\')" '
-          + 'style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:6px;border:1.5px solid '
-          + (isSel?'var(--navy)':'var(--border)') + ';background:' + (isSel?'rgba(0,40,112,0.05)':'#fff') + ';cursor:pointer">'
-          + '<div style="width:14px;height:14px;border-radius:50%;border:2px solid ' + (isSel?'var(--navy)':'var(--border)') + ';flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;background:' + (isSel?'var(--navy)':'#fff') + '">'
-          + (isSel?'<div style="width:5px;height:5px;border-radius:50%;background:#fff"></div>':'')
-          + '</div>'
-          + '<span style="font-size:12px;line-height:1.4">' + esc(o.text||'') + '</span>'
-          + '</div>'
-      }).join('')
-    + '</div></div>'
-
-    // Nav
-    + '<div style="display:flex;justify-content:space-between">'
-    + '<button onclick="profilerBackFM()" style="padding:7px 14px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer;' + (step===0?'opacity:.4;pointer-events:none':'') + '">&#8592; Back</button>'
-    + (selected
-      ? '<button onclick="profilerNextFM()" style="padding:7px 16px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">Next &#8594;</button>'
-      : '<button onclick="profilerNextFM()" style="padding:7px 14px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer;color:var(--mid)">Skip</button>')
-    + '</div></div>'
-  return html
-}
-
-function profilerPickFM(qId, optId) {
-  PROFILE_STATE.answers[qId] = optId
-  switchTab('profile')
-}
-function profilerNextFM() {
-  PROFILE_STATE.step++
-  if (PROFILE_STATE.step >= PROFILE_STATE.questions.length) { finishProfiler() }
-  switchTab('profile')
-}
-function profilerBackFM() {
-  if (PROFILE_STATE.step > 0) { PROFILE_STATE.step--; switchTab('profile') }
-}
-
-function finishProfiler() {
-  PROFILE_STATE.running = false
-  PROFILE_STATE.result  = profilerMatch()
-  // Write matched archetype to FM data for use in other tabs
-  if (PROFILE_STATE.result && PROFILE_STATE.result.best) {
-    FM_DATA.territory_archetype      = PROFILE_STATE.result.best.arch.id
-    FM_DATA.territory_archetype_name = PROFILE_STATE.result.best.arch.name || PROFILE_STATE.result.best.arch.id
-    FM_DATA.territory_match_score    = Math.round(PROFILE_STATE.result.best.score * 100)
+  // Headline recommendation
+  if (TP.s2.headline_recommendation) {
+    html += '<div style="background:var(--navy);border-radius:8px;padding:14px 18px;color:#fff;margin-bottom:14px">'
+      + '<div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Strategic Recommendation</div>'
+      + '<div style="font-size:14px;font-weight:500;line-height:1.5">' + esc(TP.s2.headline_recommendation) + '</div>'
+      + '</div>'
   }
-  // Save run
-  saveProfilerRun()
-}
 
-async function saveProfilerRun() {
-  var result = PROFILE_STATE.result
-  if (!result || !result.best) return
-  var run = {
-    id: 'RUN-' + Date.now(),
-    engagement_id: FM_DATA.engId || null,
-    answers: PROFILE_STATE.answers,
-    matched_archetype: result.best.arch.id,
-    match_score: Math.round(result.best.score*100),
-    dimension_scores: result.profile,
-    created_at: new Date().toISOString()
+  // Archetype match banner
+  if (best) {
+    html += '<div style="background:linear-gradient(135deg,rgba(0,40,112,.06) 0%,rgba(0,40,112,.02) 100%);border:1.5px solid var(--navy);border-radius:8px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px">'
+      + '<div style="font-size:28px">' + (icons[best.arch.id]||'') + '</div>'
+      + '<div style="flex:1">'
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:2px">Matched archetype   ' + pct + '% confidence</div>'
+      + '<div style="font-size:16px;font-weight:900;color:var(--navy)">' + esc(best.arch.name||best.arch.id) + '</div>'
+      + '<div style="font-size:12px;color:var(--mid);margin-top:2px">' + esc((best.arch.description||'').substring(0,120)) + '</div>'
+      + '</div></div>'
   }
-  await sbInsert('profiler_runs', run)
-}
 
-function renderProfileResult() {
-  var result = PROFILE_STATE.result || profilerMatch()
-  if (!result || !result.best) return renderProfileIntro()
+  // Three columns: Working | Attention | Objective Feasibility
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">'
 
-  var best     = result.best
-  var arch     = best.arch
-  var profile  = result.profile
-  var dimNames = result.dimNames
-  var pct      = Math.round(best.score*100)
-  var icons    = {Q1:'&#127807;',Q2:'&#127970;',Q3:'&#9881;',Q4:'&#127758;'}
-
-  var html = '<div style="padding:20px 0">'
-    // Matched archetype banner
-    + '<div style="background:var(--navy);border-radius:8px;padding:16px 20px;color:#fff;margin-bottom:14px">'
-    + '<div style="font-size:10px;color:rgba(255,255,255,0.6);margin-bottom:4px">MATCHED ARCHETYPE</div>'
-    + '<div style="font-size:18px;font-weight:900;margin-bottom:4px">' + (icons[arch.id]||'') + ' ' + esc(arch.name||arch.id) + '</div>'
-    + '<div style="font-size:12px;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:8px">' + esc(arch.description||'') + '</div>'
-    + '<div style="font-size:11px;color:var(--teal)">Match confidence: ' + pct + '%</div>'
-    + '</div>'
-
-  // Radar + dim scores
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
-
-  // Radar
+  // Working in favour
   html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
-    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">Dimension radar</div>'
-    + '<canvas id="fm-profiler-radar" height="200"></canvas>'
-    + '</div>'
-
-  // Dim scores
-  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
-    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">Your scores</div>'
-    + dimNames.map(function(d){
-        var sc = Math.min(1,Math.max(0,profile[d]||0))
-        var p2 = Math.round(sc*100)
-        var lbl= d.length>18 ? d.substring(0,16)+'..' : d
-        return '<div style="margin-bottom:8px">'
-          + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">'
-          + '<span style="color:var(--mid)">' + esc(lbl) + '</span>'
-          + '<span style="font-weight:700;color:var(--navy)">' + p2 + '</span>'
-          + '</div>'
-          + '<div style="height:3px;background:var(--border);border-radius:2px">'
-          + '<div style="width:' + p2 + '%;height:100%;background:var(--teal);border-radius:2px"></div>'
+    + '<div style="font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">&#9989; Working in favour</div>'
+    + TP.overrides.working.filter(function(p){ return !p.removed }).map(function(p,i){
+        return '<div style="padding:7px 9px;background:#F0FDF4;border-radius:5px;margin-bottom:6px;border-left:3px solid var(--teal)">'
+          + '<div style="font-size:11px;line-height:1.4">' + esc(p.text) + '</div>'
+          + (p.metric ? '<div style="font-size:10px;color:var(--mid);margin-top:3px">&#128202; ' + esc(p.metric) + '</div>' : '')
+          + '<div style="display:flex;gap:4px;margin-top:4px">'
+          + '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--teal);color:#fff;font-weight:700">' + esc(p.confidence||'') + '</span>'
+          + '<span onclick="tpRemovePoint(\'working\',' + i + ')" style="font-size:9px;color:var(--mid);cursor:pointer">Remove</span>'
           + '</div></div>'
+      }).join('')
+    + '<div onclick="tpAddPoint(\'working\')" style="font-size:11px;color:var(--mid);cursor:pointer;padding:5px;text-align:center;border:1px dashed var(--border);border-radius:5px;margin-top:4px">+ Add observation</div>'
+    + '</div>'
+
+  // Needs attention
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">&#9888; Needs attention</div>'
+    + TP.overrides.attention.filter(function(p){ return !p.removed }).map(function(p,i){
+        var sevCol = p.severity==='critical'?'var(--orange)':p.severity==='moderate'?'var(--amber)':'var(--mid)'
+        return '<div style="padding:7px 9px;background:#FFF8F0;border-radius:5px;margin-bottom:6px;border-left:3px solid '+sevCol+'">'
+          + '<div style="font-size:11px;line-height:1.4">' + esc(p.text) + '</div>'
+          + (p.mitigation ? '<div style="font-size:10px;color:var(--mid);margin-top:3px">&#128161; ' + esc(p.mitigation) + '</div>' : '')
+          + '<div style="display:flex;gap:4px;margin-top:4px">'
+          + '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:'+sevCol+';color:#fff;font-weight:700">' + esc(p.severity||'') + '</span>'
+          + '<span onclick="tpRemovePoint(\'attention\',' + i + ')" style="font-size:9px;color:var(--mid);cursor:pointer">Remove</span>'
+          + '</div></div>'
+      }).join('')
+    + '<div onclick="tpAddPoint(\'attention\')" style="font-size:11px;color:var(--mid);cursor:pointer;padding:5px;text-align:center;border:1px dashed var(--border);border-radius:5px;margin-top:4px">+ Add observation</div>'
+    + '</div>'
+
+  // Objective feasibility
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">Objective feasibility</div>'
+    + (TP.s2.objective_viability||[]).map(function(v){
+        var col = viabCol[v.viability] || 'var(--mid)'
+        var bg  = viabBg[v.viability]  || 'var(--light)'
+        var sc  = v.score || 0
+        return '<div style="margin-bottom:8px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+          + '<span style="font-size:11px;font-weight:600">' + esc(v.objective||'') + '</span>'
+          + '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:'+bg+';color:'+col+';font-weight:700">' + esc(v.viability||'') + '</span>'
+          + '</div>'
+          + '<div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:3px">'
+          + '<div style="width:'+sc+'%;height:100%;background:'+col+';border-radius:3px"></div>'
+          + '</div>'
+          + (v.rationale ? '<div style="font-size:10px;color:var(--mid);line-height:1.3">' + esc(v.rationale) + '</div>' : '')
+          + '</div>'
       }).join('')
     + '</div>'
 
   html += '</div>'
 
-  // All archetype matches
-  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">'
-    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">All archetype matches</div>'
-    + '<div style="display:flex;flex-direction:column;gap:7px">'
-    + result.all.map(function(m,i){
+  // Feasibility grid (situation   objectives)
+  html += tpFeasibilityGrid()
+
+  // Radar + dim bars + archetype comparison
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
+
+  // Radar
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">Dimension Radar</div>'
+    + '<canvas id="tp-radar-chart"></canvas>'
+    + '</div>'
+
+  // Dim bars + archetype comparison
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">Dimension Scores vs Archetype</div>'
+    + '<div style="display:flex;flex-direction:column;gap:8px">'
+    + dims.map(function(d){
+        var sc = Math.round(dimScores[d]||0)
+        var ref = best ? Math.round(archVecs[best.arch.id][d]||0) : 0
+        var lbl = dimLabels[d] || d
+        return '<div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">'
+          + '<span style="color:var(--mid)">' + esc(lbl) + '</span>'
+          + '<span style="font-weight:700;color:var(--navy)">' + sc + ' <span style="color:var(--mid);font-weight:400">vs ref ' + ref + '</span></span>'
+          + '</div>'
+          + '<div style="position:relative;height:5px;background:var(--border);border-radius:3px">'
+          + '<div style="position:absolute;left:0;top:0;width:'+sc+'%;height:100%;background:var(--teal);border-radius:3px;opacity:.8"></div>'
+          + '<div style="position:absolute;left:0;top:0;width:'+ref+'%;height:100%;background:transparent;border-right:2px solid var(--navy)"></div>'
+          + '</div></div>'
+      }).join('')
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--mid);margin-top:8px">&#9646; Teal = Territory &nbsp; | &nbsp; Navy line = Archetype reference</div>'
+    + '</div>'
+
+  html += '</div>'
+
+  // All archetypes ranked
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">All archetype matches</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">'
+    + matches.map(function(m,i){
         var sc2 = Math.round(m.score*100)
         var isBest = i===0
-        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;background:' + (isBest?'rgba(0,40,112,0.06)':'var(--light)') + ';border:1.5px solid ' + (isBest?'var(--navy)':'transparent') + '">'
-          + '<span style="font-size:13px;width:22px">' + (icons[m.arch.id]||'') + '</span>'
-          + '<span style="flex:1;font-size:12px;font-weight:' + (isBest?700:400) + '">' + esc(m.arch.name||m.arch.id) + '</span>'
-          + '<div style="width:100px;height:4px;background:var(--border);border-radius:2px"><div style="width:' + sc2 + '%;height:100%;background:' + (isBest?'var(--navy)':'var(--teal)') + ';border-radius:2px"></div></div>'
-          + '<span style="font-size:11px;font-weight:600;color:' + (isBest?'var(--navy)':'var(--mid)') + ';width:32px;text-align:right">' + sc2 + '%</span>'
+        return '<div style="text-align:center;padding:10px 8px;border-radius:6px;background:'+(isBest?'rgba(0,40,112,.08)':'var(--light)')+';border:1.5px solid '+(isBest?'var(--navy)':'transparent')+'">'
+          + '<div style="font-size:20px;margin-bottom:4px">' + (icons[m.arch.id]||'') + '</div>'
+          + '<div style="font-size:11px;font-weight:' + (isBest?700:400) + ';color:var(--navy);margin-bottom:6px">' + esc(m.arch.name||m.arch.id) + '</div>'
+          + '<div style="height:4px;background:var(--border);border-radius:2px;margin-bottom:4px">'
+          + '<div style="width:'+sc2+'%;height:100%;background:'+(isBest?'var(--navy)':'var(--teal)')+';border-radius:2px"></div>'
+          + '</div>'
+          + '<div style="font-size:12px;font-weight:700;color:'+(isBest?'var(--navy)':'var(--mid)')+'">' + sc2 + '%</div>'
           + '</div>'
       }).join('')
     + '</div></div>'
-
-  // Actions
-  if (arch.actions || arch.challenges) {
-    var items = []
-    try { items = items.concat(JSON.parse(arch.actions||'[]')) } catch(e){}
-    try { items = items.concat(JSON.parse(arch.challenges||'[]')) } catch(e){}
-    if (items.length) {
-      html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">'
-        + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">Playbook for this archetype</div>'
-        + '<div style="display:flex;flex-direction:column;gap:7px">'
-        + items.map(function(item){
-            return '<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.4">'
-              + '<div style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:5px"></div>'
-              + esc(item) + '</div>'
-          }).join('')
-        + '</div></div>'
-    }
-  }
-
-  // Retake
-  html += '<button onclick="startProfilerInFM()" style="padding:7px 14px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8635; Retake</button>'
 
   html += '</div>'
 
   // Draw radar after render
   setTimeout(function(){
-    var ctx = document.getElementById('fm-profiler-radar')
-    if (!ctx || !dimNames.length) return
-    try {
-      new Chart(ctx, {
-        type:'radar',
-        data:{
-          labels: dimNames.map(function(d){ return d.length>10?d.substring(0,9)+'..':d }),
-          datasets:[
-            { label:'Your profile', data:dimNames.map(function(d){ return Math.round((profile[d]||0)*100) }),
-              fill:true, backgroundColor:'rgba(0,178,144,0.2)', borderColor:'#00B290', pointBackgroundColor:'#00B290' },
-            { label:esc(arch.name||arch.id), data:dimNames.map(function(d){
-                var row = PROFILE_STATE.archetype_dims.find(function(x){ return x.archetype_id===arch.id&&x.dimension===d })
-                return row ? Math.round(parseFloat(row.score||0)*100) : 0
-              }), fill:true, backgroundColor:'rgba(0,40,112,0.1)', borderColor:'#002870', pointBackgroundColor:'#002870', borderDash:[4,4] }
-          ]
-        },
-        options:{ responsive:true, scales:{ r:{ min:0,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:9}} } },
-          plugins:{ legend:{ position:'bottom', labels:{font:{size:10}} } } }
-      })
-    } catch(e){}
-  }, 80)
+    var ctx = document.getElementById('tp-radar-chart'); if (!ctx) return
+    if (TP.radarChart) { try{ TP.radarChart.destroy() }catch(e){} }
+    var labels  = dims.map(function(d){ return dimLabels[d]||d })
+    var userData = dims.map(function(d){ return Math.round(dimScores[d]||0) })
+    var archData = best ? dims.map(function(d){ return Math.round(archVecs[best.arch.id][d]||0) }) : []
+    TP.radarChart = new Chart(ctx, {
+      type:'radar',
+      data:{ labels:labels, datasets:[
+        { label:'Territory', data:userData, fill:true, backgroundColor:'rgba(0,178,144,.2)', borderColor:'#00B290', pointBackgroundColor:'#00B290' },
+        { label:best?esc(best.arch.name||best.arch.id):'Reference', data:archData, fill:true, backgroundColor:'rgba(0,40,112,.1)', borderColor:'#002870', pointBackgroundColor:'#002870', borderDash:[4,3] }
+      ]},
+      options:{ responsive:true, scales:{ r:{ min:0,max:100,ticks:{stepSize:25,font:{size:8}},pointLabels:{font:{size:9}} } },
+        plugins:{ legend:{ position:'bottom',labels:{font:{size:10}} } } }
+    })
+  }, 100)
+
+  // Save result to Supabase
+  setTimeout(tpSaveResult, 500)
 
   return html
 }
+
+//    Feasibility grid                                                           
+function tpFeasibilityGrid() {
+  var p = TP.s1
+  if (!p || !TP.objectives.length) return ''
+
+  // Situation signals (from Stage 1 data)
+  var e = p.hard_stats && p.hard_stats.energy  || {}
+  var w = p.hard_stats && p.hard_stats.water   || {}
+  var l = p.hard_stats && p.hard_stats.land    || {}
+  var k = p.hard_stats && p.hard_stats.workers || {}
+  var d = p.hard_stats && p.hard_stats.digital || {}
+
+  var signals = [
+    { label:'Power supply', val: e.status, enabler: 'surplus', risk: 'deficit' },
+    { label:'Power cost', val: e.tariff_index_pct<=85?'competitive':e.tariff_index_pct>=115?'expensive':'average', enabler:'competitive',risk:'expensive' },
+    { label:'Water stress', val: w.stress_index, enabler:'low', risk:'critical' },
+    { label:'DC cooling', val: w.dc_cooling, enabler:'high', risk:'low' },
+    { label:'Land availability', val: l.govt_land, enabler:'high', risk:'low' },
+    { label:'Skilled labour', val: k.skilled_labour, enabler:'abundant', risk:'scarce' },
+    { label:'Digital infra', val: d.internet_pct>=60?'strong':d.internet_pct>=35?'adequate':'weak', enabler:'strong',risk:'weak' },
+  ]
+
+  // Objective   signal relevance map (which signals matter for which objectives)
+  var relevanceMap = {
+    'Sovereign AI Centre of Excellence':         ['Power supply','Power cost','Water stress','DC cooling','Land availability','Skilled labour','Digital infra'],
+    'High-Performance Computing Hub':            ['Power supply','Power cost','Water stress','DC cooling','Land availability'],
+    'Edge AI & Rural Connectivity':              ['Digital infra','Power supply'],
+    'Agricultural Modernisation & Food Security':['Skilled labour','Digital infra','Water stress'],
+    'Industrial & Manufacturing AI':             ['Power supply','Power cost','Skilled labour'],
+    'e-Governance & Citizen Service Delivery':   ['Digital infra','Skilled labour'],
+    'Disaster & Emergency Management':           ['Digital infra','Power supply'],
+    'Water Resource Management':                 ['Water stress','Digital infra'],
+    'Healthcare AI & Telemedicine':              ['Digital infra','Skilled labour'],
+  }
+
+  function cellRag(signal, objName) {
+    var relMap = relevanceMap[objName]
+    if (!relMap || relMap.indexOf(signal.label) < 0) {
+      return { bg:'#f9f9f9', col:'var(--mid)', text:'' }  // not relevant
+    }
+    var v = signal.val
+    if (v === signal.enabler) return { bg:'#E1F5EE', col:'var(--teal)', text:'&#9679;' }
+    if (v === signal.risk)    return { bg:'#FEE2E2', col:'var(--orange)', text:'&#9675;' }
+    return { bg:'#FFF8E7', col:'var(--amber)', text:'&#9677;' }
+  }
+
+  var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;overflow-x:auto">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">Feasibility Matrix   Situation vs Objectives</div>'
+    + '<div style="font-size:10px;color:var(--mid);margin-bottom:8px">&#9679; Enabler &nbsp; &#9677; Neutral &nbsp; &#9675; Risk &nbsp; Grey = not directly relevant</div>'
+
+  // Header row
+  html += '<table style="width:100%;border-collapse:collapse;font-size:10px">'
+    + '<tr><th style="text-align:left;padding:5px 8px;background:var(--navy);color:#fff;border-radius:4px 0 0 0;min-width:120px">Situation Signal</th>'
+    + '<th style="text-align:center;padding:4px 6px;background:var(--navy);color:#fff;font-size:9px">Value</th>'
+    + TP.objectives.map(function(o){
+        return '<th style="text-align:center;padding:4px 6px;background:var(--navy);color:#fff;font-size:9px;max-width:80px">'
+          + esc(o.length>20?o.substring(0,18)+'..':o) + '</th>'
+      }).join('')
+    + '</tr>'
+
+  // Signal rows
+  signals.forEach(function(sig, ri){
+    html += '<tr style="background:'+(ri%2===0?'#fff':'var(--light)')+'">'
+      + '<td style="padding:6px 8px;font-size:11px;border-bottom:1px solid var(--border)">' + esc(sig.label) + '</td>'
+      + '<td style="text-align:center;padding:6px 4px;font-size:10px;font-weight:600;border-bottom:1px solid var(--border);color:'
+        + (sig.val===sig.enabler?'var(--teal)':sig.val===sig.risk?'var(--orange)':'var(--mid)') + '">'
+        + esc(String(sig.val||'N/A')) + '</td>'
+      + TP.objectives.map(function(obj){
+          var c = cellRag(sig, obj)
+          return '<td style="text-align:center;padding:6px;background:'+c.bg+';border-bottom:1px solid var(--border);font-size:14px;color:'+c.col+'">'+c.text+'</td>'
+        }).join('')
+      + '</tr>'
+  })
+
+  html += '</table></div>'
+  return html
+}
+
+//    Override handlers                                                          
+function tpRemovePoint(type, idx) {
+  TP.overrides[type][idx].removed = true
+  switchTab('profile')
+}
+
+function tpAddPoint(type) {
+  var text = prompt('Add observation:')
+  if (!text || !text.trim()) return
+  TP.overrides[type].push({ text: text.trim(), removed: false, confidence: 'medium', severity: 'moderate' })
+  switchTab('profile')
+}
+
+//    Save to Supabase                                                           
+async function tpSaveResult() {
+  if (!TP.s1 || !TP.s2) return
+  var slug = TP.territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
+  var row = {
+    id:             'TASS-' + Date.now(),
+    territory_id:   slug,
+    answers:        { objectives: TP.objectives, free_text: TP.freeText },
+    dim_scores:     TP.s2.dim_scores,
+    archetype_id:   (TP.archetypes.find(function(a,_,arr){ return arr.sort && arr[0] }) || {}).id || null,
+    created_at:     new Date().toISOString()
+  }
+  await sbInsert('territory_assessments', row)
+}
+
+//    Export stubs (will be built separately)                                    
+function tpExportWord() { alert('Word export coming soon') }
+function tpExportPPT()  { alert('PPT export coming soon') }
+
 
 function renderCostTab() {
   var capex   = calcCapex()
