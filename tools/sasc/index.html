@@ -138,24 +138,6 @@ input:focus,select:focus{border-color:var(--blue);}
 /* Toast */
 .toast{position:fixed;bottom:20px;right:20px;background:var(--dark);color:var(--white);padding:10px 16px;border-radius:var(--r);font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
 .toast.show{opacity:1;}
-
-/* ── ATLAS Standard Masthead ─────────────────────────────────────────────── */
-.atlas-hdr{background:var(--navy,#002870);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
-.atlas-hdr-left{display:flex;align-items:center;gap:12px;}
-.atlas-brand{font-size:16px;font-weight:900;color:#fff;letter-spacing:3px;white-space:nowrap;}
-.atlas-brand span{color:#FF5539;}
-.atlas-tool-name{font-size:12px;font-weight:600;color:rgba(255,255,255,0.75);padding:3px 8px;background:rgba(255,255,255,0.1);border-radius:4px;letter-spacing:.3px;}
-.atlas-eng-badge{font-size:11px;color:rgba(255,255,255,0.6);padding:3px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.atlas-eng-badge strong{color:#fff;}
-.atlas-hdr-right{display:flex;align-items:center;gap:8px;}
-.atlas-ver{font-size:10px;font-weight:700;color:#FF5539;padding:2px 7px;background:rgba(255,85,57,0.15);border-radius:10px;white-space:nowrap;}
-.atlas-nav-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;font-family:inherit;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
-.atlas-nav-btn:hover{background:rgba(255,255,255,0.1);color:#fff;border-color:rgba(255,255,255,0.4);}
-.atlas-nav-btn:disabled{opacity:0.35;cursor:not-allowed;pointer-events:none;}
-.atlas-nav-btn.orange{background:#FF5539;border-color:#FF5539;color:#fff;}
-.atlas-nav-btn.orange:hover{background:#e04530;}
-.atlas-nav-btn.teal{background:rgba(0,178,144,0.15);border-color:#00B290;color:#00B290;}
-.atlas-nav-btn.teal:hover{background:rgba(0,178,144,0.25);}
 </style>
 </head>
 <body>
@@ -164,7 +146,7 @@ input:focus,select:focus{border-color:var(--blue);}
   <div class="hdr-brand">ATL<span>A</span>S <span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.5);letter-spacing:1px;margin-left:8px">SASC</span></div>
   <div class="hdr-actions">
     <div class="hdr-eng" id="hdr-eng-label">No engagement loaded</div>
-    <button class="atlas-nav-btn" onclick="backToDocket()">&#8592; Docket</button>
+    <button class="btn btn-ghost btn-sm" onclick="backToDocket()">&#8592; Back to Docket</button>
   </div>
 </div>
 
@@ -218,60 +200,15 @@ function showToast(msg, duration) {
 
 // -- Currency formatting -------------------------------------------------------
 var SASC_CURRENCY = localStorage.getItem('sasc_currency') || 'USD'
-var FX_RATES = { USD: 1, INR: 95.76, EUR: 0.865, EUR_INR: 110.7, _source: 'config', _date: '' }
+var FX_RATES = { USD: 1, INR: 84.20, EUR: 0.93 }
 
 async function loadFxRates() {
-  try {
-    var ctrl = new AbortController()
-    var timeout = setTimeout(function(){ ctrl.abort() }, 4000)
-    var r = await fetch('https://api.frankfurter.app/latest?from=USD&to=INR,EUR', { signal: ctrl.signal })
-    clearTimeout(timeout)
-    if (r.ok) {
-      var data = await r.json()
-      if (data && data.rates) {
-        if (data.rates.INR) FX_RATES.INR = data.rates.INR
-        if (data.rates.EUR) FX_RATES.EUR = data.rates.EUR
-        if (FX_RATES.INR && FX_RATES.EUR) FX_RATES.EUR_INR = Math.round(FX_RATES.INR / FX_RATES.EUR * 100) / 100
-        FX_RATES._source = 'live'
-        FX_RATES._date = data.date || new Date().toISOString().slice(0,10)
-        saveFxRatesToConfig()
-        return
-      }
-    }
-  } catch(e) {}
   var rows = await sbFetch('fx_rates', 'from_currency=eq.USD&order=effective_date.desc', 20)
   if (rows && rows.length) {
-    rows.forEach(function(r) { FX_RATES[r.to_currency] = r.rate })
-    FX_RATES._source = 'supabase'
+    rows.forEach(function(r) {
+      FX_RATES[r.to_currency] = r.rate
+    })
   }
-}
-
-async function saveFxRatesToConfig() {
-  var sb = getSB(); if (!sb.url) return
-  var today = FX_RATES._date || new Date().toISOString().slice(0,10)
-  var patches = [
-    { key: 'fx_usd_inr', value: String(FX_RATES.INR) },
-    { key: 'fx_usd_eur', value: String(FX_RATES.EUR) },
-    { key: 'fx_eur_inr', value: String(FX_RATES.EUR_INR || '') },
-    { key: 'fx_updated_at', value: today }
-  ]
-  patches.forEach(function(p) {
-    fetch(sb.url + '/rest/v1/app_config?key=eq.' + p.key, {
-      method: 'PATCH',
-      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ value: p.value, updated_at: new Date().toISOString() })
-    }).catch(function(){})
-  })
-  var histRows = [
-    { currency_pair: 'USD_INR', rate: FX_RATES.INR, effective_date: today, source: 'frankfurter_api', notes: 'Auto-fetched' },
-    { currency_pair: 'USD_EUR', rate: FX_RATES.EUR, effective_date: today, source: 'frankfurter_api', notes: 'Auto-fetched' },
-    { currency_pair: 'EUR_INR', rate: FX_RATES.EUR_INR, effective_date: today, source: 'frankfurter_api', notes: 'Derived' }
-  ]
-  fetch(sb.url + '/rest/v1/exchange_rate_history', {
-    method: 'POST',
-    headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
-    body: JSON.stringify(histRows)
-  }).catch(function(){})
 }
 
 function fmtMoney(usdVal, currency) {
@@ -696,16 +633,11 @@ function renderROMSummary() {
       + '</div>'
   }
 
-  var fmUrl = ENGAGEMENT_ID ? '../tsap-financial-model/?eng=' + ENGAGEMENT_ID : '../tsap-financial-model/'
-  var fmBtn = ENGAGEMENT_ID
-    ? '<a href="' + fmUrl + '" class="btn btn-outline" style="border-color:var(--teal);color:var(--teal);text-decoration:none">&#128184; Financial Model &rarr;</a>'
-    : '<button class="btn btn-ghost" disabled style="opacity:0.4">&#128184; Financial Model</button>'
   html += '<div class="actions-bar">'
     + '<button class="btn btn-ghost" onclick="renderStep(3)">&larr; Back to stack</button>'
     + '<div style="display:flex;gap:8px">'
     + '<button class="btn btn-outline" onclick="exportBOM()">&#128196; Export CSV</button>'
     + '<button class="btn btn-primary" onclick="saveToDocket()">&#128190; Save to docket</button>'
-    + fmBtn
     + '</div></div>'
     + '</div>'
 
@@ -739,14 +671,12 @@ async function init() {
       document.getElementById('hdr-eng-label').innerHTML =
         '<strong>' + esc(SASC_DATA.customerName) + '</strong> &mdash; ' + esc(SASC_DATA.engName)
     }
-    // Load UCs from uc_library (status=active) + pre-select from docket
-    var libraryUCs = await sbFetch('uc_library', 'status=eq.active&order=cluster.asc,uc_name.asc', 200)
-    ALL_UCS = libraryUCs || []
+    // Load UC docket items
     if (SASC_DATA.docketId) {
-      var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_type=eq.use_case', 100)
-      var docketRefs = (docketUCItems || []).map(function(d) { return d.ref_id }).filter(Boolean)
-      if (!SASC_DATA.selectedUCs.length && docketRefs.length) {
-        SASC_DATA.selectedUCs = docketRefs
+      var docketItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_type=eq.uc', 50)
+      ALL_UCS = docketItems || []
+      if (!SASC_DATA.selectedUCs.length && ALL_UCS.length) {
+        SASC_DATA.selectedUCs = ALL_UCS.map(function(u) { return u.id })
       }
     }
   } else {
@@ -759,11 +689,6 @@ async function init() {
   // Adjust layers by scope on first load
   adjustLayersByScope(SASC_DATA.scope)
 
-  renderStep(1)
-}
-
-function setSASCUCFilter(cluster) {
-  SASC_DATA.ucClusterFilter = cluster
   renderStep(1)
 }
 
@@ -851,36 +776,18 @@ function renderScreen1() {
 
   var ucHtml = ''
   if (ALL_UCS.length) {
-    var allClusters = []
-    ALL_UCS.forEach(function(u) { if (u.cluster && allClusters.indexOf(u.cluster) < 0) allClusters.push(u.cluster) })
-    allClusters.sort()
-    var ucFilter = SASC_DATA.ucClusterFilter || 'all'
-    var visibleUCs = ucFilter === 'all' ? ALL_UCS : ALL_UCS.filter(function(u) { return u.cluster === ucFilter })
-    var selCount = s.selectedUCs.length
-    var ucFilterBtns = '<button onclick="setSASCUCFilter(\'all\')" style="padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:' + (ucFilter==='all'?700:500) + ';border:1px solid ' + (ucFilter==='all'?'var(--navy)':'var(--border)') + ';background:' + (ucFilter==='all'?'var(--navy)':'transparent') + ';color:' + (ucFilter==='all'?'#fff':'var(--mid)') + '">All (' + ALL_UCS.length + ')</button>'
-    ucFilterBtns += allClusters.map(function(c) {
-      var cnt = ALL_UCS.filter(function(u){ return u.cluster===c }).length
-      var on = ucFilter === c
-      return '<button onclick="setSASCUCFilter(\'' + c + '\')" style="padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:' + (on?700:500) + ';border:1px solid ' + (on?'var(--navy)':'var(--border)') + ';background:' + (on?'var(--navy)':'transparent') + ';color:' + (on?'#fff':'var(--mid)') + '">' + esc(c) + ' (' + cnt + ')</button>'
-    }).join('')
-    var ucCards = visibleUCs.map(function(u) {
-      var sel = s.selectedUCs.indexOf(u.id) >= 0
-      var cmap = {simple:'var(--teal)',medium:'var(--mid)',complex:'var(--orange)',research:'#8B5CF6'}
-      var cc = u.complexity ? (cmap[u.complexity] || 'var(--mid)') : ''
-      return '<div class="uc-pill ' + (sel ? 'selected' : 'unselected') + '" data-id="' + u.id + '" onclick="toggleUC(this.dataset.id)">'
-        + (sel ? '&#10003; ' : '') + esc(u.uc_name || 'UC')
-        + (u.complexity ? '<span style="font-size:9px;margin-left:4px;color:' + cc + '">' + u.complexity + '</span>' : '')
-        + '</div>'
-    }).join('')
-    ucHtml = '<div class="card">'
-      + '<div class="card-title">Use Cases <span style="font-size:11px;font-weight:400;color:var(--mid)">(' + selCount + ' of ' + ALL_UCS.length + ' selected)</span></div>'
-      + '<div class="card-sub" style="margin-bottom:8px">Select UCs for this configuration from the active UC Library.</div>'
-      + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">' + ucFilterBtns + '</div>'
-      + '<div class="uc-grid">' + ucCards + '</div>'
-      + '</div>'
+    ucHtml = '<div class="card"><div class="card-title">Use cases from docket</div>'
+      + '<div class="card-sub">Select which UCs to include in this configuration</div>'
+      + '<div class="uc-grid">'
+      + ALL_UCS.map(function(u) {
+          var sel = s.selectedUCs.indexOf(u.id) >= 0
+          return '<div class="uc-pill ' + (sel ? 'selected' : 'unselected') + '" data-id="' + u.id + '" onclick="toggleUC(this.dataset.idset.id)>'
+            + (sel ? '&#10003; ' : '') + esc(u.title || 'UC') + '</div>'
+        }).join('')
+      + '</div></div>'
   } else {
     ucHtml = '<div class="card" style="border-left:3px solid var(--amber)">'
-      + '<div class="card-sub">&#9888; No active UCs in UC Library. Approve UCs in Second Brain first.</div></div>'
+      + '<div class="card-sub">&#9888; No UC items in docket. Add UCs from the UC Library first, or continue without -- compute sizing will use defaults.</div></div>'
   }
 
   var scopeOpts = [
