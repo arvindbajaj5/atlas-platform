@@ -948,10 +948,11 @@ function tpRenderExtractionProgress() {
     programmes:'Programmes', geography:'Geography', opportunities:'AI Opportunities'
   }
   var rows = Object.keys(SECTION_LABELS).map(function(k) {
-    var st = sections[k] || 'pending'
+    var st  = sections[k] || 'pending'
     var dot = st==='done'?'&#9989;':st==='error'?'&#10060;':st==='loading'?'&#9680;':'&#9711;'
     var col = st==='done'?'var(--teal)':st==='error'?'var(--orange)':st==='loading'?'var(--navy)':'var(--mid)'
-    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
+    // id + data-label allows updateDot() to update in place without re-rendering
+    return '<div id="tp-sec-'+k+'" data-label="'+SECTION_LABELS[k]+'" style="display:flex;align-items:center;gap:8px;padding:4px 0">'
       + '<span style="font-size:14px">'+dot+'</span>'
       + '<span style="font-size:12px;color:'+col+'">'+SECTION_LABELS[k]+'</span>'
       + '</div>'
@@ -1160,11 +1161,10 @@ async function tpStartS1() {
   }
 
   // No cache   run search
-  TP.stage = 's1_loading'
-  switchTab('profile')
-
   var prompt = buildRawIntelPrompt(territory)
-  tpTimerStart(Math.round(prompt.length/4))
+  TP.stage = 's1_loading'
+  switchTab('profile')          // render loading screen first
+  tpTimerStart(Math.round(prompt.length/4))  // start timer AFTER DOM ready
 
   var result = await geminiCall(prompt, true, 4096)
   tpTimerStop()
@@ -1192,37 +1192,44 @@ async function tpStartS1() {
 }
 
 async function tpRunExtraction(territory, rawText, slug) {
-  // Show extraction progress screen
-  TP._extracting = {}
-  TP.stage = 's1_extracting'
-  switchTab('profile')
-  tpTimerStart(0)
-
-  // Run extraction batches, updating UI as each completes
   var SECTIONS = ['macro','energy','water','land','workers','digital','policy','programmes','geography','opportunities']
-  SECTIONS.forEach(function(s){ TP._extracting[s] = 'pending' })
-  switchTab('profile')
 
-  // Batch 1 (parallel)
+  // Initialise all sections as pending, show extraction screen ONCE
+  TP._extracting = {}
+  SECTIONS.forEach(function(s){ TP._extracting[s] = 'pending' })
+  TP.stage = 's1_extracting'
+  switchTab('profile')          // render the progress screen once
+  tpTimerStart(0)               // start timer AFTER DOM is ready
+
+  // Helper: update a single section's status dot in place (no full re-render)
+  function updateDot(sectionName, status) {
+    TP._extracting[sectionName] = status
+    var el = document.getElementById('tp-sec-'+sectionName)
+    if (!el) return
+    var dots = {'pending':'&#9711;','loading':'&#9680;','done':'&#9989;','error':'&#10060;'}
+    var cols = {'pending':'var(--mid)','loading':'var(--navy)','done':'var(--teal)','error':'var(--orange)'}
+    el.innerHTML = '<span style="font-size:14px">'+dots[status]+'</span>'
+      + '<span style="font-size:12px;color:'+cols[status]+'">'+el.dataset.label+'</span>'
+  }
+
+  // Batch 1   mark loading then run in parallel
   var BATCH1 = SECTIONS.slice(0,5)
-  BATCH1.forEach(function(s){ TP._extracting[s]='loading'; switchTab('profile') })
+  BATCH1.forEach(function(s){ updateDot(s,'loading') })
   var results1 = await Promise.all(BATCH1.map(function(s){
     return tpExtractOneSection(s, rawText, territory).then(function(r){
-      TP._extracting[s] = r.ok ? 'done' : 'error'
-      switchTab('profile')
+      updateDot(s, r.ok ? 'done' : 'error')
       return r
     })
   }))
 
-  await new Promise(function(res){ setTimeout(res,800) })
+  await new Promise(function(res){ setTimeout(res,500) })
 
-  // Batch 2 (parallel)
+  // Batch 2   mark loading then run in parallel
   var BATCH2 = SECTIONS.slice(5)
-  BATCH2.forEach(function(s){ TP._extracting[s]='loading'; switchTab('profile') })
+  BATCH2.forEach(function(s){ updateDot(s,'loading') })
   var results2 = await Promise.all(BATCH2.map(function(s){
     return tpExtractOneSection(s, rawText, territory).then(function(r){
-      TP._extracting[s] = r.ok ? 'done' : 'error'
-      switchTab('profile')
+      updateDot(s, r.ok ? 'done' : 'error')
       return r
     })
   }))
@@ -1231,11 +1238,8 @@ async function tpRunExtraction(territory, rawText, slug) {
 
   TP.s1    = buildS1FromSections(results1.concat(results2), territory)
   TP.stage = 's1_done'
-
-  // Cache the profile
   tpSaveProfile()
-
-  switchTab('profile')
+  switchTab('profile')   // final render of the dashboard
 }
 
 async function tpLoadCached(id) {
