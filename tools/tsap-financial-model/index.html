@@ -695,20 +695,22 @@ function repairJSON(str) {
   var s = str
     // Strip markdown fences
     .replace(/^```json\s*/,"").replace(/```\s*$/,"")
-    // Control chars and line breaks inside strings
+    // Control chars and whitespace
     .replace(/\r\n/g," ").replace(/\r/g," ").replace(/\n/g," ").replace(/\t/g," ")
     .replace(/[\x00-\x1F\x7F]/g," ")
-    // Fix true|false copied literally from schema
+    // Fix true|false and boolean literals copied from schema
     .replace(/": true\|false/g,'": false')
     .replace(/": "true\|false"/g,'": false')
-    // Fix Indian number format: 1,50,000 or 1,50,00,000
-    // Regex: digit followed by comma followed by 2-3 digits (Indian grouping)
-    .replace(/(\d),(\d{2,3})(,|\s|"|\})/g, function(m,a,b,c){ return a+b+c })
-    .replace(/(\d),(\d{2,3})(,|\s|"|\})/g, function(m,a,b,c){ return a+b+c })
+    .replace(/": boolean/g,'": false')
+    // Fix Indian number format: 2,05,000 or 1,50,00,000
+    .replace(/(\d),(\d{2,3})(?=,|\s|"|\})/g, function(m,a,b){ return a+b })
+    .replace(/(\d),(\d{2,3})(?=,|\s|"|\})/g, function(m,a,b){ return a+b })
+    // Add missing comma between closing } and next key (Gemini omits this)
+    .replace(/\}\s*"/g, '}, "')
+    // Add missing comma between value and next key when separated by spaces
+    .replace(/([\d"tfn])\s{2,}"/g, function(m,c){ return c+', "' })
     // Remove trailing commas before } or ]
     .replace(/,([\s]*[}\]])/g,"$1")
-    // Fix unquoted boolean values that arent real booleans
-    .replace(/": boolean/g,'": false')
   return s
 }
 
