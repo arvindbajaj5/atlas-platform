@@ -671,7 +671,7 @@ function getGeminiKey() {
 //    Model lists                                                                
 var TP_MODELS_FALLBACK = ['gemini-2.0-flash-lite', 'gemini-1.5-flash']
 var TP_MODELS          = ['gemini-2.5-flash'].concat(TP_MODELS_FALLBACK)
-var TP_SEARCH_MODELS   = ['gemini-2.0-flash', 'gemini-1.5-flash-latest']
+var TP_SEARCH_MODELS   = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
 var TP_INIT_DONE       = false
 var TP_TOKENS          = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
 var TP_TIMER           = { start:null, elapsed:0, interval:null }
@@ -776,10 +776,12 @@ async function geminiCall(prompt, useSearch, maxTokens) {
         console.log('[TP] geminiCall OK model='+models[i]+' tokens='+tokens)
         return { ok:true, text:text, tokens:tokens, model:models[i] }
       }
-      console.log('[TP] skip model='+models[i]+' status='+r.status)
-      if (r.status!==404&&r.status!==400) {
-        var ed = await r.json().catch(function(){ return {} })
-        return { ok:false, error:'API '+r.status+': '+(ed.error?ed.error.message:r.statusText) }
+      var ed2 = await r.json().catch(function(){ return {} })
+      var errMsg = ed2.error ? ed2.error.message : r.statusText
+      console.log('[TP] model='+models[i]+' status='+r.status+' err='+errMsg)
+      if (r.status!==404) {
+        // 404 = model not found, try next; any other error = return immediately
+        return { ok:false, error:'API '+r.status+': '+errMsg }
       }
     } catch(e) { return { ok:false, error:e.message } }
   }
