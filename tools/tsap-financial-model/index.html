@@ -132,7 +132,7 @@ async function sbInsert(table, data) {
   try {
     var r = await fetch(sb.url + '/rest/v1/' + table, {
       method:'POST',
-      headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},
+      headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},
       body:JSON.stringify(data)
     })
     return r.ok
@@ -1003,27 +1003,45 @@ function tpSkipSection(sectionName) {
 
 //    Save profile                                                               
 async function tpRefreshIntel() {
-  var territory = TP.territory || (document.getElementById('tp-territory-input') && document.getElementById('tp-territory-input').value.trim())
+  var territory = TP.territory
   if (!territory) return
   if (!confirm('Clear cached intelligence for '+territory+' and re-search? This will run a fresh Gemini search.')) return
   var slug = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
+  // Delete from Supabase
   var sb = getSB()
-  // Try to delete from Supabase (best effort)
   if (sb.url) {
     try {
       await fetch(sb.url+'/rest/v1/territory_profiles?id=eq.'+encodeURIComponent(slug),
         { method:'DELETE', headers:{ apikey:sb.key, Authorization:'Bearer '+sb.key,
           'Content-Type':'application/json', Prefer:'return=minimal' } })
+      console.log('[TP] Cache deleted for '+slug)
     } catch(e) { console.log('[TP] Delete failed:', e) }
   }
-  // Force fresh run   bypass cache entirely
-  TP.territory  = territory
-  TP.s1         = null
-  TP._rawIntel  = null
-  TP._forceRefresh = true   // flag to skip cache check in tpStartS1
-  TP.stage      = 'home'
-  TP_TOKENS     = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
-  await tpStartS1()
+  // Reset state
+  TP.s1 = null; TP._rawIntel = null
+  TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
+  // Go directly to search   bypass tpStartS1 entirely to avoid cache check
+  if (!TP.archetypes.length) await loadTPData()
+  await loadGeminiTextModel()
+  var prompt = buildRawIntelPrompt(territory)
+  TP.stage = 's1_loading'; switchTab('profile')
+  tpTimerStart(Math.round(prompt.length/4))
+  var result = await geminiCall(prompt, true, 4096)
+  tpTimerStop()
+  if (!result.ok) {
+    TP.stage = 'home'; switchTab('profile')
+    setTimeout(function(){ alert('Search failed: '+result.error) }, 100)
+    return
+  }
+  TP_TOKENS.s1_raw = result.tokens; TP._rawIntel = result.text
+  // Save fresh raw intel (overwrites old row)
+  await sbInsert('territory_profiles', {
+    id:slug, territory:territory, raw_intel:result.text,
+    raw_cached_at:new Date().toISOString(), profile:null,
+    generated_at:new Date().toISOString(),
+    expires_at:new Date(Date.now()+90*24*60*60*1000).toISOString()
+  })
+  await tpRunExtraction(territory, result.text, slug)
 }
 
 async function tpSaveProfile() {
