@@ -614,6 +614,7 @@ function switchTab(tab) {
     b.style.borderBottom = on ? '2px solid var(--orange)' : '2px solid transparent'
     b.style.color        = on ? 'var(--orange)' : 'var(--mid)'
   })
+  console.log('[TP] switchTab('+tab+') rendering, TP.stage='+TP.stage)
   document.getElementById('tab-content').innerHTML = renderTab(tab)
   initCharts(tab)
 }
@@ -730,12 +731,14 @@ var TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
 var TP_TIMER  = { start:null, elapsed:0, interval:null }
 
 function tpTimerStart(estimatedPromptTokens) {
+  console.log("[TP] tpTimerStart called, stage="+TP.stage)
   TP_TIMER.start = Date.now(); TP_TIMER.elapsed = 0
   TP_TIMER._estPrompt = estimatedPromptTokens || 0
   if (TP_TIMER.interval) clearInterval(TP_TIMER.interval)
   TP_TIMER.interval = setInterval(function() {
     TP_TIMER.elapsed = Math.floor((Date.now()-TP_TIMER.start)/1000)
     var tel = document.getElementById("tp-timer-display")
+    if (!tel) console.log("[TP] tp-timer-display NOT FOUND in DOM at t="+TP_TIMER.elapsed)
     if (tel) tel.textContent = (TP_TIMER.elapsed>=60?Math.floor(TP_TIMER.elapsed/60)+"m ":"")+(TP_TIMER.elapsed%60)+"s"
     var kel = document.getElementById("tp-token-live")
     if (kel) {
@@ -746,9 +749,12 @@ function tpTimerStart(estimatedPromptTokens) {
 }
 
 function tpTimerStop() {
+  console.log("[TP] tpTimerStop called, elapsed="+TP_TIMER.elapsed)
   if (TP_TIMER.interval) { clearInterval(TP_TIMER.interval); TP_TIMER.interval=null }
   return TP_TIMER.elapsed
 }
+
+
 
 function tpTokenDisplay() {
   var total = TP_TOKENS.s1_raw+TP_TOKENS.s1_extract+TP_TOKENS.s2_prompt+TP_TOKENS.s2_response
@@ -786,12 +792,15 @@ async function geminiCall(prompt, useSearch, maxTokens) {
         var parts = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts
         if (parts) parts.forEach(function(p){ if(p.text) text+=p.text })
         var tokens = (data.usageMetadata&&data.usageMetadata.totalTokenCount)||0
+        console.log('[TP] geminiCall OK model='+models[i]+' tokens='+tokens+' textLen='+text.length)
         return { ok:true, text:text, tokens:tokens, model:models[i] }
       }
       if (r.status!==404&&r.status!==400) {
         var ed = await r.json().catch(function(){ return {} })
+        console.log("[TP] geminiCall API error "+r.status+" model="+models[i])
         return { ok:false, error:"API "+r.status+": "+(ed.error?ed.error.message:r.statusText) }
       }
+      console.log("[TP] geminiCall skip model "+models[i]+" status="+r.status)
     } catch(e) { return { ok:false, error:e.message } }
   }
   return { ok:false, error:"All Gemini models unavailable" }
@@ -1168,9 +1177,12 @@ async function tpStartS1() {
 
   // No cache   run search
   var prompt = buildRawIntelPrompt(territory)
+  console.log('[TP] Starting search for: '+territory)
   TP.stage = 's1_loading'
   switchTab('profile')          // render loading screen first
+  console.log('[TP] Loading screen rendered, tp-timer-display exists: '+(!!document.getElementById('tp-timer-display')))
   tpTimerStart(Math.round(prompt.length/4))  // start timer AFTER DOM ready
+  console.log('[TP] Timer started, calling geminiCall...')
 
   var result = await geminiCall(prompt, true, 4096)
   tpTimerStop()
