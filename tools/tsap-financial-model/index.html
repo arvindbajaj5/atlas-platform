@@ -1292,6 +1292,45 @@ async function tpRunExtraction(territory,rawText,slug) {
 }
 
 
+// RAG threshold helpers
+
+
+
+
+
+
+
+
+
+
+
+
+var TP = {
+  stage: 'home',         // home | s1_loading | s1_done | s2_form | s2_loading | s3
+  territory: '',
+  s1: null,              // Stage 1 profile (from Supabase cache or fresh Gemini call)
+  s2: null,              // Stage 2 AI profile
+  objectives: [],        // selected objectives (max 5)
+  freeText: '',
+  overrides: {           // user edits to AI-generated points
+    working: [],         // array of {text, removed}
+    attention: []
+  },
+  archetypes: [],
+  archetype_dims: [],
+  radarChart: null
+}
+
+var OBJECTIVES = [
+  { group:'INFRASTRUCTURE & COMPUTE',  items:['Sovereign AI Centre of Excellence','High-Performance Computing Hub','Edge AI & Rural Connectivity'] },
+  { group:'ECONOMIC SECTORS',          items:['Agricultural Modernisation & Food Security','Industrial & Manufacturing AI','Tourism & Cultural Heritage','Energy Grid & Renewable Optimisation','MSME & Informal Economy AI'] },
+  { group:'CITIZEN SERVICES',          items:['e-Governance & Citizen Service Delivery','Revenue, Land Records & Cadastral','Transport & Logistics Optimisation','Urban Planning & Smart City','Housing & Urban Development'] },
+  { group:'SOCIAL SECTORS',            items:['Healthcare AI & Telemedicine','Education & Skill Development AI','Women & Child Development AI','Tribal & Remote Community Services'] },
+  { group:'ENVIRONMENT & SAFETY',      items:['Disaster & Emergency Management','Water Resource Management','Environmental Monitoring & Climate','Forest & Wildlife Management'] },
+  { group:'SECURITY & STRATEGIC',      items:['Defence & Border Security AI','Law Enforcement & Crime Analytics','Critical Infrastructure Protection'] }
+]
+
+
 function tpS1View() {
   var p = TP.s1; if (!p) return tpHome()
   var e = p.hard_stats && p.hard_stats.energy   || {}
