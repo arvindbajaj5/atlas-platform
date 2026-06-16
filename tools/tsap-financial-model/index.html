@@ -804,18 +804,33 @@ async function callS2(territory, s1data, objectives, freeText) {
 
 //    Stage 1a prompt                                                            
 function buildRawIntelPrompt(territory) {
-  return 'Research '+territory+', India for an AI deployment feasibility study. '
-    +'Use web search for CURRENT data. Write as plain factual paragraphs. No JSON. No bullets. Just facts.\n\n'
-    +'Cover: Economy (GSDP, growth, per capita, fiscal health). '
-    +'Power (installed MW, surplus/deficit, grid hours, tariff Rs/unit, renewables %, green index, carbon gCO2/kWh, stranded MW). '
-    +'Water (rainfall, rivers, stress, cooling feasibility). '
-    +'Land (area, topography, industrial parks, SEZs, govt land, cost per acre). '
-    +'Workforce (population, literacy, engineers/year, salary, migration). '
-    +'Digital (internet %, OFC km, NKN, smart cities, BharatNet, SWAN). '
-    +'Policy (named AI/digital policies, IT budget). '
-    +'Schemes (central and state schemes for AI). '
-    +'Geography (advantages and constraints). '
-    +'AI opportunities (Agriculture, Water, Health, Education, Governance, Transport, Defence etc).'
+  return 'Search for current 2023-2025 data about '+territory+', India for an AI and technology deployment study.\n'
+    +'Write factual prose paragraphs. No JSON, no bullet points, no headers.\n\n'
+    +'Research these 10 topics and include specific numbers where available:\n\n'
+    +'1. ECONOMY: Current GSDP in crores, GDP growth rate %, per capita income vs national average, fiscal surplus or deficit status.\n\n'
+    +'2. ENERGY: Total installed power capacity in MW, is the state power surplus or deficit, average grid hours per day, '
+    +'industrial electricity tariff in Rs per unit, percentage of renewable energy, hydropower MW, solar MW, wind MW, '
+    +'green energy index score, carbon intensity in grams CO2 per kWh, any stranded or curtailed renewable capacity MW.\n\n'
+    +'3. WATER: Annual rainfall in mm, names of major perennial rivers, groundwater stress level, '
+    +'industrial water cost per kilolitre, feasibility for data centre cooling.\n\n'
+    +'4. LAND: Total area in sq km, terrain type (plains hilly coastal mixed), number of industrial parks, '
+    +'SEZ count, government land availability, construction ease, average land cost per acre in lakhs.\n\n'
+    +'5. WORKFORCE: Population in lakhs, literacy percentage, urban population percentage, '
+    +'unemployment rate, engineering graduates per year, average engineer salary per annum in lakhs, migration trend.\n\n'
+    +'6. DIGITAL INFRASTRUCTURE: Internet penetration percentage, optical fibre cable km laid, '
+    +'National Knowledge Network presence yes or no, number of smart cities, BharatNet village coverage percentage, '
+    +'number of government data centres, SWAN operational or not.\n\n'
+    +'7. AI AND DIGITAL POLICY 2020-2025: Name specific AI strategy documents, digital mission budgets in crores, '
+    +'IT policy announcements, data centre policy, startup ecosystem initiatives announced by this state government '
+    +'specifically in 2020 2021 2022 2023 2024 or 2025. Include the year each policy was announced.\n\n'
+    +'8. ACTIVE CENTRAL AND STATE SCHEMES 2020-2025: Name specific schemes from IndiaAI Mission, Digital India, '
+    +'BharatNet, PM-WANI, state IT schemes, skill development schemes that are currently active and relevant to AI. '
+    +'Include how each scheme can specifically fund or enable AI deployment in this state.\n\n'
+    +'9. GEOGRAPHY AND NATURAL ASSETS: Key geographic advantages for technology industry, '
+    +'connectivity challenges, natural disaster risks, climate considerations for data centres.\n\n'
+    +'10. AI OPPORTUNITY DOMAINS: Which sectors are most relevant for AI in this territory and why - '
+    +'Agriculture, Water Management, Healthcare, Education, Tourism, Disaster Management, '
+    +'Governance, Transport, Energy, Industry, Defence, Environment.'
 }
 
 //    Section schemas                                                            
@@ -833,18 +848,52 @@ var SECTION_SCHEMAS = {
 }
 
 function buildSectionPrompt(name, rawText, territory) {
-  return 'Extract ONLY the '+name+' data from this research about '+territory+', India.\n'
-    +'Output ONLY valid JSON matching this schema. No explanation. No markdown. '
-    +'Use null for missing values. Strings in double quotes. Numbers as plain decimals.\n\n'
-    +'Schema: '+SECTION_SCHEMAS[name]+'\n\nResearch:\n'+rawText.substring(0,6000)
+  var extra = {
+    policy: 'Focus on AI, digital technology, IT, data governance, and smart infrastructure policies from 2020 onwards. Convert each policy name into what it enables for AI deployment.',
+    programmes: 'Focus on active central and state schemes for technology, digital infrastructure, or skilling from 2020 onwards. These must be DIFFERENT from the policy section. Convert each scheme into how it can fund or support an AI initiative.',
+    opportunities: 'Score each domain 0-100 for AI relevance based on the territory context. Include at least 5 domains.',
+    geography: 'Include at least 3 advantages and 2 constraints. known_issues must have at least 1 social and 1 economic issue.'
+  }
+  return 'You are extracting structured data about '+territory+', India for an AI strategy report.\n'
+    +'Task: Extract the '+name+' section data from the research text below.\n'
+    +'Output: ONLY a single valid JSON object. No preamble, no explanation, no markdown, no code fences.\n'
+    +'Rules:\n'
+    +'- Start your response with { and end with }\n'
+    +'- All string values must be in double quotes\n'
+    +'- All numbers must be plain decimals (no commas, no units)\n'
+    +'- Use null for any value not found in the text\n'
+    +'- Boolean values: use true or false without quotes\n'
+    +(extra[name] ? '- Additional: '+extra[name]+'\n' : '')
+    +'\nRequired JSON structure:\n'+SECTION_SCHEMAS[name]
+    +'\n\nResearch text about '+territory+':\n'+rawText.substring(0,5000)
 }
 
 //    Parse section response                                                     
 function parseSectionResponse(text) {
+  // Strategy 1: find largest {...} block and repair
   var fullMatch = text.match(/\{[\s\S]*\}/)
   if (fullMatch) {
     try { return { ok:true, data:JSON.parse(repairJSON(fullMatch[0])) } } catch(e) {}
+    // Strategy 2: try with more aggressive repair on the same match
+    try {
+      var s = fullMatch[0]
+        .replace(/\r?\n/g,' ').replace(/\t/g,' ')
+        .replace(/[\x00-\x1F\x7F]/g,' ')
+        .replace(/,([\s]*[}\]])/g,'$1')
+        .replace(/([{,]\s*)(\w+)\s*:/g,'$1"$2":')
+      return { ok:true, data:JSON.parse(s) }
+    } catch(e2) {}
   }
+  // Strategy 3: extract all {...} blocks, try each from largest to smallest
+  var blocks = [], re2 = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, m
+  while ((m = re2.exec(text)) !== null) blocks.push(m[0])
+  blocks.sort(function(a,b){ return b.length - a.length })
+  for (var i=0; i<blocks.length; i++) {
+    try { return { ok:true, data:JSON.parse(repairJSON(blocks[i])) } } catch(e) {}
+  }
+  // Strategy 4: if model returned plain text, wrap key facts into a minimal object
+  // by returning an empty object so the section shows N/A rather than failing
+  console.log('[TP] parseSectionResponse gave up on: '+text.substring(0,100))
   return { ok:false, error:'No valid JSON found' }
 }
 
@@ -1084,7 +1133,7 @@ function buildS2Prompt(territory, s1data, objectives, freeText) {
   return 'You are a senior AI strategy consultant. Based on the territory intelligence below,\n'
     + 'generate a strategic territory profile for ' + territory + ', India.\n\n'
     + 'TERRITORY INTELLIGENCE:\n' + JSON.stringify(condensed, null, 2) + '\n\n'
-    + 'CLIENT OBJECTIVES FOR AI IN THIS TERRITORY:\n'
+    + 'CLIENT OBJECTIVES FOR AI IN THIS TERRITORY ('+objectives.length+' objectives):\n'
     + objectives.map(function(o,i){ return (i+1)+'. '+o }).join('\n') + '\n\n'
     + (freeText ? 'ADDITIONAL CONTEXT FROM THE TEAM:\n' + freeText + '\n\n' : '')
     + 'Generate a profile as JSON. Be specific, cite the relevant metrics.\n'
@@ -1185,6 +1234,8 @@ function renderProfileTab() {
 }
 
 function tpLoading(msg) {
+  var s1total = TP_TOKENS.s1_raw + TP_TOKENS.s1_extract
+  var s1disp  = s1total ? '<span style="font-size:10px;color:var(--mid);margin-left:8px">Stage 1: '+s1total.toLocaleString("en-IN")+' tokens used</span>' : ''
   return '<div style="padding:32px 0">'
     + '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">'
     + '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
@@ -1196,6 +1247,7 @@ function tpLoading(msg) {
     + '<div style="width:1px;height:18px;background:var(--border)"></div>'
     + '<span style="font-size:11px;color:var(--mid)">Tokens (est.):</span>'
     + '<span id="tp-token-live" style="font-size:14px;font-weight:700;color:var(--teal);font-family:monospace">calculating...</span>'
+    + s1disp
     + '</div></div>'
 }
 
@@ -1488,7 +1540,7 @@ function tpS2Form() {
     + '<button onclick="TP.stage=\'s1_done\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Back to intelligence</button>'
     + '<div style="font-size:14px;font-weight:700;color:var(--navy)">' + esc(TP.territory) + '   Set Objectives</div>'
     + '<div style="font-size:11px;color:var(--mid)">Select up to 5 objectives</div>'
-    + '<span style="margin-left:auto;font-size:12px;font-weight:700;color:' + (sel.length>=5?'var(--orange)':'var(--teal)') + '">' + sel.length + '/5 selected</span>'
+    + '<span style="margin-left:auto;font-size:12px;font-weight:700;color:' + (sel.length>=5?'var(--orange)':'var(--teal)') + '">' + sel.length + ' selected</span>'
     + '</div>'
 
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
@@ -1500,7 +1552,7 @@ function tpS2Form() {
       + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);padding:6px 10px;background:var(--light);border-radius:4px;margin-bottom:6px">'+esc(group.group)+'</div>'
       + group.items.map(function(item) {
           var isSel = sel.indexOf(item) >= 0
-          var blocked = !isSel && sel.length >= 5
+          var blocked = false  // no cap on objectives
           return '<div onclick="tpToggleObj(\'' + item.replace(/'/g,"\\'") + '\')" '
             + 'style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;border:1.5px solid '
             + (isSel?'var(--navy)':blocked?'var(--border)':'var(--border)')
@@ -1559,8 +1611,7 @@ function tpToggleObj(name) {
   if (idx >= 0) {
     TP.objectives.splice(idx, 1)
   } else {
-    if (TP.objectives.length >= 5) return
-    TP.objectives.push(name)
+    TP.objectives.push(name)  // no cap   select as many as needed
   }
   switchTab('profile')
 }
