@@ -614,7 +614,6 @@ function switchTab(tab) {
     b.style.borderBottom = on ? '2px solid var(--orange)' : '2px solid transparent'
     b.style.color        = on ? 'var(--orange)' : 'var(--mid)'
   })
-  console.log('[TP] switchTab('+tab+') rendering, TP.stage='+TP.stage)
   document.getElementById('tab-content').innerHTML = renderTab(tab)
   initCharts(tab)
 }
@@ -664,22 +663,27 @@ function getGeminiKey() {
 // Try models in order, return first successful response
 // Primary model from Settings (app_config: gemini_text_model or atlas_global_cfg: geminiTextModel)
 // Fallback chain runs automatically if primary is unavailable
-var TP_MODELS_FALLBACK = ['gemini-2.0-flash-lite', 'gemini-1.5-flash']
-var TP_MODELS = ['gemini-2.5-flash'].concat(TP_MODELS_FALLBACK)  // for extraction, overridden on load
-// Search models: must support google_search grounding
-// gemini-2.0-flash reliably supports grounding; 2.5 may need different config
-var TP_SEARCH_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash-latest']
+//                                                                               
+// Territory Intelligence Profiler   Stage 1 Engine v3
+// Architecture: Search (prose)   Cache raw_intel   Extract 10 sections   Build profile
+//                                                                               
+
+//    Model lists                                                                
+var TP_MODELS_FALLBACK  = ['gemini-2.0-flash-lite', 'gemini-1.5-flash']
+var TP_MODELS           = ['gemini-2.5-flash'].concat(TP_MODELS_FALLBACK)
+var TP_SEARCH_MODELS    = ['gemini-2.0-flash', 'gemini-1.5-flash-latest']
+var TP_INIT_DONE        = false
+
+//    Gemini key                                                                 
 
 async function loadGeminiTextModel() {
-  // 1. Check localStorage first (set immediately by Settings page on change)
   try {
-    var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}')
+    var g = atlasGetGlobal()
     if (g.geminiTextModel) {
       TP_MODELS = [g.geminiTextModel].concat(TP_MODELS_FALLBACK.filter(function(m){ return m !== g.geminiTextModel }))
       return
     }
   } catch(e) {}
-  // 2. Fall back to app_config in Supabase
   var sb = getSB(); if (!sb.url) return
   try {
     var r = await fetch(sb.url+'/rest/v1/app_config?key=eq.gemini_text_model&limit=1', {
@@ -694,86 +698,73 @@ async function loadGeminiTextModel() {
   } catch(e) {}
 }
 
-//                                                                            
-// Territory Profiler   Resilient Stage 1 Engine v2
-// Architecture: Search   Cache raw text   Extract sections independently
-// Each section extracted separately, failures don't crash others
-//                                                                            
-
-//    JSON repair                                                             
+//    JSON repair                                                                
 function repairJSON(str) {
   var s = str
-    .replace(/^```json\s*/,"").replace(/```\s*$/,"")
-    .replace(/\r\n/g," ").replace(/\r/g," ").replace(/\n/g," ").replace(/\t/g," ")
-    .replace(/[\x00-\x1F\x7F]/g," ")
-    // Fix true|false literals copied from schema
+    .replace(/^```json\s*/,'').replace(/```\s*$/,'')
+    .replace(/\r\n/g,' ').replace(/\r/g,' ').replace(/\n/g,' ').replace(/\t/g,' ')
+    .replace(/[\x00-\x1F\x7F]/g,' ')
     .replace(/": true\|false/g,'": false')
     .replace(/": "true\|false"/g,'": false')
     .replace(/": boolean/g,'": false')
-    // Fix Indian number format: 2,57,000 (two passes)
     .replace(/(\d),(\d{2,3})(?=,|\s|"|\})/g, function(m,a,b){ return a+b })
     .replace(/(\d),(\d{2,3})(?=,|\s|"|\})/g, function(m,a,b){ return a+b })
-    // Quote unquoted string values (not true/false/null)
     .replace(/": ([a-zA-Z][a-zA-Z_-]*)([,\s\}])/g, function(m,w,t) {
-      return (w==="true"||w==="false"||w==="null") ? '": '+w+t : '": "'+w+'"'+t
+      return (w==='true'||w==='false'||w==='null') ? '": '+w+t : '": "'+w+'"'+t
     })
-    // Add missing comma between closing } and next key
     .replace(/\}\s*"/g, '}, "')
-    // Add missing comma between value and next key (spaces from stripped newlines)
     .replace(/([\d"tfn])\s{2,}"/g, function(m,c){ return c+', "' })
-    // Remove trailing commas
-    .replace(/,(\s*[}\]])/g,"$1")
+    .replace(/,(\s*[}\]])/g,'$1')
   return s
 }
 
-//    Timer + token state                                                     
+//    Timer + token state                                                        
 var TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
 var TP_TIMER  = { start:null, elapsed:0, interval:null }
 
 function tpTimerStart(estimatedPromptTokens) {
-  console.log("[TP] tpTimerStart called, stage="+TP.stage)
+  console.log('[TP] tpTimerStart, stage='+TP.stage)
   TP_TIMER.start = Date.now(); TP_TIMER.elapsed = 0
   TP_TIMER._estPrompt = estimatedPromptTokens || 0
   if (TP_TIMER.interval) clearInterval(TP_TIMER.interval)
   TP_TIMER.interval = setInterval(function() {
     TP_TIMER.elapsed = Math.floor((Date.now()-TP_TIMER.start)/1000)
-    var tel = document.getElementById("tp-timer-display")
-    if (!tel) console.log("[TP] tp-timer-display NOT FOUND in DOM at t="+TP_TIMER.elapsed)
-    if (tel) tel.textContent = (TP_TIMER.elapsed>=60?Math.floor(TP_TIMER.elapsed/60)+"m ":"")+(TP_TIMER.elapsed%60)+"s"
-    var kel = document.getElementById("tp-token-live")
+    var tel = document.getElementById('tp-timer-display')
+    if (!tel) { console.log('[TP] tp-timer-display NOT FOUND at t='+TP_TIMER.elapsed); return }
+    tel.textContent = (TP_TIMER.elapsed>=60?Math.floor(TP_TIMER.elapsed/60)+'m ':'')+
+      (TP_TIMER.elapsed%60)+'s'
+    var kel = document.getElementById('tp-token-live')
     if (kel) {
-      var estTotal = TP_TIMER._estPrompt + Math.min(TP_TIMER.elapsed*40, 4096)
-      kel.textContent = "~"+estTotal.toLocaleString("en-IN")+" tokens"
+      var est = TP_TIMER._estPrompt + Math.min(TP_TIMER.elapsed*40, 4096)
+      kel.textContent = '~'+est.toLocaleString('en-IN')+' tokens'
     }
   }, 1000)
 }
 
 function tpTimerStop() {
-  console.log("[TP] tpTimerStop called, elapsed="+TP_TIMER.elapsed)
+  console.log('[TP] tpTimerStop elapsed='+TP_TIMER.elapsed)
   if (TP_TIMER.interval) { clearInterval(TP_TIMER.interval); TP_TIMER.interval=null }
   return TP_TIMER.elapsed
 }
 
-
-
 function tpTokenDisplay() {
   var total = TP_TOKENS.s1_raw+TP_TOKENS.s1_extract+TP_TOKENS.s2_prompt+TP_TOKENS.s2_response
-  if (!total) return ""
+  if (!total) return ''
   var costRs = (total/1000000*0.075*84).toFixed(2)
   return '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;margin-bottom:10px;flex-wrap:wrap">'
     + '<span style="font-size:10px;color:var(--mid)">Actual tokens:</span>'
-    + (TP_TOKENS.s1_raw?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Search: '+TP_TOKENS.s1_raw.toLocaleString("en-IN")+"</span>":"")
-    + (TP_TOKENS.s1_extract?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Extract: '+TP_TOKENS.s1_extract.toLocaleString("en-IN")+"</span>":"")
-    + (TP_TOKENS.s2_prompt?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Profile: '+(TP_TOKENS.s2_prompt+TP_TOKENS.s2_response).toLocaleString("en-IN")+"</span>":"")
-    + '<span style="font-size:11px;font-weight:700;color:var(--teal)">Total: '+total.toLocaleString("en-IN")+"</span>"
-    + '<span style="font-size:11px;color:var(--mid)">~Rs '+costRs+"</span>"
+    + (TP_TOKENS.s1_raw?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Search: '+TP_TOKENS.s1_raw.toLocaleString('en-IN')+'</span>':'')
+    + (TP_TOKENS.s1_extract?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Extract: '+TP_TOKENS.s1_extract.toLocaleString('en-IN')+'</span>':'')
+    + (TP_TOKENS.s2_prompt?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Profile: '+(TP_TOKENS.s2_prompt+TP_TOKENS.s2_response).toLocaleString('en-IN')+'</span>':'')
+    + '<span style="font-size:11px;font-weight:700;color:var(--teal)">Total: '+total.toLocaleString('en-IN')+'</span>'
+    + '<span style="font-size:11px;color:var(--mid)">~Rs '+costRs+'</span>'
     + '</div>'
 }
 
-//    Gemini call helper                                                      
+//    Core Gemini call                                                           
 async function geminiCall(prompt, useSearch, maxTokens) {
   var key = getGeminiKey()
-  if (!key) return { ok:false, error:"No Gemini API key in Settings" }
+  if (!key) return { ok:false, error:'No Gemini API key in Settings' }
   var models = useSearch ? TP_SEARCH_MODELS : TP_MODELS
   for (var i=0; i<models.length; i++) {
     try {
@@ -783,354 +774,248 @@ async function geminiCall(prompt, useSearch, maxTokens) {
       }
       if (useSearch) body.tools = [{ google_search:{} }]
       var r = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/"+models[i]+":generateContent?key="+key,
-        { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }
+        'https://generativelanguage.googleapis.com/v1beta/models/'+models[i]+':generateContent?key='+key,
+        { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }
       )
       if (r.ok) {
         var data = await r.json()
-        var text = ""
+        var text = ''
         var parts = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts
         if (parts) parts.forEach(function(p){ if(p.text) text+=p.text })
         var tokens = (data.usageMetadata&&data.usageMetadata.totalTokenCount)||0
-        console.log('[TP] geminiCall OK model='+models[i]+' tokens='+tokens+' textLen='+text.length)
+        console.log('[TP] geminiCall OK model='+models[i]+' tokens='+tokens)
         return { ok:true, text:text, tokens:tokens, model:models[i] }
       }
+      console.log('[TP] geminiCall skip model='+models[i]+' status='+r.status)
       if (r.status!==404&&r.status!==400) {
         var ed = await r.json().catch(function(){ return {} })
-        console.log("[TP] geminiCall API error "+r.status+" model="+models[i])
-        return { ok:false, error:"API "+r.status+": "+(ed.error?ed.error.message:r.statusText) }
+        return { ok:false, error:'API '+r.status+': '+(ed.error?ed.error.message:r.statusText) }
       }
-      console.log("[TP] geminiCall skip model "+models[i]+" status="+r.status)
     } catch(e) { return { ok:false, error:e.message } }
   }
-  return { ok:false, error:"All Gemini models unavailable" }
+  return { ok:false, error:'All Gemini models unavailable' }
 }
 
-//    Stage 1a: Raw intelligence search                                      
+//    Stage 1a: Raw intelligence prompt                                         
 function buildRawIntelPrompt(territory) {
   return 'Research '+territory+', India for an AI deployment feasibility study.\n'
-    + 'Use web search to find CURRENT data on the following topics.\n'
-    + 'Write as plain factual paragraphs. No JSON. No bullet points. No formatting.\n'
-    + 'Just accurate facts and numbers in prose.\n\n'
-    + 'Topics to research:\n'
-    + '1. Economy: GSDP in crores, growth rate, per capita income vs national average, fiscal health (surplus/deficit)\n'
-    + '2. Power/Energy: Installed capacity MW, power surplus or deficit, grid reliability hours/day, '
-    +    'industrial tariff Rs/unit vs national average ~Rs7.5/unit, renewable percentage especially hydel and solar, '
-    +    'green energy index, carbon intensity gCO2/kWh, stranded renewable capacity MW\n'
-    + '3. Water: Annual rainfall mm, major perennial rivers, groundwater stress level, '
-    +    'industrial water cost per kilolitre, feasibility for data centre cooling\n'
-    + '4. Land: Total area sqkm, topography (plains/hilly/coastal), number of industrial parks and SEZs, '
-    +    'government land availability, construction ease, land cost per acre in lakhs\n'
-    + '5. Workforce: Population in lakhs, literacy percentage, urban percentage, unemployment rate, '
-    +    'engineering graduates per year, average engineer salary lakhs per annum, migration trend (in/out/balanced)\n'
-    + '6. Digital infrastructure: Internet penetration percentage, optical fibre cable km, '
-    +    'NKN presence yes/no, number of smart cities, BharatNet village coverage percentage, '
-    +    'government data centres count, SWAN status\n'
-    + '7. Policy and governance: Named AI and digital policies announced, IT budget in crores, '
-    +    'central scheme eligibility (DONER, NE Fund, Special Category etc), e-governance maturity, '
-    +    'political stability, key government departments that would use AI\n'
-    + '8. Active programmes and schemes: Central and state schemes active that could fund or support AI initiatives\n'
-    + '9. Geography: Key natural advantages for AI/tech industry, key geographic constraints or challenges\n'
-    + '10. AI opportunity areas: Which domains (Agriculture, Water, Emergency, Health, Education, Urban, '
-    +    'Transport, Governance, Tourism, Industry, Defence) are most relevant and why\n'
-    + '\nBe specific with numbers. Mention sources where possible. Aim for comprehensive coverage.'
+    + 'Use web search for CURRENT data. Write as plain factual paragraphs only.\n'
+    + 'No JSON, no bullet points, no headers. Just accurate facts and numbers.\n\n'
+    + 'Cover these 10 topics:\n'
+    + '1. Economy: GSDP crores, growth rate, per capita vs national avg, fiscal health\n'
+    + '2. Power/Energy: installed MW, surplus/deficit, grid hours/day, industrial tariff Rs/unit, '
+    + 'renewable %, green energy index 0-100, carbon gCO2/kWh, stranded renewable MW\n'
+    + '3. Water: rainfall mm, rivers, groundwater stress, industrial water cost/kL, DC cooling feasibility\n'
+    + '4. Land: area sqkm, topography, industrial parks count, SEZs, govt land ease, cost per acre lakhs\n'
+    + '5. Workforce: population lakhs, literacy %, urban %, unemployment %, engineers/year, avg salary, migration\n'
+    + '6. Digital: internet %, OFC km, NKN yes/no, smart cities, BharatNet %, govt DCs, SWAN status\n'
+    + '7. Policy: named AI/digital policies, IT budget crores, central scheme eligibility, e-gov maturity\n'
+    + '8. Schemes: active central and state schemes that could fund AI initiatives\n'
+    + '9. Geography: advantages and constraints for AI/tech industry\n'
+    + '10. AI opportunities: which domains (Agriculture, Water, Emergency, Health, Education, Urban, '
+    + 'Transport, Governance, Tourism, Industry, Defence) are most relevant and why\n\n'
+    + 'Be specific with numbers. Aim for comprehensive coverage.'
 }
 
-//    Section extraction prompts                                              
+//    Section schemas                                                            
 var SECTION_SCHEMAS = {
-  macro: '{"gsdp_cr":number,"gsdp_growth_pct":number,"per_capita_inr":number,"vs_national_pct":number,"fiscal_health":"surplus or balanced or deficit"}',
-  energy: '{"installed_mw":number,"status":"surplus or balanced or deficit","grid_hrs":number,"renewable_pct":number,"industrial_tariff":number,"tariff_index_pct":number,"dc_feasibility":"high or medium or low","green_energy_index":number,"carbon_intensity_gco2":number,"vs_national_carbon_pct":number,"hydel_mw":number,"solar_mw":number,"wind_mw":number,"green_24x7_feasibility":"high or medium or low","stranded_renewable_mw":number,"green_corridor":true or false}',
-  water: '{"rainfall_mm":number,"stress_index":"low or medium or high or critical","perennial_rivers":["name1","name2"],"dc_cooling":"high or medium or low","industrial_cost_per_kl":number,"water_cost_index_pct":number}',
-  land: '{"area_sqkm":number,"topography":"plains or hilly or coastal or mixed","industrial_parks":number,"sez_count":number,"govt_land":"high or medium or low","construction_ease":"easy or moderate or challenging","cost_per_acre_lakh":number,"land_cost_index_pct":number}',
-  workers: '{"population_lakh":number,"literacy_pct":number,"urban_pct":number,"unemployment_pct":number,"graduates_per_lakh":number,"engineers_per_year":number,"migration":"net_in or net_out or balanced","avg_engineer_salary_lakh":number,"salary_index_pct":number,"skilled_labour":"abundant or adequate or scarce"}',
-  digital: '{"internet_pct":number,"ofc_km":number,"nkn":true or false,"smart_cities":number,"bharatnet_pct":number,"govt_dcs":number,"swan":"operational or partial or planned"}',
-  policy: '{"raw":["policy name 1","policy name 2"],"useable":[{"point":"what this enables for AI deployment","source":"policy name","impact":"high or medium or low"}]}',
-  programmes: '{"raw":["scheme name 1","scheme name 2"],"useable":[{"point":"how to leverage for AI","source":"scheme name","type":"funding or infrastructure or mandate or capacity"}]}',
-  geography: '{"advantages":["advantage 1","advantage 2"],"constraints":["constraint 1"],"known_issues":{"social":["issue 1"],"economic":["issue 1"]}}',
-  opportunities: '{"ai_opportunities":[{"domain":"Agriculture","relevance":"high or medium or low","score":0,"rationale":"2 sentences","example_ucs":["uc1","uc2"]}],"headline":"one sentence on the AI opportunity"}'
+  macro:        '{"gsdp_cr":number,"gsdp_growth_pct":number,"per_capita_inr":number,"vs_national_pct":number,"fiscal_health":"surplus or balanced or deficit"}',
+  energy:       '{"installed_mw":number,"status":"surplus or balanced or deficit","grid_hrs":number,"renewable_pct":number,"industrial_tariff":number,"tariff_index_pct":number,"dc_feasibility":"high or medium or low","green_energy_index":number,"carbon_intensity_gco2":number,"vs_national_carbon_pct":number,"hydel_mw":number,"solar_mw":number,"wind_mw":number,"green_24x7_feasibility":"high or medium or low","stranded_renewable_mw":number,"green_corridor":false}',
+  water:        '{"rainfall_mm":number,"stress_index":"low or medium or high or critical","perennial_rivers":["name"],"dc_cooling":"high or medium or low","industrial_cost_per_kl":number,"water_cost_index_pct":number}',
+  land:         '{"area_sqkm":number,"topography":"plains or hilly or coastal or mixed","industrial_parks":number,"sez_count":number,"govt_land":"high or medium or low","construction_ease":"easy or moderate or challenging","cost_per_acre_lakh":number,"land_cost_index_pct":number}',
+  workers:      '{"population_lakh":number,"literacy_pct":number,"urban_pct":number,"unemployment_pct":number,"graduates_per_lakh":number,"engineers_per_year":number,"migration":"net_in or net_out or balanced","avg_engineer_salary_lakh":number,"salary_index_pct":number,"skilled_labour":"abundant or adequate or scarce"}',
+  digital:      '{"internet_pct":number,"ofc_km":number,"nkn":false,"smart_cities":number,"bharatnet_pct":number,"govt_dcs":number,"swan":"operational or partial or planned"}',
+  policy:       '{"raw":["policy name"],"useable":[{"point":"what this enables for AI","source":"policy name","impact":"high or medium or low"}]}',
+  programmes:   '{"raw":["scheme name"],"useable":[{"point":"how to leverage for AI","source":"scheme name","type":"funding or infrastructure or mandate or capacity"}]}',
+  geography:    '{"advantages":["text"],"constraints":["text"],"known_issues":{"social":["text"],"economic":["text"]}}',
+  opportunities:'{"ai_opportunities":[{"domain":"Agriculture","relevance":"high or medium or low","score":0,"rationale":"2 sentences","example_ucs":["uc1"]}],"headline":"one sentence"}'
 }
 
-function buildSectionPrompt(sectionName, rawText, territory) {
-  var schema = SECTION_SCHEMAS[sectionName]
-  return 'From the research text below about '+territory+', extract ONLY the '+sectionName+' data.\n'
-    + 'Output ONLY valid JSON matching this exact schema. No explanation. No markdown.\n'
-    + 'Rules: All string values must be in double quotes. Numbers must be plain decimals (no commas). '
-    + 'Use null for any value not found in the text. For boolean fields use true or false without quotes.\n\n'
-    + 'Schema:\n'+schema+'\n\n'
-    + 'Research text:\n'+rawText.substring(0, 6000)
+function buildSectionPrompt(name, rawText, territory) {
+  return 'Extract ONLY the '+name+' data from this research about '+territory+', India.\n'
+    + 'Output ONLY valid JSON. No explanation. No markdown.\n'
+    + 'Rules: strings in double quotes, numbers as plain decimals no commas, '
+    + 'null for missing values, booleans as true or false.\n\n'
+    + 'Schema: '+SECTION_SCHEMAS[name]+'\n\n'
+    + 'Research:\n'+rawText.substring(0,6000)
 }
 
-//    Parse a section response                                                
+//    Parse section response                                                     
 function parseSectionResponse(text) {
-  // Try all JSON blocks in the response, take the last valid one
-  var blocks = []
-  var re = /\{[\s\S]*?\}/g
-  var m
-  while ((m = re.exec(text)) !== null) blocks.push(m[0])
-  // Also try the whole text as one block
   var fullMatch = text.match(/\{[\s\S]*\}/)
-  if (fullMatch) blocks.push(fullMatch[0])
-
-  // Try each block from last to first (last is usually best)
-  for (var i = blocks.length-1; i >= 0; i--) {
-    try {
-      var repaired = repairJSON(blocks[i])
-      var data = JSON.parse(repaired)
-      return { ok:true, data:data }
-    } catch(e) { continue }
+  if (fullMatch) {
+    try { return { ok:true, data:JSON.parse(repairJSON(fullMatch[0])) } } catch(e) {}
   }
-  return { ok:false, error:"No valid JSON found in response" }
+  var blocks = []
+  var re = /\{[^{}]*\}/g
+  var m
+  while ((m=re.exec(text))!==null) blocks.push(m[0])
+  for (var i=blocks.length-1;i>=0;i--) {
+    try { return { ok:true, data:JSON.parse(repairJSON(blocks[i])) } } catch(e) {}
+  }
+  return { ok:false, error:'No valid JSON found' }
 }
 
-//    Extract one section                                                     
+//    Extract one section                                                        
 async function tpExtractOneSection(sectionName, rawText, territory) {
   var prompt = buildSectionPrompt(sectionName, rawText, territory)
   var result = await geminiCall(prompt, false, 1024)
-  if (!result.ok) return { ok:false, section:sectionName, error:result.error, raw:rawText }
+  if (!result.ok) return { ok:false, section:sectionName, error:result.error }
   TP_TOKENS.s1_extract += result.tokens
   var parsed = parseSectionResponse(result.text)
-  if (!parsed.ok) return { ok:false, section:sectionName, error:parsed.error, raw_response:result.text }
+  if (!parsed.ok) {
+    // Log near-text for diagnosis
+    var near = result.text.replace(/\n/g,' ').substring(0,200)
+    console.log('[TP] '+sectionName+' parse fail. Response start: '+near)
+    return { ok:false, section:sectionName, error:parsed.error, raw_response:result.text }
+  }
   return { ok:true, section:sectionName, data:parsed.data }
 }
 
-//    Stage 1b: Extract all sections from raw text                           
-// Runs sections in two parallel batches to avoid rate limits
-async function tpExtractSections(rawText, territory) {
-  var SECTIONS = ['macro','energy','water','land','workers','digital','policy','programmes','geography','opportunities']
-  var BATCH1 = SECTIONS.slice(0,5)
-  var BATCH2 = SECTIONS.slice(5)
-
-  // Batch 1
-  var results1 = await Promise.all(BATCH1.map(function(s) {
-    return tpExtractOneSection(s, rawText, territory)
-  }))
-
-  // Small delay between batches to avoid rate limiting
-  await new Promise(function(res){ setTimeout(res, 1000) })
-
-  // Batch 2
-  var results2 = await Promise.all(BATCH2.map(function(s) {
-    return tpExtractOneSection(s, rawText, territory)
-  }))
-
-  return results1.concat(results2)
-}
-
-//    Build TP.s1 from section results                                       
+//    Build TP.s1 from section results                                          
 function buildS1FromSections(results, territory) {
-  var sections = {}
-  var failed   = {}
-
-  results.forEach(function(r) {
-    if (r.ok) sections[r.section] = r.data
-    else      failed[r.section]   = { error:r.error, raw_response:r.raw_response||'' }
-  })
-
-  // Build the TP.s1 structure that tpS1View and buildS2Prompt expect
-  var m  = sections.macro       || {}
-  var e  = sections.energy      || {}
-  var w  = sections.water       || {}
-  var l  = sections.land        || {}
-  var k  = sections.workers     || {}
-  var d  = sections.digital     || {}
-  var po = sections.policy      || {}
-  var pr = sections.programmes  || {}
-  var ge = sections.geography   || {}
-  var op = sections.opportunities || {}
-
+  var sections={}, failed={}
+  results.forEach(function(r){ if(r.ok) sections[r.section]=r.data; else failed[r.section]={error:r.error,raw_response:r.raw_response||''} })
+  var m=sections.macro||{}, e=sections.energy||{}, w=sections.water||{}
+  var l=sections.land||{}, k=sections.workers||{}, d=sections.digital||{}
+  var po=sections.policy||{}, pr=sections.programmes||{}, ge=sections.geography||{}
+  var op=sections.opportunities||{}
   return {
-    territory:   territory,
-    headline:    op.headline || null,
-    hard_stats:  { macro:m, energy:e, water:w, land:l, workers:k, digital:d },
-    policy:      po,
-    programmes:  pr,
-    geography:   ge,
-    ai_opportunities: op.ai_opportunities || [],
-    _sections:   sections,
-    _failed:     failed,
-    _complete:   Object.keys(failed).length === 0
+    territory:territory, headline:op.headline||null,
+    hard_stats:{ macro:m, energy:e, water:w, land:l, workers:k, digital:d },
+    policy:po, programmes:pr, geography:ge,
+    ai_opportunities:op.ai_opportunities||[],
+    _sections:sections, _failed:failed, _complete:Object.keys(failed).length===0
   }
 }
 
-//    Progressive render during extraction                                   
+//    Extraction progress display                                                
 function tpRenderExtractionProgress() {
   var sections = TP._extracting || {}
-  var SECTION_LABELS = {
-    macro:'Macroeconomics', energy:'Energy', water:'Water', land:'Land',
+  var LABELS = { macro:'Macroeconomics', energy:'Energy', water:'Water', land:'Land',
     workers:'Workforce', digital:'Digital', policy:'Policy',
-    programmes:'Programmes', geography:'Geography', opportunities:'AI Opportunities'
-  }
-  var rows = Object.keys(SECTION_LABELS).map(function(k) {
-    var st  = sections[k] || 'pending'
-    var dot = st==='done'?'&#9989;':st==='error'?'&#10060;':st==='loading'?'&#9680;':'&#9711;'
-    var col = st==='done'?'var(--teal)':st==='error'?'var(--orange)':st==='loading'?'var(--navy)':'var(--mid)'
-    // id + data-label allows updateDot() to update in place without re-rendering
-    return '<div id="tp-sec-'+k+'" data-label="'+SECTION_LABELS[k]+'" style="display:flex;align-items:center;gap:8px;padding:4px 0">'
-      + '<span style="font-size:14px">'+dot+'</span>'
-      + '<span style="font-size:12px;color:'+col+'">'+SECTION_LABELS[k]+'</span>'
-      + '</div>'
+    programmes:'Programmes', geography:'Geography', opportunities:'AI Opportunities' }
+  var rows = Object.keys(LABELS).map(function(k) {
+    var st=sections[k]||'pending'
+    var dot=st==='done'?'&#9989;':st==='error'?'&#10060;':st==='loading'?'&#9680;':'&#9711;'
+    var col=st==='done'?'var(--teal)':st==='error'?'var(--orange)':st==='loading'?'var(--navy)':'var(--mid)'
+    return '<div id="tp-sec-'+k+'" data-label="'+LABELS[k]+'" style="display:flex;align-items:center;gap:8px;padding:4px 0">'
+      +'<span style="font-size:14px">'+dot+'</span>'
+      +'<span style="font-size:12px;color:'+col+'">'+LABELS[k]+'</span></div>'
   }).join('')
-
   return '<div style="padding:24px 0">'
-    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:6px">Extracting territory intelligence...</div>'
-    + '<div style="font-size:11px;color:var(--mid);margin-bottom:16px">'+esc(TP.territory)+'</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-bottom:16px">'
-    + rows + '</div>'
-    + '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;width:fit-content">'
-    + '<span style="font-size:11px;color:var(--mid)">Elapsed:</span>'
-    + '<span id="tp-timer-display" style="font-size:14px;font-weight:700;color:var(--navy);font-family:monospace;min-width:36px">0s</span>'
-    + '<div style="width:1px;height:20px;background:var(--border)"></div>'
-    + '<span style="font-size:11px;color:var(--mid)">Tokens (est.):</span>'
-    + '<span id="tp-token-live" style="font-size:14px;font-weight:700;color:var(--teal);font-family:monospace">calculating...</span>'
-    + '</div></div>'
+    +'<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px">Extracting territory intelligence...</div>'
+    +'<div style="font-size:11px;color:var(--mid);margin-bottom:14px">'+esc(TP.territory)+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-bottom:14px">'+rows+'</div>'
+    +'<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;width:fit-content">'
+    +'<span style="font-size:11px;color:var(--mid)">Elapsed:</span>'
+    +'<span id="tp-timer-display" style="font-size:14px;font-weight:700;color:var(--navy);font-family:monospace;min-width:36px">0s</span>'
+    +'<div style="width:1px;height:18px;background:var(--border)"></div>'
+    +'<span style="font-size:11px;color:var(--mid)">Tokens (est.):</span>'
+    +'<span id="tp-token-live" style="font-size:14px;font-weight:700;color:var(--teal);font-family:monospace">calculating...</span>'
+    +'</div></div>'
 }
 
-//    Loading state (for search phase)                                      
-function tpLoading(msg) {
-  return '<div style="padding:32px 0">'
-    + '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">'
-    + '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
-    + '<div style="font-size:14px;color:var(--mid)">' + msg + '</div>'
-    + '</div>'
-    + '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;width:fit-content">'
-    + '<span style="font-size:11px;color:var(--mid)">Elapsed:</span>'
-    + '<span id="tp-timer-display" style="font-size:14px;font-weight:700;color:var(--navy);font-family:monospace;min-width:36px">0s</span>'
-    + '<div style="width:1px;height:20px;background:var(--border)"></div>'
-    + '<span style="font-size:11px;color:var(--mid)">Tokens (est.):</span>'
-    + '<span id="tp-token-live" style="font-size:14px;font-weight:700;color:var(--teal);font-family:monospace">calculating...</span>'
-    + '</div></div>'
-}
-
-//    Failed sections repair UI                                               
+//    Failed sections banner                                                     
 function tpRenderFailedSections(failed) {
-  if (!failed || !Object.keys(failed).length) return ''
-  var SECTION_LABELS = {
-    macro:'Macroeconomics', energy:'Energy', water:'Water', land:'Land',
-    workers:'Workforce', digital:'Digital', policy:'Policy',
-    programmes:'Programmes', geography:'Geography', opportunities:'AI Opportunities'
-  }
-  var html = '<div style="background:#FEF3C7;border:1px solid var(--amber);border-radius:8px;padding:14px 18px;margin-bottom:14px">'
-    + '<div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:10px">'
-    + '&#9888; '+Object.keys(failed).length+' section(s) could not be extracted   data shown below is partial'
-    + '</div>'
-    + Object.keys(failed).map(function(k) {
-        var f = failed[k]
-        var label = SECTION_LABELS[k] || k
+  if (!failed||!Object.keys(failed).length) return ''
+  var LABELS={macro:'Macroeconomics',energy:'Energy',water:'Water',land:'Land',
+    workers:'Workforce',digital:'Digital',policy:'Policy',
+    programmes:'Programmes',geography:'Geography',opportunities:'AI Opportunities'}
+  return '<div style="background:#FEF3C7;border:1px solid var(--amber);border-radius:8px;padding:14px 18px;margin-bottom:14px">'
+    +'<div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:10px">&#9888; '
+    +Object.keys(failed).length+' section(s) could not be extracted   data shown is partial</div>'
+    +Object.keys(failed).map(function(k){
+        var f=failed[k], label=LABELS[k]||k
         return '<div style="background:#fff;border-radius:6px;padding:10px 12px;margin-bottom:8px">'
-          + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
-          + '<span style="font-size:12px;font-weight:600;color:var(--orange)">&#10060; '+label+'</span>'
-          + '<div style="display:flex;gap:6px">'
-          + '<button onclick="tpRetrySection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--navy);background:transparent;border-radius:4px;cursor:pointer;color:var(--navy)">&#8635; Re-extract</button>'
-          + '<button onclick="tpEditSection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);background:transparent;border-radius:4px;cursor:pointer">&#9997; Edit manually</button>'
-          + '<button onclick="tpSkipSection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);background:transparent;border-radius:4px;cursor:pointer;color:var(--mid)">Skip</button>'
-          + '</div></div>'
-          + '<div style="font-size:10px;color:var(--mid)">Error: '+esc(f.error||'Parse failed')+'</div>'
-          + '</div>'
+          +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+          +'<span style="font-size:12px;font-weight:600;color:var(--orange)">&#10060; '+label+'</span>'
+          +'<div style="display:flex;gap:6px">'
+          +'<button onclick="tpRetrySection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--navy);background:transparent;border-radius:4px;cursor:pointer;color:var(--navy)">&#8635; Re-extract</button>'
+          +'<button onclick="tpEditSection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);background:transparent;border-radius:4px;cursor:pointer">&#9997; Edit</button>'
+          +'<button onclick="tpSkipSection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);background:transparent;border-radius:4px;cursor:pointer;color:var(--mid)">Skip</button>'
+          +'</div></div>'
+          +'<div style="font-size:10px;color:var(--mid)">Error: '+esc(f.error||'Parse failed')+'</div>'
+          +'</div>'
       }).join('')
-    + '</div>'
-  return html
+    +'</div>'
 }
 
-//    Retry one section                                                      
+//    Retry / edit / skip section                                                
 async function tpRetrySection(sectionName) {
-  if (!TP.s1 || !TP._rawIntel) return
-  // Show spinner in that section's button
-  var btn = event && event.target
-  if (btn) { btn.textContent = '...'; btn.disabled = true }
-
+  if (!TP.s1||!TP._rawIntel) return
   var result = await tpExtractOneSection(sectionName, TP._rawIntel, TP.territory)
   if (result.ok) {
-    // Merge into TP.s1
     delete TP.s1._failed[sectionName]
     TP.s1._sections[sectionName] = result.data
-    // Update hard_stats
-    var hsMap = { macro:'macro', energy:'energy', water:'water', land:'land', workers:'workers', digital:'digital' }
-    if (hsMap[sectionName]) TP.s1.hard_stats[sectionName] = result.data
-    if (sectionName==='policy')       TP.s1.policy = result.data
-    if (sectionName==='programmes')   TP.s1.programmes = result.data
-    if (sectionName==='geography')    TP.s1.geography = result.data
-    if (sectionName==='opportunities'){ TP.s1.ai_opportunities = result.data.ai_opportunities||[]; TP.s1.headline = result.data.headline }
-    TP.s1._complete = Object.keys(TP.s1._failed).length === 0
-    // Save updated profile to Supabase
+    var hsMap={macro:1,energy:1,water:1,land:1,workers:1,digital:1}
+    if (hsMap[sectionName]) TP.s1.hard_stats[sectionName]=result.data
+    if (sectionName==='policy')       TP.s1.policy=result.data
+    if (sectionName==='programmes')   TP.s1.programmes=result.data
+    if (sectionName==='geography')    TP.s1.geography=result.data
+    if (sectionName==='opportunities'){ TP.s1.ai_opportunities=result.data.ai_opportunities||[]; TP.s1.headline=result.data.headline }
+    TP.s1._complete = Object.keys(TP.s1._failed).length===0
     tpSaveProfile()
-  } else {
-    TP.s1._failed[sectionName].error = result.error
-  }
+  } else { TP.s1._failed[sectionName].error=result.error }
   switchTab('profile')
 }
 
-//    Edit section manually                                                  
 function tpEditSection(sectionName) {
-  var SECTION_LABELS = { macro:'Macroeconomics', energy:'Energy', water:'Water', land:'Land',
-    workers:'Workforce', digital:'Digital', policy:'Policy', programmes:'Programmes',
-    geography:'Geography', opportunities:'AI Opportunities' }
+  var LABELS={macro:'Macroeconomics',energy:'Energy',water:'Water',land:'Land',
+    workers:'Workforce',digital:'Digital',policy:'Policy',
+    programmes:'Programmes',geography:'Geography',opportunities:'AI Opportunities'}
   var existing = TP.s1&&TP.s1._sections&&TP.s1._sections[sectionName]
-  var schema    = SECTION_SCHEMAS[sectionName]
-  var prefill   = existing ? JSON.stringify(existing, null, 2) : schema
-
+  var prefill  = existing ? JSON.stringify(existing,null,2) : SECTION_SCHEMAS[sectionName]
   var modal = document.createElement('div')
   modal.id  = 'tp-edit-modal'
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center'
   modal.innerHTML = '<div style="background:#fff;border-radius:10px;padding:20px 24px;width:560px;max-height:80vh;overflow-y:auto">'
-    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px">Edit   '+SECTION_LABELS[sectionName]+'</div>'
-    + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px">Edit the JSON below and click Save. Must be valid JSON.</div>'
-    + '<textarea id="tp-edit-json" style="width:100%;height:280px;font-family:monospace;font-size:11px;padding:10px;border:1.5px solid var(--border);border-radius:6px;resize:vertical">'+esc(prefill)+'</textarea>'
-    + '<div id="tp-edit-error" style="font-size:11px;color:var(--orange);margin-top:6px;min-height:18px"></div>'
-    + '<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">'
-    + '<button onclick="document.getElementById(\'tp-edit-modal\').remove()" style="padding:7px 14px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">Cancel</button>'
-    + '<button onclick="tpSaveSection(\''+sectionName+'\')" style="padding:7px 16px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">&#10003; Save section</button>'
-    + '</div></div>'
+    +'<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px">Edit   '+(LABELS[sectionName]||sectionName)+'</div>'
+    +'<textarea id="tp-edit-json" style="width:100%;height:260px;font-family:monospace;font-size:11px;padding:10px;border:1.5px solid var(--border);border-radius:6px;resize:vertical">'+esc(prefill)+'</textarea>'
+    +'<div id="tp-edit-error" style="font-size:11px;color:var(--orange);margin-top:6px;min-height:18px"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">'
+    +'<button onclick="document.getElementById(\'tp-edit-modal\').remove()" style="padding:7px 14px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">Cancel</button>'
+    +'<button onclick="tpSaveSection(\''+sectionName+'\')" style="padding:7px 16px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">&#10003; Save</button>'
+    +'</div></div>'
   document.body.appendChild(modal)
 }
 
 function tpSaveSection(sectionName) {
-  var ta  = document.getElementById('tp-edit-json')
-  var err = document.getElementById('tp-edit-error')
+  var ta=document.getElementById('tp-edit-json'), err=document.getElementById('tp-edit-error')
   if (!ta) return
   try {
-    var data = JSON.parse(repairJSON(ta.value))
-    // Apply to TP.s1
-    delete TP.s1._failed[sectionName]
-    TP.s1._sections[sectionName] = data
-    var hsMap = { macro:'macro', energy:'energy', water:'water', land:'land', workers:'workers', digital:'digital' }
-    if (hsMap[sectionName]) TP.s1.hard_stats[sectionName] = data
-    if (sectionName==='policy')       TP.s1.policy = data
-    if (sectionName==='programmes')   TP.s1.programmes = data
-    if (sectionName==='geography')    TP.s1.geography = data
-    if (sectionName==='opportunities'){ TP.s1.ai_opportunities = data.ai_opportunities||[]; TP.s1.headline = data.headline }
-    TP.s1._complete = Object.keys(TP.s1._failed).length === 0
-    tpSaveProfile()
-    document.getElementById('tp-edit-modal').remove()
-    switchTab('profile')
-  } catch(e) {
-    if (err) err.textContent = 'Invalid JSON: '+e.message
-  }
+    var data=JSON.parse(repairJSON(ta.value))
+    delete TP.s1._failed[sectionName]; TP.s1._sections[sectionName]=data
+    var hsMap={macro:1,energy:1,water:1,land:1,workers:1,digital:1}
+    if (hsMap[sectionName]) TP.s1.hard_stats[sectionName]=data
+    if (sectionName==='policy')       TP.s1.policy=data
+    if (sectionName==='programmes')   TP.s1.programmes=data
+    if (sectionName==='geography')    TP.s1.geography=data
+    if (sectionName==='opportunities'){ TP.s1.ai_opportunities=data.ai_opportunities||[]; TP.s1.headline=data.headline }
+    TP.s1._complete=Object.keys(TP.s1._failed).length===0
+    tpSaveProfile(); document.getElementById('tp-edit-modal').remove(); switchTab('profile')
+  } catch(e) { if(err) err.textContent='Invalid JSON: '+e.message }
 }
 
 function tpSkipSection(sectionName) {
-  if (TP.s1&&TP.s1._failed) {
-    delete TP.s1._failed[sectionName]
-    TP.s1._sections[sectionName] = {}
-  }
+  if (TP.s1&&TP.s1._failed) { delete TP.s1._failed[sectionName]; TP.s1._sections[sectionName]={} }
   switchTab('profile')
 }
 
-//    Save profile to Supabase                                               
+//    Save profile to Supabase                                                   
 async function tpSaveProfile() {
   if (!TP.s1) return
   var slug = TP.territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
   await sbInsert('territory_profiles', {
-    id:           slug,
-    territory:    TP.territory,
-    profile:      TP.s1,
-    raw_intel:    TP._rawIntel||null,
-    generated_at: new Date().toISOString(),
-    expires_at:   new Date(Date.now()+90*24*60*60*1000).toISOString(),
-    model_used:   'gemini-2.5-flash'
+    id:slug, territory:TP.territory, profile:TP.s1,
+    raw_intel:TP._rawIntel||null,
+    generated_at:new Date().toISOString(),
+    expires_at:new Date(Date.now()+90*24*60*60*1000).toISOString(),
+    model_used:'gemini-2.0-flash'
   })
 }
 
-//    callS2                                                                 
+//    callS2 updated                                                             
 async function callS2(territory, s1data, objectives, freeText) {
   var prompt = buildS2Prompt(territory, s1data, objectives, freeText)
   tpTimerStart(Math.round(prompt.length/4))
@@ -1140,155 +1025,20 @@ async function callS2(territory, s1data, objectives, freeText) {
   TP_TOKENS.s2_prompt   = Math.round(result.tokens*0.6)
   TP_TOKENS.s2_response = Math.round(result.tokens*0.4)
   var parsed = parseSectionResponse(result.text)
-  if (!parsed.ok) return { ok:false, error:"S2 parse: "+parsed.error }
+  if (!parsed.ok) return { ok:false, error:'S2 parse: '+parsed.error }
   return { ok:true, data:parsed.data }
 }
 
-//    Main entry: start Stage 1                                              
-async function tpStartS1() {
-  var inp = document.getElementById('tp-territory-input')
-  var territory = inp ? inp.value.trim() : ''
-  if (!territory) return
-  TP.territory = territory
-  TP._rawIntel = null
-  // Ensure archetypes loaded before proceeding (prevents loadTPData re-render interference)
-  if (!TP.archetypes.length) await loadTPData()
-
-  // Check for cached raw intel first
-  var slug  = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
-  var cached = await sbFetch('territory_profiles', 'id=eq.'+encodeURIComponent(slug), 1)
-  if (cached && cached[0] && cached[0].raw_intel) {
-    var exp = cached[0].expires_at ? new Date(cached[0].expires_at) : null
-    if (!exp || exp > new Date()) {
-      // We have fresh raw intel   skip search, go straight to extraction
-      TP._rawIntel = cached[0].raw_intel
-      if (cached[0].profile) {
-        // Full profile cached too
-        TP.s1    = cached[0].profile
-        TP.stage = 's1_done'
-        switchTab('profile')
-        return
-      }
-      // Raw intel cached but no profile   re-extract
-      await tpRunExtraction(territory, TP._rawIntel, slug)
-      return
-    }
-  }
-
-  // No cache   run search
-  var prompt = buildRawIntelPrompt(territory)
-  console.log('[TP] Starting search for: '+territory)
-  TP.stage = 's1_loading'
-  switchTab('profile')          // render loading screen first
-  console.log('[TP] Loading screen rendered, tp-timer-display exists: '+(!!document.getElementById('tp-timer-display')))
-  tpTimerStart(Math.round(prompt.length/4))  // start timer AFTER DOM ready
-  console.log('[TP] Timer started, calling geminiCall...')
-
-  var result = await geminiCall(prompt, true, 4096)
-  tpTimerStop()
-
-  if (!result.ok) {
-    TP.stage = 'home'
-    switchTab('profile')
-    setTimeout(function(){ alert('Search failed: '+result.error) }, 100)
-    return
-  }
-
-  TP_TOKENS.s1_raw = result.tokens
-  TP._rawIntel     = result.text
-
-  // Cache raw intel immediately
-  await sbInsert('territory_profiles', {
-    id:        slug, territory:territory,
-    raw_intel: result.text, raw_cached_at: new Date().toISOString(),
-    profile:   null, generated_at: new Date().toISOString(),
-    expires_at: new Date(Date.now()+90*24*60*60*1000).toISOString(),
-    model_used: 'gemini-2.5-flash'
-  })
-
-  await tpRunExtraction(territory, result.text, slug)
-}
-
-async function tpRunExtraction(territory, rawText, slug) {
-  var SECTIONS = ['macro','energy','water','land','workers','digital','policy','programmes','geography','opportunities']
-
-  // Initialise all sections as pending, show extraction screen ONCE
-  TP._extracting = {}
-  SECTIONS.forEach(function(s){ TP._extracting[s] = 'pending' })
-  TP.stage = 's1_extracting'
-  switchTab('profile')          // render the progress screen once
-  tpTimerStart(0)               // start timer AFTER DOM is ready
-
-  // Helper: update a single section's status dot in place (no full re-render)
-  function updateDot(sectionName, status) {
-    TP._extracting[sectionName] = status
-    var el = document.getElementById('tp-sec-'+sectionName)
-    if (!el) return
-    var dots = {'pending':'&#9711;','loading':'&#9680;','done':'&#9989;','error':'&#10060;'}
-    var cols = {'pending':'var(--mid)','loading':'var(--navy)','done':'var(--teal)','error':'var(--orange)'}
-    el.innerHTML = '<span style="font-size:14px">'+dots[status]+'</span>'
-      + '<span style="font-size:12px;color:'+cols[status]+'">'+el.dataset.label+'</span>'
-  }
-
-  // Batch 1   mark loading then run in parallel
-  var BATCH1 = SECTIONS.slice(0,5)
-  BATCH1.forEach(function(s){ updateDot(s,'loading') })
-  var results1 = await Promise.all(BATCH1.map(function(s){
-    return tpExtractOneSection(s, rawText, territory).then(function(r){
-      updateDot(s, r.ok ? 'done' : 'error')
-      return r
-    })
-  }))
-
-  await new Promise(function(res){ setTimeout(res,500) })
-
-  // Batch 2   mark loading then run in parallel
-  var BATCH2 = SECTIONS.slice(5)
-  BATCH2.forEach(function(s){ updateDot(s,'loading') })
-  var results2 = await Promise.all(BATCH2.map(function(s){
-    return tpExtractOneSection(s, rawText, territory).then(function(r){
-      updateDot(s, r.ok ? 'done' : 'error')
-      return r
-    })
-  }))
-
-  tpTimerStop()
-
-  TP.s1    = buildS1FromSections(results1.concat(results2), territory)
-  TP.stage = 's1_done'
-  tpSaveProfile()
-  switchTab('profile')   // final render of the dashboard
-}
-
-async function tpLoadCached(id) {
-  var rows = await sbFetch('territory_profiles','id=eq.'+encodeURIComponent(id),1)
-  if (!rows||!rows[0]) return
-  var row = rows[0]
-  TP.territory = row.territory
-  TP._rawIntel = row.raw_intel || null
-  if (row.profile) {
-    TP.s1 = row.profile
-    // Ensure _failed exists
-    if (!TP.s1._failed) TP.s1._failed = {}
-    TP.stage = 's1_done'
-    switchTab('profile')
-  } else if (row.raw_intel) {
-    // Have raw but no profile   re-extract
-    var slug = id
-    await tpRunExtraction(row.territory, row.raw_intel, slug)
-  }
-}
 
 
 function buildS2Prompt(territory, s1data, objectives, freeText) {
   // Condensed s1 summary   only strategically relevant metrics
-  var hs = s1data.hard_stats || {}
-  var e = hs.energy  || {}
-  var w = hs.water   || {}
-  var l = hs.land    || {}
-  var k = hs.workers || {}
-  var m = hs.macro   || {}
-  var d = hs.digital || {}
+  var e = s1data.hard_stats.energy || {}
+  var w = s1data.hard_stats.water  || {}
+  var l = s1data.hard_stats.land   || {}
+  var k = s1data.hard_stats.workers|| {}
+  var m = s1data.hard_stats.macro  || {}
+  var d = s1data.hard_stats.digital|| {}
 
   var condensed = {
     territory:    territory,
@@ -1376,22 +1126,33 @@ function ragText(pct) {
 //    Profile tab entry                                                          
 function renderProfileTab() {
   if (!TP.archetypes.length) {
-    loadTPData().then(function(){
-      // Only re-render if not mid-search or mid-extraction (would destroy timer)
-      if (TP.stage === 'home') switchTab('profile')
-    })
+    loadTPData().then(function(){ if (TP.stage === 'home') switchTab('profile') })
     return tpLoading('Loading reference data...')
   }
-  if (TP.stage === 'home')       return tpHome()
+  if (TP.stage === 'home')           return tpHome()
   if (TP.stage === 's1_loading')     return tpLoading('Searching for intelligence on ' + esc(TP.territory) + '... (~20 seconds)')
-  if (TP.stage === 's1_extracting') return tpRenderExtractionProgress()
-  if (TP.stage === 's1_done')    return tpS1View()
+  if (TP.stage === 's1_extracting')  return tpRenderExtractionProgress()
+  if (TP.stage === 's1_done')        return tpS1View()
   if (TP.stage === 's2_form')    return tpS2Form()
   if (TP.stage === 's2_loading') return tpLoading('Profiling territory against your objectives...<br><small style="color:rgba(255,255,255,.6)">~15 seconds</small>')
   if (TP.stage === 's3')         return tpS3Result()
   return tpHome()
 }
 
+function tpLoading(msg) {
+  return '<div style="padding:32px 0">'
+    + '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">'
+    + '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
+    + '<div style="font-size:14px;color:var(--mid)">' + msg + '</div>'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;width:fit-content">'
+    + '<span style="font-size:11px;color:var(--mid)">Elapsed:</span>'
+    + '<span id="tp-timer-display" style="font-size:14px;font-weight:700;color:var(--navy);font-family:monospace;min-width:36px">0s</span>'
+    + '<div style="width:1px;height:18px;background:var(--border)"></div>'
+    + '<span style="font-size:11px;color:var(--mid)">Tokens (est.):</span>'
+    + '<span id="tp-token-live" style="font-size:14px;font-weight:700;color:var(--teal);font-family:monospace">calculating...</span>'
+    + '</div></div>'
+}
 
 async function loadTPData() {
   await loadGeminiTextModel()  // ensure model is set before any Gemini calls
@@ -1428,7 +1189,7 @@ function tpHome() {
     + '<input id="tp-territory-input" type="text" placeholder="e.g. Himachal Pradesh, Assam, Maharashtra..." '
     + 'style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit" '
     + 'onkeydown="if(event.key===\'Enter\')tpStartS1()">'
-    + '<button onclick="tpStartS1()" style="padding:9px 18px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">&#9889; Search & Generate</button>'
+    + '<button onclick="tpStartS1()" style="padding:9px 18px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">&#9889; Generate</button>'
     + '</div></div>'
 
   // Past profiles
@@ -1457,21 +1218,1358 @@ function tpHome() {
 }
 
 async function tpLoadPast() {
-  var el = document.getElementById('tp-past-list')
-  if (!el) return
-  var rows = await sbFetch('territory_profiles', 'order=generated_at.desc', 8)
-  if (!rows || !rows.length) { el.innerHTML = '<span style="font-size:11px;color:var(--mid);font-style:italic">No profiles yet</span>'; return }
+  var el = document.getElementById('tp-past-list'); if (!el) return
+  var rows = await sbFetch('territory_profiles','order=generated_at.desc',8)
+  if (!rows||!rows.length){ el.innerHTML='<span style="font-size:11px;color:var(--mid);font-style:italic">No profiles yet</span>'; return }
   el.innerHTML = rows.map(function(r){
     var date = r.generated_at ? new Date(r.generated_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) : ''
-    var exp  = r.expires_at ? new Date(r.expires_at) : null
-    var stale = exp && exp < new Date()
-    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="tpLoadCached(\'' + esc(r.id) + '\')">'
-      + '<div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--navy)">' + esc(r.territory) + '</div>'
-      + '<div style="font-size:10px;color:var(--mid)">' + date + (stale?' &bull; <span style="color:var(--amber)">stale</span>':'') + '</div></div>'
-      + '<span style="font-size:12px;color:var(--mid)">&#8250;</span></div>'
+    var stale = r.expires_at && new Date(r.expires_at) < new Date()
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="tpLoadCached(this.dataset.id)" data-id="'+esc(r.id)+'">'
+      +'<div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--navy)">'+esc(r.territory)+'</div>'
+      +'<div style="font-size:10px;color:var(--mid)">'+date+(stale?' &bull; <span style="color:var(--amber)">stale</span>':'')+'</div></div>'
+      +'<span style="font-size:12px;color:var(--mid)">&#8250;</span></div>'
   }).join('')
 }
 
+async function tpLoadCached(id) {
+  var rows = await sbFetch('territory_profiles','id=eq.'+encodeURIComponent(id),1)
+  if (!rows||!rows[0]) return
+  var row=rows[0]; TP.territory=row.territory; TP._rawIntel=row.raw_intel||null
+  if (row.profile&&row.profile._sections){ TP.s1=row.profile; TP.stage='s1_done'; switchTab('profile') }
+  else if (row.raw_intel) { await tpRunExtraction(row.territory,row.raw_intel,id) }
+}
+
+async function tpStartS1() {
+  var inp = document.getElementById('tp-territory-input')
+  var territory = inp ? inp.value.trim() : ''
+  if (!territory) return
+  TP.territory = territory; TP._rawIntel = null
+  TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
+  if (!TP.archetypes.length) await loadTPData()
+  await loadGeminiTextModel()
+  var slug   = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
+  var cached = await sbFetch('territory_profiles','id=eq.'+encodeURIComponent(slug),1)
+  if (cached&&cached[0]&&cached[0].raw_intel) {
+    var exp = cached[0].expires_at ? new Date(cached[0].expires_at) : null
+    if (!exp||exp>new Date()) {
+      TP._rawIntel=cached[0].raw_intel
+      if (cached[0].profile&&cached[0].profile._sections){ TP.s1=cached[0].profile; TP.stage='s1_done'; switchTab('profile'); return }
+      await tpRunExtraction(territory,TP._rawIntel,slug); return
+    }
+  }
+  var prompt=buildRawIntelPrompt(territory)
+  TP.stage='s1_loading'; switchTab('profile')
+  console.log('[TP] Stage set to s1_loading, tp-timer-display exists: '+(!!document.getElementById('tp-timer-display')))
+  tpTimerStart(Math.round(prompt.length/4))
+  var result=await geminiCall(prompt,true,4096)
+  tpTimerStop()
+  if (!result.ok){ TP.stage='home'; switchTab('profile'); setTimeout(function(){ alert('Search failed: '+result.error) },100); return }
+  TP_TOKENS.s1_raw=result.tokens; TP._rawIntel=result.text
+  await sbInsert('territory_profiles',{ id:slug,territory:territory,raw_intel:result.text,
+    raw_cached_at:new Date().toISOString(),profile:null,generated_at:new Date().toISOString(),
+    expires_at:new Date(Date.now()+90*24*60*60*1000).toISOString() })
+  await tpRunExtraction(territory,result.text,slug)
+}
+
+async function tpRunExtraction(territory,rawText,slug) {
+  var SECS=['macro','energy','water','land','workers','digital','policy','programmes','geography','opportunities']
+  TP._extracting={}; SECS.forEach(function(s){ TP._extracting[s]='pending' })
+  TP.stage='s1_extracting'; switchTab('profile'); tpTimerStart(0)
+  function updateDot(name,status){
+    TP._extracting[name]=status
+    var el=document.getElementById('tp-sec-'+name); if (!el) return
+    var dots={pending:'&#9711;',loading:'&#9680;',done:'&#9989;',error:'&#10060;'}
+    var cols={pending:'var(--mid)',loading:'var(--navy)',done:'var(--teal)',error:'var(--orange)'}
+    el.innerHTML='<span style="font-size:14px">'+dots[status]+'</span><span style="font-size:12px;color:'+cols[status]+'">'+el.dataset.label+'</span>'
+  }
+  var B1=SECS.slice(0,5); B1.forEach(function(s){ updateDot(s,'loading') })
+  var r1=await Promise.all(B1.map(function(s){ return tpExtractOneSection(s,rawText,territory).then(function(r){ updateDot(s,r.ok?'done':'error'); return r }) }))
+  await new Promise(function(res){ setTimeout(res,500) })
+  var B2=SECS.slice(5); B2.forEach(function(s){ updateDot(s,'loading') })
+  var r2=await Promise.all(B2.map(function(s){ return tpExtractOneSection(s,rawText,territory).then(function(r){ updateDot(s,r.ok?'done':'error'); return r }) }))
+  tpTimerStop(); TP.s1=buildS1FromSections(r1.concat(r2),territory); TP.stage='s1_done'
+  tpSaveProfile(); switchTab('profile')
+}
+
+
+function tpS1View() {
+  var p = TP.s1; if (!p) return tpHome()
+  var e = p.hard_stats && p.hard_stats.energy   || {}
+  var w = p.hard_stats && p.hard_stats.water    || {}
+  var l = p.hard_stats && p.hard_stats.land     || {}
+  var k = p.hard_stats && p.hard_stats.workers  || {}
+  var m = p.hard_stats && p.hard_stats.macro    || {}
+  var d = p.hard_stats && p.hard_stats.digital  || {}
+  var geo = p.geography || {}
+  var pol = p.policy    || {}
+  var prg = p.programmes || {}
+
+  var html = '<div style="padding:16px 0">'
+
+  // Failed sections repair banner
+  if (p._failed && Object.keys(p._failed).length) html += tpRenderFailedSections(p._failed)
+
+  // Header row
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    + '<div><div style="font-size:16px;font-weight:900;color:var(--navy)">' + esc(p.territory||TP.territory) + '</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-top:2px">Territory Intelligence   Stage 1 of 3</div></div>'
+    + '<button onclick="tpGoS2()" style="padding:9px 18px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Set Objectives &#8594;</button>'
+    + '</div>'
+
+  // Headline
+  if (p.headline) {
+    html += '<div style="background:var(--navy);border-radius:8px;padding:14px 18px;color:#fff;margin-bottom:14px">'
+      + '<div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Intelligence Headline</div>'
+      + '<div style="font-size:14px;font-weight:500;line-height:1.5">' + esc(p.headline) + '</div>'
+      + '</div>'
+  }
+
+  //    HARD STATS                                                              
+  html += tpSectionHeader('HARD STATS', 'Objective data   macroeconomics, 4Ws, digital infrastructure', '#002870')
+
+  // Cost indices strip
+  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">'
+  html += tpCostTile('&#9889; Energy Tariff', e.industrial_tariff ? 'Rs '+e.industrial_tariff+'/unit' : 'N/A',
+    e.tariff_index_pct, e.dc_feasibility ? 'DC: '+e.dc_feasibility : null, 'lower is better')
+  html += tpCostTile('&#128167; Water Cost', w.industrial_cost_per_kl ? 'Rs '+w.industrial_cost_per_kl+'/kL' : 'N/A',
+    w.water_cost_index_pct, 'Stress: '+(w.stress_index||'N/A'), 'lower is better')
+  html += tpCostTile('&#128119; Labour Cost', k.avg_engineer_salary_lakh ? 'Rs '+k.avg_engineer_salary_lakh+'L pa' : 'N/A',
+    k.salary_index_pct, k.skilled_labour||null, 'lower is better')
+  html += tpCostTile('&#127968; Land Cost', l.cost_per_acre_lakh ? 'Rs '+l.cost_per_acre_lakh+'L/acre' : 'N/A',
+    l.land_cost_index_pct, 'Govt land: '+(l.govt_land||'N/A'), 'lower is better')
+  html += '</div>'
+
+  // Stats grid
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">'
+
+  // Macro
+  html += tpStatCard('Macroeconomics', [
+    { label:'GSDP', val: m.gsdp_cr ? 'Rs '+Number(m.gsdp_cr).toLocaleString('en-IN')+' Cr' : 'N/A', rag:'' },
+    { label:'Growth', val: m.gsdp_growth_pct ? m.gsdp_growth_pct+'%' : 'N/A', rag: m.gsdp_growth_pct >= 7 ? 'rag-green' : m.gsdp_growth_pct >= 5 ? 'rag-amber' : 'rag-red' },
+    { label:'Per capita vs national', val: m.vs_national_pct ? m.vs_national_pct+'%' : 'N/A', rag: indexRag(m.vs_national_pct) },
+    { label:'Fiscal health', val: m.fiscal_health||'N/A', rag: m.fiscal_health==='surplus'?'rag-green':m.fiscal_health==='balanced'?'rag-amber':'rag-red' }
+  ])
+
+  // Energy
+  html += tpStatCard('Energy (Watts)', [
+    { label:'Installed capacity', val: e.installed_mw ? Number(e.installed_mw).toLocaleString('en-IN')+' MW' : 'N/A', rag:'' },
+    { label:'Status', val: e.status||'N/A', rag: e.status==='surplus'?'rag-green':e.status==='balanced'?'rag-amber':'rag-red' },
+    { label:'Grid reliability', val: e.grid_hrs ? e.grid_hrs+'h/day' : 'N/A', rag: e.grid_hrs>=22?'rag-green':e.grid_hrs>=18?'rag-amber':'rag-red' },
+    { label:'Renewable mix', val: e.renewable_pct ? e.renewable_pct+'%' : 'N/A', rag: e.renewable_pct>=40?'rag-green':e.renewable_pct>=20?'rag-amber':'rag-red' },
+    { label:'Industrial tariff vs avg', val: ragText(e.tariff_index_pct), rag: indexRag(e.tariff_index_pct) },
+    { label:'DC power feasibility', val: e.dc_feasibility||'N/A', rag: e.dc_feasibility==='high'?'rag-green':e.dc_feasibility==='medium'?'rag-amber':'rag-red' }
+  ])
+
+  // Water
+  html += tpStatCard('Water', [
+    { label:'Annual rainfall', val: w.rainfall_mm ? w.rainfall_mm+' mm' : 'N/A', rag: w.rainfall_mm>=800?'rag-green':w.rainfall_mm>=400?'rag-amber':'rag-red' },
+    { label:'Stress index', val: w.stress_index||'N/A', rag: w.stress_index==='low'?'rag-green':w.stress_index==='medium'?'rag-amber':'rag-red' },
+    { label:'Rivers', val: (w.perennial_rivers||[]).slice(0,3).join(', ')||'N/A', rag:'' },
+    { label:'DC cooling', val: w.dc_cooling||'N/A', rag: w.dc_cooling==='high'?'rag-green':w.dc_cooling==='medium'?'rag-amber':'rag-red' },
+    { label:'Water cost vs avg', val: ragText(w.water_cost_index_pct), rag: indexRag(w.water_cost_index_pct) }
+  ])
+
+  // Land
+  html += tpStatCard('Land (Acres)', [
+    { label:'Area', val: l.area_sqkm ? Number(l.area_sqkm).toLocaleString('en-IN')+' km ' : 'N/A', rag:'' },
+    { label:'Topography', val: l.topography||'N/A', rag: l.topography==='plains'?'rag-green':l.topography==='mixed'?'rag-amber':'rag-red' },
+    { label:'Industrial parks / SEZs', val: (l.industrial_parks||0)+' / '+(l.sez_count||0), rag: (l.industrial_parks||0)>2?'rag-green':(l.industrial_parks||0)>0?'rag-amber':'rag-red' },
+    { label:'Govt land avail.', val: l.govt_land||'N/A', rag: l.govt_land==='high'?'rag-green':l.govt_land==='medium'?'rag-amber':'rag-red' },
+    { label:'Construction ease', val: l.construction_ease||'N/A', rag: l.construction_ease==='easy'?'rag-green':l.construction_ease==='moderate'?'rag-amber':'rag-red' },
+    { label:'Land cost vs avg', val: ragText(l.land_cost_index_pct), rag: indexRag(l.land_cost_index_pct) }
+  ])
+
+  // Workers
+  html += tpStatCard('Workers', [
+    { label:'Population', val: k.population_lakh ? k.population_lakh+' lakh' : 'N/A', rag:'' },
+    { label:'Literacy', val: k.literacy_pct ? k.literacy_pct+'%' : 'N/A', rag: k.literacy_pct>=80?'rag-green':k.literacy_pct>=65?'rag-amber':'rag-red' },
+    { label:'Engineers/yr', val: k.engineers_per_year ? Number(k.engineers_per_year).toLocaleString('en-IN') : 'N/A', rag: k.engineers_per_year>=5000?'rag-green':k.engineers_per_year>=1000?'rag-amber':'rag-red' },
+    { label:'Migration', val: k.migration||'N/A', rag: k.migration==='net_in'?'rag-green':k.migration==='balanced'?'rag-amber':'rag-red' },
+    { label:'Skilled labour', val: k.skilled_labour||'N/A', rag: k.skilled_labour==='abundant'?'rag-green':k.skilled_labour==='adequate'?'rag-amber':'rag-red' },
+    { label:'Salary vs avg', val: ragText(k.salary_index_pct), rag: indexRag(k.salary_index_pct) }
+  ])
+
+  // Digital
+  html += tpStatCard('Digital', [
+    { label:'Internet penetration', val: d.internet_pct ? d.internet_pct+'%' : 'N/A', rag: d.internet_pct>=60?'rag-green':d.internet_pct>=35?'rag-amber':'rag-red' },
+    { label:'OFC backbone', val: d.ofc_km ? Number(d.ofc_km).toLocaleString('en-IN')+' km' : 'N/A', rag: d.ofc_km>=10000?'rag-green':d.ofc_km>=2000?'rag-amber':'rag-red' },
+    { label:'NKN presence', val: d.nkn?'Yes':'No', rag: d.nkn?'rag-green':'rag-red' },
+    { label:'Smart cities', val: d.smart_cities||'0', rag: d.smart_cities>0?'rag-green':'rag-amber' },
+    { label:'BharatNet coverage', val: d.bharatnet_pct ? d.bharatnet_pct+'%' : 'N/A', rag: d.bharatnet_pct>=70?'rag-green':d.bharatnet_pct>=40?'rag-amber':'rag-red' },
+    { label:'Govt DCs', val: d.govt_dcs||'0', rag: d.govt_dcs>0?'rag-green':'rag-amber' }
+  ])
+
+  html += '</div>'
+
+  // Geography
+  if ((geo.advantages||[]).length || (geo.constraints||[]).length) {
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
+    if ((geo.advantages||[]).length) {
+      html += '<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px 14px">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--teal);text-transform:uppercase;margin-bottom:8px">&#9989; Geography Advantages</div>'
+        + (geo.advantages||[]).map(function(a){ return '<div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)">'+esc(a)+'</div>' }).join('')
+        + '</div>'
+    }
+    if ((geo.constraints||[]).length) {
+      html += '<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px 14px">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;margin-bottom:8px">&#9888; Constraints</div>'
+        + (geo.constraints||[]).map(function(a){ return '<div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)">'+esc(a)+'</div>' }).join('')
+        + '</div>'
+    }
+    html += '</div>'
+  }
+
+  //    POLICY                                                                  
+  html += tpSectionHeader('POLICY', 'Named policies converted to AI deployment enablers', '#5B21B6')
+  html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">'
+  var polItems = (pol.useable||[])
+  if (polItems.length) {
+    html += polItems.map(function(item){
+      var impCol = item.impact==='high'?'var(--teal)':item.impact==='medium'?'var(--amber)':'var(--mid)'
+      return '<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:11px 14px;border-left:3px solid '+impCol+'">'
+        + '<div style="font-size:11px;color:var(--mid);margin-bottom:3px">Source: '+esc(item.source||'')+'</div>'
+        + '<div style="font-size:12px;line-height:1.4">'+esc(item.point||'')+'</div>'
+        + '<div style="font-size:10px;color:'+impCol+';font-weight:700;margin-top:4px;text-transform:uppercase">'+esc(item.impact||'')+'</div>'
+        + '</div>'
+    }).join('')
+  } else {
+    html += '<div style="font-size:12px;color:var(--mid);grid-column:1/-1">No policy data available</div>'
+  }
+  html += '</div>'
+
+  //    PROGRAMMES                                                              
+  html += tpSectionHeader('PROGRAMMES', 'Central and state schemes converted to AI leverage points', '#065A82')
+  html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px">'
+  var prgItems = (prg.useable||[])
+  if (prgItems.length) {
+    var typeCol = { funding:'var(--teal)', infrastructure:'var(--blue)', mandate:'var(--orange)', capacity:'var(--amber)' }
+    html += prgItems.map(function(item){
+      var col = typeCol[item.type] || 'var(--mid)'
+      return '<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:11px 14px;border-left:3px solid '+col+'">'
+        + '<div style="font-size:10px;font-weight:700;color:'+col+';text-transform:uppercase;margin-bottom:3px">'+esc(item.type||'programme')+'</div>'
+        + '<div style="font-size:11px;color:var(--mid);margin-bottom:3px">'+esc(item.source||'')+'</div>'
+        + '<div style="font-size:12px;line-height:1.4">'+esc(item.point||'')+'</div>'
+        + '</div>'
+    }).join('')
+  } else {
+    html += '<div style="font-size:12px;color:var(--mid);grid-column:1/-1">No programme data available</div>'
+  }
+  html += '</div>'
+
+  // CTA
+  html += '<div style="background:#E1F5EE;border-radius:8px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">'
+    + '<div><div style="font-size:13px;font-weight:700;color:var(--navy)">Stage 1 complete. Set your objectives to generate the territory profile.</div>'
+    + '<div style="font-size:11px;color:var(--mid)">Select up to 5 objectives. Gemini will auto-profile the territory against them.</div></div>'
+    + '<button onclick="tpGoS2()" style="padding:9px 18px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0">Set Objectives &#8594;</button>'
+    + '</div>'
+
+  html += '</div>'
+  return html
+}
+
+function tpSectionHeader(title, sub, col) {
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid '+(col||'var(--border)')+'">'
+    + '<div style="width:4px;height:28px;background:'+(col||'var(--navy)')+';border-radius:2px"></div>'
+    + '<div><div style="font-size:12px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;color:'+(col||'var(--navy)')+'">'+title+'</div>'
+    + '<div style="font-size:10px;color:var(--mid)">'+sub+'</div></div>'
+    + '</div>'
+}
+
+function tpCostTile(label, value, indexPct, detail, direction) {
+  var rag = indexRag(indexPct)
+  var bgMap = { 'rag-green':'#E1F5EE', 'rag-amber':'#FFF8E7', 'rag-red':'#FEE2E2', 'rag-grey':'var(--light)' }
+  var colMap = { 'rag-green':'var(--teal)', 'rag-amber':'var(--amber)', 'rag-red':'var(--orange)', 'rag-grey':'var(--mid)' }
+  var bg  = bgMap[rag]  || 'var(--light)'
+  var col = colMap[rag] || 'var(--mid)'
+  return '<div style="background:'+bg+';border-radius:8px;padding:12px 14px;border-left:4px solid '+col+'">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">'+label+'</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:4px">'+esc(value)+'</div>'
+    + (indexPct ? '<div style="font-size:11px;font-weight:700;color:'+col+'">'+arrow(indexPct)+indexPct+'% of national avg</div>' : '')
+    + (detail ? '<div style="font-size:10px;color:var(--mid);margin-top:3px">'+esc(detail)+'</div>' : '')
+    + '</div>'
+}
+
+function tpStatCard(title, rows) {
+  return '<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px 14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px">'+esc(title)+'</div>'
+    + rows.map(function(r){
+        var dot = r.rag ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+
+          (r.rag==='rag-green'?'var(--teal)':r.rag==='rag-amber'?'var(--amber)':r.rag==='rag-red'?'var(--orange)':'var(--mid)')+
+          ';margin-right:5px;flex-shrink:0;margin-top:2px"></span>' : ''
+        return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:3px 0;border-bottom:1px solid var(--border);gap:8px">'
+          + '<span style="font-size:11px;color:var(--mid);flex-shrink:0">'+esc(r.label)+'</span>'
+          + '<span style="font-size:11px;font-weight:500;text-align:right;display:flex;align-items:flex-start">'+dot+esc(String(r.val))+'</span>'
+          + '</div>'
+      }).join('')
+    + '</div>'
+}
+
+function tpGoS2() { TP.stage = 's2_form'; switchTab('profile') }
+
+
+//                                                                               
+// Stage 2: Objectives + AI Profile Form
+//                                                                               
+
+function tpS2Form() {
+  var sel = TP.objectives || []
+  var html = '<div style="padding:16px 0">'
+
+  html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">'
+    + '<button onclick="TP.stage=\'s1_done\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Back to intelligence</button>'
+    + '<div style="font-size:14px;font-weight:700;color:var(--navy)">' + esc(TP.territory) + '   Set Objectives</div>'
+    + '<div style="font-size:11px;color:var(--mid)">Select up to 5 objectives</div>'
+    + '<span style="margin-left:auto;font-size:12px;font-weight:700;color:' + (sel.length>=5?'var(--orange)':'var(--teal)') + '">' + sel.length + '/5 selected</span>'
+    + '</div>'
+
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
+
+  // Objectives panel
+  html += '<div>'
+  OBJECTIVES.forEach(function(group) {
+    html += '<div style="margin-bottom:12px">'
+      + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);padding:6px 10px;background:var(--light);border-radius:4px;margin-bottom:6px">'+esc(group.group)+'</div>'
+      + group.items.map(function(item) {
+          var isSel = sel.indexOf(item) >= 0
+          var blocked = !isSel && sel.length >= 5
+          return '<div onclick="tpToggleObj(\'' + item.replace(/'/g,"\\'") + '\')" '
+            + 'style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;border:1.5px solid '
+            + (isSel?'var(--navy)':blocked?'var(--border)':'var(--border)')
+            + ';background:' + (isSel?'rgba(0,40,112,.06)':'#fff')
+            + ';cursor:' + (blocked?'not-allowed':'pointer')
+            + ';opacity:' + (blocked?'.45':'1')
+            + ';margin-bottom:4px">'
+            + '<div style="width:14px;height:14px;border-radius:3px;flex-shrink:0;border:1.5px solid '
+            + (isSel?'var(--navy)':'var(--border)')
+            + ';background:' + (isSel?'var(--navy)':'#fff')
+            + ';display:flex;align-items:center;justify-content:center">'
+            + (isSel?'<span style="color:#fff;font-size:9px;font-weight:700">&#10003;</span>':'')
+            + '</div>'
+            + '<span style="font-size:12px;font-weight:' + (isSel?600:400) + '">' + esc(item) + '</span>'
+            + '</div>'
+        }).join('')
+      + '</div>'
+  })
+  html += '</div>'
+
+  // Context panel
+  html += '<div>'
+    + '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:10px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">Selected objectives</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:10px">Max 5. Use the context box for anything outside the list.</div>'
+    + '<div style="display:flex;flex-direction:column;gap:5px;min-height:60px">'
+    + (sel.length ? sel.map(function(o,i){
+        return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 8px;background:var(--light);border-radius:4px">'
+          + '<span style="font-size:10px;font-weight:700;color:var(--navy);width:14px">' + (i+1) + '</span>'
+          + '<span style="flex:1">' + esc(o) + '</span>'
+          + '<span onclick="tpToggleObj(\'' + o.replace(/'/g,"\\'") + '\')" style="cursor:pointer;color:var(--mid);font-size:14px">&#215;</span>'
+          + '</div>'
+      }).join('') : '<div style="font-size:11px;color:var(--mid);font-style:italic">No objectives selected yet</div>')
+    + '</div></div>'
+
+    + '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:10px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">Additional context <span style="font-weight:400;color:var(--mid)">(optional)</span></div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Anything your team knows that the AI should factor in   ground truth, specific constraints, political dynamics, client conversations.</div>'
+    + '<textarea id="tp-free-text" rows="8" '
+    + 'style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;line-height:1.5"'
+    + ' placeholder="e.g. The CM has personally committed to making this the AI capital of Himachal. Budget is pre-approved in the supplementary estimates. Site in Bilaspur is surveyed and has 10MW available from HPSEBL grid connection...">'
+    + esc(TP.freeText||'') + '</textarea>'
+    + '</div>'
+
+    + (sel.length > 0
+      ? '<button onclick="tpRunS2()" style="width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">&#9889; Generate territory profile &#8594;</button>'
+      : '<button disabled style="width:100%;padding:11px;background:var(--border);color:var(--mid);border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:not-allowed">Select at least 1 objective first</button>')
+
+  html += '</div>'
+  html += '</div></div>'
+  return html
+}
+
+function tpToggleObj(name) {
+  var idx = TP.objectives.indexOf(name)
+  if (idx >= 0) {
+    TP.objectives.splice(idx, 1)
+  } else {
+    if (TP.objectives.length >= 5) return
+    TP.objectives.push(name)
+  }
+  switchTab('profile')
+}
+
+async function tpRunS2() {
+  var ft = document.getElementById('tp-free-text')
+  TP.freeText = ft ? ft.value : ''
+  TP.stage = 's2_loading'
+  switchTab('profile')
+
+  var result = await callS2(TP.territory, TP.s1, TP.objectives, TP.freeText)
+  if (!result.ok) {
+    TP.stage = 's2_form'; switchTab('profile')
+    setTimeout(function(){ alert('Stage 2 failed: ' + result.error) }, 100)
+    return
+  }
+  TP.s2 = result.data
+  TP.overrides.working   = (TP.s2.working_in_favour || []).map(function(p){ return { text: p.point, metric: p.metric, confidence: p.confidence, removed: false } })
+  TP.overrides.attention = (TP.s2.needs_attention   || []).map(function(p){ return { text: p.point, severity: p.severity, mitigation: p.mitigation, removed: false } })
+  TP.stage = 's3'
+  switchTab('profile')
+}
+
+//                                                                               
+// Stage 3: Matchmaking Results
+//                                                                               
+
+function tpS3Result() {
+  if (!TP.s2) { TP.stage = 's2_form'; return tpS2Form() }
+  var icons = {T1:'&#127965;',T2:'&#127807;',T3:'&#128681;',T4:'&#127970;',T5:'&#127758;'}
+  var dimLabels = {
+    infrastructure_readiness: 'Infrastructure', fiscal_capacity: 'Fiscal Capacity',
+    ai_opportunity_density: 'AI Opportunity', workforce_readiness: 'Workforce',
+    political_commercial: 'Political & Commercial', central_strategic_value: 'Central Strategic'
+  }
+  var viabCol = { excellent:'var(--teal)',strong:'var(--teal)',viable:'var(--amber)',challenging:'var(--orange)',not_recommended:'var(--orange)' }
+  var viabBg  = { excellent:'#E1F5EE',strong:'#E1F5EE',viable:'#FFF8E7',challenging:'#FEE2E2',not_recommended:'#FEE2E2' }
+
+  // Compute archetype match
+  var dimScores = TP.s2.dim_scores || {}
+  var dims = Object.keys(dimScores)
+  var archVecs = {}
+  TP.archetypes.forEach(function(a){
+    var key = a.code || a.id
+    archVecs[key]={}; dims.forEach(function(d){ archVecs[key][d]=0 })
+  })
+  TP.archetype_dims.forEach(function(d){
+    var dk = d.archetype_code || d.archetype_id; if(archVecs[dk]) archVecs[dk][d.dimension]=parseFloat(d.score)||0
+  })
+  var matches = TP.archetypes.map(function(a){
+    var key = a.code || a.id
+    var dot=0,mA=0,mB=0
+    dims.forEach(function(d){
+      // Normalise user 0-100 to 1-5 scale to match DB reference vectors
+      var av=((dimScores[d]||0)/100)*4+1, bv=(archVecs[key]&&archVecs[key][d]||0)
+      dot+=av*bv;mA+=av*av;mB+=bv*bv
+    })
+    return { arch:a, score:(mA&&mB)?dot/(Math.sqrt(mA)*Math.sqrt(mB)):0 }
+  }).sort(function(a,b){return b.score-a.score})
+  var best = matches[0]
+  var pct  = best ? Math.round(best.score*100) : 0
+
+  var html = '<div style="padding:16px 0">'
+
+  // Nav
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    + '<button onclick="TP.stage=\'s1_done\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Intelligence</button>'
+    + '<button onclick="TP.stage=\'s2_form\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#9997; Objectives</button>'
+    + '<div style="font-size:14px;font-weight:700;color:var(--navy);flex:1">' + esc(TP.territory) + '   Territory Profile</div>'
+    + '<button onclick="tpExportWord()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#128196; Word</button>'
+    + '<button onclick="tpExportPPT()" style="padding:5px 12px;border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#128190; PPT</button>'
+    + '</div>'
+    + tpTokenDisplay()
+
+  // Headline recommendation
+  if (TP.s2.headline_recommendation) {
+    html += '<div style="background:var(--navy);border-radius:8px;padding:14px 18px;color:#fff;margin-bottom:14px">'
+      + '<div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Strategic Recommendation</div>'
+      + '<div style="font-size:14px;font-weight:500;line-height:1.5">' + esc(TP.s2.headline_recommendation) + '</div>'
+      + '</div>'
+  }
+
+  // Archetype match banner
+  if (best) {
+    html += '<div style="background:linear-gradient(135deg,rgba(0,40,112,.06) 0%,rgba(0,40,112,.02) 100%);border:1.5px solid var(--navy);border-radius:8px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px">'
+      + '<div style="font-size:28px">' + (icons[best.arch.id]||'') + '</div>'
+      + '<div style="flex:1">'
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:2px">Matched archetype   ' + pct + '% confidence</div>'
+      + '<div style="font-size:16px;font-weight:900;color:var(--navy)">' + esc(best.arch.name||best.arch.id) + '</div>'
+      + '<div style="font-size:12px;color:var(--mid);margin-top:2px">' + esc((best.arch.description||'').substring(0,120)) + '</div>'
+      + '</div></div>'
+  }
+
+  // Three columns: Working | Attention | Objective Feasibility
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">'
+
+  // Working in favour
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">&#9989; Working in favour</div>'
+    + TP.overrides.working.filter(function(p){ return !p.removed }).map(function(p,i){
+        return '<div style="padding:7px 9px;background:#F0FDF4;border-radius:5px;margin-bottom:6px;border-left:3px solid var(--teal)">'
+          + '<div style="font-size:11px;line-height:1.4">' + esc(p.text) + '</div>'
+          + (p.metric ? '<div style="font-size:10px;color:var(--mid);margin-top:3px">&#128202; ' + esc(p.metric) + '</div>' : '')
+          + '<div style="display:flex;gap:4px;margin-top:4px">'
+          + '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--teal);color:#fff;font-weight:700">' + esc(p.confidence||'') + '</span>'
+          + '<span onclick="tpRemovePoint(\'working\',' + i + ')" style="font-size:9px;color:var(--mid);cursor:pointer">Remove</span>'
+          + '</div></div>'
+      }).join('')
+    + '<div onclick="tpAddPoint(\'working\')" style="font-size:11px;color:var(--mid);cursor:pointer;padding:5px;text-align:center;border:1px dashed var(--border);border-radius:5px;margin-top:4px">+ Add observation</div>'
+    + '</div>'
+
+  // Needs attention
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">&#9888; Needs attention</div>'
+    + TP.overrides.attention.filter(function(p){ return !p.removed }).map(function(p,i){
+        var sevCol = p.severity==='critical'?'var(--orange)':p.severity==='moderate'?'var(--amber)':'var(--mid)'
+        return '<div style="padding:7px 9px;background:#FFF8F0;border-radius:5px;margin-bottom:6px;border-left:3px solid '+sevCol+'">'
+          + '<div style="font-size:11px;line-height:1.4">' + esc(p.text) + '</div>'
+          + (p.mitigation ? '<div style="font-size:10px;color:var(--mid);margin-top:3px">&#128161; ' + esc(p.mitigation) + '</div>' : '')
+          + '<div style="display:flex;gap:4px;margin-top:4px">'
+          + '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:'+sevCol+';color:#fff;font-weight:700">' + esc(p.severity||'') + '</span>'
+          + '<span onclick="tpRemovePoint(\'attention\',' + i + ')" style="font-size:9px;color:var(--mid);cursor:pointer">Remove</span>'
+          + '</div></div>'
+      }).join('')
+    + '<div onclick="tpAddPoint(\'attention\')" style="font-size:11px;color:var(--mid);cursor:pointer;padding:5px;text-align:center;border:1px dashed var(--border);border-radius:5px;margin-top:4px">+ Add observation</div>'
+    + '</div>'
+
+  // Objective feasibility
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">Objective feasibility</div>'
+    + (TP.s2.objective_viability||[]).map(function(v){
+        var col = viabCol[v.viability] || 'var(--mid)'
+        var bg  = viabBg[v.viability]  || 'var(--light)'
+        var sc  = v.score || 0
+        return '<div style="margin-bottom:8px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+          + '<span style="font-size:11px;font-weight:600">' + esc(v.objective||'') + '</span>'
+          + '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:'+bg+';color:'+col+';font-weight:700">' + esc(v.viability||'') + '</span>'
+          + '</div>'
+          + '<div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:3px">'
+          + '<div style="width:'+sc+'%;height:100%;background:'+col+';border-radius:3px"></div>'
+          + '</div>'
+          + (v.rationale ? '<div style="font-size:10px;color:var(--mid);line-height:1.3">' + esc(v.rationale) + '</div>' : '')
+          + '</div>'
+      }).join('')
+    + '</div>'
+
+  html += '</div>'
+
+  // Feasibility grid (situation   objectives)
+  html += tpFeasibilityGrid()
+
+  // Radar + dim bars + archetype comparison
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
+
+  // Radar
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">Dimension Radar</div>'
+    + '<canvas id="tp-radar-chart"></canvas>'
+    + '</div>'
+
+  // Dim bars + archetype comparison
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">Dimension Scores vs Archetype</div>'
+    + '<div style="display:flex;flex-direction:column;gap:8px">'
+    + dims.map(function(d){
+        var sc = Math.round(dimScores[d]||0)
+        var bestKey2 = best ? (best.arch.code||best.arch.id) : null
+        var ref = best ? Math.round(((archVecs[bestKey2]&&archVecs[bestKey2][d])||0)*20) : 0
+        var lbl = dimLabels[d] || d
+        return '<div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">'
+          + '<span style="color:var(--mid)">' + esc(lbl) + '</span>'
+          + '<span style="font-weight:700;color:var(--navy)">' + sc + ' <span style="color:var(--mid);font-weight:400">vs ref ' + ref + '</span></span>'
+          + '</div>'
+          + '<div style="position:relative;height:5px;background:var(--border);border-radius:3px">'
+          + '<div style="position:absolute;left:0;top:0;width:'+sc+'%;height:100%;background:var(--teal);border-radius:3px;opacity:.8"></div>'
+          + '<div style="position:absolute;left:0;top:0;width:'+ref+'%;height:100%;background:transparent;border-right:2px solid var(--navy)"></div>'
+          + '</div></div>'
+      }).join('')
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--mid);margin-top:8px">&#9646; Teal = Territory &nbsp; | &nbsp; Navy line = Archetype reference</div>'
+    + '</div>'
+
+  html += '</div>'
+
+  // All archetypes ranked
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">All archetype matches</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">'
+    + matches.map(function(m,i){
+        var sc2 = Math.round(m.score*100)
+        var isBest = i===0
+        return '<div style="text-align:center;padding:10px 8px;border-radius:6px;background:'+(isBest?'rgba(0,40,112,.08)':'var(--light)')+';border:1.5px solid '+(isBest?'var(--navy)':'transparent')+'">'
+          + '<div style="font-size:20px;margin-bottom:4px">' + (icons[m.arch.id]||'') + '</div>'
+          + '<div style="font-size:11px;font-weight:' + (isBest?700:400) + ';color:var(--navy);margin-bottom:6px">' + esc(m.arch.name||m.arch.id) + '</div>'
+          + '<div style="height:4px;background:var(--border);border-radius:2px;margin-bottom:4px">'
+          + '<div style="width:'+sc2+'%;height:100%;background:'+(isBest?'var(--navy)':'var(--teal)')+';border-radius:2px"></div>'
+          + '</div>'
+          + '<div style="font-size:12px;font-weight:700;color:'+(isBest?'var(--navy)':'var(--mid)')+'">' + sc2 + '%</div>'
+          + '</div>'
+      }).join('')
+    + '</div></div>'
+
+  html += '</div>'
+
+  // Draw radar after render
+  setTimeout(function(){
+    var ctx = document.getElementById('tp-radar-chart'); if (!ctx) return
+    if (TP.radarChart) { try{ TP.radarChart.destroy() }catch(e){} }
+    var labels  = dims.map(function(d){ return dimLabels[d]||d })
+    var userData = dims.map(function(d){ return Math.round(dimScores[d]||0) })
+    var bestKey = best ? (best.arch.code||best.arch.id) : null
+    var archData = best ? dims.map(function(d){ return Math.round(((archVecs[bestKey]&&archVecs[bestKey][d])||0)*20) }) : []
+    TP.radarChart = new Chart(ctx, {
+      type:'radar',
+      data:{ labels:labels, datasets:[
+        { label:'Territory', data:userData, fill:true, backgroundColor:'rgba(0,178,144,.2)', borderColor:'#00B290', pointBackgroundColor:'#00B290' },
+        { label:best?esc(best.arch.name||best.arch.id):'Reference', data:archData, fill:true, backgroundColor:'rgba(0,40,112,.1)', borderColor:'#002870', pointBackgroundColor:'#002870', borderDash:[4,3] }
+      ]},
+      options:{ responsive:true, scales:{ r:{ min:0,max:100,ticks:{stepSize:25,font:{size:8}},pointLabels:{font:{size:9}} } },
+        plugins:{ legend:{ position:'bottom',labels:{font:{size:10}} } } }
+    })
+  }, 100)
+
+  // Save result to Supabase
+  setTimeout(tpSaveResult, 500)
+
+  return html
+}
+
+//    Feasibility grid                                                           
+function tpFeasibilityGrid() {
+  var p = TP.s1
+  if (!p || !TP.objectives.length) return ''
+
+  // Situation signals (from Stage 1 data)
+  var e = p.hard_stats && p.hard_stats.energy  || {}
+  var w = p.hard_stats && p.hard_stats.water   || {}
+  var l = p.hard_stats && p.hard_stats.land    || {}
+  var k = p.hard_stats && p.hard_stats.workers || {}
+  var d = p.hard_stats && p.hard_stats.digital || {}
+
+  var signals = [
+    { label:'Power supply', val: e.status, enabler: 'surplus', risk: 'deficit' },
+    { label:'Power cost', val: e.tariff_index_pct<=85?'competitive':e.tariff_index_pct>=115?'expensive':'average', enabler:'competitive',risk:'expensive' },
+    { label:'Water stress', val: w.stress_index, enabler:'low', risk:'critical' },
+    { label:'DC cooling', val: w.dc_cooling, enabler:'high', risk:'low' },
+    { label:'Land availability', val: l.govt_land, enabler:'high', risk:'low' },
+    { label:'Skilled labour', val: k.skilled_labour, enabler:'abundant', risk:'scarce' },
+    { label:'Digital infra', val: d.internet_pct>=60?'strong':d.internet_pct>=35?'adequate':'weak', enabler:'strong',risk:'weak' },
+  ]
+
+  // Objective   signal relevance map (which signals matter for which objectives)
+  var relevanceMap = {
+    'Sovereign AI Centre of Excellence':         ['Power supply','Power cost','Water stress','DC cooling','Land availability','Skilled labour','Digital infra'],
+    'High-Performance Computing Hub':            ['Power supply','Power cost','Water stress','DC cooling','Land availability'],
+    'Edge AI & Rural Connectivity':              ['Digital infra','Power supply'],
+    'Agricultural Modernisation & Food Security':['Skilled labour','Digital infra','Water stress'],
+    'Industrial & Manufacturing AI':             ['Power supply','Power cost','Skilled labour'],
+    'e-Governance & Citizen Service Delivery':   ['Digital infra','Skilled labour'],
+    'Disaster & Emergency Management':           ['Digital infra','Power supply'],
+    'Water Resource Management':                 ['Water stress','Digital infra'],
+    'Healthcare AI & Telemedicine':              ['Digital infra','Skilled labour'],
+  }
+
+  function cellRag(signal, objName) {
+    var relMap = relevanceMap[objName]
+    if (!relMap || relMap.indexOf(signal.label) < 0) {
+      return { bg:'#f9f9f9', col:'var(--mid)', text:'' }  // not relevant
+    }
+    var v = signal.val
+    if (v === signal.enabler) return { bg:'#E1F5EE', col:'var(--teal)', text:'&#9679;' }
+    if (v === signal.risk)    return { bg:'#FEE2E2', col:'var(--orange)', text:'&#9675;' }
+    return { bg:'#FFF8E7', col:'var(--amber)', text:'&#9677;' }
+  }
+
+  var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;overflow-x:auto">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">Feasibility Matrix   Situation vs Objectives</div>'
+    + '<div style="font-size:10px;color:var(--mid);margin-bottom:8px">&#9679; Enabler &nbsp; &#9677; Neutral &nbsp; &#9675; Risk &nbsp; Grey = not directly relevant</div>'
+
+  // Header row
+  html += '<table style="width:100%;border-collapse:collapse;font-size:10px">'
+    + '<tr><th style="text-align:left;padding:5px 8px;background:var(--navy);color:#fff;border-radius:4px 0 0 0;min-width:120px">Situation Signal</th>'
+    + '<th style="text-align:center;padding:4px 6px;background:var(--navy);color:#fff;font-size:9px">Value</th>'
+    + TP.objectives.map(function(o){
+        return '<th style="text-align:center;padding:4px 6px;background:var(--navy);color:#fff;font-size:9px;max-width:80px">'
+          + esc(o.length>20?o.substring(0,18)+'..':o) + '</th>'
+      }).join('')
+    + '</tr>'
+
+  // Signal rows
+  signals.forEach(function(sig, ri){
+    html += '<tr style="background:'+(ri%2===0?'#fff':'var(--light)')+'">'
+      + '<td style="padding:6px 8px;font-size:11px;border-bottom:1px solid var(--border)">' + esc(sig.label) + '</td>'
+      + '<td style="text-align:center;padding:6px 4px;font-size:10px;font-weight:600;border-bottom:1px solid var(--border);color:'
+        + (sig.val===sig.enabler?'var(--teal)':sig.val===sig.risk?'var(--orange)':'var(--mid)') + '">'
+        + esc(String(sig.val||'N/A')) + '</td>'
+      + TP.objectives.map(function(obj){
+          var c = cellRag(sig, obj)
+          return '<td style="text-align:center;padding:6px;background:'+c.bg+';border-bottom:1px solid var(--border);font-size:14px;color:'+c.col+'">'+c.text+'</td>'
+        }).join('')
+      + '</tr>'
+  })
+
+  html += '</table></div>'
+  return html
+}
+
+//    Override handlers                                                          
+function tpRemovePoint(type, idx) {
+  TP.overrides[type][idx].removed = true
+  switchTab('profile')
+}
+
+function tpAddPoint(type) {
+  var text = prompt('Add observation:')
+  if (!text || !text.trim()) return
+  TP.overrides[type].push({ text: text.trim(), removed: false, confidence: 'medium', severity: 'moderate' })
+  switchTab('profile')
+}
+
+//    Save to Supabase                                                           
+async function tpSaveResult() {
+  if (!TP.s1 || !TP.s2) return
+  var slug = TP.territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
+  var row = {
+    id:             'TASS-' + Date.now(),
+    territory_id:   slug,
+    answers:        { objectives: TP.objectives, free_text: TP.freeText },
+    dim_scores:     TP.s2.dim_scores,
+    archetype_code: null, // populated by matchmaking
+    created_at:     new Date().toISOString()
+  }
+  await sbInsert('territory_assessments', row)
+}
+
+//    Export stubs (will be built separately)                                    
+function tpExportWord() { alert('Word export coming soon') }
+function tpExportPPT()  { alert('PPT export coming soon') }
+
+
+
+
+function renderCostTab() {
+  var capex   = calcCapex()
+  var opex    = calcOpex()
+  var ucdev   = calcUCDev()
+  var people  = calcPeople()
+  var demand  = calcDemandByYear()
+  var yrs     = MODEL.programme_years
+  var ucphase = ucDevPhase()
+  var cxph    = capexPhase()
+
+  var sascBadge = SASC_DATA
+    ? '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(0,178,144,0.12);color:#00B290;margin-left:8px"> Derived from SASC</span>'
+    : '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,182,0,0.15);color:#b45309;margin-left:8px">No SASC data   using defaults</span>'
+
+  var html = '<div class="card">'
+    + '<div class="card-hdr">Programme parameters</div>'
+    + '<div class="form-grid">'
+    + fmtInput('Programme name', 'text', MODEL.programme_name, 'MODEL.programme_name=this.value;updateHeader()')
+    + fmtInput('Territory', 'text', MODEL.territory, 'MODEL.territory=this.value;updateHeader()')
+    + fmtSelect('Duration', MODEL.programme_years, [3,4,5,7], function(v){ return v + ' years' }, 'MODEL.programme_years=+this.value;switchTab(ACTIVE_TAB)')
+    + fmtSelect('DC type', MODEL.dc_type, ['mdc','bm'], function(v){ return v==='mdc'?'MDC   Modular (14 months)':'B&M   Brick & Mortar (30 months)' }, 'MODEL.dc_type=this.value;switchTab(ACTIVE_TAB)')
+    + fmtInput('Phase 1 compute (MW)', 'number', MODEL.phase1_mw, 'MODEL.phase1_mw=+this.value;switchTab(ACTIVE_TAB)', 'min="1" max="100"')
+    + fmtInput('USD/INR rate', 'number', MODEL.fx_usd_inr, 'MODEL.fx_usd_inr=+this.value;switchTab(ACTIVE_TAB)', 'min="70" max="120"')
+    + '</div></div>'
+
+    // CapEx table
+    + '<div class="card"><div class="card-hdr">Infrastructure CapEx' + sascBadge + '</div>'
+    + '<table class="fm-tbl"><thead><tr><th>Component</th><th style="text-align:right">Rs Cr</th><th>Source</th></tr></thead><tbody>'
+    + capex.lines.map(function(l) {
+        return '<tr><td>' + esc(l.label) + '</td><td style="text-align:right">' + fmtCr(l.cr) + '</td><td style="font-size:10px;color:var(--mid)">' + esc(l.source||'') + '</td></tr>'
+      }).join('')
+    + '<tr class="total-row"><td>Total CapEx</td><td style="text-align:right">' + fmtCr(capex.total) + '</td><td></td></tr>'
+    + '</tbody></table>'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
+    + '<input type="checkbox"' + (MODEL.capex_override_cr !== null ? ' checked' : '') + ' onchange="MODEL.capex_override_cr=this.checked?'+capex.total+':null;switchTab(ACTIVE_TAB)">'
+    + '<label style="margin:0;font-size:11px">Override CapEx</label>'
+    + (MODEL.capex_override_cr !== null ? '<input type="number" value="' + MODEL.capex_override_cr + '" style="width:100px" onchange="MODEL.capex_override_cr=+this.value;switchTab(ACTIVE_TAB)"><span style="font-size:11px;color:var(--mid)">Rs Cr</span>' : '')
+    + '</div></div>'
+
+    // OpEx table
+    + '<div class="card"><div class="card-hdr">Annual OpEx (Phase 1, Rs Cr/yr)</div>'
+    + '<table class="fm-tbl"><thead><tr><th>Component</th><th style="text-align:right">Rs Cr/yr</th></tr></thead><tbody>'
+    + opex.lines.map(function(l) {
+        return '<tr><td>' + esc(l.label) + '</td><td style="text-align:right">' + fmtCr(l.cr, 1) + '</td></tr>'
+      }).join('')
+    + '<tr class="total-row"><td>Total annual OpEx</td><td style="text-align:right">' + fmtCr(opex.total) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
+    + '<input type="checkbox"' + (MODEL.opex_override_cr !== null ? ' checked' : '') + ' onchange="MODEL.opex_override_cr=this.checked?'+opex.total+':null;switchTab(ACTIVE_TAB)">'
+    + '<label style="margin:0;font-size:11px">Override OpEx</label>'
+    + (MODEL.opex_override_cr !== null ? '<input type="number" value="' + MODEL.opex_override_cr + '" style="width:100px" onchange="MODEL.opex_override_cr=+this.value;switchTab(ACTIVE_TAB)"><span style="font-size:11px;color:var(--mid)">Rs Cr/yr</span>' : '')
+    + '</div></div>'
+
+    // UC Dev
+    + '<div class="card"><div class="card-hdr">UC Development' + sascBadge + '</div>'
+    + (ucdev.lines.length ? '<table class="fm-tbl"><thead><tr><th>Wave</th><th style="text-align:right">Rs Cr</th></tr></thead><tbody>'
+      + ucdev.lines.map(function(l){ return '<tr><td>' + esc(l.label) + '</td><td style="text-align:right">' + fmtCr(l.cr) + '</td></tr>' }).join('')
+      + '<tr class="total-row"><td>Total UC dev</td><td style="text-align:right">' + fmtCr(ucdev.total) + '</td></tr>'
+      + '</tbody></table>' : '<div style="color:var(--mid);font-size:12px">No SASC data. Set override below.</div>')
+    + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
+    + '<input type="checkbox"' + (MODEL.ucdev_override_cr !== null ? ' checked' : '') + ' onchange="MODEL.ucdev_override_cr=this.checked?'+(ucdev.total||85)+':null;switchTab(ACTIVE_TAB)">'
+    + '<label style="margin:0;font-size:11px">Override UC dev</label>'
+    + (MODEL.ucdev_override_cr !== null ? '<input type="number" value="' + MODEL.ucdev_override_cr + '" style="width:100px" onchange="MODEL.ucdev_override_cr=+this.value;switchTab(ACTIVE_TAB)"><span style="font-size:11px;color:var(--mid)">Rs Cr</span>' : '')
+    + '</div></div>'
+
+    // Year by year demand + chart
+    + '<div class="card"><div class="card-hdr">Programme cost by year (Rs Cr)</div>'
+    + '<table class="fm-tbl"><thead><tr><th></th>'
+    + Array.from({length:yrs},function(_,i){ return '<th style="text-align:right">Y'+(i+1)+'</th>' }).join('')
+    + '<th style="text-align:right">Total</th></tr></thead><tbody>'
+    + '<tr><td>CapEx</td>' + Array.from({length:yrs},function(_,i){ return '<td style="text-align:right">' + fmtCr(Math.round(cxph[i+1]*capex.total)) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(capex.total) + '</td></tr>'
+    + '<tr><td>OpEx</td>' + Array.from({length:yrs},function(){ return '<td style="text-align:right">' + fmtCr(opex.total) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(opex.total * yrs) + '</td></tr>'
+    + '<tr><td>UC Dev</td>' + Array.from({length:yrs},function(_,i){ return '<td style="text-align:right">' + fmtCr(Math.round(ucphase[i+1])) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(ucdev.total) + '</td></tr>'
+    + '<tr><td>People</td>' + Array.from({length:yrs},function(_,i){ return '<td style="text-align:right">' + fmtCr(people.byYear[i+1]||0) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(people.total) + '</td></tr>'
+    + '<tr class="total-row"><td>Total</td>' + Array.from({length:yrs},function(_,i){ return '<td style="text-align:right">' + fmtCr(demand[i+1]) + '</td>' }).join('') + '<td style="text-align:right">' + fmtCr(totalDemand()) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div style="margin-top:16px;height:220px"><canvas id="chart-demand"></canvas></div>'
+    + '</div>'
+
+  return html
+}
+
+//    TAB 2: Funding Sources                                                     
+function renderSupplyTab() {
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy)">Funding sources</div>'
+    + '<button class="btn btn-primary" onclick="addFundingSource()">+ Add source</button>'
+    + '</div>'
+
+  if (!FUNDING_SOURCES.length) {
+    html += '<div class="card" style="color:var(--mid);font-size:12px;text-align:center;padding:30px">No funding sources added yet. Click "+ Add source" to begin.</div>'
+  } else {
+    FUNDING_SOURCES.forEach(function(fs, idx) {
+      html += renderFundingSourceCard(fs, idx)
+    })
+  }
+
+  var sup = calcTotalSupply()
+  html += '<div class="card" style="border-left:3px solid var(--teal);margin-top:16px">'
+    + '<div class="card-hdr">Total funding   Rs Cr</div>'
+    + '<table class="fm-tbl"><tbody>'
+    + Object.keys(sup.byType).filter(function(k){ return sup.byType[k] > 0 }).map(function(k) {
+        return '<tr><td style="text-transform:capitalize">' + k.replace('_',' ') + '</td><td style="text-align:right;font-weight:600">' + fmtCr(sup.byType[k]) + '</td></tr>'
+      }).join('')
+    + '<tr class="total-row"><td>Total supply</td><td style="text-align:right">' + fmtCr(sup.total) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div style="margin-top:16px;height:200px"><canvas id="chart-funding-mix"></canvas></div>'
+    + '</div>'
+
+  return html
+}
+
+function renderFundingSourceCard(fs, idx) {
+  var emi  = calcEMI(fs)
+  var intT = calcTotalInterest(fs)
+  var isLoan = fs.type === 'loan'
+
+  var html = '<div class="card" style="border-left:3px solid var(--blue)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'
+    + '<div style="font-size:13px;font-weight:700">' + esc(fs.name||'Source '+(idx+1)) + '</div>'
+    + '<button onclick="removeFundingSource(\'' + fs.id + '\')" style="font-size:11px;color:var(--orange);border:none;background:none;cursor:pointer">Remove</button>'
+    + '</div>'
+    + '<div class="form-grid">'
+    + fmtInput('Name', 'text', fs.name, 'updateFS(\'' + fs.id + '\',\'name\',this.value)')
+    + fmtSelect('Type', fs.type, ['grant','loan','scheme','vgf','equity','inkind','revenue_share'], function(v){ return v.replace('_',' ') }, 'updateFS(\'' + fs.id + '\',\'type\',this.value)')
+    + fmtInput('Amount (Rs Cr)', 'number', fs.amount_cr, 'updateFS(\'' + fs.id + '\',\'amount_cr\',+this.value)', 'min="0"')
+    + fmtInput('Start year', 'number', fs.start_year||1, 'updateFS(\'' + fs.id + '\',\'start_year\',+this.value)', 'min="1" max="'+MODEL.programme_years+'"')
+    + '</div>'
+    + (isLoan ? '<div class="form-grid" style="margin-top:8px">'
+        + fmtInput('Interest rate (% pa)', 'number', fs.interest_rate_pct||0, 'updateFS(\'' + fs.id + '\',\'interest_rate_pct\',+this.value)', 'min="0" max="30" step="0.5"')
+        + fmtInput('Tenure (years)', 'number', fs.tenure_years||10, 'updateFS(\'' + fs.id + '\',\'tenure_years\',+this.value)', 'min="1" max="30"')
+        + fmtInput('Grace period (months)', 'number', fs.grace_period_months||0, 'updateFS(\'' + fs.id + '\',\'grace_period_months\',+this.value)', 'min="0" max="36"')
+        + fmtInput('Moratorium (months)', 'number', fs.moratorium_months||0, 'updateFS(\'' + fs.id + '\',\'moratorium_months\',+this.value)', 'min="0" max="60"')
+        + fmtSelect('Repayment type', fs.repayment_type||'annuity', ['annuity','bullet','stepup'], function(v){ return v }, 'updateFS(\'' + fs.id + '\',\'repayment_type\',this.value)')
+        + '</div>'
+        + '<div style="display:flex;gap:16px;margin-top:8px;padding:8px 10px;background:rgba(0,40,112,0.04);border-radius:6px;font-size:12px">'
+        + '<div><span style="color:var(--mid)">Monthly EMI </span><strong>Rs ' + fmtCr(emi, 2) + ' Cr</strong></div>'
+        + '<div><span style="color:var(--mid)">Total interest </span><strong style="color:var(--orange)">Rs ' + fmtCr(intT, 1) + ' Cr</strong></div>'
+        + '<div><span style="color:var(--mid)">Total outflow </span><strong>Rs ' + fmtCr((fs.amount_cr||0) + intT, 1) + ' Cr</strong></div>'
+        + '</div>'
+      : '')
+    + (fs.type === 'scheme' ? '<div class="form-grid" style="margin-top:8px">'
+        + fmtInput('Scheme code', 'text', fs.scheme_code||'', 'updateFS(\'' + fs.id + '\',\'scheme_code\',this.value)')
+        + fmtInput('Coverage % of eligible', 'number', fs.coverage_pct||60, 'updateFS(\'' + fs.id + '\',\'coverage_pct\',+this.value)', 'min="0" max="100"')
+        + '</div>'
+      : '')
+    + (fs.notes ? '<div style="font-size:11px;color:var(--mid);margin-top:6px">' + esc(fs.notes) + '</div>' : '')
+    + '</div>'
+  return html
+}
+
+//    TAB 3: Funding Gap                                                         
+function renderGapTab() {
+  var gap = calcFundingGap()
+  var netColor = gap.net_commitment > 0 ? 'var(--orange)' : 'var(--teal)'
+  var rev = calcRevenue()
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px">'
+    + kpiCard('Total demand', fmtCrFull(gap.demand), 'var(--navy)')
+    + kpiCard('Scheme + loan + grant', fmtCrFull(gap.supply), 'var(--blue)')
+    + kpiCard('Revenue (gross profit)', fmtCrFull(gap.revenue_gp), 'var(--teal)')
+    + kpiCard(MODEL.territory + ' net commitment', fmtCrFull(gap.net_commitment), netColor)
+    + '</div>'
+
+    // Coverage bar
+    + '<div class="card">'
+    + '<div class="card-hdr">Funding coverage: ' + gap.coverage_pct + '%</div>'
+    + '<div style="height:14px;border-radius:7px;background:#e5e7eb;overflow:hidden;margin:8px 0 12px">'
+    + '<div style="height:100%;border-radius:7px;background:linear-gradient(90deg,var(--teal),var(--blue));width:' + Math.min(100,gap.coverage_pct) + '%;transition:width 0.4s"></div>'
+    + '</div>'
+
+    // Waterfall table
+    + '<table class="fm-tbl"><tbody>'
+    + '<tr><td style="font-weight:600">Programme demand</td><td style="text-align:right;font-weight:600">' + fmtCr(gap.demand) + '</td><td></td></tr>'
+    + '<tr><td style="color:var(--teal)">Less: scheme / grant / other funding</td><td style="text-align:right;color:var(--teal)">(' + fmtCr(gap.supply) + ')</td><td style="text-align:right;font-size:11px;color:var(--mid)">' + Math.round(gap.supply/gap.demand*100) + '%</td></tr>'
+    + (gap.revenue_gp > 0 ? '<tr><td style="color:var(--teal)">Less: Track 2 gross profit</td><td style="text-align:right;color:var(--teal)">(' + fmtCr(gap.revenue_gp) + ')</td><td style="text-align:right;font-size:11px;color:var(--mid)">' + Math.round(gap.revenue_gp/gap.demand*100) + '%</td></tr>' : '')
+    + '<tr class="total-row"><td>' + esc(MODEL.territory) + ' net commitment</td><td style="text-align:right;color:' + netColor + '">' + fmtCr(gap.net_commitment) + '</td><td style="text-align:right;font-size:11px;color:'+netColor+'">' + Math.round(gap.net_commitment/gap.demand*100) + '%</td></tr>'
+    + '</tbody></table></div>'
+
+    // Year by year
+    + '<div class="card"><div class="card-hdr">Net commitment by year (indicative)</div>'
+    + '<table class="fm-tbl"><thead><tr><th>Year</th><th style="text-align:right">Demand</th><th style="text-align:right">Supply est.</th><th style="text-align:right">Track 2 GP</th><th style="text-align:right">Net</th></tr></thead><tbody>'
+
+  var demand = calcDemandByYear()
+  var supplyPerYr = gap.supply / MODEL.programme_years
+  for (var y = 1; y <= MODEL.programme_years; y++) {
+    var d = demand[y] || 0
+    var s = Math.round(Math.min(supplyPerYr, d))
+    var r = Math.round((rev.gpByYear ? rev.gpByYear[y]||0 : 0))
+    var net = Math.max(0, d - s - r)
+    html += '<tr><td>Year ' + y + '</td><td style="text-align:right">' + fmtCr(d) + '</td>'
+      + '<td style="text-align:right;color:var(--teal)">(' + fmtCr(s) + ')</td>'
+      + '<td style="text-align:right;color:var(--teal)">(' + fmtCr(r) + ')</td>'
+      + '<td style="text-align:right;font-weight:700;color:' + (net>0?'var(--orange)':'var(--teal)') + '">' + fmtCr(net) + '</td></tr>'
+  }
+  html += '</tbody></table>'
+    + '<div style="margin-top:16px;height:200px"><canvas id="chart-gap"></canvas></div>'
+    + '</div>'
+
+  // One-liner
+  html += '<div class="card" style="border-left:3px solid var(--teal)">'
+    + '<div style="font-size:13px;line-height:1.75;color:var(--dark)">'
+    + esc(MODEL.territory) + ' puts in <strong>Rs ' + fmtCr(gap.net_commitment) + ' Cr net cash</strong> over ' + MODEL.programme_years + ' years '
+    + (gap.supply > 0 ? '(balance covered by scheme funding, grants and external financing). ' : '. ')
+    + (rev.totalGst > 0 ? 'In return, the territory earns <strong>Rs ' + fmtCr(rev.totalGst) + ' Cr in GST</strong> from the AI economy over ' + MODEL.programme_years + ' years.' : '')
+    + (gap.net_commitment > 0 && rev.totalGst > 0 ? ' <strong>Benefit-cost ratio: ' + Math.round(rev.totalGst / gap.net_commitment * 10)/10 + 'x.</strong>' : '')
+    + '</div></div>'
+
+  return html
+}
+
+//    TAB 4: Revenue model                                                       
+function renderRevenueTab() {
+  var rev = calcRevenue()
+  var m = MODEL
+
+  var html = '<div class="card">'
+    + '<div class="card-hdr">Revenue model (Track 2   Inferencing Factory)</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:14px">'
+    + ['bear','base','bull'].map(function(s) {
+        var on = m.rev_scenario === s
+        var colors = { bear:'#FF5539', base:'#002870', bull:'#00B290' }
+        return '<button style="flex:1;padding:7px 10px;border-radius:6px;border:2px solid ' + (on?colors[s]:'#e5e7eb') + ';background:' + (on?colors[s]+'18':'#fff') + ';cursor:pointer;font-weight:' + (on?'700':'500') + ';color:' + (on?colors[s]:'#6B7280') + ';font-size:12px" onclick="MODEL.rev_scenario=\'' + s + '\';switchTab(\'revenue\')">' + s.charAt(0).toUpperCase()+s.slice(1) + '</button>'
+      }).join('')
+    + '</div>'
+    + '<div class="form-grid">'
+    + fmtInput('Market Y1 (Rs Cr)', 'number', m.rev_market_y1_cr, 'MODEL.rev_market_y1_cr=+this.value;switchTab(ACTIVE_TAB)')
+    + fmtInput('Market CAGR (%)', 'number', m.rev_market_cagr, 'MODEL.rev_market_cagr=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="200" step="0.5"')
+    + fmtInput('Y5 capture %   Bear', 'number', m.rev_capture_bear, 'MODEL.rev_capture_bear=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="100" step="0.5"')
+    + fmtInput('Y5 capture %   Base', 'number', m.rev_capture_base, 'MODEL.rev_capture_base=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="100" step="0.5"')
+    + fmtInput('Y5 capture %   Bull', 'number', m.rev_capture_bull, 'MODEL.rev_capture_bull=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="100" step="0.5"')
+    + fmtInput('Gross margin OW (%)', 'number', m.rev_gm_ow_pct, 'MODEL.rev_gm_ow_pct=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="80" step="1"')
+    + fmtInput('GST rate (%)', 'number', m.rev_gst_rate, 'MODEL.rev_gst_rate=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="30"')
+    + fmtInput('Territory GST share (%)', 'number', m.rev_territory_gst_share, 'MODEL.rev_territory_gst_share=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="100"')
+    + '</div></div>'
+
+    // Revenue ramp inputs
+    + '<div class="card"><div class="card-hdr">Revenue ramp (% of Y5 run-rate)</div>'
+    + '<div class="form-grid">'
+    + [1,2,3,4,5].map(function(y) {
+        return fmtInput('Year ' + y, 'number', m.rev_ramp_pct[y-1], 'MODEL.rev_ramp_pct[' + (y-1) + ']=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="100"')
+      }).join('')
+    + '</div></div>'
+
+    // Revenue table
+    + '<div class="card"><div class="card-hdr">Revenue output (Rs Cr)</div>'
+    + '<table class="fm-tbl"><thead><tr><th></th>'
+    + Array.from({length:m.programme_years},function(_,i){ return '<th style="text-align:right">Y'+(i+1)+'</th>' }).join('')
+    + '<th style="text-align:right">Total</th></tr></thead><tbody>'
+    + '<tr><td>Gross revenue</td>' + Array.from({length:m.programme_years},function(_,i){ return '<td style="text-align:right">' + fmtCr(rev.byYear[i+1]||0) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(rev.totalRev) + '</td></tr>'
+    + '<tr><td>Gross profit (' + m.rev_gm_ow_pct + '%)</td>' + Array.from({length:m.programme_years},function(_,i){ return '<td style="text-align:right">' + fmtCr(rev.gpByYear ? rev.gpByYear[i+1]||0 : 0) + '</td>' }).join('') + '<td style="text-align:right;font-weight:600">' + fmtCr(rev.gpByYear ? rev.gpByYear.slice(1,m.programme_years+1).reduce(function(s,v){return s+v},0) : 0) + '</td></tr>'
+    + '<tr><td style="color:var(--teal)">Territory GST earned</td>' + Array.from({length:m.programme_years},function(_,i){ return '<td style="text-align:right;color:var(--teal)">' + fmtCr(rev.gstByYear[i+1]||0) + '</td>' }).join('') + '<td style="text-align:right;font-weight:700;color:var(--teal)">' + fmtCr(rev.totalGst) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div style="margin-top:16px;height:220px"><canvas id="chart-revenue"></canvas></div>'
+    + '</div>'
+
+  return html
+}
+
+//    TAB 5: Cash Flow                                                           
+function renderCashFlowTab() {
+  var cf = calcCashFlow()
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px">'
+    + kpiCard('Peak cash requirement', fmtCrFull(cf.peakCash), cf.peakCash < 0 ? 'var(--orange)' : 'var(--teal)')
+    + kpiCard('Break-even quarter', cf.breakevenQtr ? 'Q' + cf.breakevenQtr + ' (Y' + Math.ceil(cf.breakevenQtr/4) + ')' : 'Not reached', cf.breakevenQtr ? 'var(--teal)' : 'var(--orange)')
+    + kpiCard('NPV (at ' + MODEL.discount_rate_pct + '%)', fmtCrFull(cf.npv), cf.npv >= 0 ? 'var(--teal)' : 'var(--orange)')
+    + kpiCard('Indicative IRR', cf.irr + '%', cf.irr >= MODEL.discount_rate_pct ? 'var(--teal)' : 'var(--orange)')
+    + '</div>'
+
+    + '<div class="card"><div class="card-hdr">Discount rate</div>'
+    + '<div>' + fmtInput('Discount rate (%)', 'number', MODEL.discount_rate_pct, 'MODEL.discount_rate_pct=+this.value;switchTab(ACTIVE_TAB)', 'min="0" max="30" step="0.5"') + '</div>'
+    + '</div>'
+
+    // Cumulative cash flow chart
+    + '<div class="card"><div class="card-hdr">Cumulative cash flow (Rs Cr)</div>'
+    + '<div style="height:220px"><canvas id="chart-cashflow"></canvas></div>'
+    + '</div>'
+
+    // Quarterly bar chart
+    + '<div class="card"><div class="card-hdr">Quarterly cash in vs out (Rs Cr)</div>'
+    + '<div style="height:200px"><canvas id="chart-qtrly"></canvas></div>'
+    + '</div>'
+
+    // Cash flow table (yearly summary)
+    + '<div class="card"><div class="card-hdr">Annual cash flow summary (Rs Cr)</div>'
+    + '<table class="fm-tbl"><thead><tr><th>Year</th><th style="text-align:right">Total outflow</th><th style="text-align:right">Total inflow</th><th style="text-align:right">Net</th><th style="text-align:right">Cumulative</th></tr></thead><tbody>'
+
+  for (var yr = 1; yr <= MODEL.programme_years; yr++) {
+    var yrQtrs = cf.quarters.filter(function(q){ return q.yr === yr })
+    var out = yrQtrs.reduce(function(s,q){ return s+q.outflow },0)
+    var inp = yrQtrs.reduce(function(s,q){ return s+q.inflow },0)
+    var net = yrQtrs.reduce(function(s,q){ return s+q.net },0)
+    var cum = yrQtrs[yrQtrs.length-1].cumulative
+    html += '<tr><td>Year ' + yr + '</td>'
+      + '<td style="text-align:right;color:var(--orange)">(' + fmtCr(out) + ')</td>'
+      + '<td style="text-align:right;color:var(--teal)">' + fmtCr(inp) + '</td>'
+      + '<td style="text-align:right;font-weight:600;color:' + (net>=0?'var(--teal)':'var(--orange)') + '">' + fmtCr(net) + '</td>'
+      + '<td style="text-align:right;font-weight:600;color:' + (cum>=0?'var(--teal)':'var(--orange)') + '">' + fmtCr(cum) + '</td></tr>'
+  }
+  html += '</tbody></table></div>'
+
+  return html
+}
+
+//    TAB 6: What-If                                                             
+function renderWhatIfTab() {
+  var SCENARIOS_DEF = {
+    conservative: { label:'Conservative', rev_scenario:'bear', dc_type:'bm', desc:'B&M DC, bear revenue, minimal schemes' },
+    base:         { label:'Base',         rev_scenario:'base', dc_type:'mdc', desc:'MDC DC, base revenue, standard scheme coverage' },
+    optimistic:   { label:'Optimistic',   rev_scenario:'bull', dc_type:'mdc', desc:'MDC DC, bull revenue, maximum scheme + VGF' }
+  }
+
+  // Compute gap for each scenario without mutating MODEL
+  var results = {}
+  var origDC = MODEL.dc_type, origRev = MODEL.rev_scenario
+  Object.keys(SCENARIOS_DEF).forEach(function(s) {
+    MODEL.dc_type = SCENARIOS_DEF[s].dc_type
+    MODEL.rev_scenario = SCENARIOS_DEF[s].rev_scenario
+    var g = calcFundingGap()
+    var cf = calcCashFlow()
+    var rev = calcRevenue()
+    results[s] = { gap: g, irr: cf.irr, npv: cf.npv, peak: cf.peakCash, rev: rev.totalRev, gst: rev.totalGst }
+  })
+  MODEL.dc_type = origDC; MODEL.rev_scenario = origRev
+
+  var html = '<div class="card"><div class="card-hdr">Scenario comparison</div>'
+    + '<table class="fm-tbl"><thead><tr><th>Metric</th>'
+    + Object.keys(SCENARIOS_DEF).map(function(s){ return '<th style="text-align:right">' + SCENARIOS_DEF[s].label + '</th>' }).join('')
+    + '</tr></thead><tbody>'
+    + [
+        ['Total demand (Rs Cr)',           function(s){ return fmtCr(results[s].gap.demand) }],
+        ['Total supply (Rs Cr)',           function(s){ return fmtCr(results[s].gap.effective_supply) }],
+        ['Net commitment (Rs Cr)',         function(s){ return fmtCr(results[s].gap.net_commitment) }, true],
+        ['Coverage %',                     function(s){ return results[s].gap.coverage_pct + '%' }],
+        ['5yr revenue (Rs Cr)',            function(s){ return fmtCr(results[s].rev) }],
+        ['5yr territory GST (Rs Cr)',      function(s){ return fmtCr(results[s].gst) }],
+        ['Peak cash requirement (Rs Cr)',  function(s){ return fmtCr(results[s].peak) }],
+        ['Indicative IRR',                 function(s){ return results[s].irr + '%' }],
+        ['NPV (Rs Cr)',                    function(s){ return fmtCr(results[s].npv) }],
+      ].map(function(row) {
+        return '<tr><td>' + row[0] + '</td>'
+          + Object.keys(SCENARIOS_DEF).map(function(s) {
+              return '<td style="text-align:right;font-weight:' + (row[2]?'700':'400') + '">' + row[1](s) + '</td>'
+            }).join('')
+          + '</tr>'
+      }).join('')
+    + '</tbody></table></div>'
+
+    // Save scenario
+    + '<div class="card">'
+    + '<div class="card-hdr">Save scenario</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + Object.keys(SCENARIOS_DEF).map(function(s) {
+        return '<button class="btn btn-outline" onclick="saveScenario(\'' + s + '\',\'' + SCENARIOS_DEF[s].label + '\')">' + SCENARIOS_DEF[s].label + '</button>'
+      }).join('')
+    + '<button class="btn btn-primary" onclick="saveScenario(\'custom\',\'Custom\')">Save current as Custom</button>'
+    + '</div></div>'
+
+  return html
+}
+
+//    Chart initialisation                                                       
+function initCharts(tab) {
+  setTimeout(function() {
+    if (tab === 'cost')     initDemandChart()
+    if (tab === 'supply')   initFundingMixChart()
+    if (tab === 'gap')      initGapChart()
+    if (tab === 'revenue')  initRevenueChart()
+    if (tab === 'cashflow') { initCashFlowChart(); initQtrlyChart() }
+  }, 100)
+}
+
+function destroyChart(id) {
+  if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id] }
+}
+
+function initDemandChart() {
+  var el = document.getElementById('chart-demand'); if (!el) return
+  destroyChart('demand')
+  var yrs = MODEL.programme_years
+  var capex  = calcCapex().total
+  var opex   = calcOpex().total
+  var ucdev  = ucDevPhase()
+  var people = calcPeople().byYear
+  var cxph   = capexPhase()
+  var labels = Array.from({length:yrs},function(_,i){ return 'Y'+(i+1) })
+  CHARTS['demand'] = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label:'CapEx',   data:labels.map(function(_,i){ return Math.round((cxph[i+1]||0)*capex) }), backgroundColor:'#1C38F5', stack:'s' },
+        { label:'OpEx',    data:labels.map(function(){ return opex }),                                 backgroundColor:'#002870', stack:'s' },
+        { label:'UC Dev',  data:labels.map(function(_,i){ return Math.round(ucdev[i+1]||0) }),         backgroundColor:'#FFB600', stack:'s' },
+        { label:'People',  data:labels.map(function(_,i){ return people[i+1]||0 }),                   backgroundColor:'#00B290', stack:'s' },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{boxWidth:12,font:{size:10}}} }, scales:{ x:{stacked:true}, y:{stacked:true, ticks:{font:{size:10}}} } }
+  })
+}
+
+function initFundingMixChart() {
+  var el = document.getElementById('chart-funding-mix'); if (!el) return
+  destroyChart('funding-mix')
+  var sup = calcTotalSupply()
+  var labels = [], data = [], colors = []
+  var colorMap = { grant:'#00B290', loan:'#1C38F5', scheme:'#002870', vgf:'#FFB600', inkind:'#6B7280', equity:'#FF5539', revenue_share:'#8B5CF6' }
+  Object.keys(sup.byType).forEach(function(k) {
+    if (sup.byType[k] > 0) { labels.push(k.replace('_',' ')); data.push(sup.byType[k]); colors.push(colorMap[k]||'#ccc') }
+  })
+  if (!data.length) return
+  CHARTS['funding-mix'] = new Chart(el.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels:labels, datasets:[{ data:data, backgroundColor:colors }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{boxWidth:12,font:{size:10}}} } }
+  })
+}
+
+function initGapChart() {
+  var el = document.getElementById('chart-gap'); if (!el) return
+  destroyChart('gap')
+  var demand  = calcDemandByYear()
+  var rev     = calcRevenue()
+  var sup     = calcTotalSupply()
+  var supPerYr = sup.total / MODEL.programme_years
+  var yrs     = MODEL.programme_years
+  var labels  = Array.from({length:yrs},function(_,i){ return 'Y'+(i+1) })
+  CHARTS['gap'] = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label:'Demand',  data:labels.map(function(_,i){ return demand[i+1]||0 }),    backgroundColor:'rgba(255,85,57,0.5)', stack:'a' },
+        { label:'Supply',  data:labels.map(function(){ return Math.round(supPerYr) }), backgroundColor:'rgba(0,178,144,0.6)', stack:'b' },
+        { label:'Revenue', data:labels.map(function(_,i){ return rev.gpByYear ? rev.gpByYear[i+1]||0 : 0 }), backgroundColor:'rgba(28,56,245,0.5)', stack:'b' },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{boxWidth:12,font:{size:10}}} }, scales:{ y:{ticks:{font:{size:10}}} } }
+  })
+}
+
+function initRevenueChart() {
+  var el = document.getElementById('chart-revenue'); if (!el) return
+  destroyChart('revenue')
+  var rev  = calcRevenue()
+  var yrs  = MODEL.programme_years
+  var labels = Array.from({length:yrs},function(_,i){ return 'Y'+(i+1) })
+  CHARTS['revenue'] = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label:'Gross revenue', data:labels.map(function(_,i){ return rev.byYear[i+1]||0 }),  backgroundColor:'rgba(0,40,112,0.15)', yAxisID:'y' },
+        { label:'Gross profit',  data:labels.map(function(_,i){ return rev.gpByYear ? rev.gpByYear[i+1]||0 : 0 }),  backgroundColor:'rgba(0,178,144,0.5)', yAxisID:'y' },
+        { label:'Territory GST', data:labels.map(function(_,i){ return rev.gstByYear[i+1]||0 }), type:'line', borderColor:'#FFB600', backgroundColor:'#FFB600', fill:false, tension:0.3, yAxisID:'y' },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{boxWidth:12,font:{size:10}}} }, scales:{ y:{ticks:{font:{size:10}}} } }
+  })
+}
+
+function initCashFlowChart() {
+  var el = document.getElementById('chart-cashflow'); if (!el) return
+  destroyChart('cashflow')
+  var cf = calcCashFlow()
+  var labels = cf.quarters.map(function(q){ return 'Q'+q.q })
+  var cumData = cf.quarters.map(function(q){ return q.cumulative })
+  var peakIdx = cumData.indexOf(Math.min.apply(null, cumData))
+  CHARTS['cashflow'] = new Chart(el.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        { label:'Cumulative cash (Rs Cr)', data:cumData, borderColor:'#1C38F5', backgroundColor:'rgba(28,56,245,0.08)', fill:true, tension:0.3, pointRadius:0, pointHoverRadius:4 },
+        { label:'Break-even', data:cf.quarters.map(function(){ return 0 }), borderColor:'rgba(0,178,144,0.5)', borderDash:[5,5], pointRadius:0, fill:false }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}},
+        annotation:{ annotations: cf.breakevenQtr ? [{ type:'line', xMin:cf.breakevenQtr-1, xMax:cf.breakevenQtr-1, borderColor:'#00B290', borderWidth:2, label:{display:true, content:'Break-even Q'+cf.breakevenQtr, position:'start', font:{size:9}} }] : [] }
+      },
+      scales:{ y:{ticks:{font:{size:10}}} }
+    }
+  })
+}
+
+function initQtrlyChart() {
+  var el = document.getElementById('chart-qtrly'); if (!el) return
+  destroyChart('qtrly')
+  var cf = calcCashFlow()
+  // Show yearly aggregated for readability
+  var labels = Array.from({length:MODEL.programme_years},function(_,i){ return 'Y'+(i+1) })
+  var outflows = [], inflows = []
+  for (var yr = 1; yr <= MODEL.programme_years; yr++) {
+    var yrQtrs = cf.quarters.filter(function(q){ return q.yr === yr })
+    outflows.push(yrQtrs.reduce(function(s,q){ return s+q.outflow },0))
+    inflows.push(yrQtrs.reduce(function(s,q){ return s+q.inflow },0))
+  }
+  CHARTS['qtrly'] = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label:'Total outflow', data:outflows.map(function(v){ return -v }), backgroundColor:'rgba(255,85,57,0.6)' },
+        { label:'Total inflow',  data:inflows,                                backgroundColor:'rgba(0,178,144,0.6)' },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}} }, scales:{ y:{ticks:{font:{size:10}}} } }
+  })
+}
+
+//    Form helpers                                                               
+function fmtInput(label, type, val, onchange, extra) {
+  return '<div><label>' + esc(label) + '</label><input type="' + type + '" value="' + esc(String(val||'')) + '" onchange="' + onchange + '"' + (extra ? ' ' + extra : '') + '></div>'
+}
+function fmtSelect(label, val, options, labelFn, onchange) {
+  return '<div><label>' + esc(label) + '</label><select onchange="' + onchange + '">'
+    + options.map(function(o){ return '<option value="' + o + '"' + (val==o?' selected':'') + '>' + esc(labelFn(o)) + '</option>' }).join('')
+    + '</select></div>'
+}
+function kpiCard(label, val, color) {
+  return '<div class="ucrd"><div class="ucrd-v" style="color:' + color + '">' + esc(val) + '</div><div class="ucrd-l">' + esc(label) + '</div></div>'
+}
+
+//    Funding source CRUD                                                        
+async function addFundingSource() {
+  var fs = { id: genId(), engagement_id: ENGAGEMENT_ID||'standalone', name: 'New source', type: 'scheme', amount_cr: 0, start_year: 1, end_year: MODEL.programme_years }
+  FUNDING_SOURCES.push(fs)
+  if (ENGAGEMENT_ID) await sbPost('tsap_funding_sources', fs)
+  switchTab('supply')
+}
+
+async function removeFundingSource(id) {
+  FUNDING_SOURCES = FUNDING_SOURCES.filter(function(fs){ return fs.id !== id })
+  if (ENGAGEMENT_ID) await sbDelete('tsap_funding_sources', 'id=eq.' + id)
+  switchTab('supply')
+}
+
+async function updateFS(id, field, value) {
+  var fs = FUNDING_SOURCES.find(function(f){ return f.id === id })
+  if (!fs) return
+  fs[field] = value
+  if (ENGAGEMENT_ID) {
+    var patch = {}; patch[field] = value
+    var sb = getSB()
+    await fetch(sb.url + '/rest/v1/tsap_funding_sources?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(patch)
+    })
+  }
+  switchTab('supply')
+}
+
+//    Scenario save / load                                                       
+async function saveScenario(name, label) {
+  if (!ENGAGEMENT_ID) { showToast('Load an engagement first', 'error'); return }
+  var payload = {
+    id: 'sc-' + ENGAGEMENT_ID + '-' + name,
+    engagement_id: ENGAGEMENT_ID,
+    name: name,
+    label: label || name,
+    model_json: MODEL,
+    results_json: { gap: calcFundingGap(), rev: calcRevenue(), cf: { irr: calcCashFlow().irr, npv: calcCashFlow().npv } },
+    updated_at: new Date().toISOString()
+  }
+  var ok = await sbPost('tsap_scenarios', payload)
+  showToast(ok ? 'Scenario saved' : 'Save failed', ok ? '' : 'error')
+}
+
+//    Boot                                                                       
+async function init() {
+  // Load unit costs
+  var rows = await sbGet('tsap_unit_costs', 'active=eq.true', 200)
+  rows.forEach(function(r) { UNIT_COSTS[r.item_code] = r })
+  console.log('Unit costs loaded:', Object.keys(UNIT_COSTS).length)
+
+  // Load engagements
+  await loadFXRates()
+  ALL_ENGAGEMENTS = await sbGet('engagements', 'order=name.asc', 50) || []
+
+  // Parse engagement from URL
+  var params = new URLSearchParams(window.location.search)
+  ENGAGEMENT_ID = params.get('eng') || null
+  if (ENGAGEMENT_ID) {
+    var eng = ALL_ENGAGEMENTS.find(function(e){ return e.id === ENGAGEMENT_ID })
+    if (eng) {
+      ENGAGEMENT_NAME = eng.name || ''
+      MODEL.programme_name = ENGAGEMENT_NAME + '   TSAP Financial Model'
+      MODEL.territory = eng.territory || MODEL.territory
+    }
+
+    // Load SASC output for this engagement
+    var sascItems = await sbGet('docket_items', 'engagement_id=eq.' + ENGAGEMENT_ID + '&item_type=eq.solution&order=created_at.desc', 1)
+    if (sascItems && sascItems[0] && sascItems[0].content) {
+      SASC_DATA = sascItems[0].content
+      console.log('SASC data loaded for engagement:', ENGAGEMENT_ID)
+    }
+
+    // Load funding sources
+    FUNDING_SOURCES = await sbGet('tsap_funding_sources', 'engagement_id=eq.' + ENGAGEMENT_ID, 50) || []
+
+    // Load last saved scenario
+    var savedScenarios = await sbGet('tsap_scenarios', 'engagement_id=eq.' + ENGAGEMENT_ID + '&name=eq.custom&order=updated_at.desc', 1)
+    if (savedScenarios && savedScenarios[0] && savedScenarios[0].model_json) {
+      Object.assign(MODEL, savedScenarios[0].model_json)
+    }
+  }
+
+  // Populate engagement dropdown
+  var sel = document.getElementById('eng-select')
+  if (sel && ALL_ENGAGEMENTS.length) {
+    ALL_ENGAGEMENTS.forEach(function(e) {
+      var opt = document.createElement('option')
+      opt.value = e.id
+      opt.textContent = e.name || e.id
+      if (e.id === ENGAGEMENT_ID) opt.selected = true
+      sel.appendChild(opt)
+    })
+  }
+
+  if (ENGAGEMENT_NAME) document.getElementById('eng-status').textContent = ENGAGEMENT_NAME
+  updateHeader()
+  TP_INIT_DONE = true
+  if (TP.stage === 'home') switchTab(ACTIVE_TAB || 'cost')
+}
+
+async function selectEngagement(id) {
+  if (!id) { ENGAGEMENT_ID = null; ENGAGEMENT_NAME = ''; document.getElementById('eng-status').textContent = ''; switchTab('cost'); return }
+  window.location.href = window.location.pathname + '?eng=' + id
+}
+
+init()
 </script>
 </body>
 </html>
