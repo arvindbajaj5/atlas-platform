@@ -763,6 +763,8 @@ async function geminiCall(prompt, useSearch, maxTokens) {
     try {
       var body = { contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.1, maxOutputTokens:maxTokens||2048} }
       if (useSearch) body.tools = [{ google_search:{} }]
+      // For non-search calls, request JSON output mode to prevent markdown/explanation
+      if (!useSearch) body.generationConfig.responseMimeType = 'application/json'
       var r = await fetch(
         'https://generativelanguage.googleapis.com/v1beta/models/'+models[i]+':generateContent?key='+key,
         { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }
@@ -864,8 +866,9 @@ function buildSectionPrompt(name, rawText, territory) {
     +'- Use null for any value not found in the text\n'
     +'- Boolean values: use true or false without quotes\n'
     +(extra[name] ? '- Additional: '+extra[name]+'\n' : '')
+    +'IMPORTANT: Output ONLY the JSON object. No explanation. No markdown.\n'
     +'\nRequired JSON structure:\n'+SECTION_SCHEMAS[name]
-    +'\n\nResearch text about '+territory+':\n'+rawText.substring(0,5000)
+    +'\n\nResearch text about '+territory+':\n'+rawText.substring(0,4000)
 }
 
 //    Parse section response                                                     
@@ -905,7 +908,7 @@ function parseSectionResponse(text) {
 //    Extract one section                                                        
 async function tpExtractOneSection(sectionName, rawText, territory) {
   // Sections with rich text arrays need more tokens
-  var maxTok = { opportunities:3000, geography:2000, programmes:2000, policy:2000 }[sectionName] || 1500
+  var maxTok = { opportunities:4096, geography:3000, programmes:3000, policy:3000, energy:3000, land:2000, workers:2000, digital:2000 }[sectionName] || 2000
   var result = await geminiCall(buildSectionPrompt(sectionName, rawText, territory), false, maxTok)
   if (!result.ok) return { ok:false, section:sectionName, error:result.error }
   TP_TOKENS.s1_extract += result.tokens
@@ -1194,10 +1197,10 @@ function buildS2Prompt(territory, s1data, objectives, freeText) {
     + 'Return ONLY valid JSON, no markdown.\n\n'
     + '{\n'
     + '  "working_in_favour": [\n'
-    + '    {"point": "Specific strength that supports AI objectives", "metric": "the data that proves it", "confidence": "high|medium", "relevance_to": ["objective names"]}\n'
+    + '    {"point": "key strength", "metric": "data proof", "confidence": "high|medium}\n'
     + '  ],\n'
     + '  "needs_attention": [\n'
-    + '    {"point": "Specific gap or risk", "severity": "critical|moderate|minor", "mitigation": "practical suggestion", "relevance_to": ["objective names"]}\n'
+    + '    {"point": "gap or risk", "severity": "critical|moderate|minor", "mitigation": "suggestion}\n'
     + '  ],\n'
     + '  "objective_viability": [\n'
     + '    {"objective": "exact objective name", "viability": "excellent|strong|viable|challenging|not_recommended", "score": 0-100, "rationale": "2 sentences max"}\n'
