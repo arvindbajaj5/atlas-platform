@@ -904,8 +904,9 @@ async function tpExtractOneSection(sectionName, rawText, territory) {
   TP_TOKENS.s1_extract += result.tokens
   var parsed = parseSectionResponse(result.text)
   if (!parsed.ok) {
-    console.log('[TP] '+sectionName+' parse fail: '+result.text.substring(0,100))
-    return { ok:false, section:sectionName, error:parsed.error, raw_response:result.text }
+    // Log first 300 chars to see what model returned
+    console.log('[TP] '+sectionName+' parse fail. Model returned: '+result.text.substring(0,300))
+    return { ok:false, section:sectionName, error:parsed.error+' | Response: '+result.text.substring(0,120), raw_response:result.text }
   }
   return { ok:true, section:sectionName, data:parsed.data }
 }
@@ -970,7 +971,7 @@ function tpRenderFailedSections(failed) {
           +'<button onclick="tpRetrySection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--navy);background:transparent;border-radius:4px;cursor:pointer;color:var(--navy)">&#8635; Re-extract</button>'
           +'<button onclick="tpSkipSection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);background:transparent;border-radius:4px;cursor:pointer;color:var(--mid)">Skip</button>'
           +'</div></div>'
-          +'<div style="font-size:10px;color:var(--mid);margin-top:4px">'+esc(failed[k].error||'Parse failed')+'</div>'
+          +'<div style="font-size:10px;color:var(--mid);margin-top:4px;font-family:monospace;word-break:break-all">'+esc((failed[k].error||'Parse failed').substring(0,200))+'</div>'
           +'</div>'
       }).join('')
     +'</div>'
@@ -1005,19 +1006,23 @@ async function tpRefreshIntel() {
   var territory = TP.territory || (document.getElementById('tp-territory-input') && document.getElementById('tp-territory-input').value.trim())
   if (!territory) return
   if (!confirm('Clear cached intelligence for '+territory+' and re-search? This will run a fresh Gemini search.')) return
-  // Delete from Supabase
   var slug = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
   var sb = getSB()
+  // Try to delete from Supabase (best effort)
   if (sb.url) {
     try {
       await fetch(sb.url+'/rest/v1/territory_profiles?id=eq.'+encodeURIComponent(slug),
-        { method:'DELETE', headers:{ apikey:sb.key, Authorization:'Bearer '+sb.key } })
-    } catch(e) { console.log('Delete failed:', e) }
+        { method:'DELETE', headers:{ apikey:sb.key, Authorization:'Bearer '+sb.key,
+          'Content-Type':'application/json', Prefer:'return=minimal' } })
+    } catch(e) { console.log('[TP] Delete failed:', e) }
   }
-  // Reset TP state and restart
-  TP.territory = territory
-  TP.s1 = null; TP._rawIntel = null; TP.stage = 'home'
-  TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
+  // Force fresh run   bypass cache entirely
+  TP.territory  = territory
+  TP.s1         = null
+  TP._rawIntel  = null
+  TP._forceRefresh = true   // flag to skip cache check in tpStartS1
+  TP.stage      = 'home'
+  TP_TOKENS     = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
   await tpStartS1()
 }
 
@@ -1064,15 +1069,19 @@ async function tpStartS1() {
   if (!TP.archetypes.length) await loadTPData()
   await loadGeminiTextModel()
   var slug = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
-  var cached = await sbFetch('territory_profiles','id=eq.'+encodeURIComponent(slug),1)
-  if (cached&&cached[0]&&cached[0].raw_intel) {
-    var exp = cached[0].expires_at ? new Date(cached[0].expires_at) : null
-    if (!exp||exp>new Date()) {
-      TP._rawIntel=cached[0].raw_intel
-      if (cached[0].profile&&cached[0].profile._sections){ TP.s1=cached[0].profile; TP.stage='s1_done'; switchTab('profile'); return }
-      await tpRunExtraction(territory,TP._rawIntel,slug); return
+  var skipCache = TP._forceRefresh
+  TP._forceRefresh = false  // consume the flag
+  if (!skipCache) {
+    var cached = await sbFetch('territory_profiles','id=eq.'+encodeURIComponent(slug),1)
+    if (cached&&cached[0]&&cached[0].raw_intel) {
+      var exp = cached[0].expires_at ? new Date(cached[0].expires_at) : null
+      if (!exp||exp>new Date()) {
+        TP._rawIntel=cached[0].raw_intel
+        if (cached[0].profile&&cached[0].profile._sections){ TP.s1=cached[0].profile; TP.stage='s1_done'; switchTab('profile'); return }
+        await tpRunExtraction(territory,TP._rawIntel,slug); return
+      }
     }
-  }
+  } else { console.log('[TP] Bypassing cache for fresh search') }
   var prompt = buildRawIntelPrompt(territory)
   TP.stage='s1_loading'; switchTab('profile')
   tpTimerStart(Math.round(prompt.length/4))
