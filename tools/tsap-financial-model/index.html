@@ -1062,7 +1062,7 @@ async function tpLoadCached(id) {
 
 async function tpStartS1() {
   var inp = document.getElementById('tp-territory-input')
-  var territory = inp ? inp.value.trim() : ''
+  var territory = (inp ? inp.value.trim() : '') || TP.territory || ''
   if (!territory) return
   TP.territory=territory; TP._rawIntel=null
   TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
