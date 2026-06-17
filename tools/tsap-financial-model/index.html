@@ -955,14 +955,9 @@ async function tpRefreshIntel() {
   var territory = TP.territory
   if (!territory) return
   if (!confirm('Clear cached intelligence for '+territory+' and re-search?')) return
-  var slug = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
-  var sb = getSB()
-  if (sb.url) {
-    try {
-      await fetch(sb.url+'/rest/v1/territory_profiles?id=eq.'+encodeURIComponent(slug),
-        {method:'DELETE',headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'}})
-    } catch(e) {}
-  }
+  var slug=territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
+  var sb=getSB()
+  if (sb.url) { try { await fetch(sb.url+'/rest/v1/territory_profiles?id=eq.'+encodeURIComponent(slug),{method:'DELETE',headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'}}) } catch(e){} }
   TP.s1=null; TP._rawIntel=null
   TP_TOKENS={s1_raw:0,s1_extract:0,s2_prompt:0,s2_response:0}
   if (!TP.archetypes.length) await loadTPData()
@@ -972,9 +967,7 @@ async function tpRefreshIntel() {
   var result=await geminiCall(prompt,true,4096); tpTimerStop()
   if (!result.ok){TP.stage='home';switchTab('profile');setTimeout(function(){alert('Search failed: '+result.error)},100);return}
   TP_TOKENS.s1_raw=result.tokens; TP._rawIntel=result.text
-  await sbInsert('territory_profiles',{id:slug,territory:territory,raw_intel:result.text,
-    raw_cached_at:new Date().toISOString(),profile:null,generated_at:new Date().toISOString(),
-    expires_at:new Date(Date.now()+90*24*60*60*1000).toISOString()})
+  await sbInsert('territory_profiles',{id:slug,territory:territory,raw_intel:result.text,raw_cached_at:new Date().toISOString(),profile:null,generated_at:new Date().toISOString(),expires_at:new Date(Date.now()+90*24*60*60*1000).toISOString()})
   await tpRunExtraction(territory,result.text,slug)
 }
 
@@ -1085,7 +1078,8 @@ var TP = {
   },
   archetypes: [],
   archetype_dims: [],
-  radarChart: null
+  radarChart: null,
+  _loadingData: false
 }
 
 var OBJECTIVES = [
@@ -1194,8 +1188,16 @@ function ragText(pct) {
 //    Profile tab entry                                                          
 function renderProfileTab() {
   if (!TP.archetypes.length) {
-    loadTPData().then(function(){ if (TP.stage === 'home') switchTab('profile') })
-    return tpLoading('Loading reference data...')
+    if (!TP._loadingData) {
+      TP._loadingData = true
+      loadTPData().then(function(){
+        TP._loadingData = false
+        // Only re-render if archetypes actually loaded
+        if (TP.archetypes.length > 0 && TP.stage === 'home') switchTab('profile')
+      })
+    }
+    // Always show home while loading or if archetypes unavailable
+    return tpHome()
   }
   if (TP.stage === 'home')           return tpHome()
   if (TP.stage === 's1_loading')     return tpLoading('Searching for intelligence on ' + esc(TP.territory) + '... (~20 seconds)')
@@ -1208,8 +1210,8 @@ function renderProfileTab() {
 }
 
 function tpLoading(msg) {
-  var s1tot=TP_TOKENS.s1_raw+TP_TOKENS.s1_extract
-  var s1d=s1tot?'<span style="font-size:10px;color:var(--mid);margin-left:10px">Stage 1: '+s1tot.toLocaleString('en-IN')+' tokens</span>':""
+  var s1t=TP_TOKENS.s1_raw+TP_TOKENS.s1_extract
+  var s1d=s1t?'<span style="font-size:10px;color:var(--mid);margin-left:10px">S1: '+s1t.toLocaleString('en-IN')+' tokens</span>':""
   return '<div style="padding:32px 0">'
     +'<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">'
     +'<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
@@ -1333,8 +1335,8 @@ function tpS1View() {
     k.salary_index_pct, k.skilled_labour||null, 'lower is better')
   html += tpCostTile('&#127968; Land Cost', l.cost_per_acre_lakh ? 'Rs '+l.cost_per_acre_lakh+'L/acre' : 'N/A',
     l.land_cost_index_pct, 'Govt land: '+(l.govt_land||'N/A'), 'lower is better')
-  var gei=e.green_energy_index||0,gRag=gei>=70?'var(--teal)':gei>=40?'var(--amber)':'var(--orange)'
-  html += '<div style="background:#F5F7FA;border-radius:8px;padding:12px 14px;border-left:4px solid '+gRag+'">'
+  var gei=e.green_energy_index||0,gc=gei>=70?'var(--teal)':gei>=40?'var(--amber)':'var(--orange)'
+  html += '<div style="background:#F5F7FA;border-radius:8px;padding:12px 14px;border-left:4px solid '+gc+'">'
     +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">&#127807; Green Energy</div>'
     +'<div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:4px">'+(gei?gei+'/100':'N/A')+'</div>'
     +'<div style="font-size:11px;color:var(--mid)">24x7: '+(e.green_24x7_feasibility||'N/A')+'</div></div>'
@@ -1651,10 +1653,10 @@ function tpS3Result() {
     })
     var mxd=Math.sqrt(dims.length*16),dist=Math.sqrt(ssq)
     var score=mxd>0?Math.max(0,1-dist/mxd):0
-    return { arch:a, score:isNaN(score)?0:score }
+    return {arch:a,score:isNaN(score)?0:score}
   }).sort(function(a,b){return b.score-a.score})
   var best = matches[0]
-  var pct = best?(isNaN(best.score)?0:Math.round(best.score*100)):0
+  var pct=best?(isNaN(best.score)?0:Math.round(best.score*100)):0
 
   var html = '<div style="padding:16px 0">'
 
@@ -1666,9 +1668,6 @@ function tpS3Result() {
     + '<button onclick="tpExportWord()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#128196; Word</button>'
     + '<button onclick="tpExportPPT()" style="padding:5px 12px;border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#128190; PPT</button>'
     + '</div>'
-
-  // Token usage display
-  html += tpTokenDisplay()
 
   // Headline recommendation
   if (TP.s2.headline_recommendation) {
