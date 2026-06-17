@@ -911,15 +911,28 @@ async function tpRefreshIntel() {
 }
 
 async function tpSaveProfile() {
+  // tpSaveProfile now saves full session (S1 profile + S2 result + objectives + overrides + stage)
   if (!TP.s1) return
   var slug = TP.territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
-  await sbInsert('territory_profiles',{
-    id:slug, territory:TP.territory, profile:TP.s1,
-    raw_intel:TP._rawIntel||null,
-    generated_at:new Date().toISOString(),
-    expires_at:new Date(Date.now()+90*24*60*60*1000).toISOString()
+  var session = TP.s2 ? {
+    objectives: TP.objectives,
+    freeText:   TP.freeText,
+    s2:         TP.s2,
+    overrides:  TP.overrides,
+    stage:      TP.stage,
+    saved_at:   new Date().toISOString()
+  } : null
+  await sbInsert('territory_profiles', {
+    id:           slug,
+    territory:    TP.territory,
+    profile:      TP.s1,
+    raw_intel:    TP._rawIntel || null,
+    session:      session,
+    generated_at: new Date().toISOString(),
+    expires_at:   new Date(Date.now() + 90*24*60*60*1000).toISOString()
   })
 }
+
 
 //    tpLoadPast + tpLoadCached + tpStartS1 + tpRunExtraction                  
 async function tpLoadPast() {
@@ -937,12 +950,48 @@ async function tpLoadPast() {
 }
 
 async function tpLoadCached(id) {
-  var rows = await sbFetch('territory_profiles','id=eq.'+encodeURIComponent(id),1)
-  if (!rows||!rows[0]) return
-  var row=rows[0]; TP.territory=row.territory; TP._rawIntel=row.raw_intel||null
-  if (row.profile&&row.profile._sections){ TP.s1=row.profile; TP.stage='s1_done'; switchTab('profile') }
-  else if (row.raw_intel) { await tpRunExtraction(row.territory,row.raw_intel,id) }
+  var rows = await sbFetch('territory_profiles', 'id=eq.' + encodeURIComponent(id), 1)
+  if (!rows || !rows[0]) return
+  var row = rows[0]
+  TP.territory   = row.territory
+  TP._rawIntel   = row.raw_intel || null
+
+  // Restore S1
+  if (row.profile && row.profile._sections) {
+    TP.s1 = row.profile
+  }
+
+  // Restore full session (S2 + objectives + overrides + stage)
+  if (row.session && row.session.s2) {
+    var sess = row.session
+    TP.objectives       = sess.objectives  || []
+    TP.freeText         = sess.freeText    || ''
+    TP.s2               = sess.s2
+    TP.overrides        = sess.overrides   || { working:[], attention:[] }
+    // Restore to S3 if we have a full session, otherwise S1
+    TP.stage = (TP.s1 && TP.s2) ? 's3' : (TP.s1 ? 's1_done' : 'home')
+    showToast('\u21ba Session restored: ' + row.territory)
+    switchTab('profile')
+    return
+  }
+
+  // No S2 session — go to S1 if we have it
+  if (TP.s1) {
+    TP.stage = 's1_done'
+    switchTab('profile')
+    return
+  }
+
+  // Only raw intel — re-extract
+  if (row.raw_intel) {
+    await tpRunExtraction(row.territory, row.raw_intel, id)
+    return
+  }
+
+  TP.stage = 'home'
+  switchTab('profile')
 }
+
 
 async function tpStartS1() {
   var inp = document.getElementById('tp-territory-input')
@@ -958,8 +1007,23 @@ async function tpStartS1() {
     var exp = cached[0].expires_at ? new Date(cached[0].expires_at) : null
     if (!exp||exp>new Date()) {
       TP._rawIntel=cached[0].raw_intel
-      if (cached[0].profile&&cached[0].profile._sections){ TP.s1=cached[0].profile; TP.stage='s1_done'; switchTab('profile'); return }
-      await tpRunExtraction(territory,TP._rawIntel,slug); return
+      if (cached[0].profile && cached[0].profile._sections) {
+        TP.s1 = cached[0].profile
+        // Restore session if available
+        if (cached[0].session && cached[0].session.s2) {
+          var sess = cached[0].session
+          TP.objectives = sess.objectives || []
+          TP.freeText   = sess.freeText   || ''
+          TP.s2         = sess.s2
+          TP.overrides  = sess.overrides  || { working:[], attention:[] }
+          TP.stage      = 's3'
+          showToast('\u21ba Session restored: ' + territory)
+        } else {
+          TP.stage = 's1_done'
+        }
+        switchTab('profile'); return
+      }
+      await tpRunExtraction(territory, TP._rawIntel, slug); return
     }
   }
   var prompt = buildRawIntelPrompt(territory)
@@ -1535,6 +1599,8 @@ function tpToggleObj(name) {
     TP.objectives.push(name)
   }
   switchTab('profile')
+  // Auto-save objectives selection (debounced)
+  if (TP.s1) setTimeout(tpSaveProfile, 500)
 }
 
 async function tpRunS2() {
@@ -1554,6 +1620,8 @@ async function tpRunS2() {
   TP.overrides.attention = (TP.s2.needs_attention   || []).map(function(p){ return { text: p.point, severity: p.severity, mitigation: p.mitigation, removed: false } })
   TP.stage = 's3'
   switchTab('profile')
+  // Auto-save full session (objectives + S2 result + overrides)
+  setTimeout(tpSaveProfile, 300)
 }
 
 //                                                                               
@@ -1847,6 +1915,7 @@ function tpFeasibilityGrid() {
 function tpRemovePoint(type, idx) {
   TP.overrides[type][idx].removed = true
   switchTab('profile')
+  if (TP.s2) setTimeout(tpSaveProfile, 300)
 }
 
 function tpAddPoint(type) {
@@ -1854,22 +1923,15 @@ function tpAddPoint(type) {
   if (!text || !text.trim()) return
   TP.overrides[type].push({ text: text.trim(), removed: false, confidence: 'medium', severity: 'moderate' })
   switchTab('profile')
+  if (TP.s2) setTimeout(tpSaveProfile, 300)
 }
 
 //    Save to Supabase                                                           
 async function tpSaveResult() {
-  if (!TP.s1 || !TP.s2) return
-  var slug = TP.territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
-  var row = {
-    id:             'TASS-' + Date.now(),
-    territory_id:   slug,
-    answers:        { objectives: TP.objectives, free_text: TP.freeText },
-    dim_scores:     TP.s2.dim_scores,
-    archetype_code: null, // populated by matchmaking
-    created_at:     new Date().toISOString()
-  }
-  await sbInsert('territory_assessments', row)
+  // Full session save (S1 + S2 + objectives + overrides + stage)
+  await tpSaveProfile()
 }
+
 
 //    Export stubs (will be built separately)                                    
 function tpExportWord() { alert('Word export coming soon') }
