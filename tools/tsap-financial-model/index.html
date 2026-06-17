@@ -253,11 +253,9 @@ async function sbFetch(table, params, limit) {
 async function sbGet(table, params, limit) {
   var sb = getSB(); if (!sb.url) return []
   try {
-    var ctrl=new AbortController(); var tid=setTimeout(function(){ ctrl.abort() },8000)
-    var r = await fetch(sb.url+'/rest/v1/'+table+'?'+params+(limit?'&limit='+limit:''),
-      { headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}, signal:ctrl.signal })
-    clearTimeout(tid)
-    return r.ok ? r.json() : []
+    var ctrl=new AbortController(),tid=setTimeout(function(){ctrl.abort()},8000)
+    var r=await fetch(sb.url+'/rest/v1/'+table+'?'+params+(limit?'&limit='+limit:''),{headers:{apikey:sb.key,Authorization:'Bearer '+sb.key},signal:ctrl.signal})
+    clearTimeout(tid); return r.ok?r.json():[]
   } catch(e) { return [] }
 }
 async function sbPost(table, data, prefer) {
@@ -956,45 +954,29 @@ function tpSkipSection(sectionName) {
 async function tpRefreshIntel() {
   var territory = TP.territory
   if (!territory) return
-  if (!confirm('Clear cached intelligence for '+territory+' and re-search? This will run a fresh Gemini search.')) return
+  if (!confirm('Clear cached intelligence for '+territory+' and re-search?')) return
   var slug = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
-  // Delete from Supabase
   var sb = getSB()
   if (sb.url) {
     try {
       await fetch(sb.url+'/rest/v1/territory_profiles?id=eq.'+encodeURIComponent(slug),
-        { method:'DELETE', headers:{ apikey:sb.key, Authorization:'Bearer '+sb.key,
-          'Content-Type':'application/json', Prefer:'return=minimal' } })
-      console.log('[TP] Cache deleted for '+slug)
-    } catch(e) { console.log('[TP] Delete failed:', e) }
+        {method:'DELETE',headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'}})
+    } catch(e) {}
   }
-  // Reset state
-  TP.s1 = null; TP._rawIntel = null
-  TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
-  // Go directly to search   bypass tpStartS1 entirely to avoid cache check
+  TP.s1=null; TP._rawIntel=null
+  TP_TOKENS={s1_raw:0,s1_extract:0,s2_prompt:0,s2_response:0}
   if (!TP.archetypes.length) await loadTPData()
   await loadGeminiTextModel()
-  var prompt = buildRawIntelPrompt(territory)
-  TP.stage = 's1_loading'; switchTab('profile')
-  tpTimerStart(Math.round(prompt.length/4))
-  var result = await geminiCall(prompt, true, 4096)
-  tpTimerStop()
-  if (!result.ok) {
-    TP.stage = 'home'; switchTab('profile')
-    setTimeout(function(){ alert('Search failed: '+result.error) }, 100)
-    return
-  }
-  TP_TOKENS.s1_raw = result.tokens; TP._rawIntel = result.text
-  // Save fresh raw intel (overwrites old row)
-  await sbInsert('territory_profiles', {
-    id:slug, territory:territory, raw_intel:result.text,
-    raw_cached_at:new Date().toISOString(), profile:null,
-    generated_at:new Date().toISOString(),
-    expires_at:new Date(Date.now()+90*24*60*60*1000).toISOString()
-  })
-  await tpRunExtraction(territory, result.text, slug)
+  var prompt=buildRawIntelPrompt(territory)
+  TP.stage='s1_loading'; switchTab('profile'); tpTimerStart(Math.round(prompt.length/4))
+  var result=await geminiCall(prompt,true,4096); tpTimerStop()
+  if (!result.ok){TP.stage='home';switchTab('profile');setTimeout(function(){alert('Search failed: '+result.error)},100);return}
+  TP_TOKENS.s1_raw=result.tokens; TP._rawIntel=result.text
+  await sbInsert('territory_profiles',{id:slug,territory:territory,raw_intel:result.text,
+    raw_cached_at:new Date().toISOString(),profile:null,generated_at:new Date().toISOString(),
+    expires_at:new Date(Date.now()+90*24*60*60*1000).toISOString()})
+  await tpRunExtraction(territory,result.text,slug)
 }
-
 
 async function tpSaveProfile() {
   if (!TP.s1) return
@@ -1086,6 +1068,34 @@ async function tpRunExtraction(territory, rawText, slug) {
   TP.s1=buildS1FromSections(r1.concat(r2),territory); TP.stage='s1_done'
   tpSaveProfile(); switchTab('profile')
 }
+
+
+
+
+var TP = {
+  stage: 'home',         // home | s1_loading | s1_done | s2_form | s2_loading | s3
+  territory: '',
+  s1: null,              // Stage 1 profile (from Supabase cache or fresh Gemini call)
+  s2: null,              // Stage 2 AI profile
+  objectives: [],        // selected objectives (max 5)
+  freeText: '',
+  overrides: {           // user edits to AI-generated points
+    working: [],         // array of {text, removed}
+    attention: []
+  },
+  archetypes: [],
+  archetype_dims: [],
+  radarChart: null
+}
+
+var OBJECTIVES = [
+  { group:'INFRASTRUCTURE & COMPUTE',  items:['Sovereign AI Centre of Excellence','High-Performance Computing Hub','Edge AI & Rural Connectivity'] },
+  { group:'ECONOMIC SECTORS',          items:['Agricultural Modernisation & Food Security','Industrial & Manufacturing AI','Tourism & Cultural Heritage','Energy Grid & Renewable Optimisation','MSME & Informal Economy AI'] },
+  { group:'CITIZEN SERVICES',          items:['e-Governance & Citizen Service Delivery','Revenue, Land Records & Cadastral','Transport & Logistics Optimisation','Urban Planning & Smart City','Housing & Urban Development'] },
+  { group:'SOCIAL SECTORS',            items:['Healthcare AI & Telemedicine','Education & Skill Development AI','Women & Child Development AI','Tribal & Remote Community Services'] },
+  { group:'ENVIRONMENT & SAFETY',      items:['Disaster & Emergency Management','Water Resource Management','Environmental Monitoring & Climate','Forest & Wildlife Management'] },
+  { group:'SECURITY & STRATEGIC',      items:['Defence & Border Security AI','Law Enforcement & Crime Analytics','Critical Infrastructure Protection'] }
+]
 
 
 
@@ -1198,21 +1208,19 @@ function renderProfileTab() {
 }
 
 function tpLoading(msg) {
-  var s1tot = TP_TOKENS.s1_raw + TP_TOKENS.s1_extract
-  var s1disp = s1tot ? '<span style="font-size:10px;color:var(--mid);margin-left:10px">Stage 1: '+s1tot.toLocaleString('en-IN')+' tokens used</span>' : ''
+  var s1tot=TP_TOKENS.s1_raw+TP_TOKENS.s1_extract
+  var s1d=s1tot?'<span style="font-size:10px;color:var(--mid);margin-left:10px">Stage 1: '+s1tot.toLocaleString('en-IN')+' tokens</span>':""
   return '<div style="padding:32px 0">'
-    + '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">'
-    + '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
-    + '<div style="font-size:14px;color:var(--mid)">' + msg + '</div>'
-    + '</div>'
-    + '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;width:fit-content">'
-    + '<span style="font-size:11px;color:var(--mid)">Elapsed:</span>'
-    + '<span id="tp-timer-display" style="font-size:14px;font-weight:700;color:var(--navy);font-family:monospace;min-width:36px">0s</span>'
-    + '<div style="width:1px;height:18px;background:var(--border)"></div>'
-    + '<span style="font-size:11px;color:var(--mid)">Tokens (est.):</span>'
-    + '<span id="tp-token-live" style="font-size:14px;font-weight:700;color:var(--teal);font-family:monospace">calculating...</span>'
-    + s1disp
-    + '</div></div>'
+    +'<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">'
+    +'<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
+    +'<div style="font-size:14px;color:var(--mid)">'+msg+'</div></div>'
+    +'<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;width:fit-content">'
+    +'<span style="font-size:11px;color:var(--mid)">Elapsed:</span>'
+    +'<span id="tp-timer-display" style="font-size:14px;font-weight:700;color:var(--navy);font-family:monospace;min-width:36px">0s</span>'
+    +'<div style="width:1px;height:18px;background:var(--border)"></div>'
+    +'<span style="font-size:11px;color:var(--mid)">Tokens (est.):</span>'
+    +'<span id="tp-token-live" style="font-size:14px;font-weight:700;color:var(--teal);font-family:monospace">calculating...</span>'
+    +s1d+'</div></div>'
 }
 
 async function loadTPData() {
@@ -1299,7 +1307,7 @@ function tpS1View() {
     + '<div><div style="font-size:16px;font-weight:900;color:var(--navy)">' + esc(p.territory||TP.territory) + '</div>'
     + '<div style="font-size:11px;color:var(--mid);margin-top:2px">Territory Intelligence   Stage 1 of 3</div></div>'
     + '<div style="display:flex;gap:8px">'
-    + '<button onclick="tpRefreshIntel()" style="padding:9px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--mid)" title="Clear cache and re-search">&#8635; Refresh intelligence</button>'
+    + '<button onclick="tpRefreshIntel()" style="padding:9px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--mid)">&#8635; Refresh</button>'
     + '<button onclick="tpGoS2()" style="padding:9px 18px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Set Objectives &#8594;</button>'
     + '</div>'
     + '</div>'
@@ -1325,16 +1333,11 @@ function tpS1View() {
     k.salary_index_pct, k.skilled_labour||null, 'lower is better')
   html += tpCostTile('&#127968; Land Cost', l.cost_per_acre_lakh ? 'Rs '+l.cost_per_acre_lakh+'L/acre' : 'N/A',
     l.land_cost_index_pct, 'Govt land: '+(l.govt_land||'N/A'), 'lower is better')
-  var gei=e.green_energy_index||0
-  var gRag=gei>=70?'rag-green':gei>=40?'rag-amber':'rag-red'
-  var gBg={'rag-green':'#E1F5EE','rag-amber':'#FFF8E7','rag-red':'#FEE2E2'}[gRag]
-  var gCol={'rag-green':'var(--teal)','rag-amber':'var(--amber)','rag-red':'var(--orange)'}[gRag]
-  html += '<div style="background:'+gBg+';border-radius:8px;padding:12px 14px;border-left:4px solid '+gCol+'">'
-    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">&#127807; Green Energy</div>'
-    + '<div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:4px">'+(gei?gei+'/100':'N/A')+'</div>'
-    + '<div style="font-size:11px;font-weight:700;color:'+gCol+'">'+(e.carbon_intensity_gco2?e.carbon_intensity_gco2+' gCO /kWh':'No data')+'</div>'
-    + '<div style="font-size:10px;color:var(--mid);margin-top:3px">24x7: '+(e.green_24x7_feasibility||'N/A')+'</div>'
-    + '</div>'
+  var gei=e.green_energy_index||0,gRag=gei>=70?'var(--teal)':gei>=40?'var(--amber)':'var(--orange)'
+  html += '<div style="background:#F5F7FA;border-radius:8px;padding:12px 14px;border-left:4px solid '+gRag+'">'
+    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">&#127807; Green Energy</div>'
+    +'<div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:4px">'+(gei?gei+'/100':'N/A')+'</div>'
+    +'<div style="font-size:11px;color:var(--mid)">24x7: '+(e.green_24x7_feasibility||'N/A')+'</div></div>'
   html += '</div>'
 
   // Stats grid
@@ -1529,7 +1532,7 @@ function tpS2Form() {
       + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);padding:6px 10px;background:var(--light);border-radius:4px;margin-bottom:6px">'+esc(group.group)+'</div>'
       + group.items.map(function(item) {
           var isSel = sel.indexOf(item) >= 0
-          var blocked = false
+          var blocked = !isSel && sel.length >= 5
           return '<div onclick="tpToggleObj(\'' + item.replace(/'/g,"\\'") + '\')" '
             + 'style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;border:1.5px solid '
             + (isSel?'var(--navy)':blocked?'var(--border)':'var(--border)')
@@ -1588,7 +1591,7 @@ function tpToggleObj(name) {
   if (idx >= 0) {
     TP.objectives.splice(idx, 1)
   } else {
-    TP.objectives.push(name)  // no cap
+    TP.objectives.push(name)
   }
   switchTab('profile')
 }
@@ -1640,18 +1643,18 @@ function tpS3Result() {
   })
   var matches = TP.archetypes.map(function(a){
     var key = a.code || a.id
-    var sumSq=0
+    var ssq=0
     dims.forEach(function(d){
       var av=((parseFloat(dimScores[d])||0)/100)*4+1
       var bv=parseFloat((archVecs[key]&&archVecs[key][d]))||3
-      sumSq+=Math.pow(av-bv,2)
+      ssq+=Math.pow(av-bv,2)
     })
-    var maxDist=Math.sqrt(dims.length*16); var dist=Math.sqrt(sumSq)
-    var score=(maxDist>0)?Math.max(0,1-dist/maxDist):0
+    var mxd=Math.sqrt(dims.length*16),dist=Math.sqrt(ssq)
+    var score=mxd>0?Math.max(0,1-dist/mxd):0
     return { arch:a, score:isNaN(score)?0:score }
   }).sort(function(a,b){return b.score-a.score})
   var best = matches[0]
-  var pct  = best ? (isNaN(best.score)?0:Math.round(best.score*100)) : 0
+  var pct = best?(isNaN(best.score)?0:Math.round(best.score*100)):0
 
   var html = '<div style="padding:16px 0">'
 
@@ -1663,7 +1666,9 @@ function tpS3Result() {
     + '<button onclick="tpExportWord()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#128196; Word</button>'
     + '<button onclick="tpExportPPT()" style="padding:5px 12px;border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#128190; PPT</button>'
     + '</div>'
-    + tpTokenDisplay()
+
+  // Token usage display
+  html += tpTokenDisplay()
 
   // Headline recommendation
   if (TP.s2.headline_recommendation) {
@@ -1782,7 +1787,7 @@ function tpS3Result() {
     + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">All archetype matches</div>'
     + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">'
     + matches.map(function(m,i){
-        var sc2 = isNaN(m.score)?0:Math.round(m.score*100)
+        var sc2=isNaN(m.score)?0:Math.round(m.score*100)
         var isBest = i===0
         return '<div style="text-align:center;padding:10px 8px;border-radius:6px;background:'+(isBest?'rgba(0,40,112,.08)':'var(--light)')+';border:1.5px solid '+(isBest?'var(--navy)':'transparent')+'">'
           + '<div style="font-size:20px;margin-bottom:4px">' + (icons[m.arch.id]||'') + '</div>'
