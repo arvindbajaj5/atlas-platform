@@ -253,7 +253,13 @@ async function sbFetch(table, params, limit) {
 async function sbGet(table, params, limit) {
   var sb = getSB(); if (!sb.url) return []
   try {
-    var r = await fetch(sb.url + '/rest/v1/' + table + '?' + params + (limit ? '&limit=' + limit : ''), { headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key } })
+    var ctrl = new AbortController()
+    var tid = setTimeout(function(){ ctrl.abort() }, 8000)
+    var r = await fetch(
+      sb.url + '/rest/v1/' + table + '?' + params + (limit ? '&limit=' + limit : ''),
+      { headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }, signal: ctrl.signal }
+    )
+    clearTimeout(tid)
     return r.ok ? r.json() : []
   } catch(e) { return [] }
 }
@@ -630,14 +636,16 @@ function renderTab(tab) {
 }
 
 function updateHeader() {
-  var gap = calcFundingGap()
-  document.getElementById('hdr-title').textContent = MODEL.programme_name || 'TSAP Financial Model'
-  document.getElementById('hdr-territory').textContent = (MODEL.territory||'No engagement') + ' - ' + MODEL.programme_years + 'yr ' + MODEL.dc_type.toUpperCase()
-  document.getElementById('hdr-demand').textContent  = 'Rs ' + fmtCr(gap.demand) + ' Cr'
-  document.getElementById('hdr-supply').textContent  = 'Rs ' + fmtCr(gap.effective_supply) + ' Cr'
-  document.getElementById('hdr-gap').textContent     = 'Rs ' + fmtCr(gap.net_commitment) + ' Cr'
-  document.getElementById('hdr-gap').style.color     = gap.net_commitment > 0 ? '#FF5539' : '#00B290'
-  document.getElementById('hdr-coverage').textContent = gap.coverage_pct + '% covered'
+  try {
+    var gap = calcFundingGap()
+    var el
+    el = document.getElementById('hdr-title');     if (el) el.textContent = MODEL.programme_name || 'TSAP Financial Model'
+    el = document.getElementById('hdr-territory'); if (el) el.textContent = (MODEL.territory||'No engagement') + ' - ' + MODEL.programme_years + 'yr ' + MODEL.dc_type.toUpperCase()
+    el = document.getElementById('hdr-demand');    if (el) el.textContent = 'Rs ' + fmtCr(gap.demand) + ' Cr'
+    el = document.getElementById('hdr-supply');    if (el) el.textContent = 'Rs ' + fmtCr(gap.effective_supply) + ' Cr'
+    el = document.getElementById('hdr-gap');       if (el) { el.textContent = 'Rs ' + fmtCr(gap.net_commitment) + ' Cr'; el.style.color = gap.net_commitment > 0 ? '#FF5539' : '#00B290' }
+    el = document.getElementById('hdr-coverage');  if (el) el.textContent = gap.coverage_pct + '% covered'
+  } catch(e) { console.warn('updateHeader error:', e) }
 }
 
 //    TAB 1: Programme Cost                                                      
@@ -2667,7 +2675,7 @@ async function init() {
     })
   }
 
-  if (ENGAGEMENT_NAME) document.getElementById('eng-status').textContent = ENGAGEMENT_NAME
+  var engEl = document.getElementById('eng-status'); if (ENGAGEMENT_NAME && engEl) engEl.textContent = ENGAGEMENT_NAME
   updateHeader()
   TP_INIT_DONE = true
   if (TP.stage === 'home') switchTab(ACTIVE_TAB || 'cost')
@@ -2678,7 +2686,7 @@ async function selectEngagement(id) {
   window.location.href = window.location.pathname + '?eng=' + id
 }
 
-init()
+init().catch(function(e){ console.error("init failed:", e); switchTab("cost") })
 </script>
 </body>
 </html>
