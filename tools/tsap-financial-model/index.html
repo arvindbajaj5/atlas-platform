@@ -793,7 +793,7 @@ async function geminiCall(prompt, useSearch, maxTokens) {
 async function callS2(territory, s1data, objectives, freeText) {
   var prompt = buildS2Prompt(territory, s1data, objectives, freeText)
   tpTimerStart(Math.round(prompt.length/4))
-  var result = await geminiCall(prompt,false,4096)
+  var result = await geminiCall(prompt,false,8192)
   tpTimerStop()
   if (!result.ok) return { ok:false, error:result.error }
   TP_TOKENS.s2_prompt   = Math.round(result.tokens*0.6)
@@ -1173,7 +1173,7 @@ function buildS2Prompt(territory, s1data, objectives, freeText) {
     + 'CLIENT OBJECTIVES FOR AI IN THIS TERRITORY:\n'
     + objectives.map(function(o,i){ return (i+1)+'. '+o }).join('\n') + '\n\n'
     + (freeText ? 'ADDITIONAL CONTEXT FROM THE TEAM:\n' + freeText + '\n\n' : '')
-    + 'Generate a profile as JSON. Be specific, cite the relevant metrics.\n'
+    + 'Generate a profile as JSON. Be concise. Maximum 3 items per array. 1 sentence per point.\n'
     + 'Return ONLY valid JSON, no markdown.\n\n'
     + '{\n'
     + '  "working_in_favour": [\n'
@@ -1183,7 +1183,7 @@ function buildS2Prompt(territory, s1data, objectives, freeText) {
     + '    {"point": "gap or risk", "severity": "critical|moderate|minor", "mitigation": "suggestion"}\n'
     + '  ],\n'
     + '  "objective_viability": [\n'
-    + '    {"objective": "exact objective name", "viability": "excellent|strong|viable|challenging|not_recommended", "score": 75, "rationale": "2 sentences max"}\n'
+    + '    {"objective": "exact objective name", "viability": "excellent|strong|viable|challenging|not_recommended", "score": 75, "rationale": "brief rationale"}\n'
     + '  ],\n'
     + '  "dim_scores": {\n'
     + '    "infrastructure_readiness": 50,\n'
