@@ -763,8 +763,6 @@ async function geminiCall(prompt, useSearch, maxTokens) {
     try {
       var body = { contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.1, maxOutputTokens:maxTokens||2048} }
       if (useSearch) body.tools = [{ google_search:{} }]
-      // For non-search calls, request JSON output mode to prevent markdown/explanation
-      if (!useSearch) body.generationConfig.responseMimeType = 'application/json'
       var r = await fetch(
         'https://generativelanguage.googleapis.com/v1beta/models/'+models[i]+':generateContent?key='+key,
         { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }
@@ -781,10 +779,13 @@ async function geminiCall(prompt, useSearch, maxTokens) {
       var ed2 = await r.json().catch(function(){ return {} })
       var errMsg = ed2.error ? ed2.error.message : r.statusText
       console.log('[TP] model='+models[i]+' status='+r.status+' err='+errMsg)
-      if (r.status!==404) {
-        // 404 = model not found, try next; any other error = return immediately
+      // 404 = model not found, try next model
+      // 400 = bad request (schema issue, try next model)
+      // 429 = rate limit, 500/503 = server error   return immediately
+      if (r.status===429 || r.status>=500) {
         return { ok:false, error:'API '+r.status+': '+errMsg }
       }
+      // 400 or 404: try next model
     } catch(e) { return { ok:false, error:e.message } }
   }
   return { ok:false, error:'All Gemini models unavailable' }
@@ -799,6 +800,7 @@ async function callS2(territory, s1data, objectives, freeText) {
   if (!result.ok) return { ok:false, error:result.error }
   TP_TOKENS.s2_prompt   = Math.round(result.tokens*0.6)
   TP_TOKENS.s2_response = Math.round(result.tokens*0.4)
+  console.log('[TP] S2 response (first 500):', result.text.substring(0,500))
   var parsed = parseSectionResponse(result.text)
   if (!parsed.ok) return { ok:false, error:'S2 parse: '+parsed.error }
   return { ok:true, data:parsed.data }
@@ -856,9 +858,9 @@ function buildSectionPrompt(name, rawText, territory) {
     opportunities: 'Score each domain 0-100 for AI relevance based on the territory context. Include at least 5 domains.',
     geography: 'Include at least 3 advantages and 2 constraints. known_issues must have at least 1 social and 1 economic issue.'
   }
-  return 'You are extracting structured data about '+territory+', India for an AI strategy report.\n'
-    +'Task: Extract the '+name+' section data from the research text below.\n'
-    +'Output: ONLY a single valid JSON object. No preamble, no explanation, no markdown, no code fences.\n'
+  return 'Extract '+name+' data about '+territory+', India from the research text.\n'
+    +'Output ONLY valid JSON. First character must be {. Last character must be }.\n'
+    +'No preamble. No explanation. No markdown. No code fences.\n'
     +'Rules:\n'
     +'- Start your response with { and end with }\n'
     +'- All string values must be in double quotes\n'
@@ -900,6 +902,20 @@ function parseSectionResponse(text) {
   var fullMatch = text.match(/\{[\s\S]*\}/)
   if (fullMatch) {
     try { return { ok:true, data:JSON.parse(repairJSON(fullMatch[0])) } } catch(e) {}
+  }
+  // Step 4: strip markdown fences and try again
+  var stripped = text.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim()
+  if (stripped !== text.trim()) {
+    try { return { ok:true, data:JSON.parse(stripped) } } catch(e) {}
+    var s2 = stripped.indexOf('{')
+    if (s2 >= 0) {
+      var d2=0, e2=-1
+      for (var j=s2;j<stripped.length;j++) {
+        if (stripped[j]==='{') d2++
+        else if (stripped[j]==='}') { d2--; if(d2===0){ e2=j; break } }
+      }
+      if (e2>s2) try { return { ok:true, data:JSON.parse(stripped.substring(s2,e2+1)) } } catch(e) {}
+    }
   }
   console.log('[TP] parseSectionResponse failed on: '+text.substring(0,150))
   return { ok:false, error:'No valid JSON found' }
@@ -1203,15 +1219,15 @@ function buildS2Prompt(territory, s1data, objectives, freeText) {
     + '    {"point": "gap or risk", "severity": "critical|moderate|minor", "mitigation": "suggestion"}\n'
     + '  ],\n'
     + '  "objective_viability": [\n'
-    + '    {"objective": "exact objective name", "viability": "excellent|strong|viable|challenging|not_recommended", "score": 0-100, "rationale": "2 sentences max"}\n'
+    + '    {"objective": "exact objective name", "viability": "excellent|strong|viable|challenging|not_recommended", "score": 75, "rationale": "rationale"}\n'
     + '  ],\n'
     + '  "dim_scores": {\n'
-    + '    "infrastructure_readiness": 0-100,\n'
-    + '    "fiscal_capacity": 0-100,\n'
-    + '    "ai_opportunity_density": 0-100,\n'
-    + '    "workforce_readiness": 0-100,\n'
-    + '    "political_commercial": 0-100,\n'
-    + '    "central_strategic_value": 0-100\n'
+    + '    "infrastructure_readiness": 50,\n'
+    + '    "fiscal_capacity": 50,\n'
+    + '    "ai_opportunity_density": 50,\n'
+    + '    "workforce_readiness": 50,\n'
+    + '    "political_commercial": 50,\n'
+    + '    "central_strategic_value": 50\n'
     + '  },\n'
     + '  "headline_recommendation": "One sentence capturing the strategic play for this territory"\n'
     + '}'
