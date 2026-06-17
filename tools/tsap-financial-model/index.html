@@ -631,14 +631,16 @@ function renderTab(tab) {
 }
 
 function updateHeader() {
-  var gap = calcFundingGap()
-  document.getElementById('hdr-title').textContent = MODEL.programme_name || 'TSAP Financial Model'
-  document.getElementById('hdr-territory').textContent = (MODEL.territory||'No engagement') + ' - ' + MODEL.programme_years + 'yr ' + MODEL.dc_type.toUpperCase()
-  document.getElementById('hdr-demand').textContent  = 'Rs ' + fmtCr(gap.demand) + ' Cr'
-  document.getElementById('hdr-supply').textContent  = 'Rs ' + fmtCr(gap.effective_supply) + ' Cr'
-  document.getElementById('hdr-gap').textContent     = 'Rs ' + fmtCr(gap.net_commitment) + ' Cr'
-  document.getElementById('hdr-gap').style.color     = gap.net_commitment > 0 ? '#FF5539' : '#00B290'
-  document.getElementById('hdr-coverage').textContent = gap.coverage_pct + '% covered'
+  try {
+    var gap = calcFundingGap(); var el
+    // hdr-title does not exist as an ID   use hdr-territory for name
+    el = document.getElementById('hdr-territory')
+    if (el) el.textContent = MODEL.programme_name || (MODEL.territory ? MODEL.territory + '   TSAP FM' : 'TSAP Financial Model')
+    el = document.getElementById('hdr-demand');   if (el) el.textContent = 'Rs ' + fmtCr(gap.demand) + ' Cr'
+    el = document.getElementById('hdr-supply');   if (el) el.textContent = 'Rs ' + fmtCr(gap.effective_supply) + ' Cr'
+    el = document.getElementById('hdr-gap');      if (el) { el.textContent = 'Rs ' + fmtCr(gap.net_commitment) + ' Cr'; el.style.color = gap.net_commitment > 0 ? '#FF5539' : '#00B290' }
+    el = document.getElementById('hdr-coverage'); if (el) el.textContent = gap.coverage_pct + '% covered'
+  } catch(e) { console.warn('[FM] updateHeader error:', e) }
 }
 
 //    TAB 1: Programme Cost                                                      
@@ -2559,7 +2561,7 @@ async function init() {
     })
   }
 
-  if (ENGAGEMENT_NAME) document.getElementById('eng-status').textContent = ENGAGEMENT_NAME
+  var _es = document.getElementById('eng-status'); if (ENGAGEMENT_NAME && _es) _es.textContent = ENGAGEMENT_NAME
   updateHeader()
   TP_INIT_DONE = true
   if (TP.stage === 'home') switchTab(ACTIVE_TAB || 'cost')
