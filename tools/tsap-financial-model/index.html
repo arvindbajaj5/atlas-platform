@@ -774,7 +774,7 @@ async function geminiCall(prompt, useSearch, maxTokens) {
         var data = await r.json()
         var text = ''
         var parts = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts
-        if (parts) parts.forEach(function(p){ if(p.text) text+=p.text })
+        if (parts) parts.forEach(function(p){ if(p.text && p.thought !== true) text+=p.text })
         var tokens = (data.usageMetadata&&data.usageMetadata.totalTokenCount)||0
         console.log('[TP] geminiCall OK model='+models[i]+' tokens='+tokens)
         return { ok:true, text:text, tokens:tokens, model:models[i] }
@@ -798,8 +798,9 @@ async function callS2(territory, s1data, objectives, freeText) {
   if (!result.ok) return { ok:false, error:result.error }
   TP_TOKENS.s2_prompt   = Math.round(result.tokens*0.6)
   TP_TOKENS.s2_response = Math.round(result.tokens*0.4)
+  console.log('[TP] S2 response first 400:', result.text.substring(0,400))
   var parsed = parseSectionResponse(result.text)
-  if (!parsed.ok) return { ok:false, error:'S2 parse: '+parsed.error }
+  if (!parsed.ok) return { ok:false, error:'S2 parse: '+parsed.error+' | got: '+result.text.substring(0,120) }
   return { ok:true, data:parsed.data }
 }
 
@@ -867,6 +868,17 @@ function parseSectionResponse(text) {
   var stripped = text.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim()
   if (stripped !== trimmed) {
     try { return { ok:true, data:JSON.parse(stripped) } } catch(e) {}
+  }
+  // Strategy 4: find ALL top-level {...} blocks, try each from last to first
+  // (thinking models put JSON last, after the thinking text)
+  var allBlocks = []; var d4=0, s4=-1
+  for (var k=0; k<text.length; k++) {
+    if (text[k]==='{') { if(d4===0) s4=k; d4++ }
+    else if (text[k]==='}') { d4--; if(d4===0&&s4>=0){ allBlocks.push(text.substring(s4,k+1)); s4=-1 } }
+  }
+  for (var b=allBlocks.length-1; b>=0; b--) {
+    try { var obj=JSON.parse(allBlocks[b]); if (obj && typeof obj==='object') return { ok:true, data:obj } } catch(e) {}
+    try { var obj2=JSON.parse(repairJSON(allBlocks[b])); if (obj2 && typeof obj2==='object') return { ok:true, data:obj2 } } catch(e) {}
   }
   console.log('[TP] parseSectionResponse failed:', text.substring(0,150))
   return { ok:false, error:'No valid JSON found' }
