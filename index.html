@@ -510,8 +510,9 @@ function renderSidebar(){
   if(user.role==='BUSINESS_HEAD'){
     h+='<div class="nav-cat">Engineering</div>'
     h+='<div class="nav-item" onclick="showTodo()">&#128231; &nbsp;Engineering To-Do</div>'
-    h+='<div class="nav-item" onclick="showSettings()">&#9881; &nbsp;Settings</div>'
   }
+  h+='<div class="nav-cat">Configuration</div>'
+  h+='<div class="nav-item" onclick="window.location.href=\'settings/index.html\'" style="color:var(--mid)">&#9881; &nbsp;Settings</div>'
   document.getElementById('sidebar').innerHTML=h
 }
 function renderHome(){
@@ -699,6 +700,16 @@ function showTodo(){
 }
 
 function showSettings(){
+  // Redirect notice — new dedicated Settings page available
+  document.getElementById('main').innerHTML = '<div style="padding:24px">'
+    + '<div style="background:#E1F5EE;border:1px solid #A7F3D0;border-radius:8px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between">'
+    + '<div><div style="font-size:14px;font-weight:700;color:#065F46">&#9881; Settings have moved</div>'
+    + '<div style="font-size:12px;color:#047857;margin-top:4px">A dedicated Settings page is now available with full configuration options including national averages, hardware SKUs, brand colours, and model preferences.</div></div>'
+    + '<a href="settings/index.html" style="padding:9px 18px;background:#002870;color:#fff;text-decoration:none;border-radius:6px;font-size:13px;font-weight:600;white-space:nowrap;margin-left:16px">Open Settings →</a>'
+    + '</div>'
+    + '<div style="font-size:12px;color:#6B7280">The legacy settings panel below is still available for unit cost editing and model registry. Use the new Settings page for API keys, company info, and national averages.</div>'
+    + '</div>'
+  // Legacy panel continues below for unit costs and model registry
   var gcfg=(function(){try{return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}')}catch(e){return {}}})()
   var dModel=localStorage.getItem('atlas_default_model')||'gemini-3.1-flash-lite'
   // Build provider cards dynamically from registry
