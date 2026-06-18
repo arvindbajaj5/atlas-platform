@@ -2501,6 +2501,8 @@ async function tpGenerateS4() {
     return
   }
 
+  // Log raw S4 text for debugging
+  console.log('[S4] Raw text (first 500):', result.text.substring(0, 500))
   // Parse into sections
   TP.s4 = {
     raw:        result.text,
@@ -2522,57 +2524,87 @@ function tpParseS4(text) {
   var sectionTitles = ['THE MOMENT', 'WHAT THIS TERRITORY OFFERS', 'THE RECOMMENDATION', 'WHAT IT DELIVERS', 'THE ASK']
   var sections = {}
 
-  // Strip markdown before parsing
+  // Strip markdown formatting Gemini may add
   var clean = text
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/^#{1,6}\s*/gm, '')
     .replace(/^---+\s*$/gm, '')
+    .trim()
   var cleanUpper = clean.toUpperCase()
+
+  // Log raw text length for debugging
+  console.log('[S4] Parsing text length:', clean.length, 'chars')
 
   sectionKeys.forEach(function(key, i) {
     var title = sectionTitles[i]
     var nextTitle = sectionTitles[i + 1] || null
     var start = -1
 
-    // S1: exact CAPS title on its own line
-    var tries = [
-      '\n' + title + '\n',
-      '\n' + title + ' ',
-      'SECTION ' + (i+1) + ' ',
-      'SECTION ' + (i+1) + '\u2014',
-      (i+1) + '. ' + title.split(' ')[0]
+    // Try multiple patterns to find section start
+    var patterns = [
+      '\n' + title + '\n',           // title on own line with newlines
+      '\n' + title + ' ',            // title followed by space
+      '\n' + title + ':',            // title with colon
+      title + '\n',                  // title at start of string or after content
+      'SECTION ' + (i+1) + ' \u2014', // Section N — format
+      'SECTION ' + (i+1) + ': ',    // Section N: format
+      'SECTION ' + (i+1) + '\n',    // Section N alone
+      (i+1) + '. ' + title.split(' ')[0]  // N. TITLE
     ]
-    for (var t = 0; t < tries.length; t++) {
-      var idx = cleanUpper.indexOf(tries[t])
-      if (idx >= 0) { start = idx + 1; break }
+
+    for (var p = 0; p < patterns.length; p++) {
+      var idx = cleanUpper.indexOf(patterns[p])
+      if (idx >= 0) {
+        start = idx
+        // Skip past the newline prefix if present
+        if (patterns[p].charAt(0) === '\n') start += 1
+        break
+      }
+    }
+
+    // Also check if title is at very start of text
+    if (start < 0 && cleanUpper.startsWith(title)) {
+      start = 0
     }
 
     if (start < 0) {
+      console.log('[S4] Section not found:', title)
       sections[key] = { title: title, body: '', verified: false }
       return
     }
 
+    // Move past the title line to the content
     var lineEnd = clean.indexOf('\n', start)
     var contentStart = lineEnd >= 0 ? lineEnd + 1 : start + title.length
 
+    // Find where this section ends (start of next section)
     var end = clean.length
     if (nextTitle) {
-      var nxt = cleanUpper.indexOf('\n' + nextTitle, contentStart)
-      if (nxt < 0) nxt = cleanUpper.indexOf('SECTION ' + (i+2), contentStart)
-      if (nxt >= 0) end = nxt
+      for (var np = 0; np < patterns.length && np < 4; np++) {
+        var nextPat = patterns[np].replace(title, nextTitle)
+        var nxt = cleanUpper.indexOf(nextPat, contentStart)
+        if (nxt >= 0) { end = nxt; break }
+      }
+      // Also try simple nextTitle search
+      if (end === clean.length) {
+        var simpleNext = cleanUpper.indexOf(nextTitle, contentStart)
+        if (simpleNext >= 0) end = simpleNext
+      }
     }
 
-    sections[key] = {
-      title: title,
-      body: clean.substring(contentStart, end).trim(),
-      verified: false
-    }
+    var body = clean.substring(contentStart, end).trim()
+    console.log('[S4] Section', title, ':', body.length, 'chars')
+    sections[key] = { title: title, body: body, verified: false }
   })
 
-  // Fallback: split by double newlines if <3 sections found
-  var populated = Object.values(sections).filter(function(sc){ return sc.body.length > 60 }).length
+  // Fallback: if fewer than 3 sections have content, split by paragraphs
+  var populated = Object.values(sections).filter(function(sc){
+    return sc.body.length > 60
+  }).length
+
   if (populated < 3) {
+    console.log('[S4] Fallback: only', populated, 'sections found, trying paragraph split')
     var paras = clean.split(/\n{2,}/).filter(function(p){ return p.trim().length > 80 })
     sectionKeys.forEach(function(key, i) {
       if (sections[key].body.length < 60 && paras[i]) {
@@ -3546,7 +3578,15 @@ async function init() {
     var _b = document.getElementById('missing-key-banner')
     if (_b) _b.style.display = 'flex'
   }
-  switchTab('cost')
+  // Auto-restore last session if available
+  var _autoRestore = await sbFetch('territory_profiles',
+    'session=not.is.null&order=generated_at.desc', 1)
+  if (_autoRestore && _autoRestore[0] && _autoRestore[0].session &&
+      _autoRestore[0].session.s2) {
+    await tpLoadCached(_autoRestore[0].id)
+  } else {
+    switchTab('cost')
+  }
 }
 
 async function selectEngagement(id) {
