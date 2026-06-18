@@ -184,6 +184,47 @@ function boot() {
   try { CFG = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}') } catch(e) { CFG = {} }
   showTab('company')
   updateStatusBar()
+  // Load additional fields from Supabase (async, fills gaps from root index)
+  loadFromSupabase()
+}
+
+async function loadFromSupabase() {
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) return
+  try {
+    var r = await fetch(
+      url + '/rest/v1/app_config?key=in.(brand_name,brand_tagline,brand_logo_url,brand_colour_primary,brand_colour_accent,parent_company_website,nat_avg_power_tariff_inr,nat_avg_water_cost_inr_kl,nat_avg_land_cost_lakh_acre,nat_avg_engineer_salary_lakh,nat_avg_civil_cost_index,nat_avg_construction_cr_mw,atlasai_primary_model)&limit=20',
+      { headers: { apikey: key, Authorization: 'Bearer ' + key } }
+    )
+    if (!r.ok) return
+    var rows = await r.json()
+    var na = CFG.national_averages || {}
+    var changed = false
+    rows.forEach(function(row) {
+      if (row.key === 'brand_name'             && !CFG.companyName)    { CFG.companyName    = row.value; changed = true }
+      if (row.key === 'brand_tagline'          && !CFG.companyTagline) { CFG.companyTagline = row.value; changed = true }
+      if (row.key === 'brand_logo_url'         && !CFG.logoUrl)        { CFG.logoUrl        = row.value; changed = true }
+      if (row.key === 'brand_colour_primary'   && !CFG.brandPrimary)   { CFG.brandPrimary   = row.value; changed = true }
+      if (row.key === 'brand_colour_accent'    && !CFG.brandAccent)    { CFG.brandAccent    = row.value; changed = true }
+      if (row.key === 'parent_company_website' && !CFG.companyWebsite) { CFG.companyWebsite = row.value; changed = true }
+      if (row.key === 'atlasai_primary_model'  && !CFG.geminiTextModel){ CFG.geminiTextModel= row.value; changed = true }
+      if (row.key.startsWith('nat_avg_')) {
+        var k = row.key.replace('nat_avg_', '')
+        if (na[k] === undefined) { na[k] = parseFloat(row.value) || 0; changed = true }
+      }
+    })
+    if (Object.keys(na).length) CFG.national_averages = na
+    if (changed) {
+      try { localStorage.setItem('atlas_global_cfg', JSON.stringify(CFG)) } catch(e) {}
+      // Re-render active tab to show loaded values
+      var activeBtn = document.querySelector('.tab-btn.on')
+      if (activeBtn) showTab(activeBtn.dataset.tab)
+      updateStatusBar()
+    }
+  } catch(e) {
+    console.warn('[Settings] Load from Supabase failed:', e.message)
+  }
 }
 
 function updateStatusBar() {
@@ -564,12 +605,59 @@ function saveAll() {
       else CFG[key] = el.type === 'number' ? (parseFloat(el.value) || el.value) : el.value
     }
   })
+  // Mirror to legacy keys that older tools still read
+  if (CFG.key_gemini) {
+    try { localStorage.setItem('atlas_gemini_key', CFG.key_gemini) } catch(e) {}
+  }
   try {
     localStorage.setItem('atlas_global_cfg', JSON.stringify(CFG))
     updateStatusBar()
-    showToast('\u2713 Settings saved')
+    showToast('✓ Settings saved')
   } catch(e) {
     showToast('Save failed: ' + e.message, 'error')
+    return
+  }
+  // Sync to Supabase (async, non-blocking)
+  syncToSupabase()
+}
+
+
+async function syncToSupabase() {
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) return
+  var rows = []
+  // Company fields — compatible with root index app_config keys
+  if (CFG.companyName)    rows.push({ key: 'brand_name',              value: CFG.companyName })
+  if (CFG.companyTagline) rows.push({ key: 'brand_tagline',           value: CFG.companyTagline })
+  if (CFG.companyWebsite) rows.push({ key: 'parent_company_website',  value: CFG.companyWebsite })
+  if (CFG.logoUrl)        rows.push({ key: 'brand_logo_url',          value: CFG.logoUrl })
+  if (CFG.brandPrimary)   rows.push({ key: 'brand_colour_primary',    value: CFG.brandPrimary })
+  if (CFG.brandAccent)    rows.push({ key: 'brand_colour_accent',     value: CFG.brandAccent })
+  // National averages
+  var na = CFG.national_averages || {}
+  NAT_AVG_FIELDS.forEach(function(f) {
+    var val = na[f.key] !== undefined ? na[f.key] : f.default
+    rows.push({ key: 'nat_avg_' + f.key, value: String(val) })
+  })
+  // atlasAI config
+  var mdl = CFG.geminiTextModel || (CFG.model_tiers && CFG.model_tiers.default) || 'gemini-2.5-flash'
+  rows.push({ key: 'atlasai_primary_model', value: mdl })
+  rows.push({ key: 'atlasai_s4_max_tokens', value: '4096' })
+  rows.push({ key: 'atlasai_s4_timeout_ms', value: '60000' })
+  if (!rows.length) return
+  try {
+    var r = await fetch(url + '/rest/v1/app_config', {
+      method: 'POST',
+      headers: { apikey: key, Authorization: 'Bearer ' + key,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(rows)
+    })
+    if (r.ok) console.log('[Settings] Synced ' + rows.length + ' rows to Supabase')
+    else console.warn('[Settings] Supabase sync failed: HTTP ' + r.status)
+  } catch(e) {
+    console.warn('[Settings] Supabase sync error:', e.message)
   }
 }
 
