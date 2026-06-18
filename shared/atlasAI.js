@@ -47,7 +47,9 @@
     temperature:        0.1,
     retry_on_400:       true,
     timeout_ms:         30000,
-    log_prefix:         '[atlasAI]'
+    log_prefix:         '[atlasAI]',
+    s4_max_tokens:      4096,
+    s4_timeout_ms:      60000
   }
 
   // ── Internal state ───────────────────────────────────────────────────────────
@@ -230,7 +232,7 @@
       contents:         [{ parts: [{ text: prompt }] }],
       generationConfig: { temperature: temp, maxOutputTokens: maxTok }
     }
-    var result = await _fetch(models, body, _cfg.timeout_ms)
+    var result = await _fetch(models, body, opts._timeout || _cfg.timeout_ms)
     if (result.ok) _log('call OK model=' + result.model + ' tokens=' + result.tokens +
       (opts.tool ? ' tool=' + opts.tool : '') + (opts.callType ? ' type=' + opts.callType : ''))
     return result
