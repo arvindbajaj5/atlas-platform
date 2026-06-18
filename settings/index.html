@@ -127,9 +127,8 @@ body{font-family:'Inter',sans-serif;font-size:13px;color:var(--dark);background:
     <button class="tab-btn on" data-tab="company"   onclick="showTab('company')">&#127970; Company</button>
     <button class="tab-btn"    data-tab="keys"       onclick="showTab('keys')">&#128274; API Keys</button>
     <button class="tab-btn"    data-tab="models"     onclick="showTab('models')">&#129302; AI Models</button>
-    <button class="tab-btn"    data-tab="hardware"   onclick="showTab('hardware')">&#9881; Hardware SKUs</button>
+    <button class="tab-btn"    data-tab="hardware"   onclick="showTab('hardware')">&#9881; Hardware &amp; Costs</button>
     <button class="tab-btn"    data-tab="natavg"     onclick="showTab('natavg')">&#127758; National Averages</button>
-    <button class="tab-btn"    data-tab="territory"  onclick="showTab('territory')">&#128205; Territory Config</button>
   </div>
 
   <!-- Tab content -->
@@ -194,7 +193,7 @@ async function loadFromSupabase() {
   if (!url || !key) return
   try {
     var r = await fetch(
-      url + '/rest/v1/app_config?key=in.(brand_name,brand_tagline,brand_logo_url,brand_colour_primary,brand_colour_accent,parent_company_website,nat_avg_power_tariff_inr,nat_avg_water_cost_inr_kl,nat_avg_land_cost_lakh_acre,nat_avg_engineer_salary_lakh,nat_avg_civil_cost_index,nat_avg_construction_cr_mw,atlasai_primary_model)&limit=20',
+      url + '/rest/v1/app_config?key=in.(brand_name,brand_tagline,brand_logo_url,brand_doc_logo_url,brand_colour_primary,brand_colour_accent,parent_company_name,parent_company_website,parent_company_addr1,parent_company_addr2,parent_company_city,parent_company_country,local_company_name,local_company_addr1,local_company_addr2,local_company_city,doc_author_default,doc_prefix,nat_avg_power_tariff_inr,nat_avg_water_cost_inr_kl,nat_avg_land_cost_lakh_acre,nat_avg_engineer_salary_lakh,nat_avg_civil_cost_index,nat_avg_construction_cr_mw,atlasai_primary_model,gpu_skus)&limit=50',
       { headers: { apikey: key, Authorization: 'Bearer ' + key } }
     )
     if (!r.ok) return
@@ -202,16 +201,30 @@ async function loadFromSupabase() {
     var na = CFG.national_averages || {}
     var changed = false
     rows.forEach(function(row) {
-      if (row.key === 'brand_name'             && !CFG.companyName)    { CFG.companyName    = row.value; changed = true }
-      if (row.key === 'brand_tagline'          && !CFG.companyTagline) { CFG.companyTagline = row.value; changed = true }
-      if (row.key === 'brand_logo_url'         && !CFG.logoUrl)        { CFG.logoUrl        = row.value; changed = true }
-      if (row.key === 'brand_colour_primary'   && !CFG.brandPrimary)   { CFG.brandPrimary   = row.value; changed = true }
-      if (row.key === 'brand_colour_accent'    && !CFG.brandAccent)    { CFG.brandAccent    = row.value; changed = true }
-      if (row.key === 'parent_company_website' && !CFG.companyWebsite) { CFG.companyWebsite = row.value; changed = true }
-      if (row.key === 'atlasai_primary_model'  && !CFG.geminiTextModel){ CFG.geminiTextModel= row.value; changed = true }
+      var km = {
+        'brand_name': 'companyName', 'brand_tagline': 'companyTagline',
+        'brand_logo_url': 'logoUrl', 'brand_doc_logo_url': 'docLogoUrl',
+        'brand_colour_primary': 'brandPrimary', 'brand_colour_accent': 'brandAccent',
+        'parent_company_name': 'parentCompanyName', 'parent_company_website': 'parentCompanyWebsite',
+        'parent_company_addr1': 'parentAddr1', 'parent_company_addr2': 'parentAddr2',
+        'parent_company_city': 'parentCity', 'parent_company_country': 'parentCountry',
+        'local_company_name': 'localCompanyName', 'local_company_addr1': 'localAddr1',
+        'local_company_addr2': 'localAddr2', 'local_company_city': 'localCity',
+        'doc_author_default': 'docAuthor', 'doc_prefix': 'docPrefix',
+        'atlasai_primary_model': 'geminiTextModel'
+      }
+      if (km[row.key] && !CFG[km[row.key]]) { CFG[km[row.key]] = row.value; changed = true }
       if (row.key.startsWith('nat_avg_')) {
         var k = row.key.replace('nat_avg_', '')
         if (na[k] === undefined) { na[k] = parseFloat(row.value) || 0; changed = true }
+      }
+      if (row.key === 'gpu_skus' && !CFG.gpu_skus) {
+        try { CFG.gpu_skus = JSON.parse(row.value); changed = true } catch(e) {}
+      }
+      if (row.key.startsWith('hw_cost_') && CFG.hardware_costs === undefined) {
+        var hc = CFG.hardware_costs || {}
+        hc[row.key.replace('hw_cost', '')] = parseFloat(row.value) || 0
+        CFG.hardware_costs = hc; changed = true
       }
     })
     if (Object.keys(na).length) CFG.national_averages = na
@@ -261,7 +274,7 @@ function showTab(tab) {
     case 'models':    el.innerHTML = renderModels();    break
     case 'hardware':  el.innerHTML = renderHardware();  break
     case 'natavg':    el.innerHTML = renderNatAvg();    break
-    case 'territory': el.innerHTML = renderTerritory(); break
+
   }
 }
 
@@ -292,38 +305,90 @@ function select(label, key, options, note) {
 
 // ── Tab: Company ──────────────────────────────────────────────────────────────
 function renderCompany() {
-  var logo = CFG.logoUrl || ''
-  var p = CFG.brandPrimary || '#002870'
-  var a = CFG.brandAccent  || '#FF5539'
+  var g = CFG
+  function cf(label, key, placeholder, note, full) {
+    var val = g[key] !== undefined ? g[key] : ''
+    return '<div class="field' + (full ? ' field-full' : '') + '">'
+      + '<label>' + label + '</label>'
+      + '<input type="text" id="cfg-' + key + '" value="' + esc(String(val)) + '" placeholder="' + esc(placeholder||'') + '" oninput="live(\'' + key + '\',this.value)">'
+      + (note ? '<div class="field-note">' + note + '</div>' : '')
+      + '</div>'
+  }
+
+  // Logo preview helper
+  function logoPreview(key, id) {
+    var url = g[key] || ''
+    return '<div id="' + id + '-preview" style="margin-top:8px;min-height:40px">'
+      + (url ? '<img src="' + esc(url) + '" style="height:40px;border:1px solid var(--border);border-radius:4px;padding:4px" onerror="this.style.display=\'none\'">' : '<span style="font-size:11px;color:var(--mid)">No logo set</span>')
+      + '</div>'
+  }
+
   return '<div class="card">'
-    + '<div class="card-title">Organisation</div>'
-    + '<div class="card-sub">Used in all exports \u2014 Word docs, presentations, Vision Documents</div>'
+    + '<div class="card-title">Brand Identity</div>'
+    + '<div class="card-sub">Short name and logos used across tools and exports</div>'
     + '<div class="field-row">'
-    +   field('Organisation Name', 'companyName', 'text', 'e.g. Acme AI Solutions')
-    +   field('Tagline', 'companyTagline', 'text', 'e.g. Building Sovereign AI')
+    + cf('Brand Name (short)', 'companyName', 'e.g. Acme AI', 'Used in tool headers, nav, document footers')
+    + cf('Brand Tagline', 'companyTagline', 'e.g. Building Sovereign AI')
     + '</div>'
-    + field('Website', 'companyWebsite', 'text', 'https://yourcompany.com')
-    + field('Logo URL', 'logoUrl', 'text', 'https://... (hosted image, PNG/SVG recommended)',
-        'Paste a publicly accessible image URL. Used in Word/PPT exports.',
-        'onchange="refreshLogo()"')
-    + '<div class="logo-preview" id="logo-preview">'
-    + (logo ? '<img src="' + esc(logo) + '" id="logo-img" onerror="this.style.display=\'none\'">' : '<span style="font-size:11px;color:var(--mid)">No logo set</span>')
+    + '<div class="field-row">'
+    + '<div class="field"><label>Tool Logo (simple)</label>'
+    + '<input type="text" id="cfg-logoUrl" value="' + esc(g.logoUrl||'') + '" placeholder="https://... PNG/SVG" oninput="live(\'logoUrl\',this.value);refreshLogo(\'logoUrl\',\'tool-logo\')">'
+    + '<div class="field-note">Small square/horizontal logo for tool headers and nav bar</div>'
+    + logoPreview('logoUrl', 'tool-logo')
+    + '</div>'
+    + '<div class="field"><label>Document Logo (formal)</label>'
+    + '<input type="text" id="cfg-docLogoUrl" value="' + esc(g.docLogoUrl||'') + '" placeholder="https://... PNG/SVG" oninput="live(\'docLogoUrl\',this.value);refreshLogo(\'docLogoUrl\',\'doc-logo\')">'
+    + '<div class="field-note">Full/formal logo for Word docs, PowerPoint covers, Vision Document</div>'
+    + logoPreview('docLogoUrl', 'doc-logo')
+    + '</div>'
     + '</div>'
     + '</div>'
     + '<div class="card">'
-    + '<div class="card-title">Brand Colours</div>'
-    + '<div class="card-sub">Used in exports for headings, accents, and section markers</div>'
+    + '<div class="card-title">Parent Company</div>'
+    + '<div class="card-sub">Legal entity — appears in formal document headers and footers</div>'
+    + '<div class="field-row">'
+    + cf('Company Name (full legal)', 'parentCompanyName', 'e.g. Acme AI Solutions Pvt Ltd')
+    + cf('Website', 'parentCompanyWebsite', 'https://...')
+    + '</div>'
+    + '<div class="field-row">'
+    + cf('Address Line 1', 'parentAddr1', 'Street / building')
+    + cf('Address Line 2', 'parentAddr2', 'Area / locality')
+    + '</div>'
+    + '<div class="field-row">'
+    + cf('City', 'parentCity', 'e.g. Mumbai')
+    + cf('Country', 'parentCountry', 'e.g. India')
+    + '</div>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="card-title">Local / Regional Entity</div>'
+    + '<div class="card-sub">India or regional office — used when engaging state governments</div>'
+    + '<div class="field-row">'
+    + cf('Entity Name', 'localCompanyName', 'e.g. Acme AI India Pvt Ltd')
+    + cf('City', 'localCity', 'e.g. Bengaluru')
+    + '</div>'
+    + '<div class="field-row">'
+    + cf('Address Line 1', 'localAddr1', 'Street / building')
+    + cf('Address Line 2', 'localAddr2', 'Area / locality')
+    + '</div>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="card-title">Document Defaults</div>'
+    + '<div class="card-sub">Pre-filled in generated documents</div>'
+    + '<div class="field-row">'
+    + cf('Default Author Name', 'docAuthor', 'e.g. Presales Team')
+    + cf('Document Prefix', 'docPrefix', 'e.g. ATLAS-2026')
+    + '</div>'
     + '<div class="field-row">'
     + '<div class="field"><label>Primary Colour</label>'
     + '<div style="display:flex;gap:8px;align-items:center">'
-    + '<input type="color" id="cfg-brandPrimary" value="' + p + '" onchange="live(\'brandPrimary\',this.value)" style="width:48px;height:38px;padding:2px;border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer">'
-    + '<input type="text" id="cfg-brandPrimaryHex" value="' + esc(p) + '" placeholder="#002870" style="flex:1" onchange="live(\'brandPrimary\',this.value);document.getElementById(\'cfg-brandPrimary\').value=this.value">'
-    + '</div><div class="field-note">Default: navy #002870</div></div>'
+    + '<input type="color" value="' + esc(g.brandPrimary||'#002870') + '" onchange="live(\'brandPrimary\',this.value)" style="width:48px;height:38px;padding:2px;border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer">'
+    + '<input type="text" value="' + esc(g.brandPrimary||'#002870') + '" placeholder="#002870" style="flex:1" onchange="live(\'brandPrimary\',this.value)">'
+    + '</div></div>'
     + '<div class="field"><label>Accent Colour</label>'
     + '<div style="display:flex;gap:8px;align-items:center">'
-    + '<input type="color" id="cfg-brandAccent" value="' + a + '" onchange="live(\'brandAccent\',this.value)" style="width:48px;height:38px;padding:2px;border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer">'
-    + '<input type="text" id="cfg-brandAccentHex" value="' + esc(a) + '" placeholder="#FF5539" style="flex:1" onchange="live(\'brandAccent\',this.value);document.getElementById(\'cfg-brandAccent\').value=this.value">'
-    + '</div><div class="field-note">Default: orange #FF5539</div></div>'
+    + '<input type="color" value="' + esc(g.brandAccent||'#FF5539') + '" onchange="live(\'brandAccent\',this.value)" style="width:48px;height:38px;padding:2px;border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer">'
+    + '<input type="text" value="' + esc(g.brandAccent||'#FF5539') + '" placeholder="#FF5539" style="flex:1" onchange="live(\'brandAccent\',this.value)">'
+    + '</div></div>'
     + '</div>'
     + '</div>'
 }
@@ -429,23 +494,168 @@ function renderModels() {
 
 // ── Tab: Hardware SKUs ────────────────────────────────────────────────────────
 function renderHardware() {
-  var selected = CFG.primaryGpuSku || 'gb200nvl72'
+  var g = CFG
+  var hc = g.hardware_costs || {}
+
+  // GPU SKUs — from Inferencing Factory PROC structure + user editable
+  var skus = g.gpu_skus || [
+    { id:'gb200nvl2',  vendor:'NVIDIA', name:'GB200 NVL2',     type:'SC',  tdp_w:2700, fp8_tflops:9000,  usd_per_unit:70000, gpus_per_chassis:1,  cooling:'dlc', tier:'premium', enabled:true  },
+    { id:'b200',       vendor:'NVIDIA', name:'B200',            type:'GPU', tdp_w:1000, fp8_tflops:4500,  usd_per_unit:37500, gpus_per_chassis:8,  cooling:'dlc', tier:'high',    enabled:true  },
+    { id:'h200sxm',    vendor:'NVIDIA', name:'H200 SXM',        type:'GPU', tdp_w:700,  fp8_tflops:1979,  usd_per_unit:30000, gpus_per_chassis:8,  cooling:'dlc', tier:'high',    enabled:true  },
+    { id:'mi325x',     vendor:'AMD',    name:'MI325X',          type:'GPU', tdp_w:750,  fp8_tflops:2600,  usd_per_unit:22000, gpus_per_chassis:8,  cooling:'dlc', tier:'high',    enabled:true  },
+    { id:'mi350x',     vendor:'AMD',    name:'MI350X',          type:'GPU', tdp_w:800,  fp8_tflops:3600,  usd_per_unit:28000, gpus_per_chassis:8,  cooling:'dlc', tier:'high',    enabled:false },
+    { id:'l40s',       vendor:'NVIDIA', name:'L40S',            type:'GPU', tdp_w:350,  fp8_tflops:733,   usd_per_unit:8000,  gpus_per_chassis:8,  cooling:'ac',  tier:'light',   enabled:true  },
+    { id:'vera_rubin', vendor:'NVIDIA', name:'Vera Rubin',      type:'GPU', tdp_w:1400, fp8_tflops:8400,  usd_per_unit:55000, gpus_per_chassis:8,  cooling:'dlc', tier:'nextgen', enabled:false }
+  ]
+  if (!g.gpu_skus) CFG.gpu_skus = skus
+
+  var primarySku = g.primaryGpuSku || 'gb200nvl2'
+
   var html = '<div class="card">'
-    + '<div class="card-title">Primary GPU SKU</div>'
-    + '<div class="card-sub">Used in Programme Cost calculations for CapEx sizing and power modelling. Click to select primary.</div>'
-    + '<div class="sku-grid">'
-  HARDWARE_SKUS.forEach(function(sku) {
-    var isSel = sku.id === selected
-    html += '<div class="sku-card' + (isSel ? ' selected' : '') + '" onclick="selectSku(\'' + sku.id + '\')">'
-      + '<div class="sku-tag" style="color:' + sku.color + '">' + esc(sku.tag) + (isSel ? ' \u2014 PRIMARY' : '') + '</div>'
-      + '<div class="sku-name">' + esc(sku.name) + '</div>'
-      + '<div class="sku-spec">' + sku.tdp + ' kW/rack \u00b7 ' + sku.gpus + ' GPUs</div>'
-      + '</div>'
-  })
-  html += '</div>'
-    + '<div class="field-note" style="margin-top:4px">The selected SKU drives rack count, power draw, and cooling estimates in the FM Programme Cost tab.</div>'
+    + '<div class="card-title">GPU SKUs</div>'
+    + '<div class="card-sub">Hardware catalogue — editable. Primary SKU drives FM CapEx calculations. Click row to set primary.</div>'
+    + '<div style="overflow-x:auto"><table class="nat-table" style="min-width:700px">'
+    + '<tr><th style="width:32px"></th><th>SKU ID</th><th>Vendor</th><th>Model Name</th><th>Type</th><th>TDP (W)</th><th>FP8 TFLOPS</th><th>USD/Unit</th><th>GPUs/Chassis</th><th>Cooling</th><th>Enabled</th><th></th></tr>'
+    + skus.map(function(sku, i) {
+        var isPrimary = sku.id === primarySku
+        return '<tr style="cursor:pointer;' + (isPrimary ? 'background:#E1F5EE' : '') + '" onclick="setSkuPrimary(' + i + ')">'
+          + '<td style="text-align:center">' + (isPrimary ? '<span style="color:var(--teal);font-weight:700" title="Primary">&#9679;</span>' : '<span style="color:var(--border)">&#9675;</span>') + '</td>'
+          + '<td><input type="text" value="' + esc(sku.id) + '" oninput="updateSku(' + i + ',\'id\',this.value)" style="width:90px"></td>'
+          + '<td><input type="text" value="' + esc(sku.vendor) + '" oninput="updateSku(' + i + ',\'vendor\',this.value)" style="width:70px"></td>'
+          + '<td><input type="text" value="' + esc(sku.name) + '" oninput="updateSku(' + i + ',\'name\',this.value)" style="width:120px"></td>'
+          + '<td><select onchange="updateSku(' + i + ',\'type\',this.value)" style="width:60px"><option' + (sku.type==='GPU'?' selected':'') + '>GPU</option><option' + (sku.type==='SC'?' selected':'') + '>SC</option><option' + (sku.type==='ASIC'?' selected':'') + '>ASIC</option><option' + (sku.type==='CPU'?' selected':'') + '>CPU</option></select></td>'
+          + '<td><input type="number" value="' + sku.tdp_w + '" oninput="updateSku(' + i + ',\'tdp_w\',+this.value)" style="width:70px"></td>'
+          + '<td><input type="number" value="' + sku.fp8_tflops + '" oninput="updateSku(' + i + ',\'fp8_tflops\',+this.value)" style="width:80px"></td>'
+          + '<td><input type="number" value="' + sku.usd_per_unit + '" oninput="updateSku(' + i + ',\'usd_per_unit\',+this.value)" style="width:80px"></td>'
+          + '<td><input type="number" value="' + sku.gpus_per_chassis + '" oninput="updateSku(' + i + ',\'gpus_per_chassis\',+this.value)" style="width:60px"></td>'
+          + '<td><select onchange="updateSku(' + i + ',\'cooling\',this.value)" style="width:55px"><option' + (sku.cooling==='dlc'?' selected':'') + ' value="dlc">DLC</option><option' + (sku.cooling==='ac'?' selected':'') + ' value="ac">AC</option></select></td>'
+          + '<td style="text-align:center"><input type="checkbox" ' + (sku.enabled ? 'checked' : '') + ' onchange="updateSku(' + i + ',\'enabled\',this.checked)"></td>'
+          + '<td><button onclick="removeSku(' + i + ')" style="padding:2px 7px;background:#FEE2E2;border:none;border-radius:4px;cursor:pointer;font-size:11px;color:#991B1B">&#10005;</button></td>'
+          + '</tr>'
+      }).join('')
+    + '</table></div>'
+    + '<div class="btn-row" style="margin-top:10px">'
+    + '<button class="btn btn-outline" onclick="addSku()">+ Add SKU</button>'
+    + '<button class="btn btn-teal" onclick="saveSkus()">&#8593; Save SKUs to Supabase</button>'
     + '</div>'
+    + '</div>'
+
+  // Rack & Infrastructure Costs
+  var rc = [
+    { key:'_rackDLC', label:'DLC Rack (260kW)',     unit:'USD',  default:85000, hint:'Full DLC rack chassis cost' },
+    { key:'_rackAC',  label:'AC Rack (90kW)',        unit:'USD',  default:35000, hint:'Standard AC rack chassis' },
+    { key:'_cdu',     label:'CDU (Coolant Dist Unit)',unit:'USD', default:25000, hint:'Per DLC rack' },
+    { key:'_pdu',     label:'PDU per rack',           unit:'USD', default:3500,  hint:'Power distribution unit' },
+    { key:'_cwLoop',  label:'Chilled Water Loop',     unit:'USD', default:0,     hint:'Per cluster (0 if not applicable)' },
+    { key:'_chassis', label:'Server Chassis',         unit:'USD', default:12000, hint:'Per 2U/4U server chassis' },
+    { key:'_dimm',    label:'DRAM DIMM per server',   unit:'USD', default:300,   hint:'Per DIMM module' },
+    { key:'_ssd',     label:'NVMe SSD $/TB',          unit:'USD', default:150,   hint:'Per TB NVMe storage' },
+    { key:'_kwh',     label:'Power Cost',             unit:'Rs/kWh', default:7.50, hint:'Overrides national avg if set' },
+    { key:'_rackDLCkw', label:'DLC Rack Capacity',   unit:'kW',   default:260,   hint:'kW per DLC rack' },
+    { key:'_rackACkw',  label:'AC Rack Capacity',     unit:'kW',   default:90,    hint:'kW per AC rack' }
+  ]
+
+  html += '<div class="card">'
+    + '<div class="card-title">Rack &amp; Infrastructure Costs</div>'
+    + '<div class="card-sub">Used in FM CapEx calculations for rack, power, and cooling infrastructure</div>'
+    + '<table class="nat-table">'
+    + '<tr><th>Component</th><th>Unit</th><th>Value</th><th>Hint</th></tr>'
+    + rc.map(function(r) {
+        var val = (hc[r.key] !== undefined) ? hc[r.key] : r.default
+        return '<tr><td style="font-weight:600">' + esc(r.label) + '</td>'
+          + '<td style="color:var(--mid)">' + esc(r.unit) + '</td>'
+          + '<td><input type="number" step="0.01" id="hc-' + r.key.replace('_','') + '" value="' + val + '" onchange="liveHC(\'' + r.key + '\',+this.value)"></td>'
+          + '<td style="color:var(--mid);font-size:10px">' + esc(r.hint) + '</td>'
+          + '</tr>'
+      }).join('')
+    + '</table>'
+    + '</div>'
+
+  // Network costs
+  html += '<div class="card">'
+    + '<div class="card-title">Network &amp; Software Costs</div>'
+    + '<div class="card-sub">Per-port and per-switch network costs; software licensing rates</div>'
+    + '<div class="field-row">'
+    + '<div class="field"><label>IB/RoCE Cost per Port (USD)</label>'
+    + '<input type="number" id="hc-netcpp" value="' + (hc._netcpp||3000) + '" onchange="liveHC(\'_netcpp\',+this.value)">'
+    + '<div class="field-note">Cost per GPU port for InfiniBand/RoCE fabric</div></div>'
+    + '<div class="field"><label>Spine Switch (USD)</label>'
+    + '<input type="number" id="hc-spineSw" value="' + (hc._spineSw||45000) + '" onchange="liveHC(\'_spineSw\',+this.value)">'
+    + '<div class="field-note">64-port spine switch unit cost</div></div>'
+    + '</div>'
+    + '<div class="field-row">'
+    + '<div class="field"><label>NVAIE License (USD/GPU/yr)</label>'
+    + '<input type="number" id="hc-nvaie" value="' + (hc._nvaie||4500) + '" onchange="liveHC(\'_nvaie\',+this.value)">'
+    + '<div class="field-note">NVIDIA AI Enterprise annual per-GPU</div></div>'
+    + '<div class="field"><label>OS License (USD/server/yr)</label>'
+    + '<input type="number" id="hc-os" value="' + (hc._os||1500) + '" onchange="liveHC(\'_os\',+this.value)">'
+    + '<div class="field-note">RHEL / Ubuntu Pro per server</div></div>'
+    + '</div>'
+    + '<div class="btn-row" style="margin-top:8px">'
+    + '<button class="btn btn-teal" onclick="saveHardwareCosts()">&#8593; Save to Supabase</button>'
+    + '</div>'
+    + '</div>'
+
   return html
+}
+
+// SKU helpers
+function setSkuPrimary(i) {
+  var skus = CFG.gpu_skus || []
+  if (skus[i]) { CFG.primaryGpuSku = skus[i].id; showTab('hardware') }
+}
+function updateSku(i, field, val) {
+  var skus = CFG.gpu_skus || []
+  if (skus[i]) skus[i][field] = val
+  CFG.gpu_skus = skus
+}
+function removeSku(i) {
+  var skus = CFG.gpu_skus || []
+  skus.splice(i, 1)
+  CFG.gpu_skus = skus
+  showTab('hardware')
+}
+function addSku() {
+  var skus = CFG.gpu_skus || []
+  skus.push({ id:'new_sku', vendor:'', name:'New SKU', type:'GPU', tdp_w:0, fp8_tflops:0, usd_per_unit:0, gpus_per_chassis:8, cooling:'dlc', tier:'standard', enabled:true })
+  CFG.gpu_skus = skus
+  showTab('hardware')
+}
+function liveHC(key, val) {
+  var hc = CFG.hardware_costs || {}
+  hc[key] = val
+  CFG.hardware_costs = hc
+}
+async function saveSkus() {
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) { showToast('Configure Supabase first', 'error'); return }
+  try {
+    var r = await fetch(url + '/rest/v1/app_config', {
+      method: 'POST',
+      headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ key: 'gpu_skus', value: JSON.stringify(CFG.gpu_skus || []) }])
+    })
+    if (r.ok) showToast('\u2713 GPU SKUs saved to Supabase')
+    else showToast('Save failed: HTTP ' + r.status, 'error')
+  } catch(e) { showToast('Save failed: ' + e.message, 'error') }
+}
+async function saveHardwareCosts() {
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) { showToast('Configure Supabase first', 'error'); return }
+  var hc = CFG.hardware_costs || {}
+  var rows = Object.keys(hc).map(function(k) { return { key: 'hw_cost' + k, value: String(hc[k]) } })
+  if (!rows.length) { showToast('No hardware costs to save', 'error'); return }
+  try {
+    var r = await fetch(url + '/rest/v1/app_config', {
+      method: 'POST',
+      headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(rows)
+    })
+    if (r.ok) showToast('\u2713 Hardware costs saved to Supabase')
+    else showToast('Save failed: HTTP ' + r.status, 'error')
+  } catch(e) { showToast('Save failed: ' + e.message, 'error') }
 }
 
 // ── Tab: National Averages ────────────────────────────────────────────────────
@@ -573,16 +783,22 @@ function selectSku(id) {
   showToast('Primary GPU: ' + id)
 }
 
-function refreshLogo() {
-  var url = document.getElementById('cfg-logoUrl')
-  if (!url) return
-  CFG.logoUrl = url.value
-  var prev = document.getElementById('logo-preview')
+function refreshLogo(key, previewId) {
+  key = key || 'logoUrl'; previewId = previewId || 'tool-logo'
+  var inp = document.getElementById('cfg-' + key)
+  if (!inp) return
+  CFG[key] = inp.value
+  var prev = document.getElementById(previewId + '-preview')
   if (!prev) return
-  if (url.value) {
-    prev.innerHTML = '<img src="' + esc(url.value) + '" style="height:40px;border:1px solid var(--border);border-radius:4px;padding:4px" onerror="this.style.display=\'none\'">'
+  if (inp.value) {
+    var img = document.createElement('img')
+    img.src = inp.value
+    img.style.cssText = 'height:40px;border:1px solid #E5E7EB;border-radius:4px;padding:4px'
+    img.onerror = function(){ this.style.opacity = '0.3' }
+    prev.innerHTML = ''
+    prev.appendChild(img)
   } else {
-    prev.innerHTML = '<span style="font-size:11px;color:var(--mid)">No logo set</span>'
+    prev.innerHTML = '<span style="font-size:11px;color:#6B7280">No logo set</span>'
   }
 }
 
@@ -628,12 +844,24 @@ async function syncToSupabase() {
   if (!url || !key) return
   var rows = []
   // Company fields — compatible with root index app_config keys
-  if (CFG.companyName)    rows.push({ key: 'brand_name',              value: CFG.companyName })
-  if (CFG.companyTagline) rows.push({ key: 'brand_tagline',           value: CFG.companyTagline })
-  if (CFG.companyWebsite) rows.push({ key: 'parent_company_website',  value: CFG.companyWebsite })
-  if (CFG.logoUrl)        rows.push({ key: 'brand_logo_url',          value: CFG.logoUrl })
-  if (CFG.brandPrimary)   rows.push({ key: 'brand_colour_primary',    value: CFG.brandPrimary })
-  if (CFG.brandAccent)    rows.push({ key: 'brand_colour_accent',     value: CFG.brandAccent })
+  if (CFG.companyName)         rows.push({ key: 'brand_name',              value: CFG.companyName })
+  if (CFG.companyTagline)      rows.push({ key: 'brand_tagline',           value: CFG.companyTagline })
+  if (CFG.logoUrl)             rows.push({ key: 'brand_logo_url',          value: CFG.logoUrl })
+  if (CFG.docLogoUrl)          rows.push({ key: 'brand_doc_logo_url',      value: CFG.docLogoUrl })
+  if (CFG.brandPrimary)        rows.push({ key: 'brand_colour_primary',    value: CFG.brandPrimary })
+  if (CFG.brandAccent)         rows.push({ key: 'brand_colour_accent',     value: CFG.brandAccent })
+  if (CFG.parentCompanyName)   rows.push({ key: 'parent_company_name',     value: CFG.parentCompanyName })
+  if (CFG.parentCompanyWebsite)rows.push({ key: 'parent_company_website',  value: CFG.parentCompanyWebsite })
+  if (CFG.parentAddr1)         rows.push({ key: 'parent_company_addr1',    value: CFG.parentAddr1 })
+  if (CFG.parentAddr2)         rows.push({ key: 'parent_company_addr2',    value: CFG.parentAddr2 })
+  if (CFG.parentCity)          rows.push({ key: 'parent_company_city',     value: CFG.parentCity })
+  if (CFG.parentCountry)       rows.push({ key: 'parent_company_country',  value: CFG.parentCountry })
+  if (CFG.localCompanyName)    rows.push({ key: 'local_company_name',      value: CFG.localCompanyName })
+  if (CFG.localAddr1)          rows.push({ key: 'local_company_addr1',     value: CFG.localAddr1 })
+  if (CFG.localAddr2)          rows.push({ key: 'local_company_addr2',     value: CFG.localAddr2 })
+  if (CFG.localCity)           rows.push({ key: 'local_company_city',      value: CFG.localCity })
+  if (CFG.docAuthor)           rows.push({ key: 'doc_author_default',      value: CFG.docAuthor })
+  if (CFG.docPrefix)           rows.push({ key: 'doc_prefix',              value: CFG.docPrefix })
   // National averages
   var na = CFG.national_averages || {}
   NAT_AVG_FIELDS.forEach(function(f) {
