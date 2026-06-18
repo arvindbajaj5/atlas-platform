@@ -138,7 +138,8 @@ async function sbInsert(table, data) {
   try {
     var r = await fetch(sb.url + '/rest/v1/' + table, {
       method:'POST',
-      headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},
+      headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',
+               Prefer:'resolution=merge-duplicates,return=minimal'},
       body:JSON.stringify(data)
     })
     return r.ok
@@ -340,6 +341,62 @@ function ucUsd(code) { return parseFloat(uc(code).value_usd || 0) }
 function usdToCr(usd) { return usd * MODEL.fx_usd_inr / 10 }   // $M -> Rs Cr: $1M * 85 / 10 = 8.5 Cr
 
 //    Demand calculations                                                        
+// ── National Average Unit Costs ───────────────────────────────────────────────
+// Loaded from Supabase app_config (nat_avg_* prefix)
+// All tools use these as the baseline; territory ratios from S1 adjust them
+var NAT_AVG = {
+  power_tariff_inr:      7.50,   // Rs/kWh industrial
+  water_cost_inr_kl:    45.00,   // Rs/kL industrial
+  land_cost_lakh_acre:  80.00,   // Rs lakh/acre industrial
+  engineer_salary_lakh: 12.00,   // Rs lakh/year
+  civil_cost_index:    100.00,   // base 100
+  construction_cr_mw:    8.00    // Rs Cr/MW civil+structural
+}
+
+async function loadNatAvg() {
+  var sb = getSB(); if (!sb.url) return
+  try {
+    var r = await fetch(sb.url + '/rest/v1/app_config?key=like.nat_avg_%25&limit=20',
+      { headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key } })
+    if (!r.ok) return
+    var rows = await r.json()
+    rows.forEach(function(row) {
+      var k = row.key.replace('nat_avg_', '')
+      if (NAT_AVG.hasOwnProperty(k)) NAT_AVG[k] = parseFloat(row.value) || NAT_AVG[k]
+    })
+    console.log('[NAT_AVG] loaded:', JSON.stringify(NAT_AVG))
+  } catch(e) { console.warn('[NAT_AVG] load failed:', e.message) }
+}
+
+// Compute effective territory costs from S1 index values
+// Returns { power_tariff, water_cost, land_cost, civil_index, engineer_salary }
+function getTerritoryCosts() {
+  var e = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.energy   || {}
+  var w = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.water    || {}
+  var l = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.land     || {}
+  var k = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.workers  || {}
+
+  // index_pct: 100 = national avg, 65 = 0.65x, 140 = 1.4x
+  var powerRatio = e.tariff_index_pct  ? e.tariff_index_pct  / 100 : 1.0
+  var waterRatio = w.water_cost_index_pct ? w.water_cost_index_pct / 100 : 1.0
+  var landRatio  = l.land_cost_index_pct  ? l.land_cost_index_pct  / 100 : 1.0
+  var salRatio   = k.salary_index_pct     ? k.salary_index_pct     / 100 : 1.0
+  // Civil cost tracks land cost as a proxy (terrain difficulty)
+  var civilRatio = l.land_cost_index_pct  ? Math.max(0.7, l.land_cost_index_pct / 100) : 1.0
+
+  return {
+    power_tariff:     Math.round(NAT_AVG.power_tariff_inr    * powerRatio * 100) / 100,
+    water_cost:       Math.round(NAT_AVG.water_cost_inr_kl   * waterRatio * 100) / 100,
+    land_cost:        Math.round(NAT_AVG.land_cost_lakh_acre  * landRatio  * 100) / 100,
+    engineer_salary:  Math.round(NAT_AVG.engineer_salary_lakh * salRatio   * 100) / 100,
+    civil_index:      Math.round(NAT_AVG.civil_cost_index     * civilRatio),
+    civil_ratio:      Math.round(civilRatio * 100) / 100,
+    power_ratio:      Math.round(powerRatio * 100) / 100,
+    has_s1:           !!TP.s1
+  }
+}
+
+
 function calcCapex() {
   if (MODEL.capex_override_cr !== null) return { total: MODEL.capex_override_cr, lines: [{ label: 'Override', cr: MODEL.capex_override_cr, source: 'manual' }] }
   var mw = MODEL.phase1_mw
@@ -347,7 +404,13 @@ function calcCapex() {
   var lines = [
     { label: 'Compute (GPU accelerators)',       cr: usdToCr(ucUsd('capex_compute_per_mw') * mw),                         source: 'HAICE FM v2.1' },
     { label: 'MDC container / pod',              cr: isMDC ? usdToCr(ucUsd('capex_pod_per_mw') * mw) : 0,                 source: 'HAICE FM v2.1' },
-    { label: 'Civil & structural',               cr: usdToCr(ucUsd(isMDC ? 'capex_civil_mdc_per_mw' : 'capex_civil_bm_per_mw') * mw), source: 'HAICE FM v2.1' },
+    (function(){
+      var tc = getTerritoryCosts()
+      var base = usdToCr(ucUsd(isMDC ? 'capex_civil_mdc_per_mw' : 'capex_civil_bm_per_mw') * mw)
+      var adj  = Math.round(base * tc.civil_ratio)
+      var src  = tc.has_s1 ? 'Adj '+tc.civil_ratio+'x (territory terrain)' : 'HAICE FM v2.1'
+      return { label: 'Civil & structural', cr: adj, source: src }
+    }()),
     { label: 'DLC-HPAC cooling',                 cr: usdToCr(ucUsd(isMDC ? 'capex_cooling_mdc_per_mw' : 'capex_cooling_bm_per_mw') * mw), source: 'HAICE FM v2.1' },
     { label: 'Power & electrical',               cr: usdToCr(ucUsd(isMDC ? 'capex_power_mdc_per_mw' : 'capex_power_bm_per_mw') * mw), source: 'HAICE FM v2.1' },
     { label: 'Seismic risk + insurance',         cr: usdToCr(ucUsd(isMDC ? 'capex_seismic_mdc_per_mw' : 'capex_seismic_bm_per_mw') * mw), source: 'HAICE FM v2.1' },
@@ -364,10 +427,18 @@ function calcCapex() {
 function calcOpex() {
   if (MODEL.opex_override_cr !== null) return { total: MODEL.opex_override_cr, lines: [{ label: 'Override', cr: MODEL.opex_override_cr }] }
   var lines = [
-    { label: 'Power (hydel Rs 3.5/kWh, PUE 1.15)', cr: ucInr('opex_power_phase1') },
+    (function(){
+      var tc = getTerritoryCosts()
+      var tariff = tc.has_s1 ? tc.power_tariff : NAT_AVG.power_tariff_inr
+      var label  = tc.has_s1 ? 'Power (Rs '+tariff+'/kWh × PUE 1.15 — '+tc.power_ratio+'x national)' : 'Power (national avg Rs '+tariff+'/kWh)'
+      // Power OpEx = tariff * kWh/yr for phase1_mw at PUE 1.15
+      var kwhPerYr = MODEL.phase1_mw * 1000 * 8760 * 1.15  // kW * hours * PUE
+      var crPerYr  = (tariff * kwhPerYr) / 1e7              // Rs to Cr
+      return { label: label, cr: Math.round(crPerYr) }
+    }()),
     { label: 'Core ops & maintenance',              cr: ucInr('opex_core_ops_phase1') },
     { label: 'NOC / SOC / inference engineering',   cr: ucInr('opex_noc_soc_phase1') },
-    { label: 'DR + HP State Cloud + multi-site',    cr: ucInr('opex_dr_cloud_phase1') },
+    { label: 'DR + resilience + multi-site',        cr: ucInr('opex_dr_cloud_phase1') },
     { label: 'Bandwidth & connectivity',            cr: ucInr('opex_bandwidth_phase1') },
     { label: 'Sales, marketing & API platform',     cr: ucInr('opex_sales_phase1') },
     { label: 'Model licences',                      cr: ucInr('opex_model_licence') },
@@ -1013,8 +1084,9 @@ async function tpLoadCached(id) {
 
 async function tpStartS1() {
   var inp = document.getElementById('tp-territory-input')
-  var territory = inp ? inp.value.trim() : ''
-  if (!territory) return
+  var sel = document.getElementById('tp-territory-select')
+  var territory = (inp ? inp.value.trim() : '') || (sel && sel.value ? sel.value : '')
+  if (!territory) { showToast('Enter or select a territory', 'error'); return }
   TP.territory=territory; TP._rawIntel=null
   TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
   if (!TP.archetypes.length) await loadTPData()
@@ -1269,6 +1341,41 @@ async function loadTPData() {
 }
 
 //    HOME                                                                       
+// ── Territory dropdown ────────────────────────────────────────────────────────
+async function tpLoadTerritoryList() {
+  var sel = document.getElementById('tp-territory-select')
+  if (!sel) return
+  var rows = await sbFetch('territory_profiles', 'order=generated_at.desc', 30)
+  sel.innerHTML = '<option value="">Search new territory...</option>'
+  if (rows && rows.length) {
+    rows.forEach(function(r) {
+      var opt = document.createElement('option')
+      opt.value = r.territory
+      opt.textContent = r.territory + (r.session && r.session.s2 ? ' ✓' : '')
+      sel.appendChild(opt)
+    })
+  }
+}
+
+function tpSelectTerritory(val) {
+  if (!val) {
+    // Show free-text input
+    var wrap = document.getElementById('tp-new-territory-wrap')
+    if (wrap) wrap.style.display = 'flex'
+    var inp = document.getElementById('tp-territory-input')
+    if (inp) inp.focus()
+  } else {
+    // Hide free-text, load the selected territory
+    var wrap = document.getElementById('tp-new-territory-wrap')
+    if (wrap) wrap.style.display = 'none'
+    // Directly load — same as typing + Generate
+    var slug = val.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
+    TP.territory = val
+    tpLoadCached(slug)
+  }
+}
+
+
 function tpHome() {
   var icons = {T1:'&#127965;',T2:'&#127807;',T3:'&#128681;',T4:'&#127970;',T5:'&#127758;'}
   var html = '<div style="padding:16px 0">'
@@ -1318,6 +1425,7 @@ function tpHome() {
   html += '</div></div>'
   // Load past profiles async
   setTimeout(tpLoadPast, 100)
+  setTimeout(tpLoadTerritoryList, 150)
   return html
 }
 
@@ -1390,31 +1498,6 @@ function tpS1View() {
 
   // Grounding sources
   html += tpSourcesPanel()
-
-  // ── AI OPPORTUNITIES ───────────────────────────────────────────────────────
-  if (opp.length) {
-    html += tpSectionHeader('AI OPPORTUNITIES', 'Territory-specific AI deployment opportunities ranked by relevance', '#059669')
-    html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">'
-    opp.forEach(function(op) {
-      var relCol = op.relevance==='high'?'var(--teal)':op.relevance==='medium'?'var(--amber)':'var(--mid)'
-      var score  = op.score || 0
-      html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px 14px;border-left:4px solid '+relCol+'">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
-        + '<div style="font-size:12px;font-weight:700;color:var(--navy)">' + esc(op.domain||'') + '</div>'
-        + '<div style="display:flex;align-items:center;gap:6px">'
-        + '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:'+relCol+';color:#fff;font-weight:700;text-transform:uppercase">' + esc(op.relevance||'') + '</span>'
-        + '<span style="font-size:12px;font-weight:700;color:var(--navy)">' + score + '</span>'
-        + '</div></div>'
-        + '<div style="height:4px;background:var(--border);border-radius:2px;margin-bottom:8px">'
-        + '<div style="width:'+score+'%;height:100%;background:'+relCol+';border-radius:2px"></div></div>'
-        + '<div style="font-size:11px;color:var(--mid);margin-bottom:6px;line-height:1.4">' + esc(op.rationale||'') + '</div>'
-        + ((op.example_ucs||[]).length ? '<div style="display:flex;flex-wrap:wrap;gap:4px">'
-          + op.example_ucs.map(function(uc){ return '<span style="font-size:9px;padding:1px 6px;background:var(--light);border-radius:8px;color:var(--mid)">' + esc(uc) + '</span>' }).join('')
-          + '</div>' : '')
-        + '</div>'
-    })
-    html += '</div>'
-  }
 
   // ── HARD STATS ─────────────────────────────────────────────────────────────
   html += tpSectionHeader('HARD STATS', 'Objective data  \u2014  macroeconomics, 4Ws, digital infrastructure', '#002870')
@@ -1529,6 +1612,31 @@ function tpS1View() {
   ])
 
   html += '</div>'
+
+  // ── AI OPPORTUNITIES ───────────────────────────────────────────────────────
+  if (opp.length) {
+    html += tpSectionHeader('AI OPPORTUNITIES', 'Territory-specific AI deployment opportunities ranked by relevance', '#059669')
+    html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">'
+    opp.forEach(function(op) {
+      var relCol = op.relevance==='high'?'var(--teal)':op.relevance==='medium'?'var(--amber)':'var(--mid)'
+      var score  = op.score || 0
+      html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px 14px;border-left:4px solid '+relCol+'">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--navy)">' + esc(op.domain||'') + '</div>'
+        + '<div style="display:flex;align-items:center;gap:6px">'
+        + '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:'+relCol+';color:#fff;font-weight:700;text-transform:uppercase">' + esc(op.relevance||'') + '</span>'
+        + '<span style="font-size:12px;font-weight:700;color:var(--navy)">' + score + '</span>'
+        + '</div></div>'
+        + '<div style="height:4px;background:var(--border);border-radius:2px;margin-bottom:8px">'
+        + '<div style="width:'+score+'%;height:100%;background:'+relCol+';border-radius:2px"></div></div>'
+        + '<div style="font-size:11px;color:var(--mid);margin-bottom:6px;line-height:1.4">' + esc(op.rationale||'') + '</div>'
+        + ((op.example_ucs||[]).length ? '<div style="display:flex;flex-wrap:wrap;gap:4px">'
+          + op.example_ucs.map(function(uc){ return '<span style="font-size:9px;padding:1px 6px;background:var(--light);border-radius:8px;color:var(--mid)">' + esc(uc) + '</span>' }).join('')
+          + '</div>' : '')
+        + '</div>'
+    })
+    html += '</div>'
+  }
 
   // ── DEMOGRAPHICS ──────────────────────────────────────────────────────────
   if (dem.population_lakh || dem.urban_pct || dem.working_age_pct) {
@@ -2362,7 +2470,10 @@ async function tpGenerateS4() {
   }
 
   var prompt = buildS4Prompt(TP.territory, TP.s1, TP.s2, TP._2x2, TP.objectives, fmData)
-  var result = await atlasAI.call(prompt, { maxTokens: atlasAI.sectionMaxTokens('s4'), tool: 'tsap-s4', callType: 's4_vision' })
+  // S4 uses dedicated timeout + token config from Supabase app_config
+  var s4MaxTok  = atlasAI.config.s4_max_tokens  || atlasAI.sectionMaxTokens('s4')
+  var s4Timeout = atlasAI.config.s4_timeout_ms  || atlasAI.config.timeout_ms || 60000
+  var result = await atlasAI.call(prompt, { maxTokens: s4MaxTok, tool: 'tsap-s4', callType: 's4_vision', _timeout: s4Timeout })
 
   if (!result.ok) {
     TP.stage = 's3'; switchTab('profile')
@@ -2703,7 +2814,9 @@ function tpExportPPT()  { alert('PPT export coming soon') }
 
 
 function renderCostTab() {
-  // Guard: show placeholder if no territory has been set
+  // Sync MODEL.territory from TP if available
+  if (!MODEL.territory && TP.territory) MODEL.territory = TP.territory
+  // Guard: show placeholder if still no territory
   if (!MODEL.territory) {
     return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:320px;color:var(--mid);gap:12px">'
       + '<div style="font-size:32px">&#128205;</div>'
@@ -3294,10 +3407,11 @@ async function init() {
   var _sb = getSB()
   await atlasAI.init(_sb.url, _sb.key)
 
-  // Load unit costs
+  // Load unit costs + national averages
   var rows = await sbGet('tsap_unit_costs', 'active=eq.true', 200)
   rows.forEach(function(r) { UNIT_COSTS[r.item_code] = r })
   console.log('Unit costs loaded:', Object.keys(UNIT_COSTS).length)
+  await loadNatAvg()
 
   // Load engagements
   await loadFXRates()
@@ -3312,6 +3426,19 @@ async function init() {
       ENGAGEMENT_NAME = eng.name || ''
       MODEL.programme_name = ENGAGEMENT_NAME + '   TSAP Financial Model'
       MODEL.territory = eng.territory || MODEL.territory
+      if (eng.territory) {
+        TP.territory = eng.territory
+        // Pre-fill dropdown if it exists
+        setTimeout(function() {
+          var sel2 = document.getElementById('tp-territory-select')
+          if (sel2) {
+            var opt = document.createElement('option')
+            opt.value = eng.territory; opt.textContent = eng.territory + ' (from engagement)'
+            opt.selected = true; sel2.insertBefore(opt, sel2.firstChild)
+            sel2.disabled = true
+          }
+        }, 500)
+      }
     }
 
     // Load SASC output for this engagement
