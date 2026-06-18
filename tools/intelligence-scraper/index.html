@@ -252,7 +252,10 @@ input:focus,select:focus{border-color:var(--blue);}
   <div id="resultsSection" style="display:none">
     <div class="section-hdr">
       <span>&#9989; Intelligence Items</span>
-    
+    </div>
+  </div>
+
+<script charset="utf-8">
 //    Test DB Manager                                                            
 var TEST_MASTER_URL = 'https://raw.githubusercontent.com/arvindbajaj5/atlas-platform/main/standards/test-data/intelligence_items_master.json'
 
@@ -1898,13 +1901,18 @@ async function getSupabaseUrls(domainCode){
   return new Set()
 }
 
-
-r.ok){ var rows = await r.json(); return new Set(rows.map(function(x){return (x.source_url||'').toLowerCase().trim()})) }
-  }catch(e){}
-  return new Set()
-}
-
-
+// ── Boot ────────────────────────────────────────────────────────────────────
+;(async function() {
+  await loadTTLConfig()
+  await loadRunRecords()
+  init()
+  await checkTestDBStatus()
+  // Auto-load from Supabase if connected
+  var cfg = getConfig()
+  if (cfg.sbUrl && cfg.sbKey) {
+    await loadFromSupabase()
+  }
+})()
 </script>
 </body>
 </html>
