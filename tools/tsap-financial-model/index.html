@@ -364,35 +364,65 @@ async function loadNatAvg() {
       var k = row.key.replace('nat_avg_', '')
       if (NAT_AVG.hasOwnProperty(k)) NAT_AVG[k] = parseFloat(row.value) || NAT_AVG[k]
     })
-    console.log('[NAT_AVG] loaded:', JSON.stringify(NAT_AVG))
+    // Merge with Settings national_averages (Settings takes priority)
+  var _g = atlasGetGlobal()
+  var _na = _g.national_averages || {}
+  if (_na.power_tariff_inr)     NAT_AVG.power_tariff_inr      = _na.power_tariff_inr
+  if (_na.water_cost_inr_kl)    NAT_AVG.water_cost_inr_kl     = _na.water_cost_inr_kl
+  if (_na.land_cost_lakh_acre)  NAT_AVG.land_cost_lakh_acre   = _na.land_cost_lakh_acre
+  if (_na.engineer_salary_lakh) NAT_AVG.engineer_salary_lakh  = _na.engineer_salary_lakh
+  if (_na.civil_cost_index)     NAT_AVG.civil_cost_index       = _na.civil_cost_index
+  if (_na.construction_cr_mw)   NAT_AVG.construction_cr_mw    = _na.construction_cr_mw
+  console.log('[NAT_AVG] loaded:', JSON.stringify(NAT_AVG))
   } catch(e) { console.warn('[NAT_AVG] load failed:', e.message) }
 }
 
 // Compute effective territory costs from S1 index values
 // Returns { power_tariff, water_cost, land_cost, civil_index, engineer_salary }
 function getTerritoryCosts() {
+  // National averages: read from Settings (atlas_global_cfg.national_averages)
+  // then fall back to Supabase-loaded NAT_AVG, then hardcoded defaults
+  var g  = atlasGetGlobal()
+  var na = g.national_averages || {}
+  var tc = g.territory_config  || {}
+
+  // Merge: Settings national_averages overrides NAT_AVG defaults
+  var natPower  = na.power_tariff_inr      || NAT_AVG.power_tariff_inr
+  var natWater  = na.water_cost_inr_kl     || NAT_AVG.water_cost_inr_kl
+  var natLand   = na.land_cost_lakh_acre   || NAT_AVG.land_cost_lakh_acre
+  var natSal    = na.engineer_salary_lakh  || NAT_AVG.engineer_salary_lakh
+  var natCivil  = na.civil_cost_index      || NAT_AVG.civil_cost_index
+
   var e = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.energy   || {}
   var w = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.water    || {}
   var l = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.land     || {}
   var k = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.workers  || {}
 
-  // index_pct: 100 = national avg, 65 = 0.65x, 140 = 1.4x
-  var powerRatio = e.tariff_index_pct  ? e.tariff_index_pct  / 100 : 1.0
+  // Territory config overrides take highest priority
+  if (tc.power_tariff_inr)   return buildCosts(tc.power_tariff_inr/natPower, tc.water_cost_inr_kl ? tc.water_cost_inr_kl/natWater : (w.water_cost_index_pct||100)/100, tc.land_cost_lakh_acre ? tc.land_cost_lakh_acre/natLand : (l.land_cost_index_pct||100)/100, (tc.manpower_mult||1), (tc.civil_cost_index||natCivil)/natCivil, natPower, natWater, natLand, natSal, natCivil, true)
+
+  // S1 index ratios
+  var powerRatio = e.tariff_index_pct   ? e.tariff_index_pct   / 100 : 1.0
   var waterRatio = w.water_cost_index_pct ? w.water_cost_index_pct / 100 : 1.0
   var landRatio  = l.land_cost_index_pct  ? l.land_cost_index_pct  / 100 : 1.0
   var salRatio   = k.salary_index_pct     ? k.salary_index_pct     / 100 : 1.0
-  // Civil cost tracks land cost as a proxy (terrain difficulty)
   var civilRatio = l.land_cost_index_pct  ? Math.max(0.7, l.land_cost_index_pct / 100) : 1.0
 
+  return buildCosts(powerRatio, waterRatio, landRatio, salRatio, civilRatio, natPower, natWater, natLand, natSal, natCivil, !!TP.s1)
+}
+
+function buildCosts(powerRatio, waterRatio, landRatio, salRatio, civilRatio, natPower, natWater, natLand, natSal, natCivil, hasS1) {
   return {
-    power_tariff:     Math.round(NAT_AVG.power_tariff_inr    * powerRatio * 100) / 100,
-    water_cost:       Math.round(NAT_AVG.water_cost_inr_kl   * waterRatio * 100) / 100,
-    land_cost:        Math.round(NAT_AVG.land_cost_lakh_acre  * landRatio  * 100) / 100,
-    engineer_salary:  Math.round(NAT_AVG.engineer_salary_lakh * salRatio   * 100) / 100,
-    civil_index:      Math.round(NAT_AVG.civil_cost_index     * civilRatio),
-    civil_ratio:      Math.round(civilRatio * 100) / 100,
-    power_ratio:      Math.round(powerRatio * 100) / 100,
-    has_s1:           !!TP.s1
+    power_tariff:    Math.round(natPower * powerRatio * 100) / 100,
+    water_cost:      Math.round(natWater * waterRatio * 100) / 100,
+    land_cost:       Math.round(natLand  * landRatio  * 100) / 100,
+    engineer_salary: Math.round(natSal   * salRatio   * 100) / 100,
+    civil_index:     Math.round(natCivil * civilRatio),
+    civil_ratio:     Math.round(civilRatio * 100) / 100,
+    power_ratio:     Math.round(powerRatio * 100) / 100,
+    has_s1:          hasS1,
+    nat_power:       natPower,
+    nat_water:       natWater
   }
 }
 
