@@ -703,6 +703,7 @@ async function generatePEI(){
   var currencyNote = currency !== 'USD' ? currency + ' (with USD equivalent where relevant)' : 'USD'
 
   try{
+    var _t0 = Date.now()
     // Step 1: Query Supabase intelligence DB
     var dbItems = await queryIntelligenceDB(sector, country, ownership)
     document.getElementById('dbStatus').textContent = dbItems.length > 0
@@ -758,7 +759,7 @@ async function generatePEI(){
     PEI_DATA = {meta:{organisation:target, ownership_type:ownership, functional_sector:sector, country:country, generated_at:new Date().toISOString(), model:model, tool:'ATLAS PEI v0.2', db_items_used:dbItems.length}, ...pei}
 
     await savePEICache(orgName, sector, country, ownership, pei, model, dbItems.length)
-    atlasLogUsage({tool:'pei',call_type:'pei_generate',model:model,input_tokens:(data.usageMetadata&&data.usageMetadata.promptTokenCount)||0,output_tokens:(data.usageMetadata&&data.usageMetadata.candidatesTokenCount)||0,latency_ms:Date.now()-_t0,status:'success'})
+    atlasLogUsage({tool:'pei',call_type:'pei_generate',model:model,input_tokens:0,output_tokens:0,latency_ms:Date.now()-_t0,status:'success'})
 
     renderPEI(PEI_DATA, target, ownership, sector, country, dbItems)
 
