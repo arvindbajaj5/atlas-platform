@@ -1,1 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#002870;--orange:#FF5539;--teal:#00B290;--blue:#1C38F5;--amber:#FFB600;
+  --dark:#111827;--mid:#6B7280;--light:#F8F9FA;--white:#fff;--border:#E5E7EB;
+  --r:8px;--r-sm:6px
+}
+body{font-family:'Inter',sans-serif;font-size:13px;color:var(--dark);background:#F0F2F5;min-height:100vh}
 
+/* Header */
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;gap:16px}
+.hdr-brand{font-size:18px;font-weight:900;color:#fff;letter-spacing:2px}
+.hdr-brand span{color:var(--orange)}
+.hdr-title{color:rgba(255,255,255,.7);font-size:13px}
+.hdr-back{margin-left:auto;color:rgba(255,255,255,.6);font-size:12px;text-decoration:none;padding:5px 12px;border:1px solid rgba(255,255,255,.2);border-radius:5px}
+.hdr-back:hover{background:rgba(255,255,255,.1)}
+
+/* Layout */
+.page{max-width:900px;margin:0 auto;padding:24px 16px}
+
+/* Status banner */
+.status-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:var(--r);margin-bottom:20px;font-size:12px;font-weight:500}
+.status-bar.ok{background:#E1F5EE;color:#065F46;border:1px solid #A7F3D0}
+.status-bar.warn{background:#FFF8E7;color:#92400E;border:1px solid #FDE68A}
+.status-bar.err{background:#FEE2E2;color:#991B1B;border:1px solid #FECACA}
+
+/* Tabs */
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px}
+.tab-btn{padding:9px 16px;font-size:12px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--mid);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;white-space:nowrap}
+.tab-btn.on{color:var(--orange);border-bottom-color:var(--orange)}
+.tab-btn:hover:not(.on){color:var(--dark)}
+
+/* Card */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+
+/* Form fields */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px}
+.field input,.field select,.field textarea{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:13px;font-family:inherit;outline:none;transition:border-color .15s;background:#fff}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--navy)}
+.field input[type=password]{font-family:monospace;letter-spacing:.5px}
+.field-note{font-size:10px;color:var(--mid);margin-top:3px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* Buttons */
+.btn{padding:8px 16px;border:none;border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn:hover{opacity:.85}
+.btn-navy{background:var(--navy);color:#fff}
+.btn-teal{background:var(--teal);color:#fff}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--dark)}
+.btn-orange{background:var(--orange);color:#fff}
+.btn-danger{background:#FEE2E2;color:#991B1B;border:1px solid #FECACA}
+.btn-row{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+
+/* Key reveal */
+.key-wrap{position:relative}
+.key-wrap input{padding-right:68px}
+.key-wrap .reveal-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;padding:3px 8px;background:var(--light);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--mid)}
+
+/* Status dot */
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.dot-green{background:#10B981}
+.dot-red{background:#EF4444}
+.dot-amber{background:var(--amber)}
+.dot-grey{background:var(--mid)}
+
+/* SKU grid */
+.sku-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.sku-card{border:1.5px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;cursor:pointer;background:#fff;transition:all .15s}
+.sku-card:hover{border-color:var(--mid)}
+.sku-card.selected{border-color:var(--teal);background:#E1F5EE}
+.sku-tag{font-size:9px;font-weight:700;text-transform:uppercase;margin-bottom:3px}
+.sku-name{font-size:11px;font-weight:700;color:var(--navy);margin-bottom:2px}
+.sku-spec{font-size:10px;color:var(--mid)}
+
+/* NAT AVG table */
+.nat-table{width:100%;border-collapse:collapse;font-size:12px}
+.nat-table th{text-align:left;padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)}
+.nat-table td{padding:7px 10px;border-bottom:1px solid var(--border)}
+.nat-table td input{width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;font-family:inherit}
+.nat-table td input:focus{outline:none;border-color:var(--navy)}
+.nat-table tr:hover td{background:var(--light)}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--navy);color:#fff;padding:10px 18px;border-radius:var(--r);font-size:12px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+.toast.show{opacity:1}
+
+/* Logo preview */
+.logo-preview{margin-top:8px;height:48px;display:flex;align-items:center;gap:10px}
+.logo-preview img{height:40px;border:1px solid var(--border);border-radius:4px;padding:4px}
+.colour-swatch{width:32px;height:32px;border-radius:4px;border:1px solid var(--border);flex-shrink:0}
+
+/* Connection test */
+.conn-result{font-size:11px;padding:6px 10px;border-radius:4px;margin-top:6px;display:none}
+.conn-result.ok{background:#E1F5EE;color:#065F46}
+.conn-result.err{background:#FEE2E2;color:#991B1B}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div class="hdr-title">Settings</div>
+  <a href="../index.html" class="hdr-back">&#8592; Portal</a>
+</div>
+
+<div class="page">
+
+  <!-- Status bar -->
+  <div class="status-bar warn" id="statusBar">
+    <span class="dot dot-amber"></span>
+    <span id="statusText">Checking configuration...</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn on" data-tab="company"   onclick="showTab('company')">&#127970; Company</button>
+    <button class="tab-btn"    data-tab="keys"       onclick="showTab('keys')">&#128274; API Keys</button>
+    <button class="tab-btn"    data-tab="models"     onclick="showTab('models')">&#129302; AI Models</button>
+    <button class="tab-btn"    data-tab="hardware"   onclick="showTab('hardware')">&#9881; Hardware SKUs</button>
+    <button class="tab-btn"    data-tab="natavg"     onclick="showTab('natavg')">&#127758; National Averages</button>
+    <button class="tab-btn"    data-tab="territory"  onclick="showTab('territory')">&#128205; Territory Config</button>
+  </div>
+
+  <!-- Tab content -->
+  <div id="tab-content"></div>
+
+  <!-- Save bar -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-top:1px solid var(--border);margin-top:8px">
+    <div style="font-size:11px;color:var(--mid)">Settings stored in browser localStorage &nbsp;·&nbsp; Never sent to any server except the respective APIs</div>
+    <div class="btn-row" style="margin:0">
+      <button class="btn btn-danger" onclick="resetAll()">&#9888; Reset All</button>
+      <button class="btn btn-navy" onclick="saveAll()">&#10003; Save Settings</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+var CFG = {}  // live config object, loaded on boot and mutated by UI
+
+var HARDWARE_SKUS = [
+  { id:'gb200nvl72', name:'NVIDIA GB200 NVL72',  tag:'Flagship',   color:'#00B290', tdp:120, gpus:72,  rack_units:1 },
+  { id:'vrnvl72',    name:'NVIDIA VR NVL72',      tag:'Next-Gen',   color:'#00B290', tdp:120, gpus:72,  rack_units:1 },
+  { id:'vrnvl4',     name:'NVIDIA VR NVL4',       tag:'Edge',       color:'#1C38F5', tdp:14,  gpus:4,   rack_units:1 },
+  { id:'mi325x',     name:'AMD MI325X',            tag:'AMD Primary',color:'#FFB600', tdp:75,  gpus:8,   rack_units:1 },
+  { id:'mi300x',     name:'AMD MI300X',            tag:'AMD Std',    color:'#FFB600', tdp:75,  gpus:8,   rack_units:1 },
+  { id:'h100sxm',    name:'NVIDIA H100 SXM5',     tag:'Standard',   color:'#6B7280', tdp:70,  gpus:8,   rack_units:1 },
+  { id:'a100sxm',    name:'NVIDIA A100 SXM4',     tag:'Standard',   color:'#6B7280', tdp:40,  gpus:8,   rack_units:1 }
+]
+
+var NAT_AVG_FIELDS = [
+  { key:'power_tariff_inr',      label:'Industrial Power Tariff',   unit:'Rs/kWh',       default:'7.50',  hint:'National avg ~Rs 7.5/unit' },
+  { key:'water_cost_inr_kl',     label:'Industrial Water Cost',      unit:'Rs/kL',        default:'45.00', hint:'National avg ~Rs 45/kL' },
+  { key:'land_cost_lakh_acre',   label:'Industrial Land Cost',       unit:'Rs lakh/acre', default:'80.00', hint:'National avg ~Rs 80L/acre' },
+  { key:'engineer_salary_lakh',  label:'Software/AI Engineer Salary',unit:'Rs lakh/yr',   default:'12.00', hint:'National avg ~Rs 12L/year' },
+  { key:'civil_cost_index',      label:'Civil Construction Index',   unit:'base 100',     default:'100',   hint:'100 = national baseline' },
+  { key:'construction_cr_mw',    label:'DC Civil Cost',              unit:'Rs Cr/MW',     default:'8.00',  hint:'Civil+structural per MW DC' }
+]
+
+var GEMINI_MODELS = [
+  { id:'gemini-2.5-flash',       label:'Gemini 2.5 Flash (recommended)' },
+  { id:'gemini-2.0-flash',       label:'Gemini 2.0 Flash' },
+  { id:'gemini-2.0-flash-lite',  label:'Gemini 2.0 Flash Lite' },
+  { id:'gemini-1.5-flash',       label:'Gemini 1.5 Flash' },
+  { id:'gemini-2.0-flash-lite',  label:'Gemini 2.0 Flash Lite (scraping)' }
+]
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+function boot() {
+  try { CFG = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}') } catch(e) { CFG = {} }
+  showTab('company')
+  updateStatusBar()
+}
+
+function updateStatusBar() {
+  var bar  = document.getElementById('statusBar')
+  var text = document.getElementById('statusText')
+  var hasGemini = !!(CFG.key_gemini || CFG.geminiKey)
+  var hasSB     = !!(CFG.sbUrl && CFG.sbKey)
+  var hasCompany = !!CFG.companyName
+
+  if (hasGemini && hasSB && hasCompany) {
+    bar.className = 'status-bar ok'
+    bar.querySelector('.dot').className = 'dot dot-green'
+    text.textContent = 'Configured \u2014 Gemini key set \u00b7 Supabase connected \u00b7 Company set'
+  } else {
+    var missing = []
+    if (!hasGemini)  missing.push('Gemini API key')
+    if (!hasSB)      missing.push('Supabase credentials')
+    if (!hasCompany) missing.push('Company name')
+    bar.className = 'status-bar warn'
+    bar.querySelector('.dot').className = 'dot dot-amber'
+    text.textContent = 'Missing: ' + missing.join(', ')
+  }
+}
+
+// ── Tab rendering ─────────────────────────────────────────────────────────────
+function showTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    b.classList.toggle('on', b.dataset.tab === tab)
+  })
+  var el = document.getElementById('tab-content')
+  switch(tab) {
+    case 'company':   el.innerHTML = renderCompany();   break
+    case 'keys':      el.innerHTML = renderKeys();      break
+    case 'models':    el.innerHTML = renderModels();    break
+    case 'hardware':  el.innerHTML = renderHardware();  break
+    case 'natavg':    el.innerHTML = renderNatAvg();    break
+    case 'territory': el.innerHTML = renderTerritory(); break
+  }
+}
+
+function field(label, key, type, placeholder, note, extra) {
+  var val = CFG[key] !== undefined ? CFG[key] : ''
+  var inputType = type === 'password' ? 'text' : (type || 'text')
+  var style = type === 'password' ? 'font-family:monospace' : ''
+  return '<div class="field">'
+    + '<label>' + label + '</label>'
+    + (type === 'password'
+      ? '<div class="key-wrap"><input type="text" id="cfg-' + key + '" value="' + esc(String(val)) + '" placeholder="' + esc(placeholder||'') + '" style="' + style + '" oninput="live(\'' + key + '\',this.value)">'
+        + '<button class="reveal-btn" onclick="toggleReveal(\'' + key + '\')">show</button></div>'
+      : '<input type="' + inputType + '" id="cfg-' + key + '" value="' + esc(String(val)) + '" placeholder="' + esc(placeholder||'') + '" oninput="live(\'' + key + '\',this.value)">')
+    + (note ? '<div class="field-note">' + note + '</div>' : '')
+    + '</div>'
+}
+
+function select(label, key, options, note) {
+  var val = CFG[key] !== undefined ? CFG[key] : ''
+  var opts = options.map(function(o) {
+    return '<option value="' + esc(o.v) + '"' + (o.v === val ? ' selected' : '') + '>' + esc(o.l) + '</option>'
+  }).join('')
+  return '<div class="field"><label>' + label + '</label>'
+    + '<select id="cfg-' + key + '" onchange="live(\'' + key + '\',this.value)">' + opts + '</select>'
+    + (note ? '<div class="field-note">' + note + '</div>' : '')
+    + '</div>'
+}
+
+// ── Tab: Company ──────────────────────────────────────────────────────────────
+function renderCompany() {
+  var logo = CFG.logoUrl || ''
+  var p = CFG.brandPrimary || '#002870'
+  var a = CFG.brandAccent  || '#FF5539'
+  return '<div class="card">'
+    + '<div class="card-title">Organisation</div>'
+    + '<div class="card-sub">Used in all exports \u2014 Word docs, presentations, Vision Documents</div>'
+    + '<div class="field-row">'
+    +   field('Organisation Name', 'companyName', 'text', 'e.g. Acme AI Solutions')
+    +   field('Tagline', 'companyTagline', 'text', 'e.g. Building Sovereign AI')
+    + '</div>'
+    + field('Website', 'companyWebsite', 'text', 'https://yourcompany.com')
+    + field('Logo URL', 'logoUrl', 'text', 'https://... (hosted image, PNG/SVG recommended)',
+        'Paste a publicly accessible image URL. Used in Word/PPT exports.',
+        'onchange="refreshLogo()"')
+    + '<div class="logo-preview" id="logo-preview">'
+    + (logo ? '<img src="' + esc(logo) + '" id="logo-img" onerror="this.style.display=\'none\'">' : '<span style="font-size:11px;color:var(--mid)">No logo set</span>')
+    + '</div>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="card-title">Brand Colours</div>'
+    + '<div class="card-sub">Used in exports for headings, accents, and section markers</div>'
+    + '<div class="field-row">'
+    + '<div class="field"><label>Primary Colour</label>'
+    + '<div style="display:flex;gap:8px;align-items:center">'
+    + '<input type="color" id="cfg-brandPrimary" value="' + p + '" onchange="live(\'brandPrimary\',this.value)" style="width:48px;height:38px;padding:2px;border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer">'
+    + '<input type="text" id="cfg-brandPrimaryHex" value="' + esc(p) + '" placeholder="#002870" style="flex:1" onchange="live(\'brandPrimary\',this.value);document.getElementById(\'cfg-brandPrimary\').value=this.value">'
+    + '</div><div class="field-note">Default: navy #002870</div></div>'
+    + '<div class="field"><label>Accent Colour</label>'
+    + '<div style="display:flex;gap:8px;align-items:center">'
+    + '<input type="color" id="cfg-brandAccent" value="' + a + '" onchange="live(\'brandAccent\',this.value)" style="width:48px;height:38px;padding:2px;border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer">'
+    + '<input type="text" id="cfg-brandAccentHex" value="' + esc(a) + '" placeholder="#FF5539" style="flex:1" onchange="live(\'brandAccent\',this.value);document.getElementById(\'cfg-brandAccent\').value=this.value">'
+    + '</div><div class="field-note">Default: orange #FF5539</div></div>'
+    + '</div>'
+    + '</div>'
+}
+
+// ── Tab: API Keys ─────────────────────────────────────────────────────────────
+function renderKeys() {
+  var gemini = CFG.key_gemini || CFG.geminiKey || ''
+  var sbUrl  = CFG.sbUrl || CFG.sb_url || ''
+  var sbKey  = CFG.sbKey || CFG.sb_key || ''
+  return '<div class="card">'
+    + '<div class="card-title">Gemini API Key</div>'
+    + '<div class="card-sub">Used for all AI generation \u2014 Territory Profile, S4 Vision Doc, PEI, Intelligence Scraper</div>'
+    + '<div class="field"><label>API Key</label>'
+    + '<div class="key-wrap"><input type="text" id="cfg-key_gemini" value="' + esc(gemini) + '" placeholder="AIza..." style="font-family:monospace" oninput="liveGemini(this.value)">'
+    + '<button class="reveal-btn" onclick="toggleReveal(\'key_gemini\')">show</button></div>'
+    + '<div class="field-note">Get from <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--navy)">Google AI Studio</a> \u00b7 Free tier available</div>'
+    + '</div>'
+    + '<div class="btn-row">'
+    + '<button class="btn btn-outline" onclick="testGemini()">&#9889; Test Gemini key</button>'
+    + '<span id="gemini-test-result" style="font-size:11px"></span>'
+    + '</div>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="card-title">Supabase</div>'
+    + '<div class="card-sub">Used for data storage \u2014 territory profiles, intelligence items, engagements, PEI cache</div>'
+    + '<div class="field-row">'
+    + '<div class="field"><label>Project URL</label>'
+    + '<input type="text" id="cfg-sbUrl" value="' + esc(sbUrl) + '" placeholder="https://xxxx.supabase.co" oninput="liveSB(\'sbUrl\',this.value)">'
+    + '</div>'
+    + '<div class="field"><label>Anon Key</label>'
+    + '<div class="key-wrap"><input type="text" id="cfg-sbKey" value="' + esc(sbKey) + '" placeholder="eyJ..." style="font-family:monospace" oninput="liveSB(\'sbKey\',this.value)">'
+    + '<button class="reveal-btn" onclick="toggleReveal(\'sbKey\')">show</button></div>'
+    + '</div>'
+    + '</div>'
+    + '<div class="btn-row">'
+    + '<button class="btn btn-outline" onclick="testSupabase()">&#9889; Test Supabase connection</button>'
+    + '<span id="sb-test-result" style="font-size:11px"></span>'
+    + '</div>'
+    + '<div id="conn-result" class="conn-result"></div>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="card-title" style="color:var(--mid)">Future Keys (optional)</div>'
+    + '<div class="card-sub">Not required for current ATLAS tools</div>'
+    + '<div class="field-row">'
+    + field('Anthropic API Key', 'key_anthropic', 'password', 'sk-ant-...')
+    + field('OpenAI API Key', 'key_openai', 'password', 'sk-...')
+    + '</div>'
+    + '</div>'
+}
+
+// ── Tab: AI Models ────────────────────────────────────────────────────────────
+function renderModels() {
+  var mt = CFG.model_tiers || {}
+  var defModel  = CFG.geminiTextModel || mt.default  || 'gemini-2.5-flash'
+  var peiModel  = mt.pei      || 'gemini-2.5-flash'
+  var scrModel  = mt.scraping || 'gemini-2.0-flash'
+  var s4Model   = mt.s4       || 'gemini-2.5-flash'
+
+  var modelOpts = [
+    {v:'gemini-2.5-flash',      l:'Gemini 2.5 Flash (recommended)'},
+    {v:'gemini-2.0-flash',      l:'Gemini 2.0 Flash'},
+    {v:'gemini-2.0-flash-lite', l:'Gemini 2.0 Flash Lite (fast/cheap)'},
+    {v:'gemini-1.5-flash',      l:'Gemini 1.5 Flash'},
+  ]
+  var searchOpts = [
+    {v:'gemini-2.0-flash',        l:'Gemini 2.0 Flash (recommended for search)'},
+    {v:'gemini-1.5-flash-latest', l:'Gemini 1.5 Flash Latest'},
+    {v:'gemini-2.5-flash',        l:'Gemini 2.5 Flash'},
+  ]
+
+  function modelSel(label, id, val, opts, note) {
+    var o = opts.map(function(o){ return '<option value="'+esc(o.v)+'"'+(o.v===val?' selected':'')+'>'+esc(o.l)+'</option>' }).join('')
+    return '<div class="field"><label>'+label+'</label><select id="'+id+'" onchange="liveModel(\''+id+'\',this.value)">'+o+'</select>'+(note?'<div class="field-note">'+note+'</div>':'')+'</div>'
+  }
+
+  return '<div class="card">'
+    + '<div class="card-title">Default Text Model</div>'
+    + '<div class="card-sub">Used by TSAP Territory Profiler (S1 extraction, S2 profile, S4 Vision Doc) and all atlasAI calls</div>'
+    + modelSel('Primary Text Model', 'model-default', defModel, modelOpts, 'TSAP FM, S4 Vision Doc, general generation')
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="card-title">Per-Task Model Overrides</div>'
+    + '<div class="card-sub">Set different models for specific tools. Leave at default to use primary model above.</div>'
+    + '<div class="field-row">'
+    + modelSel('PEI Model', 'model-pei', peiModel, modelOpts, 'Pre-Engagement Intelligence briefs')
+    + modelSel('Scraper Model', 'model-scraping', scrModel, modelOpts, 'Intelligence scraper extraction')
+    + '</div>'
+    + '<div class="field-row">'
+    + modelSel('S4 Vision Doc Model', 'model-s4', s4Model, modelOpts, 'Long-form Vision Document generation')
+    + '<div class="field"><label>Search/Grounding Model</label>'
+    + '<select id="model-search" onchange="liveModel(\'model-search\',this.value)">'
+    + searchOpts.map(function(o){ var sel = (o.v === (CFG.geminiSearchModel||'gemini-2.0-flash')) ? ' selected':'' ; return '<option value="'+esc(o.v)+'"'+sel+'>'+esc(o.l)+'</option>' }).join('')
+    + '</select><div class="field-note">S1 intelligence search with web grounding</div></div>'
+    + '</div>'
+    + '</div>'
+    + '<div class="card" style="background:var(--light)">'
+    + '<div style="font-size:11px;color:var(--mid)">'
+    + '&#9432; Model availability depends on your Gemini API key tier. '
+    + 'Gemini 2.5 Flash gives the best quality. 2.0 Flash Lite is fastest and cheapest for bulk scraping. '
+    + 'All models fall back automatically if a call fails.'
+    + '</div></div>'
+}
+
+// ── Tab: Hardware SKUs ────────────────────────────────────────────────────────
+function renderHardware() {
+  var selected = CFG.primaryGpuSku || 'gb200nvl72'
+  var html = '<div class="card">'
+    + '<div class="card-title">Primary GPU SKU</div>'
+    + '<div class="card-sub">Used in Programme Cost calculations for CapEx sizing and power modelling. Click to select primary.</div>'
+    + '<div class="sku-grid">'
+  HARDWARE_SKUS.forEach(function(sku) {
+    var isSel = sku.id === selected
+    html += '<div class="sku-card' + (isSel ? ' selected' : '') + '" onclick="selectSku(\'' + sku.id + '\')">'
+      + '<div class="sku-tag" style="color:' + sku.color + '">' + esc(sku.tag) + (isSel ? ' \u2014 PRIMARY' : '') + '</div>'
+      + '<div class="sku-name">' + esc(sku.name) + '</div>'
+      + '<div class="sku-spec">' + sku.tdp + ' kW/rack \u00b7 ' + sku.gpus + ' GPUs</div>'
+      + '</div>'
+  })
+  html += '</div>'
+    + '<div class="field-note" style="margin-top:4px">The selected SKU drives rack count, power draw, and cooling estimates in the FM Programme Cost tab.</div>'
+    + '</div>'
+  return html
+}
+
+// ── Tab: National Averages ────────────────────────────────────────────────────
+function renderNatAvg() {
+  var na = CFG.national_averages || {}
+  var html = '<div class="card">'
+    + '<div class="card-title">National Average Unit Costs \u2014 India</div>'
+    + '<div class="card-sub">Baseline costs for financial modelling. Territory S1 intelligence provides index ratios (e.g. HP power = 0.65x national avg). FM calculations = national avg \u00d7 territory index.</div>'
+    + '<table class="nat-table">'
+    + '<tr><th>Parameter</th><th>Unit</th><th>Value</th><th>Hint</th></tr>'
+  NAT_AVG_FIELDS.forEach(function(f) {
+    var val = na[f.key] !== undefined ? na[f.key] : f.default
+    html += '<tr>'
+      + '<td style="font-weight:600">' + esc(f.label) + '</td>'
+      + '<td style="color:var(--mid)">' + esc(f.unit) + '</td>'
+      + '<td><input type="number" step="0.01" id="na-' + f.key + '" value="' + esc(String(val)) + '" onchange="liveNatAvg(\'' + f.key + '\',this.value)"></td>'
+      + '<td style="color:var(--mid);font-size:10px">' + esc(f.hint) + '</td>'
+      + '</tr>'
+  })
+  html += '</table>'
+    + '<div class="btn-row" style="margin-top:12px">'
+    + '<button class="btn btn-teal" onclick="syncNatAvgToSupabase()">&#8593; Sync to Supabase</button>'
+    + '<span style="font-size:11px;color:var(--mid)">Writes nat_avg_* keys to app_config table so all browsers pick up the same values</span>'
+    + '</div>'
+    + '</div>'
+  return html
+}
+
+// ── Tab: Territory Config ─────────────────────────────────────────────────────
+function renderTerritory() {
+  var tc = CFG.territory_config || {}
+  function tcField(label, key, placeholder, note) {
+    var val = tc[key] !== undefined ? tc[key] : ''
+    return '<div class="field"><label>' + label + '</label>'
+      + '<input type="number" step="0.01" id="tc-' + key + '" value="' + esc(String(val)) + '" placeholder="' + esc(placeholder||'') + '" onchange="liveTerritoryConfig(\'' + key + '\',this.value)">'
+      + (note ? '<div class="field-note">' + note + '</div>' : '')
+      + '</div>'
+  }
+  return '<div class="card">'
+    + '<div class="card-title">Territory-Level Overrides</div>'
+    + '<div class="card-sub">Override national averages for the current territory. Leave blank to use S1 extracted data or national averages. These are applied in FM cost calculations.</div>'
+    + '<div class="field-row">'
+    + tcField('Power Tariff', 'power_tariff_inr', 'Rs/kWh e.g. 4.5', 'Overrides S1 extracted tariff and national average')
+    + tcField('Civil Cost Index', 'civil_cost_index', 'e.g. 85 (national = 100)', 'Relative to national baseline of 100')
+    + '</div>'
+    + '<div class="field-row">'
+    + tcField('Manpower Cost Multiplier', 'manpower_mult', 'e.g. 0.75 (national = 1.0)', '1.0 = national avg, 0.75 = 25% cheaper')
+    + tcField('State GST Rate (%)', 'gst_rate', 'e.g. 18', 'Applied to programme cost calculations')
+    + '</div>'
+    + '<div class="field-row">'
+    + tcField('Land Cost Rs lakh/acre', 'land_cost_lakh_acre', 'e.g. 45', 'Overrides national avg for this territory')
+    + tcField('Water Cost Rs/kL', 'water_cost_inr_kl', 'e.g. 35', 'Industrial water cost override')
+    + '</div>'
+    + '<div style="margin-top:8px;padding:10px;background:var(--light);border-radius:var(--r-sm);font-size:11px;color:var(--mid)">'
+    + 'These overrides apply globally until cleared. For per-engagement overrides, use the Engagement Docket.'
+    + '</div>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="card-title">Programme Defaults</div>'
+    + '<div class="card-sub">Default values for new engagements in the Financial Model</div>'
+    + '<div class="field-row">'
+    + '<div class="field"><label>Programme Period (years)</label>'
+    + '<select id="cfg-programme_years" onchange="live(\'programme_years\',parseInt(this.value))">'
+    + [5,7,10,15,20].map(function(y){ return '<option value="'+y+'"'+(y===(CFG.programme_years||10)?' selected':'')+'>'+y+' years</option>' }).join('')
+    + '</select></div>'
+    + '<div class="field"><label>Default Currency</label>'
+    + '<select id="cfg-default_currency" onchange="live(\'default_currency\',this.value)">'
+    + [{v:'INR',l:'INR \u2014 Indian Rupee'},{v:'USD',l:'USD \u2014 US Dollar'},{v:'EUR',l:'EUR \u2014 Euro'},{v:'AED',l:'AED \u2014 UAE Dirham'},{v:'SGD',l:'SGD \u2014 Singapore Dollar'}]
+        .map(function(o){ return '<option value="'+o.v+'"'+(o.v===(CFG.default_currency||'INR')?' selected':'')+'>'+esc(o.l)+'</option>'}).join('')
+    + '</select></div>'
+    + '</div>'
+    + '</div>'
+}
+
+// ── Live update helpers ───────────────────────────────────────────────────────
+function live(key, val) {
+  CFG[key] = val
+}
+
+function liveGemini(val) {
+  // Write to BOTH key names since different tools use different names
+  CFG.key_gemini  = val
+  CFG.geminiKey   = val
+}
+
+function liveSB(key, val) {
+  CFG[key] = val
+  // Also write the underscore variant
+  var alt = key === 'sbUrl' ? 'sb_url' : 'sb_key'
+  CFG[alt] = val
+}
+
+function liveModel(id, val) {
+  var mt = CFG.model_tiers || {}
+  if (id === 'model-default') {
+    CFG.geminiTextModel = val
+    mt.default = val
+  } else if (id === 'model-pei') {
+    mt.pei = val
+  } else if (id === 'model-scraping') {
+    mt.scraping = val
+  } else if (id === 'model-s4') {
+    mt.s4 = val
+  } else if (id === 'model-search') {
+    CFG.geminiSearchModel = val
+  }
+  CFG.model_tiers = mt
+}
+
+function liveNatAvg(key, val) {
+  var na = CFG.national_averages || {}
+  na[key] = parseFloat(val) || 0
+  CFG.national_averages = na
+}
+
+function liveTerritoryConfig(key, val) {
+  var tc = CFG.territory_config || {}
+  tc[key] = parseFloat(val) || null
+  CFG.territory_config = tc
+}
+
+function selectSku(id) {
+  CFG.primaryGpuSku = id
+  showTab('hardware')
+  showToast('Primary GPU: ' + id)
+}
+
+function refreshLogo() {
+  var url = document.getElementById('cfg-logoUrl')
+  if (!url) return
+  CFG.logoUrl = url.value
+  var prev = document.getElementById('logo-preview')
+  if (!prev) return
+  if (url.value) {
+    prev.innerHTML = '<img src="' + esc(url.value) + '" style="height:40px;border:1px solid var(--border);border-radius:4px;padding:4px" onerror="this.style.display=\'none\'">'
+  } else {
+    prev.innerHTML = '<span style="font-size:11px;color:var(--mid)">No logo set</span>'
+  }
+}
+
+function toggleReveal(key) {
+  var inp = document.getElementById('cfg-' + key)
+  if (!inp) return
+  inp.type = inp.type === 'text' ? 'password' : 'text'
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+function saveAll() {
+  // Collect any final field values (in case oninput wasn't triggered)
+  var fields = document.querySelectorAll('[id^="cfg-"]')
+  fields.forEach(function(el) {
+    var key = el.id.replace('cfg-', '')
+    if (el.tagName === 'SELECT' || el.tagName === 'INPUT') {
+      if (key === 'key_gemini') { CFG.key_gemini = el.value; CFG.geminiKey = el.value }
+      else if (key === 'sbUrl') { CFG.sbUrl = el.value; CFG.sb_url = el.value }
+      else if (key === 'sbKey') { CFG.sbKey = el.value; CFG.sb_key = el.value }
+      else CFG[key] = el.type === 'number' ? (parseFloat(el.value) || el.value) : el.value
+    }
+  })
+  try {
+    localStorage.setItem('atlas_global_cfg', JSON.stringify(CFG))
+    updateStatusBar()
+    showToast('\u2713 Settings saved')
+  } catch(e) {
+    showToast('Save failed: ' + e.message, 'error')
+  }
+}
+
+function resetAll() {
+  if (!confirm('Clear ALL settings? This removes API keys, company info, and all preferences.')) return
+  CFG = {}
+  try { localStorage.removeItem('atlas_global_cfg') } catch(e) {}
+  updateStatusBar()
+  showTab('company')
+  showToast('Settings cleared')
+}
+
+// ── Test connections ──────────────────────────────────────────────────────────
+async function testGemini() {
+  var key = document.getElementById('cfg-key_gemini')
+  if (!key || !key.value.trim()) { showResult('gemini-test-result', 'Enter a key first', false); return }
+  showResult('gemini-test-result', 'Testing...', null)
+  try {
+    var r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + key.value.trim())
+    if (r.ok) {
+      var d = await r.json()
+      var count = (d.models || []).length
+      showResult('gemini-test-result', '\u2713 Valid \u2014 ' + count + ' models available', true)
+    } else {
+      showResult('gemini-test-result', '\u2717 Invalid key (HTTP ' + r.status + ')', false)
+    }
+  } catch(e) {
+    showResult('gemini-test-result', '\u2717 ' + e.message, false)
+  }
+}
+
+async function testSupabase() {
+  var url = (document.getElementById('cfg-sbUrl') || {}).value || CFG.sbUrl || ''
+  var key = (document.getElementById('cfg-sbKey') || {}).value || CFG.sbKey || ''
+  if (!url || !key) { showResult('sb-test-result', 'Enter URL and key first', false); return }
+  showResult('sb-test-result', 'Testing...', null)
+  try {
+    var r = await fetch(url + '/rest/v1/', { headers: { apikey: key, Authorization: 'Bearer ' + key } })
+    if (r.ok || r.status === 404) {
+      showResult('sb-test-result', '\u2713 Supabase connected', true)
+    } else {
+      showResult('sb-test-result', '\u2717 Connection failed (HTTP ' + r.status + ')', false)
+    }
+  } catch(e) {
+    showResult('sb-test-result', '\u2717 ' + e.message, false)
+  }
+}
+
+async function syncNatAvgToSupabase() {
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) { showToast('Configure Supabase first', 'error'); return }
+  var na = CFG.national_averages || {}
+  var rows = NAT_AVG_FIELDS.map(function(f) {
+    return { key: 'nat_avg_' + f.key, value: String(na[f.key] !== undefined ? na[f.key] : f.default) }
+  })
+  try {
+    var r = await fetch(url + '/rest/v1/app_config', {
+      method: 'POST',
+      headers: { apikey: key, Authorization: 'Bearer ' + key,
+        'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(rows)
+    })
+    if (r.ok) showToast('\u2713 National averages synced to Supabase')
+    else showToast('Sync failed: HTTP ' + r.status, 'error')
+  } catch(e) {
+    showToast('Sync failed: ' + e.message, 'error')
+  }
+}
+
+function showResult(id, msg, ok) {
+  var el = document.getElementById(id)
+  if (!el) return
+  el.textContent = msg
+  el.style.color = ok === true ? '#065F46' : ok === false ? '#991B1B' : 'var(--mid)'
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+function showToast(msg, type) {
+  var t = document.getElementById('toast')
+  t.textContent = msg
+  t.style.background = type === 'error' ? '#991B1B' : 'var(--navy)'
+  t.classList.add('show')
+  setTimeout(function(){ t.classList.remove('show') }, 2500)
+}
+
+boot()
+</script>
+</body>
+</html>
