@@ -112,7 +112,7 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
   <a href="../../settings" style="color:var(--navy);font-weight:600;text-decoration:none">Configure in Portal Settings →</a>
 </div>
 <div class="tab-bar">
-  <button class="tab-btn" data-tab="profile"  onclick="switchTab('profile')">&#127919; Territory Profile</button>
+  <button class="tab-btn" data-tab="profile"  onclick="switchTab('profile',true)">&#127919; Territory Profile</button>
   <button class="tab-btn" data-tab="cost"     onclick="switchTab('cost')">Programme Cost</button>
   <button class="tab-btn" data-tab="supply"   onclick="switchTab('supply')">Funding Sources</button>
   <button class="tab-btn" data-tab="gap"      onclick="switchTab('gap')">Funding Gap</button>
@@ -684,7 +684,11 @@ function calcCashFlow() {
 }
 
 //    Navigation                                                                 
-function switchTab(tab) {
+function switchTab(tab, fromTabBar) {
+  // Tab bar click on profile: always land on S1 (not mid-flow stages)
+  if (fromTabBar && tab === 'profile') {
+    TP.stage = TP.s1 ? 's1_done' : 'home'
+  }
   ACTIVE_TAB = tab
   document.querySelectorAll('.tab-btn').forEach(function(b) {
     var on = b.dataset.tab === tab
@@ -2650,7 +2654,7 @@ function tpS4View() {
 
   // Nav
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
-    + '<button onclick="TP.stage=\'s3\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Profile</button>'
+    + '<button onclick="TP.stage=\'s1_done\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Profile</button>'
     + '<div style="font-size:14px;font-weight:700;color:var(--navy);flex:1">' + esc(TP.territory) + ' &nbsp;·&nbsp; Vision Document</div>'
     + '<div style="display:flex;align-items:center;gap:6px">'
     + '<input id="s4-co" value="' + esc(companyName) + '" onchange="saveCompanyName(this.value)" placeholder="Company name" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;font-size:11px;width:140px;font-family:inherit" title="Used in Word export">'
