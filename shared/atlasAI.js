@@ -172,7 +172,31 @@
                              data.candidates[0].finishReason === 'MAX_TOKENS')
           if (truncated) _warn('Response truncated (MAX_TOKENS) model=' + model +
                                ' tokens=' + tokens + '. Increase maxTokens.')
-          return { ok: true, text: text, tokens: tokens, model: model, truncated: truncated }
+          // Capture grounding sources (present only for google_search calls)
+          var sources = []
+          var gm = data.candidates &&
+                   data.candidates[0] &&
+                   data.candidates[0].groundingMetadata
+          if (gm) {
+            var chunks = gm.groundingChunks || []
+            chunks.forEach(function (c) {
+              if (c.web && c.web.uri) {
+                sources.push({
+                  uri:    c.web.uri,
+                  title:  c.web.title || c.web.uri,
+                  domain: c.web.uri.replace(/^https?:\/\/(?:www\.)?/, '').split('/')[0]
+                })
+              }
+            })
+            var seen = {}
+            sources = sources.filter(function (src) {
+              if (seen[src.domain]) return false
+              seen[src.domain] = true
+              return true
+            })
+          }
+          if (sources.length) _log('grounding sources=' + sources.length + ' model=' + model)
+          return { ok: true, text: text, tokens: tokens, model: model, truncated: truncated, sources: sources }
         }
 
         _log('skip model=' + model + ' status=' + r.status)
