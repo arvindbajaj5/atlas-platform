@@ -993,11 +993,12 @@ function tpSkipSection(sectionName) {
 async function tpRefreshIntel() {
   var territory = TP.territory
   if (!territory) return
-  if (!confirm('Clear cached intelligence for '+territory+' and re-search?')) return
+  if (!confirm('Refresh will re-search and clear S2/S3/S4 for '+territory+'. Continue?')) return
   var slug=territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
   var sb=getSB()
   if (sb.url) { try { await fetch(sb.url+'/rest/v1/territory_profiles?id=eq.'+encodeURIComponent(slug),{method:'DELETE',headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'}}) } catch(e){} }
-  TP.s1=null; TP._rawIntel=null
+  TP.s1=null; TP._rawIntel=null; TP.s2=null; TP._2x2=null; TP.s4=null
+  TP.overrides={working:[],attention:[]}; TP.objectives=[]
   TP_TOKENS={s1_raw:0,s1_extract:0,s2_prompt:0,s2_response:0}
   if (!TP.archetypes.length) await loadTPData()
   // atlasAI handles model loading
@@ -2470,7 +2471,7 @@ function buildS4Prompt(territory, s1, s2, twoByTwo, objectives, fmData) {
     + '\nSection 3 — THE RECOMMENDATION: What specifically to build, in what phases. Plain language. Specific to this territory. 2 paragraphs.'
     + '\nSection 4 — WHAT IT DELIVERS: Outcomes for the state — jobs created, revenue potential, services modernised, GST upside, national positioning. ' + (fmData && fmData.territory ? 'Use the financial figures provided.' : 'If financial data not available, describe outcomes qualitatively.') + ' 2 paragraphs.'
     + '\nSection 5 — THE ASK: One clear, specific action the leadership must take. Direct. Decisive. 1 paragraph.'
-    + '\n\nDo NOT include any JSON, bullets, or markdown. Plain paragraphs only. Each section 150-220 words.'
+    + '\n\nFORMAT RULES - follow exactly: No JSON. No bullets. No markdown. No ** bold. No # headers. Plain flowing prose ONLY. Start each section with its EXACT title on its own line in ALL CAPS (e.g. THE MOMENT), then write the paragraphs below. Each section 150-220 words.'
 }
 
 async function tpGenerateS4() {
@@ -2521,25 +2522,30 @@ function tpParseS4(text) {
   var sectionTitles = ['THE MOMENT', 'WHAT THIS TERRITORY OFFERS', 'THE RECOMMENDATION', 'WHAT IT DELIVERS', 'THE ASK']
   var sections = {}
 
-  // Try each section title with multiple matching strategies
+  // Strip markdown before parsing
+  var clean = text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^---+\s*$/gm, '')
+  var cleanUpper = clean.toUpperCase()
+
   sectionKeys.forEach(function(key, i) {
-    var title     = sectionTitles[i]
+    var title = sectionTitles[i]
     var nextTitle = sectionTitles[i + 1] || null
-    var textUpper = text.toUpperCase()
+    var start = -1
 
-    // Strategy 1: exact CAPS match
-    var start = textUpper.indexOf(title)
-
-    // Strategy 2: partial match (first 2 words)
-    if (start < 0) {
-      var words = title.split(' ').slice(0, 2).join(' ')
-      start = textUpper.indexOf(words)
-    }
-
-    // Strategy 3: numbered section (1., 2., etc.)
-    if (start < 0) {
-      var numMatch = text.match(new RegExp('\\b' + (i + 1) + '\\.\\s+\\w', 'i'))
-      if (numMatch) start = numMatch.index
+    // S1: exact CAPS title on its own line
+    var tries = [
+      '\n' + title + '\n',
+      '\n' + title + ' ',
+      'SECTION ' + (i+1) + ' ',
+      'SECTION ' + (i+1) + '\u2014',
+      (i+1) + '. ' + title.split(' ')[0]
+    ]
+    for (var t = 0; t < tries.length; t++) {
+      var idx = cleanUpper.indexOf(tries[t])
+      if (idx >= 0) { start = idx + 1; break }
     }
 
     if (start < 0) {
@@ -2547,38 +2553,30 @@ function tpParseS4(text) {
       return
     }
 
-    // Move past the title line
-    var contentStart = text.indexOf('\n', start)
-    if (contentStart < 0) contentStart = start + title.length
-    else contentStart += 1
+    var lineEnd = clean.indexOf('\n', start)
+    var contentStart = lineEnd >= 0 ? lineEnd + 1 : start + title.length
 
-    // Find end — next section title or end of text
-    var end = text.length
+    var end = clean.length
     if (nextTitle) {
-      var nextUp = text.toUpperCase().indexOf(nextTitle, contentStart)
-      // Also try partial match for next title
-      if (nextUp < 0) {
-        var nextWords = nextTitle.split(' ').slice(0, 2).join(' ')
-        nextUp = text.toUpperCase().indexOf(nextWords, contentStart)
-      }
-      if (nextUp > 0) end = nextUp
+      var nxt = cleanUpper.indexOf('\n' + nextTitle, contentStart)
+      if (nxt < 0) nxt = cleanUpper.indexOf('SECTION ' + (i+2), contentStart)
+      if (nxt >= 0) end = nxt
     }
 
-    var body = text.substring(contentStart, end).trim()
-    // Strip leading section number/title if it snuck in
-    body = body.replace(/^\d+\.\s*/,'').replace(/^[A-Z ]{10,}\n/,'').trim()
-
-    sections[key] = { title: title, body: body, verified: false }
+    sections[key] = {
+      title: title,
+      body: clean.substring(contentStart, end).trim(),
+      verified: false
+    }
   })
 
-  // Fallback: if most sections are empty, the model may have used a different format
-  // Try splitting by blank-line-separated paragraphs
-  var populated = Object.values(sections).filter(function(s){ return s.body.length > 50 }).length
+  // Fallback: split by double newlines if <3 sections found
+  var populated = Object.values(sections).filter(function(sc){ return sc.body.length > 60 }).length
   if (populated < 3) {
-    var paras = text.split(/\n{2,}/).filter(function(p){ return p.trim().length > 80 })
+    var paras = clean.split(/\n{2,}/).filter(function(p){ return p.trim().length > 80 })
     sectionKeys.forEach(function(key, i) {
-      if ((!sections[key] || sections[key].body.length < 50) && paras[i]) {
-        sections[key] = { title: sectionTitles[i], body: paras[i].trim(), verified: false }
+      if (sections[key].body.length < 60 && paras[i]) {
+        sections[key].body = paras[i].trim()
       }
     })
   }
@@ -2599,6 +2597,11 @@ function tpS4ConfidenceFlags() {
   return flags
 }
 
+function saveCompanyName(val) {
+  var g = atlasGetGlobal(); g.companyName = val
+  try { localStorage.setItem('atlas_global_cfg', JSON.stringify(g)) } catch(e) {}
+}
+
 function tpS4View() {
   if (!TP.s4) { tpGenerateS4(); return }
   var s4   = TP.s4
@@ -2617,7 +2620,10 @@ function tpS4View() {
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
     + '<button onclick="TP.stage=\'s3\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Profile</button>'
     + '<div style="font-size:14px;font-weight:700;color:var(--navy);flex:1">' + esc(TP.territory) + ' &nbsp;·&nbsp; Vision Document</div>'
-    + '<div style="font-size:10px;color:var(--mid)">Generated ' + (s4.generated_at ? new Date(s4.generated_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) : '') + '</div>'
+    + '<div style="display:flex;align-items:center;gap:6px">'
+    + '<input id="s4-co" value="' + esc(companyName) + '" onchange="saveCompanyName(this.value)" placeholder="Company name" style="padding:3px 8px;border:1px solid var(--border);border-radius:4px;font-size:11px;width:140px;font-family:inherit" title="Used in Word export">'
+    + '<span style="font-size:10px;color:var(--mid)">' + (s4.generated_at ? new Date(s4.generated_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) : '') + '</span>'
+    + '</div>'
     + '<button onclick="tpExportS4Word()" style="padding:6px 16px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">&#128196; Export Word</button>'
     + '<button onclick="TP.s4=null;tpGenerateS4()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer;color:var(--mid)">&#8635; Re-generate</button>'
     + '</div>'
@@ -2707,7 +2713,8 @@ async function tpExportS4Word() {
 
   var s4  = TP.s4
   var g   = atlasGetGlobal()
-  var companyName = g.companyName || g.company_name || g.org_name || g.name || 'ATLAS Platform'
+  var _coEl = document.getElementById('s4-co')
+  var companyName = (_coEl && _coEl.value.trim()) || g.companyName || g.company_name || g.org_name || g.name || 'ATLAS Platform'
   var tagline     = g.companyTagline || ''
   var brandPrimary = (g.brandPrimary || '#002870').replace('#','')
   var brandAccent  = (g.brandAccent  || '#FF5539').replace('#','')
@@ -3539,9 +3546,7 @@ async function init() {
     var _b = document.getElementById('missing-key-banner')
     if (_b) _b.style.display = 'flex'
   }
-  // Open profile tab if territory already known, otherwise cost
-  var startTab = (TP.territory || MODEL.territory) ? 'profile' : (ACTIVE_TAB || 'cost')
-  switchTab(startTab)
+  switchTab('cost')
 }
 
 async function selectEngagement(id) {
