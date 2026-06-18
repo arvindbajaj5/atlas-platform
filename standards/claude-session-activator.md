@@ -1,5 +1,5 @@
 # ATLAS Claude Session Activator
-# Version: 3.6 | Last Updated: 2026-06-07
+# Version: 4.0 | Last Updated: 2026-06-18
 
 ---
 
@@ -17,7 +17,7 @@ At the start of any ATLAS session, load this file to restore full context.
 **Customer-facing intent:** A Chief Secretary, Finance Secretary, or CM works through ATLAS with the presales team. The sign-off package is generated in the room.
 
 **What stays in ATLAS:**
-Intelligence → Analysis & Recommendation → Programme Design → Financial Modelling → Sign-off Package
+Intelligence → Analysis & Recommendation → Territory Profile → Programme Design → Financial Modelling → Sign-off Package
 
 **What moves out (separate tools):**
 - RAC Tool + Deal Analysis → Commercial/Deals tool (internal)
@@ -39,220 +39,316 @@ Intelligence → Analysis & Recommendation → Programme Design → Financial Mo
 | Intelligence Scraper | ✅ Running daily | Functional but prompt needs semantic tree |
 | Feed Library | ✅ Live | 15 active feeds, weekly discovery workflow |
 | Portfolio Catalogue | ✅ Updated | L2-GIB added, L2-AIF renamed |
+| TSAP FM Territory Profiler | ✅ Live | S1→S2→S3→2x2→S4 pipeline complete |
+| atlasAI.js | ✅ Live | Shared AI module at atlas-platform/shared/ |
+
+### IN PROGRESS / PARTIALLY BUILT ⚡
+
+| Component | Status | Notes |
+|---|---|---|
+| TSAP Financial Model | ⚡ v2.x live | S1 wiki needs macro expansion; Settings tab to be demoted; export via atlasExport.js pending |
+| Territory 2x2 Framework | ⚡ Live in FM | Standalone atlas-territory-2x2.html also exists as BD reference tool |
+| S4 Vision Document | ⚡ Built in FM | Word export working (docx@8.5.0); atlasExport.js wiring pending |
 
 ### NOT YET BUILT 🔧 (in priority order)
 
 | Component | Priority | Notes |
 |---|---|---|
+| S1 Wiki expansion | 🔴 Next | Full macro, opportunities, demographics, infrastructure sections |
+| atlasExport.js | 🔴 Next | Shared Word + PPT module; replaces all per-tool export functions |
+| Portal Settings page rebuild | 🔴 Next | Master config UI — all tools read from here; no per-tool settings |
+| Docket → Profile → SASC flow coherence | 🔴 Next | Wire territory slug + session data across tools |
 | Semantic Context Tree | 🔴 Next | Foundational — upgrades scraper + RE + PEI simultaneously |
 | AI Centre Configurator | 🔴 Next | Full stack modelling → BOM + ROM |
 | Mode 1 — Budget Envelope Model | 🔴 Next | Pre-UC parametric cost model |
 | UC Definition + Reconciliation | 🔴 Next | UC vs budget fit |
 | Mode 2 — Detailed Financial Model | 🔴 Next | 6 tabs, curves, scenarios |
-| Territory AI Programme Profiler | 🟡 Next | 10 dims, radar, 4 archetypes |
+| S5 Full Pitch Document | 🟡 Next | After S4 stable; uses FM numbers + S3 profile |
 | Pitch Report generator | 🟡 Next | Boardroom document in the room |
-| AI Centre Builder unified flow | 🟡 Next | Steps 1-7 connected end to end |
 
 ---
 
-## NEXT PRIORITY: Semantic Context Tree
+## TSAP FM — Territory Profiler (S1→S4 Pipeline)
 
-**Why it's first:** Single build that upgrades intelligence quality across scraper, Second Brain, PEI, and Recommendation Engine simultaneously. The current extraction prompt oscillates between junk and low yield — the semantic tree solves this permanently.
-
-### Architecture
+### Pipeline
 
 ```
-Supabase: semantic_contexts table
-  → tier (direct_opportunity | technology_signal | market_signal | exclude)
-  → context_string (natural language description of the signal)
-  → portfolio_codes (which L1/L2/L3 items this signal maps to)
-  → active (boolean)
-
-intelligence_items table (add 2 columns):
-  → matched_context text
-  → matched_tier text
+S1: Territory Intel Search (Gemini search grounding → raw text → 10-section extraction)
+    ↓  cached in territory_profiles (Supabase)
+S2: Objectives Selection + AI Profile Generation
+    ↓  no-respend: fingerprint check skips Gemini if same objectives
+S3: Profile Display (working/attention/feasibility/radar/archetypes/2x2 positioning)
+    ↓  auto-saved to session on every significant action
+S4: Vision Document (Gemini generates 5 sections → editorial review → Word export)
+    ↓  saved as session.s4; Word export via docx@8.5.0 (interim; atlasExport.js pending)
 ```
 
-### Context Tree Design
+### Key architectural decisions
 
-**TIER 1 — Direct Opportunity (high value)**
-- Government issuing RFP/RFI/tender for AI, data centre, HPC, or digital infrastructure
-- State government announcing AI programme, digital mission, or data sovereignty initiative
-- Defence ministry procurement for surveillance, autonomous systems, C4I, ISR
-- Ministry or PSU signing MoU for AI/digital transformation
-- Budget allocation for AI, HPC, supercomputing, or digital infrastructure
-- National AI mission, sovereign AI, or digital public infrastructure announcement
+- **atlasAI.js** at `atlas-platform/shared/atlasAI.js` — zero hardcoding, all config from Supabase `app_config` (atlasai_* prefix). All tools load this module.
+- **Session persistence** — full S2/S3/S4 state saved in `territory_profiles.session` (jsonb). Restores to S3 on reload including objectives, overrides, 2x2, S4 draft.
+- **No-respend on S2** — `TP.s2._objectives_fingerprint` stores sorted objectives JSON. If unchanged on re-visit, goes straight to S3 with toast.
+- **Grounding sources** — `atlasAI.js` captures `groundingChunks` from Gemini search. Displayed as collapsible source chips on S1 intel screen. Saved in session.
+- **Confidence flags** — low-confidence S2 data points flagged ⚠ in S4 editorial. All sections must be ✓ confirmed before Word export unlocks.
+- **2x2 positioning** — auto-computed from dim_scores. 15 pre-mapped states have curated USP/hook; all others auto-derived. Saved in `session.twoByTwo`.
+- **MODEL.territory** — synced from `TP.territory` at S1 completion and session restore. Cost tab shows placeholder if blank.
 
-**TIER 2 — Technology Signal (medium value)**
-- AI/ML model deployment in government, defence, health, agriculture, or finance
-- GPU cluster, HPC, or supercomputer deployment or procurement
-- Satellite data analytics, EO processing, geospatial AI application
-- Defence system with AI, sensor fusion, autonomous, or surveillance technology
-- LLM, generative AI, or foundation model deployment in enterprise or government
-- Data centre investment, cloud infrastructure, or edge computing deployment
-- Cybersecurity AI, threat detection, or signals intelligence technology
+### Supabase tables used
 
-**TIER 3 — Market Signal (lower value, track)**
-- NVIDIA, AMD, HPE, Dell, Supermicro announcing product/win/partnership in India
-- Indian AI startup raising significant funding (>50 crore)
-- Global sovereign AI centre deployment (UAE, Saudi, Singapore, France, UK)
-- AI regulation, data localisation, or sovereignty policy announcement
-- State election manifesto or budget with digital/AI commitments
+- `territory_profiles` — S1 intel cache + full session (raw_intel, profile, session jsonb)
+- `territory_assessments` — legacy; partially used
+- `profiler_archetypes` / `profiler_archetype_dims` — T1-T5 territory archetypes
+- `app_config` — atlasai_* config keys for atlasAI.js
 
-**HARD EXCLUDE — never relevant**
-- Military personnel appointments, promotions, retirements, command handovers
-- Military ceremonies, parades, exercises without technology angle
-- Geopolitical analysis without technology procurement angle
-- Stock prices, mutual funds, commodity prices, personal finance
-- General health news without digital health or AI angle
-- Sports, entertainment, celebrity, weather, obituaries
+### Supabase migrations run
 
-### Context → Portfolio Mapping
+- `territory_profiler.sql` — base schema
+- `territory_profiler_v2.sql` — raw_intel, raw_cached_at, sections, failed_sections columns
+- `territory_profiler_session.sql` — session jsonb column
+- atlasai_* rows inserted into app_config
 
+### 2x2 Framework
+
+Axes: **Role (Y)** Supplier vs Consumer × **Advantage (X)** Infrastructure/Cost vs Domain/Use Case
+
+| | Infrastructure / Cost | Domain / Use Case |
+|---|---|---|
+| **Supplier** | Q1 Green AI Hub (teal) | Q2 Knowledge Exporter (amber) |
+| **Consumer** | Q3 Governance Moderniser (blue) | Q4 Heritage/Sector Renaissance (orange) |
+
+- Territory has **dominant quadrant** (typically 55-78%) + **supporting quadrant** (15-30%)
+- 15 states pre-mapped in `TP2X2_SD`
+- Auto-computed from dim_scores for all other territories
+
+### S4 Vision Document structure
+
+1. THE MOMENT — why AI, why now, why this territory
+2. WHAT THIS TERRITORY OFFERS — dominant quadrant narrative + supporting angle
+3. THE RECOMMENDATION — what to build, phased, plain language
+4. WHAT IT DELIVERS — outcomes: jobs, revenue, services, GST (FM numbers if available)
+5. THE ASK — one clear action
+
+Word export: `docx@8.5.0` CDN, A4, brand palette, logo from Settings, grounding sources appendix.
+
+### Pending FM items
+
+- S4 → `atlasExport.js` wiring (replace current inline docx code)
+- S5 Full Pitch Document
+- FM Settings tab → demote to read-only status panel; no gear on TSAP FM
+- S1 wiki expansion (see below)
+- TSAP FM repricing (GPU SKU-level pricing, territory overrides, new investment actors)
+
+---
+
+## S1 Wiki — Pending Expansion
+
+S1 currently renders: Energy, Water, Land, Workers, Digital, Geography, Policy, Programmes.
+
+**Missing sections (extraction runs but not rendered):**
+- **Macroeconomics** — currently a single card. Should be full section: GSDP multi-year trend, per capita vs national, fiscal deficit/surplus trend, sectoral composition (agri/industry/services %), major revenue sources
+- **Opportunities** — extracted but NOT rendered. Most important section for sales
+- **Demographics** — not extracted or rendered. Add: population, urbanisation %, working age %, dependency ratio
+- **Infrastructure** — separate from Digital. Roads, rail, airports, ports, logistics index
+
+**CTA text fix:** "Select up to 5 objectives" → "Select objectives — no limit"
+
+---
+
+## Settings Architecture (decided, not yet fully built)
+
+**Principle: one global settings UI, all tools read from it. No per-tool settings tabs.**
+
+**Portal Settings page** (master, to be rebuilt):
+- Company & Brand (name, tagline, logo URL, primary/accent colours)
+- API Keys (Gemini, Supabase URL + key)
+- AI Model Preferences (primary text model, search model)
+- Hardware SKUs (GPU platforms — click to set primary for FM calculations)
+- Territory Config (power tariff override, civil cost index, manpower multiplier, GST rate)
+
+**Tool behaviour:**
+- Tools read from `atlasGetGlobal()` (localStorage `atlas_global_cfg`)
+- If a required key is missing, tool shows a non-blocking banner with link to Portal Settings
+- **No ⚙ Settings gear on TSAP FM or any other tool**
+- **FM Settings tab** (currently built): demote to read-only status panel + "Configure in Portal Settings →" link
+
+---
+
+## Export Architecture (decided, not yet built)
+
+**`atlasExport.js`** at `atlas-platform/shared/atlasExport.js`:
+- `atlasExport.word(config)` — generates `.docx` using `docx@8.5.0`, brand from Settings
+- `atlasExport.ppt(config)` — generates `.pptx` using `pptxgenjs`, brand from Settings
+- Reads company name, logo, brand palette from `atlasGetGlobal()` automatically
+- All per-tool export functions become thin wrappers or are deleted
+
+**Current state:** S4 Word export is inline in FM (working). PPT export stubs exist. Both need migration to `atlasExport.js`.
+
+---
+
+## Docket → Profile → SASC Flow (decided, not yet wired)
+
+```
+Docket (engagement created, territory set)
+    ↓
+Territory Profile (S1 → S2 → S3 → 2x2 → S4 Vision Doc)
+    ↓  dim_scores + archetype + objectives
+SASC (Solution Architecture)
+    ↓  sizing + BOM
+FM (Financial Model)
+    ↓
+Deliverables (S4 Word, PPT, BOM)
+```
+
+**Current gaps:**
+- Territory Profile doesn't flow dim_scores/archetype into SASC
+- S4 not connected to docket (no docket_item created on S4 save)
+- No single session ID tying the full engagement flow together
+
+---
+
+## atlasAI.js — Shared AI Module
+
+**Location:** `arvindbajaj5.github.io/atlas-platform/shared/atlasAI.js`
+
+**Public API:**
 ```javascript
-const CONTEXT_TO_PORTFOLIO = {
-  'government RFP for AI or digital infrastructure':    ['L1-TSAP', 'L2-INF'],
-  'state government AI programme':                      ['L1-TSAP', 'L1.1-TSAP'],
-  'national AI mission or sovereign AI':               ['L1-TSAP', 'L1.3-TSAP'],
-  'budget allocation for AI or HPC':                   ['L1-TSAP', 'L2-AIF'],
-  'GPU cluster or HPC deployment':                     ['L2-AIF', 'L2-TRC'],
-  'satellite data or geospatial AI':                   ['L2.1-INF', 'L2-EDG'],
-  'defence surveillance or autonomous systems':         ['L2.2-INF', 'L2-EDG'],
-  'LLM or generative AI in government':                ['L2-INF', 'L2-GIB'],
-  'data centre investment or edge computing':           ['L2-MDC', 'L2-EDG'],
-  'AI regulation or data localisation':                ['L1.3-TSAP', 'L1.5-TSAP'],
-  'global sovereign AI centre':                        ['L1-TSAP'],
+atlasAI.init(sbUrl, sbKey)        // load config from Supabase app_config
+atlasAI.call(prompt, opts)         // Gemini text call, model fallback, thinking-part skip
+atlasAI.search(prompt, opts)       // Gemini + google_search grounding, returns sources[]
+atlasAI.parseJSON(text)            // 4-strategy: direct → all_blocks(last-first) → fence → repair
+atlasAI.repair(str)                // Indian numbers, unquoted enums, trailing commas, fences
+atlasAI.callAndParse(prompt, opts)
+atlasAI.searchAndParse(prompt, opts)
+atlasAI.sectionMaxTokens(name)     // opportunities:4096, s2:8192, energy:3000, etc.
+atlasAI.getGeminiKey()
+atlasAI.config                     // live config snapshot (read-only)
+atlasAI.ready
+```
+
+**Supabase app_config keys (atlasai_* prefix):**
+```
+atlasai_primary_model        gemini-2.5-flash
+atlasai_fallback_models      ["gemini-2.0-flash-lite","gemini-1.5-flash"]
+atlasai_search_models        ["gemini-2.0-flash","gemini-1.5-flash-latest"]
+atlasai_default_max_tokens   2000
+atlasai_s2_max_tokens        8192
+atlasai_temperature          0.1
+atlasai_retry_on_400         true
+atlasai_timeout_ms           30000
+```
+
+---
+
+## CRITICAL — Technical Rules
+
+### thinkingConfig
+NEVER add `thinkingConfig:{thinkingBudget:0}` to Gemini calls.
+
+### Key Resolution Pattern
+```javascript
+// atlasAI.js tools (TSAP FM and all new tools):
+var key = atlasAI.getGeminiKey()
+
+// Legacy tools (Second Brain, PEI, Scraper):
+var g = atlasGetGlobal()
+var model = atlasGetTaskModel('task_id') || 'gemini-2.0-flash'
+var key = atlasGetKeyForModel(model) || g.key_gemini || ''
+```
+
+### sbInsert — always use upsert header
+```javascript
+headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }
+```
+
+### S2 no-respend pattern
+```javascript
+TP.s2._objectives_fingerprint = JSON.stringify(TP.objectives.slice().sort())
+var currentFP = JSON.stringify(TP.objectives.slice().sort())
+if (TP.s2 && TP.s2._objectives_fingerprint === currentFP) {
+  TP.stage = 's3'; switchTab('profile')
+  showToast('↩ Using saved profile — objectives unchanged')
+  return
 }
 ```
 
-### Two-Phase Filtering (keyword + semantic)
-
-```
-Phase 1 — Keyword pre-filter (free, instant)
-  Title/content must contain AI-adjacent keywords
-  FAIL → skip without API call (cost saving)
-  PASS → go to Phase 2
-
-Phase 2 — Semantic context tree matching (Gemini)
-  Match against context tree
-  Output: tier + matched_context + portfolio_codes
-  Store in intelligence_items with context metadata
-```
-
-### Cross-Platform Impact
-
-- **Scraper** — context tree replaces blunt extraction prompt
-- **Second Brain** — items grouped/filtered by matched_context and tier
-- **PEI** — customer text parsed through tree → matched contexts as structured signals
-- **RE** — reads matched_context tags → maps to portfolio codes directly → precise recommendations
-- **TSAP AI Enrich** — pulls items filtered by context + geography
-
 ---
 
-## ATLAS — Core Architecture
+## ATLAS Core Architecture
 
 ```
 INTELLIGENCE LAYER ✅
-  Second Brain + PEI + Scraper (with semantic tree pending)
+  Second Brain + PEI + Scraper (semantic tree pending)
         ↓
-ANALYSIS & RECOMMENDATION ✅ (RE working, context tree will improve it)
+ANALYSIS & RECOMMENDATION ✅
+  Recommendation Engine (context tree will improve it)
+        ↓
+TERRITORY INTELLIGENCE ⚡ (S1-S4 built, S5 pending)
+  Territory Profile → 2x2 Positioning → Vision Document
         ↓
 DESIGN & CONFIGURATION 🔧
   AI Centre Builder Steps 1-7 (not built)
-  AI Centre Configurator — full stack (not built)
+  AI Centre Configurator (not built)
         ↓
-FINANCIAL MODELLING 🔧
-  Mode 1: Budget Envelope (not built)
-  Mode 2: Detailed 6-tab model (not built)
+FINANCIAL MODELLING ⚡
+  TSAP FM live (repricing pending)
         ↓
-SIGN-OFF PACKAGE 🔧
-  Pitch Report (not built)
+SIGN-OFF PACKAGE ⚡
+  S4 Vision Doc → S5 Full Pitch → Board Deck
 ```
 
 ---
 
-## Financial Model — Two Modes (full spec in v3.3-3.5)
+## Semantic Context Tree — Next Priority for Intelligence Layer
 
-**Mode 1** — Parametric budget envelope pre-UC (±35%)
-**Mode 2** — Detailed 6-tab post-UC model:
-- Tab 1: Objectives (Type A/B/C)
-- Tab 2: Cost Model (from Configurator BOM/ROM)
-- Tab 3: UC Schedule & Benefit Phasing ← key tab
-- Tab 4: Financing Sources (moratorium critical — often more important than rate)
-- Tab 5: Financial Curves (cash-in/out, breakeven, political kill zone visualisation)
-- Tab 6: Scenarios & What-If
+### Architecture
+```
+Supabase: semantic_contexts table
+  → tier (direct_opportunity | technology_signal | market_signal | exclude)
+  → context_string
+  → portfolio_codes
+  → active
 
-**Key insight:** Benefits don't flow when programme starts. Moratorium period bridges the cash-out zone. UC pull-in/delay controls the benefit curve.
+intelligence_items: add matched_context, matched_tier columns
+```
 
----
-
-## Intelligence Scraper — Current State
-
-**Status:** Running daily, functional but low yield (2-3 items/run)
-**Root cause:** Extraction prompt too blunt — oscillates between quality and yield
-**Fix:** Semantic context tree (next priority build)
-
-**Current settings:**
-- RSS: true (15 active feeds from feed_library)
-- Items per domain: 2
-- Delay: 1000ms
-- Dedup window: 7 days
-- Search grounding: gemini-3.5-flash (correct model — do not change)
-- Global topics: 5 (UC-GLB, TEC-GLB, OEM-GLB, POL-GLB, INV-GLB)
-
-**Feed Library:**
-- 15 active feeds across DEF-MIL, DEF-SPC, GEO-SPA, MKT-DEF, TEC-GEN, HLT-LIF, MKT-SOV
-- Weekly discovery workflow (feed_discovery.yml) — runs Sundays
-- Health check auto-dormants failing feeds, re-activates recovered ones
-- Global feed discovery still needed (HPCwire, The Register, C4ISRNET etc.)
-
-**Do NOT enable daily schedule yet** — wait until semantic tree improves quality
-
-**Multilingual:** Deferred — literal translation approach won't work, needs careful design
-
----
-
-## Supabase — Critical Notes
-
-**RLS disabled on ALL tables.**
-**Engagements archetype:** `territory_coe` | `govt_sectorial` | `enterprise` | `defence`
-
-**New columns needed (before semantic tree build):**
+### Supabase SQL needed
 ```sql
-ALTER TABLE intelligence_items 
+ALTER TABLE intelligence_items
   ADD COLUMN IF NOT EXISTS matched_context text,
   ADD COLUMN IF NOT EXISTS matched_tier text;
 
 CREATE TABLE IF NOT EXISTS semantic_contexts (
-  id          text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  tier        text NOT NULL CHECK (tier IN ('direct_opportunity','technology_signal','market_signal','exclude')),
-  name        text NOT NULL,
+  id             text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  tier           text NOT NULL CHECK (tier IN ('direct_opportunity','technology_signal','market_signal','exclude')),
+  name           text NOT NULL,
   context_string text NOT NULL,
   portfolio_codes text[] DEFAULT '{}',
-  active      boolean DEFAULT true,
-  created_at  timestamptz DEFAULT now()
+  active         boolean DEFAULT true,
+  created_at     timestamptz DEFAULT now()
 );
 ```
 
 ---
 
-## CRITICAL — thinkingConfig
+## Financial Model — Two Modes
 
-NEVER add `thinkingConfig:{thinkingBudget:0}` to Gemini calls.
+**Mode 1** — Parametric budget envelope pre-UC (±35%)
+**Mode 2** — Detailed TSAP FM (live, repricing pending)
+
+**FM repricing — pending (after Settings rebuild):**
+- GPU SKU-level pricing: GB200 NVL72, VR NVL72, VR NVL4, MI325X
+- Management infra as % of compute (not per-MW)
+- Territory-level overrides: power tariff, civil cost index, manpower multiplier
+- New investment actors: Territory Govt, Govt Rep, OEM, AI Model Co, AI Operator
+- Investment scenarios: State / Operator / Hybrid / Viability Gap
 
 ---
 
-## CRITICAL — Key Resolution Pattern
+## Intelligence Scraper
 
-```javascript
-var g = atlasGetGlobal()
-var model = atlasGetTaskModel('task_id') || 'gemini-3.1-flash-lite'
-var key = atlasGetKeyForModel(model) || g.key_gemini || g.key_anthropic || g.key_openai || ''
-if(!atlasGetKeyForModel(model) && key){
-  if(g.key_gemini) model = 'gemini-3.1-flash-lite'
-  else if(g.key_anthropic) model = 'claude-haiku-4-5-20251001'
-}
-```
+**Status:** Running daily, functional but low yield
+**Do NOT enable daily schedule** — wait for semantic tree
+**Search model:** gemini-2.0-flash (do not change)
 
 ---
 
@@ -263,7 +359,7 @@ L1     L1-TSAP    Territory Sovereign AI Programme
 L1.1-L1.5         Programme components (partner-led)
 L2     L2-GIB     GenAI-in-a-Box ✅
 L2     L2-AIF     Multi-Purpose AI Factory ✅
-L2     L2-INF     AI Centre (rename L2-AIC pending decision)
+L2     L2-INF     AI Centre (rename → L2-AIC pending)
 L2.1   L2.1-INF   GeoAI Centre
 L2.2   L2.2-INF   Defence AI Centre (air-gapped, MIL-SPEC)
 L2.3   L2.3-INF   Health AI Centre
@@ -277,7 +373,7 @@ L3     L3-*       23 Lifecycle Services
 
 ---
 
-## MDC T-Shirt Sizing (per site)
+## MDC T-Shirt Sizing
 
 | Size | Capacity | GPUs | Tokens/day | Use |
 |---|---|---|---|---|
@@ -289,433 +385,43 @@ L3     L3-*       23 Lifecycle Services
 
 ---
 
+## Supabase
+
+**RLS disabled on ALL tables.**
+**Engagements archetype:** `territory_coe` | `govt_sectorial` | `enterprise` | `defence`
+
+---
+
+## ATLAS GitHub
+
+**Repo:** `arvindbajaj5/atlas-platform`
+**Live URL:** `arvindbajaj5.github.io/atlas-platform`
+**Shared modules:** `atlas-platform/shared/` (atlasAI.js live; atlasExport.js pending)
+**TSAP FM:** `atlas-platform/tools/tsap-financial-model/index.html`
+**Drive root:** `1L6Ta_fqSlUpzE0iNr0Be9ooRjfhPRsRd`
+
+---
+
 ## Pending Items (Priority Order)
 
 | # | Item | Priority |
 |---|---|---|
-| 1 | Semantic Context Tree — Supabase table + seed data | 🔴 Next session |
-| 2 | Wire semantic tree into scraper (replace extraction prompt) | 🔴 Next session |
-| 3 | Wire semantic tree into RE (context → portfolio mapping) | 🔴 Next session |
-| 4 | Wire semantic tree into PEI (parse brief through tree) | 🟡 Next |
-| 5 | AI Centre Configurator (full stack, all layers) | 🔴 Next laptop session |
-| 6 | Mode 1 — Budget Envelope Model | 🔴 Next |
-| 7 | UC Definition + Reconciliation flow | 🔴 Next |
-| 8 | Mode 2 — Detailed Financial Model (6 tabs) | 🔴 Next |
-| 9 | Territory AI Programme Profiler | 🟡 Next |
-| 10 | Pitch Report generator | 🟡 Next |
-| 11 | Enable daily scraper schedule (after semantic tree) | 🟡 Soon |
-| 12 | Global feed discovery (HPCwire, C4ISRNET etc.) | 🟡 Soon |
-| 13 | GCP billing investigation | 🟡 Soon |
-| 14 | Decide portfolio code rename L2-INF → L2-AIC | 🟡 Soon |
-| 15 | UX pass — Engagement Docket | ⬜ Later |
-| 16 | Visualisations (radar, territory map, tokenomics) | ⬜ Later |
-| 17 | Brand.md + hardware-preferences.md | ⬜ After hardware decisions |
-
----
-
-## Intelligence Operations — Agent Architecture (Future Sprint)
-
-**Decision: Build after current ATLAS priorities (AI Centre Configurator, Financial Model, Pitch Report)**
-
-### Planned Agent Harness
-
-```
-Agent 1 — Feed Discovery Agent (weekly, feed_discovery.yml — BUILT)
-  Finds new RSS feeds, validates accessibility, writes to feed_library
-
-Agent 2 — Feed Health Agent (daily, part of feed_discovery.yml — BUILT)
-  Dormants/drops underperformers, reactivates recovered feeds
-
-Agent 3 — Intelligence Gathering Agent (daily, scrape-intelligence.js — BUILT)
-  Fetches feeds + search grounding, two-phase semantic filter, writes to intelligence_items
-
-Agent 4 — Intelligence Quality Agent (future)
-  Weekly: reviews captured items, scores quality, flags stale/irrelevant
-  Feeds back to improve semantic context tree
-
-Agent 5 — Context Tree Improvement Agent (future)
-  Monthly: analyses what's captured vs missed
-  Suggests new contexts, refines existing ones — human approval before applying
-```
-
-### Search API Evaluation (June 2026)
-
-**Exa.ai — RECOMMENDED for future Intelligence Gathering Agent**
-- $7 per 1,000 searches (standard, includes 10 results + full page content)
-- $12 per 1,000 searches (Exa Deep / agentic)
-- Free tier: 1,000 searches/month
-- **Killer feature:** "Find Similar" — give it a URL, get 10 semantically similar articles from sources not yet indexed. Perfect for feed discovery.
-- Dedicated news search mode — structured, LLM-ready
-- At our daily volume (~200 searches/day): ~$50/month
-- Use case: replace Gemini search grounding in Agent 3, power Agent 1 feed discovery
-
-**Tavily — SKIP**
-- Credit-based pricing ($30-100/month)
-- Unpredictable cost on research tasks (4-250 credits per request)
-- Good for RAG pipelines but overcomplicated for our use case
-
-**Current approach (keep for now):**
-- Gemini search grounding (free, already working)
-- Add Exa.ai when refactoring into proper agent architecture
-
----
-
-## Intelligence Scraper — Current Bugs to Fix
-
-**Bug 1 (next session):** `prompt is not defined` in RSS Phase 2
-- `phase2SemanticMatch` builds its own prompt internally
-- But `callGemini(prompt)` is still being called somewhere with undefined `prompt`
-- Fix: find and remove the orphaned `callGemini(prompt)` call in scrapeRSS
-
-**Bug 2 (low priority):** FE AI feed has malformed XML (`&` in entity name)
-- Feed itself is broken — dormant it in feed_library
-
-**Known issue:** 498 titles in dedup set suppressing yield
-- Will clear naturally as 7-day window ages out old items
-- Do NOT enable daily schedule until yield stabilises at 10+ items/run
-
----
-
-## Sprint 3 — Complete ✅ (2026-06-08)
-
-### Sovereign AI Stack Configurator (SASC) — Live at `tools/sasc/`
-
-**New tool:** `tools/sasc/index.html`
-**Launch flows:**
-1. Engagement Docket → solution item → `Configure` button → SASC pre-loaded with context
-2. Engagement Docket header → `SASC` button → fresh configuration
-3. Portal nav → SASC card in presales section
-
-**Three-screen flow:**
-- Screen 1: UC pills from docket (checkboxes), scope selector (full/hardware/software/custom), DC decision (MDC T-shirt+sites / B&M existing / B&M new build)
-- Screen 2: 9 toggleable stack layers, pre-checked by scope
-- Screen 3: BOM + ROM from pricing_params table, currency toggle (USD/INR/EUR), Indian numbering, ±35% confidence, Export CSV, Save to docket
-
-**Foundation tables (in Supabase):**
-- `pricing_params` — 45 components, all prices in USD
-- `people_params` — 20 roles with USD rates + COLA %
-- `benchmark_results` — 8 GPU benchmarks (H100, MI325X, GB200)
-- `uc_workload_profiles` — 7 HP TSAP UC profiles
-- `fx_rates` — USD→INR/EUR/GBP/JPY, updated manually
-
-**Key design decisions:**
-- All prices stored in USD — forex applied at display time via `fx_latest` view
-- INR display uses Indian numbering (Crores/Lakhs)
-- T-shirt sizing (XS-XL) only for MDC — B&M uses actual power/rack specs
-- UC workload profiles drive compute sizing (GPU count from tokens/day + latency SLA)
-- BOM traces: UC → workload → compute → networking → power → T-shirt validation
-
-**Pending (next sessions):**
-- SASC: wire UC workload profiles more precisely to compute sizing (currently uses estimated GPU count)
-- SASC: add people model tab (team ramp-up/down, COLA, multi-year)
-- SASC: networking sizing from compute count
-- SASC: detailed layer configuration forms (currently just toggles)
-- Mode 1 Budget Envelope Model (pre-UC parametric — Sprint 4)
-- Mode 2 Detailed Financial Model (post-UC, 6 tabs — Sprint 4)
-
----
-
-## SASC — Current Status (June 2026)
-
-**Live at:** `tools/sasc/index.html`
-
-**Working:**
-- 4-screen flow: Scope & DC → Stack layers → Workload Profiler → BOM + ROM
-- Supabase connection fixed — was reading from wrong localStorage key (`atlas_global` vs `atlas_global_cfg` / `sbUrl` vs `sb_url`)
-- UCs load from docket when launched via `?eng=...&docket=...` params
-- GPU sizing from workload inputs (DAU, peak multiplier, session length, tokens/session)
-- Traceability chain: UC → tokens/day → benchmark → servers → power
-- BOM driven by real UC workload sizing
-- Currency toggle USD/INR/EUR with Indian numbering
-- Save to docket, Export CSV
-
-**Known gaps for next session:**
-- BOM figures need review against real HP pricing
-- People model tab (team ramp, COLA, multi-year OpEx)
-- Detailed layer config forms (layers currently just toggles)
-- UC complexity tier selector (Simple/Medium/Complex/Research) affects UC dev cost
-- Benchmark override UI (currently alert-only)
-
-**Critical: SASC localStorage pattern**
-```javascript
-// CORRECT - matches all other ATLAS tools
-function getSB() {
-  var g = typeof atlasGetGlobal === 'function' ? atlasGetGlobal()
-    : (function(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } })()
-  return { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
-}
-```
-
----
-
-## SASC Sprint 3 — Next Build Items (agreed June 2026)
-
-### 1. Model dropdown "?" icons
-Fix `uc_interaction_types` table — update `icon` column with proper emoji per type:
-- Citizen Chatbot → 💬, RAG Q&A → 🔍, Document Processing → 📄
-- Advisory → 💡, Form Filling → 📝, Data Extraction → 🗂️
-- Satellite/Image → 🛰️, Complex Analytics → 📊, Code Assistant → 💻
-- Drug Discovery → 🔬, Speech → 🎙️, Batch Analytics → ⚙️
-Supabase table update only — no code change needed.
-
-### 2. Per-UC GPU override
-- Global GPU selector remains for primary configuration
-- Per-UC "GPU override" flag for exceptions (e.g. GB200 for 405B research UC)
-- BOM shows primary GPU for most UCs + separate line for overrides
-- Keeps BOM clean while allowing exceptions
-
-### 3. People model tab (Tab 2 on BOM+ROM screen)
-- Tab 1: Hardware + Software BOM (current)
-- Tab 2: People model (new)
-  - Role | Grade | Count | Start month | End month | Monthly rate (USD)
-  - COLA applied per year (from people_params table)
-  - Ramp-up / ramp-down curves
-  - Managed service vs customer staff split
-  - Total people cost Year 1 / Year 2 / Year 3
-  - Peak headcount
-- `people_params` table already seeded — needs programme duration input + team composition UI
-- People cost added to ROM total
-
-### 4. People cost in ROM
-- ROM currently = CapEx + OpEx (3yr) + UC dev
-- Update to: ROM = CapEx + OpEx (3yr) + UC dev + People cost
-- Requires people model tab to be built first
-
-### SASC Known Bugs to Fix in Next Build
-- `getCfgBool` helper used but verify setCfgBool called correctly everywhere
-- Layer config panels — verify all 9 layers render without errors
-- BOM numbers need validation against real HP pricing after DB cleanup
-
----
-
-## Sprint 4 Plan — TSAP Financial Model (June 2026)
-
-### Context
-HP (Himachal Pradesh / HAICE) is the proxy engagement for all large TSAP (Territory Sovereign AI Programme) builds. DGCA is a vertical/sectoral engagement — fundamentally different proposition structure. All TSAP tooling should be built with HP as the reference case but generalised for any territory.
-
-### Sprint 4A — TSAP Financial Model (standalone tool)
-**Location:** `tools/tsap-financial-model/index.html`
-**Linked to:** SASC output (reads ROM from Supabase per engagement), PEI
-
-**Six tabs:**
-
-**Tab 1: Programme Cost (demand side)**
-- 5-year phased CapEx + OpEx + UC dev + people
-- Pulls from SASC BOM as base, editable overrides
-- Year by year breakdown (Year 1 Foundation, Year 2 UC Wave 1, etc.)
-
-**Tab 2: Funding Sources (supply side)**
-- Central schemes: IndiaAI Mission, Smart Cities, NHM, PMFBY, NDRF, BharatNet
-- State budget: own capital + revenue allocation
-- External/multilateral: World Bank, ADB, JICA, Green Climate Fund
-- PPP: VGF, revenue share model
-- Editable % coverage per scheme per component
-- Scheme eligibility matrix (which component maps to which scheme)
-
-**Tab 3: Funding Gap & Net Commitment**
-- Year by year: demand vs supply vs gap
-- Territory's actual annual net outflow after scheme funding
-
-**Tab 4: What-If Scenarios**
-- Named scenarios (Base / Optimistic / Conservative / Custom)
-- Levers: programme duration, UC scope, MDC T-shirt, scheme coverage %, PPP model, team model (managed vs customer-operated)
-- Side-by-side scenario comparison
-- Scenarios saveable to Supabase per engagement
-
-**Tab 5: Cash Flow**
-- Monthly/quarterly drawdown
-- Milestone payment schedule
-- Funding commitment timeline
-- Central scheme disbursement timing
-
-**Tab 6: Value Case / ROI**
-- Economic benefits (jobs created, GDP uplift, efficiency savings)
-- Payback period
-- Benefit-cost ratio
-- Political salience metrics (citizens impacted, departments enabled)
-
-### Key design decisions (confirmed)
-- Standalone tool (not SASC screen 5) — customer-facing, more flexibility
-- Scenarios are saveable to Supabase per engagement
-- Both demand AND supply side modelled — the HP net commitment (after scheme funding) is the headline number for government conversations
-- What-if analysis is core — "if you apply for Smart Cities Mission + VGF, HP's net commitment drops from Rs. 85 Cr to Rs. 52 Cr"
-
-### Sprint 4B (after 4A) — Territory AI Programme Profiler
-Structured profile for a territory: admin overview, existing digital infra, key govt depts as UC consumers, budget cycle, AI readiness score, natural resource differentiators
-
-### Sprint 4C (after 4B) — UC Prioritisation Matrix
-Rank UCs by: impact, feasibility, speed to value, political salience
-Feeds into phased delivery plan in Tab 1
-
-### Sprint 5 — Pitch Report Generator
-Takes SASC + Financial Model + Territory Profile → client-ready document
-
----
-
-## Cost Optimisation Status (June 2026)
-
-### All optimisations deployed:
-1. Scraper: gemini-2.0-flash (cheaper grounding model)
-2. Scraper: 8 search domains (was 22)
-3. Scraper: 3 global topics x 1 call (was 5 x 3)
-4. Scraper: RSS Phase 2 batched (5 items per Gemini call)
-5. Scraper: short_description in semantic contexts (60% fewer tokens)
-6. Scraper: weekly schedule (Sunday 2am IST)
-7. Scraper: TTL per domain from app_config (skips recently scraped)
-8. Scraper: content hash dedup (prevents syndication re-ingestion)
-9. Scraper: publishedAfter constraint (only new content since last run)
-10. Scraper: usage logging to api_usage_log (batch flush at end of run)
-11. PEI: 30-day cache (pei_cache table)
-12. PEI: maxOutputTokens 4096 (was 8192)
-13. Intel Scraper portal: TTL-aware domain grid (locked tiles, dates shown)
-14. Settings: Usage tab (cost/token dashboard by tool + model)
-
-### Supabase tables added:
-- scrape_runs — TTL tracking per domain/topic
-- pei_cache — 30-day PEI cache
-- api_usage_log — usage logging with cost_usd
-- app_config — TTL parameters + model pricing (all configurable)
-- semantic_contexts.short_description — compact context descriptions
-
-### Estimated monthly cost after optimisations:
-- Before: ~Rs. 6,000/month (June spike from debug runs)
-- After: ~Rs. 300-500/month steady state
-- Reduction: ~90-95%
-
-### Note on scraper schedule:
-- Workflow cron: `30 20 * * 0` (Sunday 2am IST)
-- Old daily schedule still firing until GitHub Actions cache expires
-- TTL working — Jun 9 run took only 4 min (most domains skipped)
-- scrape_runs table now has data — domain locking visible in portal
-
----
-
-## ATLAS Platform — Current Build State (June 2026)
-
-### SASC (tools/sasc/index.html)
-4-screen flow working end to end:
-1. Scope & DC → 2. Stack layers → 3. Workload Profiler → 4. BOM + ROM
-
-BOM + ROM has 3 tabs: Bill of Materials | People Model | ROM Summary
-
-Key fix: getSB() uses atlas_global_cfg (matches all other ATLAS tools)
-Key fix: Sizing based on RPS not tokens (benchmark_results uses rps_at_Xs)
-
-Pending (next SASC sprint):
-- Per-UC GPU override flag
-- BOM number validation after DB cleanup
-- People model deeper review
-
-### New Supabase tables for SASC:
-- ai_models (10 models seeded)
-- gpu_configs (8 configs seeded)
-- benchmark_results (15 rows, RPS-based)
-- uc_interaction_types (12 types seeded)
-
----
-
-## Session Update — June 11 2026 (afternoon)
-
-### TSAP Financial Model — Sprint 4A (built, deployed)
-**Location:** `tools/tsap-financial-model/index.html` — live
-
-**Full build includes:**
-- Demand side derived from SASC output (reads `docket_items` for engagement) × unit costs from `tsap_unit_costs` Supabase table
-- Supply side with full financial instrument modelling: per funding source — type (grant/loan/scheme/VGF/equity/inkind), amount, start/end year. Loans: interest rate, tenure, grace period, moratorium, repayment type → EMI + total interest + NPV calculated
-- Revenue model (Track 2): Bear/Base/Bull, market Y1 + CAGR, capture %, ramp %, gross margin, GST rate, territory GST share — all editable
-- Cash flow (quarterly): outflows (CapEx phased, OpEx, UC dev, people, loan EMIs), inflows (scheme drawdown, Track 2 gross profit), derived: peak cash, break-even quarter, NPV, IRR
-- 6 tabs: Programme Cost | Funding Sources | Funding Gap | Revenue Model | Cash Flow | What-If
-- 7 Chart.js charts inline
-- What-if scenarios (Base/Optimistic/Conservative) saveable to Supabase per engagement
-- Linked to engagement via `?eng=xxx` URL param
-
-**Supabase tables created:**
-- `tsap_unit_costs` — 43 rows seeded from HAICE FM v2.1 (capex 12, opex 12, ucdev 5, people 10, revenue 11). UNIQUE constraint on `item_code`. Run `tsap_unit_costs_seed.sql` to seed.
-- `tsap_funding_sources` — per engagement, full instrument fields
-- `tsap_scenarios` — saveable what-if snapshots per engagement. UNIQUE on (engagement_id, name).
-
-**Navigation:**
-- ATLAS portal Pre-Sales stage: TSAP FM card added to TOOLS + STAGES + NAV categories
-- SASC ROM Summary tab: teal "Financial Model →" button opens FM with `?eng=xxx`
-
-### Pending feedback on FM (to be actioned next session):
-1. **Multi-currency (critical):** All numbers must show in INR/USD/AED with live exchange rates — seamless conversion between all three. This is a full requirement, not optional.
-2. More feedback coming from Arvind's review — collecting all items before next build pass.
-
-### Settings page — fixes applied (index.html)
-**All changes are in root `index.html` (not tools/settings/index.html which is standalone/unused)**
-
-- `gemini-2.0-flash` added to `ATLAS_MODEL_REGISTRY` + all 7 model tier dropdowns
-- API Usage section added at bottom of Settings (Load Usage button → reads `usage_last_30d`)
-- TSAP Unit Costs section added (Load Unit Costs button → inline-editable table, saves to Supabase on blur)
-- TSAP FM added to TOOLS object, STAGES presales tools list, and NAV categories presales list
-- Spillover bug fixed (h+= code was appended after </html> — trimmed cleanly)
-
-**Key learning:** Settings in ATLAS portal is the `showSettings()` function in `index.html` — NOT the standalone `tools/settings/index.html`. All future Settings changes go into `index.html`.
-
-### Scraper status
-- `scrape_runs` table exists but is empty — runs #36–#40 happened before new scraper was deployed
-- Intel Scraper portal shows yellow banner when `scrape_runs` is empty: "Trigger a manual run from GitHub Actions to populate"
-- After next manual trigger, domain locking will work correctly
-- GitHub Actions cron: `30 20 * * 0` (Sunday 2am IST) — old daily schedule still firing until cache expires
-
-### Supabase tables added this session (run these SQLs if not yet done):
-- `scraper_ttl_schema.sql` — scrape_runs, pei_cache, content_hash column
-- `scraper_app_config.sql` — app_config with TTL + pricing params
-- `api_usage_schema.sql` — api_usage_log, usage_monthly_summary view, usage_last_30d view (FIXED: no date_trunc index)
-- `semantic_contexts_short_desc.sql` — short_description column + 23 row updates
-- `tsap_schema.sql` — tsap_unit_costs, tsap_funding_sources, tsap_scenarios
-- `tsap_unit_costs_seed.sql` — seeds 43 unit costs (run this after tsap_schema.sql)
-
----
-
-## Session Update — June 11 2026 (evening)
-
-### Alignment Sprint — Phases 1-5 completed and live
-
-All 5 files deployed and verified live on GitHub.
-
-**Phase 1 — index.html bug fixes:**
-- Removed duplicate `tsap-fm` entry in TOOLS object
-- Removed duplicate `gemini-2.0-flash` in `ATLAS_MODEL_REGISTRY`
-- Removed duplicate `gemini-2.0-flash` option from all 7 tier selects
-- No spillover after `</html>` confirmed
-
-**Phase 2 — Supabase schema (atlas_alignment.sql run):**
-- `exchange_rate_history` table created with (currency_pair, effective_date) unique index
-- FX rates seeded: USD/INR=84.50, USD/EUR=0.92, EUR/INR=91.85
-- `app_config` entries added: fx_usd_inr, fx_usd_eur, fx_eur_inr, currency_primary, currency_procurement, currency_reporting
-
-**Phase 3 — Masthead standardised:**
-- All tools: `atlas-nav-btn` CSS applied, back buttons use `window.location.href='../../'`
-- TSAP FM: new standard atlas-hdr masthead (ATLAS brand + tool name + engagement badge + KPI row + Portal button)
-- SASC, Intel Scraper, PEI: back buttons standardised
-
-**Phase 4 — Usage logging:**
-- `atlasLogUsage()` shared function injected into PEI, Intel Scraper, TSAP FM
-- PEI: logs after each `savePEICache` (tool='pei', call_type='pei_generate')
-- Intel: logs after each `callGemini` enrichment (tool='intel_scraper', call_type='enrich_item')
-- Uses `app_config` price_* entries for cost calculation
-
-**Phase 5 — Currency foundation:**
-- `FX_RATES`, `loadFXRates()`, `renderCurrencySelector()`, `setCurrency()` in TSAP FM
-- `fmtCr()` and `fmtCrFull()` are currency-aware: INR=Rs Cr, USD=$M, EUR=EUR M
-- Currency selector bar rendered next to tabs, rates loaded from Supabase `app_config` at init
-
-### Supabase state — 42 tables confirmed
-Key unknown/legacy tables (DO NOT delete without review):
-- `profiler_*` (5 tables, has seed data) — likely Customer AI Readiness Profiler tool
-- `financing_models`, `financing_rules` — old FM attempt, 10+19 rows
-- `l1_configurations` — unknown, 0 rows (safe to delete)
-- `sales_actions` — possibly RAC tool, 1 row
-- `transactions` — unknown, 0 rows (safe to delete)
-
-### Decisions deferred to Phase 6+:
-- Database cleanup (transactional data wipe)
-- Test run: scraper → PEI → engagement → SASC → FM
-- Supabase migration for JSON-based tools (Deal Analysis, RAC, AI Inferencing Factory)
-- TSAP FM: full feedback review + additional changes from Arvind
-
-### Platform documentation produced this session:
-- `ATLAS_Platform_Definition_v1.0.docx` — lifecycle model, architecture, all tools, design principles
-- `ATLAS_Intelligence_Strategy_v1.0.docx` — model assignment, token optimisation, TTL, dedup, agentic roadmap
+| 1 | S1 wiki expansion — full macro, opportunities, demographics, infrastructure | 🔴 Next |
+| 2 | atlasExport.js — shared Word + PPT module | 🔴 Next |
+| 3 | Portal Settings page rebuild — master config UI | 🔴 Next |
+| 4 | FM Settings tab → demote to read-only; remove gear from TSAP FM | 🔴 After portal settings |
+| 5 | Docket → Profile → SASC flow coherence | 🔴 Next |
+| 6 | Semantic Context Tree — Supabase + seed + wire scraper/RE/PEI | 🔴 Next |
+| 7 | AI Centre Configurator (full stack) | 🔴 Next laptop session |
+| 8 | TSAP FM repricing (GPU SKU pricing, territory overrides, investment actors) | 🔴 After Settings |
+| 9 | S5 Full Pitch Document | 🟡 After S4 stable |
+| 10 | Mode 1 — Budget Envelope Model | 🟡 Next |
+| 11 | UC Definition + Reconciliation flow | 🟡 Next |
+| 12 | Mode 2 — Detailed FM rebuild | 🟡 Next |
+| 13 | Enable daily scraper schedule (after semantic tree) | 🟡 Soon |
+| 14 | Global feed discovery (HPCwire, C4ISRNET etc.) | 🟡 Soon |
+| 15 | GCP billing investigation | 🟡 Soon |
+| 16 | Decide portfolio code rename L2-INF → L2-AIC | 🟡 Soon |
+| 17 | UX pass — Engagement Docket | ⬜ Later |
+| 18 | Visualisations (territory map, tokenomics) | ⬜ Later |
+| 19 | Brand.md + hardware-preferences.md | ⬜ After hardware decisions |
