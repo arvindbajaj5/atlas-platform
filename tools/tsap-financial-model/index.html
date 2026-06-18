@@ -819,28 +819,31 @@ async function callS2(territory, s1data, objectives, freeText) {
 
 //    Stage 1a prompt                                                            
 function buildRawIntelPrompt(territory) {
-  return 'Research '+territory+', India for an AI deployment feasibility study. '
-    +'Use web search for CURRENT data. Write as plain factual paragraphs. No JSON. No bullets. Just facts.\n\n'
-    +'Cover: Economy (GSDP, growth, per capita, fiscal health). '
-    +'Power (installed MW, surplus/deficit, grid hours, tariff Rs/unit, renewables %, green index, carbon gCO2/kWh, stranded MW). '
-    +'Water (rainfall, rivers, stress, cooling feasibility). '
-    +'Land (area, topography, industrial parks, SEZs, govt land, cost per acre). '
-    +'Workforce (population, literacy, engineers/year, salary, migration). '
-    +'Digital (internet %, OFC km, NKN, smart cities, BharatNet, SWAN). '
-    +'Policy (named AI/digital policies, IT budget). '
-    +'Schemes (central and state schemes for AI). '
-    +'Geography (advantages and constraints). '
-    +'AI opportunities (Agriculture, Water, Health, Education, Governance, Transport, Defence etc).'
+  return 'Research ' + territory + ', India for an AI data centre and AI deployment feasibility study. '
+    + 'Use web search for the most CURRENT available data (2023-2025). Write as plain factual paragraphs. No JSON. No bullets. Just facts with specific numbers.\n\n'
+    + 'Cover ALL of the following:\n'
+    + 'ECONOMY: GSDP Rs crore, GSDP growth % (last 5 years trend), per capita income, per capita vs national average %, fiscal surplus or deficit, fiscal deficit % of GSDP, debt-to-GSDP %, own tax revenue Rs crore, % budget from central transfers, sectoral split agri/industry/services %.\n'
+    + 'POWER: Total installed capacity MW, hydel MW, solar MW, wind MW, power surplus or deficit, grid reliability hours per day, industrial power tariff Rs per kWh (MUST state this number), how this tariff compares to national average of Rs 7.5 per unit (e.g. 40% cheaper = index 60), renewable energy %, green energy index, carbon intensity gCO2/kWh, stranded renewable MW, 24x7 green power feasibility, data centre power feasibility.\n'
+    + 'WATER: Annual rainfall mm, names of perennial rivers, water stress level (low/medium/high), suitability for data centre cooling (high/medium/low), industrial water cost Rs per kL, how water cost compares to national average of Rs 45 per kL.\n'
+    + 'LAND: Total area sqkm, topography (plains/hilly/mountainous/coastal/mixed), number of industrial parks, number of SEZs, government land availability (high/medium/low), construction ease (easy/moderate/difficult), industrial land cost Rs lakh per acre, how land cost compares to national average of Rs 80 lakh per acre.\n'
+    + 'WORKFORCE: Population in lakh, literacy %, urbanisation %, unemployment %, engineering graduates per year, average software/AI engineer salary Rs lakh per year, how salary compares to national average of Rs 12 lakh, skilled labour availability (abundant/adequate/scarce), migration trend (net_in/net_out/balanced).\n'
+    + 'DIGITAL: Internet penetration %, optical fibre backbone km, NKN presence yes/no, smart cities count, BharatNet gram panchayat coverage %, government data centres count, SWAN status.\n'
+    + 'INFRASTRUCTURE: Total road km, national highway km, rail network km, airports count, logistics performance index score and national rank, power T&D losses %.\n'
+    + 'DEMOGRAPHICS: Population in lakh, urbanisation %, working age population %, youth (15-29) %, female workforce participation %, top 3-5 major districts by population.\n'
+    + 'POLICY: Named state AI or digital policies, IT and data centre policies, relevant central scheme allocations.\n'
+    + 'SCHEMES: Central and state schemes for AI, digital infrastructure, skill development - with funding amounts where available.\n'
+    + 'GEOGRAPHY: Key geographic advantages for data centres (cooling, power, land), key constraints.\n'
+    + 'AI OPPORTUNITIES: Top 6-8 specific AI use cases for this territory with domain name, why high/medium/low relevance, and 1-2 example applications.'
 }
 
 //    Section schemas                                                            
 var SECTION_SCHEMAS = {
-  macro:'{"gsdp_cr":0,"gsdp_growth_pct":0,"per_capita_inr":0,"vs_national_pct":0,"fiscal_health":"surplus","fiscal_deficit_pct":0,"debt_to_gsdp_pct":0,"sectoral_agri_pct":0,"sectoral_industry_pct":0,"sectoral_services_pct":0,"own_revenue_cr":0,"central_transfers_pct":0,"gsdp_5yr_trend":[0,0,0,0,0]}',
-  energy:'{"installed_mw":0,"status":"surplus","grid_hrs":0,"renewable_pct":0,"industrial_tariff":0,"tariff_index_pct":0,"dc_feasibility":"high","green_energy_index":0,"carbon_intensity_gco2":0,"hydel_mw":0,"solar_mw":0,"wind_mw":0,"green_24x7_feasibility":"medium","stranded_renewable_mw":0,"green_corridor":false}',
-  water:'{"rainfall_mm":0,"stress_index":"low","perennial_rivers":["river"],"dc_cooling":"high","industrial_cost_per_kl":0,"water_cost_index_pct":0}',
-  land:'{"area_sqkm":0,"topography":"hilly","industrial_parks":0,"sez_count":0,"govt_land":"medium","construction_ease":"moderate","cost_per_acre_lakh":0,"land_cost_index_pct":0}',
-  workers:'{"population_lakh":0,"literacy_pct":0,"urban_pct":0,"unemployment_pct":0,"engineers_per_year":0,"avg_engineer_salary_lakh":0,"salary_index_pct":0,"skilled_labour":"adequate","migration":"balanced"}',
-  digital:'{"internet_pct":0,"ofc_km":0,"nkn":false,"smart_cities":0,"bharatnet_pct":0,"govt_dcs":0,"swan":"partial"}',
+  macro:'{"gsdp_cr":234000,"gsdp_growth_pct":7.5,"per_capita_inr":185000,"vs_national_pct":78,"fiscal_health":"surplus","fiscal_deficit_pct":3.2,"debt_to_gsdp_pct":28,"sectoral_agri_pct":22,"sectoral_industry_pct":35,"sectoral_services_pct":43,"own_revenue_cr":45000,"central_transfers_pct":62,"gsdp_5yr_trend":[6.1,6.8,7.2,7.0,7.5]}',
+  energy:'{"installed_mw":10281,"status":"surplus","grid_hrs":23,"renewable_pct":94,"industrial_tariff":4.5,"tariff_index_pct":62,"dc_feasibility":"high","green_energy_index":88,"carbon_intensity_gco2":18,"hydel_mw":9850,"solar_mw":280,"wind_mw":0,"green_24x7_feasibility":"high","stranded_renewable_mw":450,"green_corridor":true}',
+  water:'{"rainfall_mm":1350,"stress_index":"low","perennial_rivers":["Beas","Ravi","Sutlej"],"dc_cooling":"high","industrial_cost_per_kl":35,"water_cost_index_pct":55}',
+  land:'{"area_sqkm":55673,"topography":"hilly","industrial_parks":3,"sez_count":0,"govt_land":"medium","construction_ease":"moderate","cost_per_acre_lakh":45,"land_cost_index_pct":58}',
+  workers:'{"population_lakh":75,"literacy_pct":93,"urban_pct":11,"unemployment_pct":4.2,"engineers_per_year":4500,"avg_engineer_salary_lakh":9.5,"salary_index_pct":72,"skilled_labour":"adequate","migration":"net_out"}',
+  digital:'{"internet_pct":68,"ofc_km":12500,"nkn":true,"smart_cities":1,"bharatnet_pct":82,"govt_dcs":3,"swan":"functional"}',
   policy:'{"raw":["policy"],"useable":[{"point":"what this enables","source":"policy","impact":"medium"}]}',
   programmes:'{"raw":["scheme"],"useable":[{"point":"how to leverage","source":"scheme","type":"funding"}]}',
   geography:'{"advantages":["text"],"constraints":["text"],"known_issues":{"social":["text"],"economic":["text"]}}',
@@ -849,11 +852,27 @@ var SECTION_SCHEMAS = {
   infrastructure:'{"road_km":0,"nh_km":0,"rail_km":0,"airports":0,"major_ports":0,"logistics_index":0,"logistics_index_rank":0,"power_transmission_loss_pct":0,"ev_charging_stations":0}'
 }
 
+var SECTION_HINTS = {
+  energy:   'Find: industrial_tariff (Rs/kWh actual number e.g. 4.5), tariff_index_pct (national avg Rs 7.5/unit = 100, so Rs 4.5 = index 60), installed_mw total, status (surplus/deficit/balanced), grid_hrs per day, renewable_pct, hydel_mw, solar_mw, wind_mw, dc_feasibility.',
+  water:    'Find: industrial_cost_per_kl (Rs/kL actual number e.g. 35), water_cost_index_pct (national avg Rs 45/kL = 100), rainfall_mm, stress_index, dc_cooling suitability.',
+  land:     'Find: cost_per_acre_lakh (Rs lakh/acre actual number e.g. 45), land_cost_index_pct (national avg Rs 80L/acre = 100), area_sqkm, topography, govt_land availability.',
+  workers:  'Find: avg_engineer_salary_lakh (Rs lakh/yr actual number e.g. 9.5), salary_index_pct (national avg Rs 12L = 100), engineers_per_year, literacy_pct, migration trend.',
+  macro:    'Find: gsdp_cr (Rs crore), gsdp_growth_pct, vs_national_pct (per capita as % of national avg), fiscal_health, fiscal_deficit_pct, debt_to_gsdp_pct, sectoral split %.',
+  digital:  'Find: ofc_km actual km number, internet_pct, bharatnet_pct, nkn true/false, govt_dcs count.',
+  demographics: 'Find: population_lakh, urban_pct, working_age_pct, youth_pct, female_workforce_pct, major_districts list.',
+  infrastructure: 'Find: road_km total, nh_km national highway km, rail_km, airports count, logistics_index score, logistics_index_rank national rank, power_transmission_loss_pct.',
+  opportunities: 'Extract top AI opportunities. Each needs: domain (e.g. Agriculture), relevance (high/medium/low), score 0-100, rationale (1 sentence), example_ucs (2-3 use case names).'
+}
+
 function buildSectionPrompt(name, rawText, territory) {
-  return 'Extract ONLY the '+name+' data from this research about '+territory+', India.\n'
-    +'Output ONLY valid JSON matching this schema. No explanation. No markdown. '
-    +'Use null for missing values. Strings in double quotes. Numbers as plain decimals.\n\n'
-    +'Schema: '+SECTION_SCHEMAS[name]+'\n\nResearch:\n'+rawText.substring(0,6000)
+  var hint = SECTION_HINTS[name] ? '\nIMPORTANT - ' + SECTION_HINTS[name] + '\n' : ''
+  return 'Extract ONLY the ' + name + ' data from this research about ' + territory + ', India.\n'
+    + 'Output ONLY valid JSON matching this schema exactly. No explanation. No markdown.\n'
+    + 'CRITICAL: Use null for genuinely missing values. Do NOT use 0 unless the actual value is truly zero.\n'
+    + 'Numbers as plain decimals. Strings in double quotes.\n'
+    + hint + '\n'
+    + 'Schema: ' + SECTION_SCHEMAS[name] + '\n\nResearch (read the entire text carefully for numbers):\n'
+    + rawText.substring(0, 12000)
 }
 
 //    Parse section response                                                     
@@ -2498,25 +2517,71 @@ async function tpGenerateS4() {
 }
 
 function tpParseS4(text) {
-  // Split into sections by CAPS section headers
   var sectionKeys   = ['moment', 'offers', 'recommendation', 'delivers', 'ask']
   var sectionTitles = ['THE MOMENT', 'WHAT THIS TERRITORY OFFERS', 'THE RECOMMENDATION', 'WHAT IT DELIVERS', 'THE ASK']
   var sections = {}
 
+  // Try each section title with multiple matching strategies
   sectionKeys.forEach(function(key, i) {
-    var title = sectionTitles[i]
-    var nextTitle = sectionTitles[i+1] || null
-    var start = text.toUpperCase().indexOf(title)
-    if (start < 0) { sections[key] = { title: title, body: '', verified: false }; return }
-    var contentStart = text.indexOf('\n', start) + 1
-    var end = nextTitle ? text.toUpperCase().indexOf(nextTitle, contentStart) : text.length
-    if (end < 0) end = text.length
-    sections[key] = {
-      title: title,
-      body:  text.substring(contentStart, end).trim(),
-      verified: false   // editorial flag — user must tick before Word export
+    var title     = sectionTitles[i]
+    var nextTitle = sectionTitles[i + 1] || null
+    var textUpper = text.toUpperCase()
+
+    // Strategy 1: exact CAPS match
+    var start = textUpper.indexOf(title)
+
+    // Strategy 2: partial match (first 2 words)
+    if (start < 0) {
+      var words = title.split(' ').slice(0, 2).join(' ')
+      start = textUpper.indexOf(words)
     }
+
+    // Strategy 3: numbered section (1., 2., etc.)
+    if (start < 0) {
+      var numMatch = text.match(new RegExp('\\b' + (i + 1) + '\\.\\s+\\w', 'i'))
+      if (numMatch) start = numMatch.index
+    }
+
+    if (start < 0) {
+      sections[key] = { title: title, body: '', verified: false }
+      return
+    }
+
+    // Move past the title line
+    var contentStart = text.indexOf('\n', start)
+    if (contentStart < 0) contentStart = start + title.length
+    else contentStart += 1
+
+    // Find end — next section title or end of text
+    var end = text.length
+    if (nextTitle) {
+      var nextUp = text.toUpperCase().indexOf(nextTitle, contentStart)
+      // Also try partial match for next title
+      if (nextUp < 0) {
+        var nextWords = nextTitle.split(' ').slice(0, 2).join(' ')
+        nextUp = text.toUpperCase().indexOf(nextWords, contentStart)
+      }
+      if (nextUp > 0) end = nextUp
+    }
+
+    var body = text.substring(contentStart, end).trim()
+    // Strip leading section number/title if it snuck in
+    body = body.replace(/^\d+\.\s*/,'').replace(/^[A-Z ]{10,}\n/,'').trim()
+
+    sections[key] = { title: title, body: body, verified: false }
   })
+
+  // Fallback: if most sections are empty, the model may have used a different format
+  // Try splitting by blank-line-separated paragraphs
+  var populated = Object.values(sections).filter(function(s){ return s.body.length > 50 }).length
+  if (populated < 3) {
+    var paras = text.split(/\n{2,}/).filter(function(p){ return p.trim().length > 80 })
+    sectionKeys.forEach(function(key, i) {
+      if ((!sections[key] || sections[key].body.length < 50) && paras[i]) {
+        sections[key] = { title: sectionTitles[i], body: paras[i].trim(), verified: false }
+      }
+    })
+  }
 
   return sections
 }
@@ -2543,8 +2608,8 @@ function tpS4View() {
 
   // Company info from Settings
   var g = atlasGetGlobal()
-  var companyName = g.companyName || g.company_name || 'Your Organisation'
-  var logoUrl     = g.logoUrl     || g.logo_url     || null
+  var companyName = g.companyName || g.company_name || g.org_name || g.name || 'Your Organisation'
+  var logoUrl     = g.logoUrl || g.logo_url || g.logo || null
 
   var html = '<div style="padding:16px 0">'
 
@@ -2553,10 +2618,7 @@ function tpS4View() {
     + '<button onclick="TP.stage=\'s3\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Profile</button>'
     + '<div style="font-size:14px;font-weight:700;color:var(--navy);flex:1">' + esc(TP.territory) + ' &nbsp;·&nbsp; Vision Document</div>'
     + '<div style="font-size:10px;color:var(--mid)">Generated ' + (s4.generated_at ? new Date(s4.generated_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) : '') + '</div>'
-    + (allVerified
-        ? '<button onclick="tpExportS4Word()" style="padding:6px 16px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">&#128196; Export Word</button>'
-        : '<button disabled style="padding:6px 16px;background:var(--border);color:var(--mid);border:none;border-radius:5px;font-size:12px;cursor:not-allowed">&#128196; Export Word (review all sections)</button>'
-      )
+    + '<button onclick="tpExportS4Word()" style="padding:6px 16px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">&#128196; Export Word</button>'
     + '<button onclick="TP.s4=null;tpGenerateS4()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer;color:var(--mid)">&#8635; Re-generate</button>'
     + '</div>'
 
@@ -2588,7 +2650,7 @@ function tpS4View() {
 
   // Editorial instruction
   html += '<div style="background:var(--light);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:11px;color:var(--mid)">'
-    + '&#9997; <strong>Editorial review:</strong> Read each section, edit where needed, then tick ✓ to confirm. All sections must be confirmed before Word export.'
+    + '&#9997; <strong>AI-generated draft.</strong> Click any section to edit inline. Tick &#10003; to mark reviewed. Export when ready — confirmation is optional.'
     + '</div>'
 
   // Sections
@@ -2645,7 +2707,7 @@ async function tpExportS4Word() {
 
   var s4  = TP.s4
   var g   = atlasGetGlobal()
-  var companyName = g.companyName || g.company_name || 'ATLAS Platform'
+  var companyName = g.companyName || g.company_name || g.org_name || g.name || 'ATLAS Platform'
   var tagline     = g.companyTagline || ''
   var brandPrimary = (g.brandPrimary || '#002870').replace('#','')
   var brandAccent  = (g.brandAccent  || '#FF5539').replace('#','')
@@ -3477,7 +3539,9 @@ async function init() {
     var _b = document.getElementById('missing-key-banner')
     if (_b) _b.style.display = 'flex'
   }
-  if (TP.stage === 'home') switchTab(ACTIVE_TAB || 'cost')
+  // Open profile tab if territory already known, otherwise cost
+  var startTab = (TP.territory || MODEL.territory) ? 'profile' : (ACTIVE_TAB || 'cost')
+  switchTab(startTab)
 }
 
 async function selectEngagement(id) {
