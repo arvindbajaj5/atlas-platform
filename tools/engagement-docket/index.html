@@ -175,6 +175,78 @@ textarea{resize:vertical;min-height:60px}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--dark);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none}
 .toast.show{opacity:1}
 .toast.err{background:var(--orange)}
+
+/* ── New tab additions ─────────────────────────────────────────────────── */
+.req-block{background:linear-gradient(135deg,#EFF3FF,#E8F5FF);border:1px solid #BDD7FF;border-radius:8px;padding:14px 18px;margin-bottom:14px}
+.req-block-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1C38F5;margin-bottom:8px}
+.req-obj{font-size:13px;font-weight:600;color:var(--navy);line-height:1.6;margin-bottom:8px}
+.req-meta{font-size:11px;color:var(--mid);line-height:1.5;margin-bottom:8px}
+.req-chips{display:flex;flex-wrap:wrap;gap:5px}
+.req-chip{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600}
+.intel-item{padding:10px 12px;border-left:3px solid var(--border);margin-bottom:8px;background:var(--light);border-radius:0 6px 6px 0;cursor:pointer;transition:all .15s}
+.intel-item:hover{border-left-color:#1C38F5;background:#EFF3FF}
+.intel-item.on{border-left-color:var(--teal);background:#E1F5EE}
+.intel-tier{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.intel-title{font-size:12px;font-weight:600;color:var(--navy);margin-bottom:3px;line-height:1.3}
+.intel-meta{font-size:10px;color:var(--mid)}
+.intel-tag{display:inline-block;font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,178,144,.15);color:#047857;font-weight:600;margin-top:4px}
+.pi-sec{margin-bottom:14px}
+.pi-sec-hdr{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);padding:6px 0;border-bottom:1px solid var(--border);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.pi-grid{display:flex;flex-wrap:wrap;gap:6px}
+.pi-item{border:1.5px solid var(--border);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;transition:all .15s;background:#fff;display:flex;align-items:center;gap:5px}
+.pi-item:hover{border-color:var(--mid)}.pi-item.on{border-color:var(--teal);background:#E1F5EE;font-weight:600}
+.pi-item.ai{border-color:#1C38F5;background:#EFF3FF}
+.pi-ck{width:13px;height:13px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+.pi-item.on .pi-ck{background:var(--teal);border-color:var(--teal);color:#fff}
+.pi-item.ai .pi-ck{background:#1C38F5;border-color:#1C38F5;color:#fff}
+.pi-sz{font-size:9px;color:var(--mid);padding:1px 4px;background:var(--light);border-radius:3px}
+.pi-item.on .pi-sz,.pi-item.ai .pi-sz{background:rgba(0,178,144,.15);color:#047857}
+.ai-map-btn{background:#1C38F5;color:#fff;border:none;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:opacity .15s}
+.ai-map-btn:hover{opacity:.85}
+.ai-map-note{background:#EFF3FF;border:1px solid #BDD7FF;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:11px;color:#1C38F5;display:none}
+.ucl-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.ucl-item{border:1.5px solid var(--border);border-radius:6px;padding:8px 10px;cursor:pointer;transition:all .15s;background:#fff;display:flex;align-items:center;gap:8px}
+.ucl-item:hover{border-color:var(--mid)}.ucl-item.on{border-color:var(--teal);background:#E1F5EE}
+.ucl-icon{font-size:16px;flex-shrink:0}
+.ucl-name{font-size:11px;font-weight:600;color:var(--navy)}
+.ucl-dom{font-size:10px;color:var(--mid)}
+.arch-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.arch-card{border:2px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;transition:all .15s;background:#fff;text-align:center}
+.arch-card:hover{border-color:var(--mid)}.arch-card.on{border-color:var(--orange);background:#FFF3F1}
+.arch-icon{font-size:22px;margin-bottom:5px}
+.arch-name{font-size:11px;font-weight:700;color:var(--navy);margin-bottom:2px}
+.arch-cnt{font-size:10px;color:var(--mid)}
+.mc-table{width:100%;border-collapse:collapse;font-size:11px}
+.mc-table th{text-align:left;padding:6px 8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border);background:var(--light);white-space:nowrap;position:sticky;top:0}
+.mc-table td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+.mc-table tr:hover td{background:#FAFBFF}.mc-table tr.on td{background:#E1F5EE}
+.mc-name{font-weight:700;color:var(--navy)}.mc-vendor{font-size:10px;color:var(--mid)}
+.mc-arch{font-size:9px;padding:1px 5px;border-radius:8px;background:#EFF3FF;color:#1C38F5;font-weight:600;margin-right:2px}
+.mc-bench{font-size:11px;font-weight:600}
+.mc-bench.hi{color:#065F46}.mc-bench.md{color:#92400E}.mc-bench.lo{color:var(--mid)}
+.mc-lic{font-size:9px;padding:1px 5px;border-radius:8px;font-weight:600}
+.mc-lic.open{background:#E1F5EE;color:#065F46}.mc-lic.comm{background:#FFF8E7;color:#92400E}
+.mc-toggle{width:28px;height:16px;background:var(--border);border-radius:8px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;display:inline-block}
+.mc-toggle.on{background:var(--teal)}
+.mc-toggle::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.mc-toggle.on::after{left:14px}
+.agent-toggle{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--light);border-radius:8px;margin-bottom:12px;cursor:pointer}
+.toggle-sw{width:36px;height:20px;background:var(--border);border-radius:10px;position:relative;transition:background .2s;flex-shrink:0}
+.toggle-sw.on{background:var(--teal)}
+.toggle-sw::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle-sw.on::after{left:18px}
+.agent-cfg{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:none}
+.agent-cfg.on{display:block}
+.gpu-est{background:var(--navy);border-radius:8px;padding:14px 18px;color:#fff;margin-top:14px}
+.gpu-est-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.gpu-est-item{padding:8px;background:rgba(255,255,255,.08);border-radius:6px;text-align:center}
+.gpu-est-val{font-size:18px;font-weight:700;margin-bottom:2px}
+.gpu-est-lbl{font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px}
+.terr-status{display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--light);border-radius:6px;margin-bottom:12px}
+.terr-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.q-sel{padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:10px;font-family:inherit;outline:none;background:#fff}
+.sla-sel{padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:10px;font-family:inherit;outline:none;background:#fff}
+.mc-filter{padding:5px 9px;border:1.5px solid var(--border);border-radius:5px;font-size:11px;font-family:inherit;outline:none;background:#fff}
 </style>
 </head>
 <body>
@@ -392,6 +464,501 @@ var ACTIVE_TAB = 'overview'
 var UC_MODAL_FILTER = 'all'
 
 //    Load                                                                       
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NEW DOCKET TABS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── INTELLIGENCE TAB ─────────────────────────────────────────────────────────
+async function renderIntelTab() {
+  var eng = CURRENT_ENG || {}
+  var cust = eng._cust || {}
+
+  // Load intel items from Supabase if not yet loaded for this engagement
+  if (!INTEL_ITEMS.length) {
+    var sb = getSB()
+    if (sb.url) {
+      // Search by territory + sector tags
+      var territory = eng.territory || ''
+      var intelRows = []
+      try {
+        var r = await fetch(sb.url + '/rest/v1/intelligence_items?order=published_at.desc&limit=30', {
+          headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+        })
+        if (r.ok) intelRows = await r.json()
+      } catch(e) {}
+      INTEL_ITEMS = intelRows
+    }
+  }
+
+  var html = '<div class="section-hdr"><div class="section-title">Intelligence (' + INTEL_ITEMS.length + ')</div>'
+    + '<button class="btn btn-sm btn-ghost" onclick="INTEL_ITEMS=[];switchTab(\'intel\')">↻ Refresh</button></div>'
+
+  html += '<div style="display:grid;grid-template-columns:1fr 280px;gap:14px">'
+    + '<div>'
+
+  if (!INTEL_ITEMS.length) {
+    html += '<div class="empty"><div class="empty-icon">🔍</div>'
+      + '<div class="empty-title">No intelligence loaded</div>'
+      + '<div class="empty-sub">Configure Supabase and run the Intel Scraper to populate</div></div>'
+  } else {
+    var tierColors = { direct_opportunity:'var(--orange)', technology_signal:'#1C38F5', market_signal:'var(--mid)', model_release:'var(--teal)' }
+    var tierLabels = { direct_opportunity:'Direct Opportunity', technology_signal:'Technology Signal', market_signal:'Market Signal', model_release:'Model Release' }
+    INTEL_ITEMS.forEach(function(item, i) {
+      var tier = item.tier || item.signal_tier || 'market_signal'
+      var isOn = (item._selected !== false)
+      html += '<div class="intel-item' + (isOn?' on':'') + '" onclick="toggleIntel(' + i + ')">'
+        + '<div class="intel-tier" style="color:' + (tierColors[tier]||'var(--mid)') + '">● ' + (tierLabels[tier]||tier) + '</div>'
+        + '<div class="intel-title">' + esc(item.title||item.headline||'') + '</div>'
+        + '<div class="intel-meta">' + esc(item.source||'') + (item.published_at ? ' · ' + fmtDate(item.published_at) : '') + '</div>'
+        + (item.tags && item.tags.length ? '<div><span class="intel-tag">' + item.tags.slice(0,3).map(esc).join('</span><span class="intel-tag" style="margin-left:3px">') + '</span></div>' : '')
+        + '</div>'
+    })
+  }
+  html += '</div>'
+
+  // Right panel — PEI summary
+  html += '<div>'
+    + '<div class="card" style="margin-bottom:10px">'
+    + '<div class="card-title">PEI Summary</div>'
+    + '<div style="font-size:12px;line-height:1.6;color:var(--mid);margin-bottom:10px">Pre-Engagement Intelligence brief will appear here once generated.</div>'
+    + '<button class="btn btn-sm btn-primary" onclick="window.location.href=\'../../tools/pei-tool/index.html?eng=' + (CURRENT_ENG&&CURRENT_ENG.id||'') + '\'">Open PEI Tool →</button>'
+    + '</div>'
+    + '<div class="card" style="background:#FFF8E7;border-color:var(--amber)">'
+    + '<div style="font-size:11px;color:#92400E;line-height:1.5"><strong>Note:</strong> Intelligence is a starting point — it informs but does not replace the engagement requirements defined in Overview.</div>'
+    + '</div>'
+    + '</div></div>'
+
+  return html
+}
+
+function toggleIntel(i) {
+  if (INTEL_ITEMS[i]) {
+    INTEL_ITEMS[i]._selected = !INTEL_ITEMS[i]._selected
+    var el = document.querySelectorAll('.intel-item')[i]
+    if (el) el.classList.toggle('on')
+  }
+}
+
+// ── PORTFOLIO TAB ─────────────────────────────────────────────────────────────
+function renderPortfolioTab() {
+  var selCount = PORTFOLIO_SELECTION.length
+
+  function piItem(id, label, size, state) {
+    // state: 'on' = selected, 'ai' = AI suggested, '' = unselected
+    var cls = state === 'on' ? 'on' : state === 'ai' ? 'ai' : ''
+    var ck = (state === 'on' || state === 'ai') ? '✓' : ''
+    return '<div class="pi-item ' + cls + '" onclick="togglePI(\'' + id + '\',this)">'
+      + '<span class="pi-ck">' + ck + '</span>'
+      + esc(label)
+      + '<span class="pi-sz">' + size + '</span>'
+      + '</div>'
+  }
+
+  function piSel(id) { return PORTFOLIO_SELECTION.includes(id) ? 'on' : '' }
+
+  var html = '<div class="section-hdr"><div class="section-title">Portfolio Map (' + selCount + ' selected)</div>'
+    + '<div style="display:flex;gap:8px"><button class="ai-map-btn" onclick="runAIPortfolioMap()">✨ AI Map</button>'
+    + '<button class="btn btn-sm btn-outline" onclick="savePortfolioSelection()">&#8593; Save</button></div></div>'
+    + '<div id="ai-map-note" class="ai-map-note">✨ <strong>AI suggested items</strong> based on requirement. Blue = suggested, Green = confirmed. Deselect anything that doesn\'t apply.</div>'
+
+  var sections = [
+    { title: 'L1 — TSAP Programme', note: 'Territory engagements', items: [
+      ['L1-TSAP','L1-TSAP Territory Programme','XL'],['L1.1','L1.1 Programme Management','L'],
+      ['L1.2','L1.2 Governance Framework','M'],['L1.3','L1.3 Ecosystem Development','M'],
+      ['L1.4','L1.4 Policy & Regulatory','M'],['L1.5','L1.5 Financing & Structuring','M']
+    ]},
+    { title: 'L2 — AI Infrastructure', items: [
+      ['L2-AIC','L2-AIC AI Centre (Flagship)','XL'],['L2-GIB','L2-GIB GenAI-in-a-Box','S/M'],
+      ['L2-MDC','L2-MDC Modular Datacenter','L'],['L2-TRC','L2-TRC GPU Training Cluster','L'],
+      ['L2-HPC','L2-HPC HPC Cluster','XL'],['L2-EDG','L2-EDG Edge AI Node','XS'],['L2-AIF','L2-AIF AI Factory','XL']
+    ]},
+    { title: 'L2.x — Domain AI Centres', items: [
+      ['L2.1-INF','L2.1-INF GeoAI Centre','M'],['L2.2-INF','L2.2-INF Defence AI Centre','L'],
+      ['L2.3-INF','L2.3-INF Health AI Centre','M'],['L2.4-INF','L2.4-INF FinAI Centre','M']
+    ]},
+    { title: 'L2-MAAS — Model as a Service', badge: 'MaaS', items: [
+      ['L2-MAAS-DOC','Document Intelligence','M'],['L2-MAAS-AUD','Audio / Speech Package','S'],
+      ['L2-MAAS-COD','Coding Assistant Package','M'],['L2-MAAS-VIS','Vision & Video Package','M'],
+      ['L2-MAAS-MUL','Multimodal Suite','L'],['L2-MAAS-EMB','Embedding & Reranking','S'],
+      ['L2-MAAS-AGT','Agent Harness Package','M'],['L2-MAAS-GPU','GPUaaS / BMaaS','—']
+    ]},
+    { title: 'L3 — Lifecycle Services', items: [
+      ['L3-DEP','L3-DEP Deployment & Integration','L'],['L3-SKL','L3-SKL AI Skills Academy','M'],
+      ['L3-GOV','L3-GOV AI Governance','M'],['L3-SEC','L3-SEC AI Security','M'],
+      ['L3-OPS','L3-OPS Managed Operations','L'],['L3-AMC','L3-AMC AMC & Refresh','L'],
+      ['L3-RAG','L3-RAG RAG Platform Setup','M'],['L3-INT','L3-INT System Integration','L'],
+      ['L3-TRN','L3-TRN Training & Capacity','M']
+    ]}
+  ]
+
+  sections.forEach(function(sec) {
+    html += '<div class="pi-sec">'
+      + '<div class="pi-sec-hdr"><span>' + sec.title + '</span>'
+      + (sec.badge ? '<span style="font-size:10px;background:#FFF3F1;color:var(--orange);padding:2px 6px;border-radius:8px;font-weight:700">' + sec.badge + '</span>' : '')
+      + (sec.note ? '<span style="font-size:10px;color:var(--teal)">' + sec.note + '</span>' : '')
+      + '</div><div class="pi-grid">'
+      + sec.items.map(function(it){ return piItem(it[0],it[1],it[2],piSel(it[0])) }).join('')
+      + '</div></div>'
+  })
+
+  var hasMaas = PORTFOLIO_SELECTION.some(function(p){ return p.startsWith('L2-MAAS') })
+  if (hasMaas) {
+    html += '<div style="background:#FFF3F1;border:1px solid #FECACA;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#991B1B">'
+      + '⚡ MaaS items selected — <strong>MaaS Config</strong> tab is now available to configure models and agents.'
+      + '</div>'
+  }
+
+  html += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">'
+    + '<button class="btn btn-outline" onclick="savePortfolioSelection()">Save Scope</button>'
+    + '<button class="btn btn-teal" onclick="switchTab(\'uc\')">Next: Use Cases →</button>'
+    + '</div>'
+
+  return html
+}
+
+function togglePI(id, el) {
+  var idx = PORTFOLIO_SELECTION.indexOf(id)
+  if (idx >= 0) {
+    PORTFOLIO_SELECTION.splice(idx, 1)
+    el.classList.remove('on','ai')
+    el.querySelector('.pi-ck').textContent = ''
+  } else {
+    PORTFOLIO_SELECTION.push(id)
+    el.classList.add('on')
+    el.classList.remove('ai')
+    el.querySelector('.pi-ck').textContent = '✓'
+  }
+  // Update count in tab bar and re-render if MaaS state changed
+  var hasMaas = PORTFOLIO_SELECTION.some(function(p){ return p.startsWith('L2-MAAS') })
+  renderDocket()
+}
+
+async function runAIPortfolioMap() {
+  var eng = CURRENT_ENG || {}
+  var req = eng.requirements || {}
+  if (!req.objective) { showToast('Add requirements first — go to Overview tab'); return }
+  showToast('✨ Calling atlasAI.js — mapping portfolio against requirement...')
+  document.getElementById('ai-map-note').style.display = 'block'
+  // AI mapping via atlasAI — in production this calls atlasAI.callAndParse
+  // For now suggest items based on engagement type
+  var engType = eng.engagement_type || eng.type || ''
+  var suggestions = ['L2-AIC','L3-DEP','L3-GOV']
+  if (engType === 'TSAP' || engType === 'tsap') suggestions = suggestions.concat(['L1-TSAP','L1.1','L2-MAAS-DOC','L2-MAAS-AUD','L3-SKL'])
+  suggestions.forEach(function(id) {
+    if (!PORTFOLIO_SELECTION.includes(id)) PORTFOLIO_SELECTION.push(id)
+  })
+  showToast('Portfolio mapped — review suggestions')
+  renderDocket()
+}
+
+async function savePortfolioSelection() {
+  var eng = CURRENT_ENG
+  if (!eng) return
+  var sb = getSB()
+  if (!sb.url) { showToast('Supabase not configured'); return }
+  // Save as docket_item with item_subtype = portfolio_selection
+  var body = {
+    docket_id: CURRENT_DOCKET_ID,
+    engagement_id: eng.id,
+    section: 'output',
+    item_subtype: 'portfolio_selection',
+    item_type: 'portfolio_selection',
+    title: 'Portfolio Selection',
+    data: JSON.stringify({ items: PORTFOLIO_SELECTION }),
+    status: 'done'
+  }
+  await sbPost('docket_items', body)
+  showToast('✓ Portfolio selection saved')
+}
+
+// ── MAAS CONFIG TAB ───────────────────────────────────────────────────────────
+async function renderMaasTab() {
+  // Load model catalogue if not yet loaded
+  if (!MC_ROWS_D.length && MC_LOAD_D !== 'loading') {
+    MC_LOAD_D = 'loading'
+    var sb = getSB()
+    if (sb.url) {
+      try {
+        var r = await fetch(sb.url + '/rest/v1/model_catalogue?enabled=eq.true&order=vendor.asc,name.asc&limit=200', {
+          headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+        })
+        if (r.ok) { MC_ROWS_D = await r.json(); MC_LOAD_D = 'loaded' }
+        else MC_LOAD_D = 'error'
+      } catch(e) { MC_LOAD_D = 'error' }
+      // Re-render now that data is loaded
+      switchTab('maas')
+      return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue...</div>'
+    } else {
+      MC_LOAD_D = 'no-creds'
+    }
+  }
+
+  if (MC_LOAD_D === 'loading') {
+    return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue...</div>'
+  }
+  if (MC_LOAD_D === 'no-creds' || MC_LOAD_D === 'error') {
+    return '<div style="padding:24px;text-align:center;color:var(--mid)">⚠ Model catalogue unavailable — check Settings → API Keys</div>'
+  }
+
+  // Archetype cards
+  var archetypes = [
+    { id:'document', icon:'📄', label:'Document Intelligence' },
+    { id:'audio',    icon:'🎙️', label:'Audio / Speech' },
+    { id:'coding',   icon:'💻', label:'Coding Assistant' },
+    { id:'vision',   icon:'👁️', label:'Vision & Video' },
+    { id:'multimodal',icon:'🔮',label:'Multimodal' },
+    { id:'embedding',icon:'🔗', label:'Embedding & RAG' },
+    { id:'indic',    icon:'🌐', label:'Indic / Indian Languages' },
+    { id:'general',  icon:'🎯', label:'General Purpose LLM' }
+  ]
+
+  var MAAS_ARCHS = window.MAAS_ARCHS || []
+
+  var html = '<div class="card">'
+    + '<div class="card-title">Model Archetypes — Select what to offer</div>'
+    + '<div class="card-sub">Select capability archetypes. Models from the catalogue will be shown for each selected archetype.</div>'
+    + '<div class="arch-grid">'
+    + archetypes.map(function(a) {
+        var cnt = MC_ROWS_D.filter(function(m){ return (m.archetype||[]).includes(a.id) }).length
+        var on = MAAS_ARCHS.includes(a.id)
+        return '<div class="arch-card' + (on?' on':'') + '" onclick="toggleArch(\'' + a.id + '\',this)">'
+          + '<div class="arch-icon">' + a.icon + '</div>'
+          + '<div class="arch-name">' + a.label + '</div>'
+          + '<div class="arch-cnt">' + cnt + ' models</div>'
+          + '</div>'
+      }).join('')
+    + '</div></div>'
+
+  // Model table
+  var selArchs = MAAS_ARCHS.length ? MAAS_ARCHS : []
+  var filteredModels = MC_ROWS_D.filter(function(m) {
+    if (!selArchs.length) return true
+    return selArchs.some(function(a){ return (m.archetype||[]).includes(a) })
+  })
+
+  html += '<div class="card">'
+    + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between">'
+    + '<span>Model Catalogue (' + filteredModels.length + ' shown)</span>'
+    + '<div style="display:flex;gap:6px">'
+    + '<select class="mc-filter" onchange="MAAS_VENDOR_FILTER=this.value;switchTab(\'maas\')">'
+    + '<option value="">All vendors</option>'
+    + Array.from(new Set(MC_ROWS_D.map(function(m){ return m.vendor }))).sort().map(function(v){ return '<option>' + esc(v) + '</option>' }).join('')
+    + '</select></div></div>'
+    + '<div class="card-sub">Select models for this MaaS offering. Featured models are pre-highlighted.</div>'
+    + '<div style="overflow-x:auto;max-height:380px;overflow-y:auto">'
+    + '<table class="mc-table"><tr>'
+    + '<th></th><th>Model</th><th>Archetypes</th><th>Params</th><th>Context</th>'
+    + '<th>MMLU</th><th>HumanEval</th><th>Quant</th><th>License</th></tr>'
+    + filteredModels.map(function(m) {
+        var sel = MAAS_MODELS_SELECTED.some(function(s){ return s.id === m.id })
+        function bc(v){ return !v?'lo':v>=80?'hi':v>=65?'md':'lo' }
+        function lc(l){ return ['Apache2','MIT','CC-BY','Gemma','Llama-Community'].includes(l||'')?'open':'comm' }
+        return '<tr class="' + (sel?'on':'') + '" onclick="toggleMaasModel(\'' + m.id + '\')">'
+          + '<td><div class="mc-toggle ' + (sel?'on':'') + '"></div></td>'
+          + '<td><div class="mc-name">' + esc(m.name||'') + '</div><div class="mc-vendor">' + esc(m.vendor||'') + '</div></td>'
+          + '<td>' + (m.archetype||[]).slice(0,3).map(function(a){ return '<span class="mc-arch">'+esc(a)+'</span>' }).join('') + '</td>'
+          + '<td style="font-size:11px;white-space:nowrap">' + (m.params_b?m.params_b+'B':'—') + '</td>'
+          + '<td style="font-size:11px">' + (m.context_length_k?m.context_length_k+'K':'—') + '</td>'
+          + '<td><span class="mc-bench ' + bc(m.bench_mmlu) + '">' + (m.bench_mmlu||'—') + '</span></td>'
+          + '<td><span class="mc-bench ' + bc(m.bench_humaneval) + '">' + (m.bench_humaneval||'—') + '</span></td>'
+          + '<td style="font-size:10px;color:var(--mid)">' + (m.quant_options||[]).slice(0,3).join(' · ') + '</td>'
+          + '<td><span class="mc-lic ' + lc(m.license) + '">' + esc(m.license||'—') + '</span></td>'
+          + '</tr>'
+      }).join('')
+    + '</table></div></div>'
+
+  // Agent harness
+  html += '<div class="card">'
+    + '<div class="card-title">Agent Configuration</div>'
+    + '<div class="card-sub">Enable if the customer wants to offer agentic AI workflows — multi-step, tool-calling, memory-enabled.</div>'
+    + '<div class="agent-toggle" onclick="toggleAgent()">'
+    + '<div class="toggle-sw' + (AGENT_ON?' on':'') + '" id="agent-sw"></div>'
+    + '<div><div style="font-size:13px;font-weight:600;color:var(--navy)">Enable Agent Harness</div>'
+    + '<div style="font-size:11px;color:var(--mid)">Adds orchestration compute + memory store to BOM (~1 GPU per 8 inference GPUs)</div></div>'
+    + '</div>'
+    + '<div class="agent-cfg' + (AGENT_ON?' on':'') + '" id="agent-cfg">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+    + '<div><div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">Harness Type</div>'
+    + '<div style="display:flex;flex-direction:column;gap:6px">'
+    + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="radio" name="harness" checked> <span style="font-size:12px"><strong>Our Harness</strong> — pre-configured (LangGraph/AutoGen/CrewAI)</span></label>'
+    + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="radio" name="harness"> <span style="font-size:12px"><strong>BYO Harness</strong> — customer brings own framework (~15% compute buffer)</span></label>'
+    + '</div></div>'
+    + '<div><div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">Orchestration Model</div>'
+    + '<select style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none">'
+    + '<option>Llama 3.1 8B INT4 (fast, lightweight)</option><option>Mistral 7B INT4</option><option>Phi-4 INT4</option><option>Qwen 2.5 7B INT4</option>'
+    + '</select>'
+    + '<div style="font-size:10px;color:var(--mid);margin-top:4px">Memory Store</div>'
+    + '<select style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;margin-top:3px">'
+    + '<option>pgvector (PostgreSQL)</option><option>Redis</option><option>ChromaDB</option><option>Qdrant</option>'
+    + '</select></div></div>'
+    + '</div>'
+
+  // GPU estimate
+  var infGPUs = MAAS_MODELS_SELECTED.length * 2
+  var agentGPUs = AGENT_ON ? Math.ceil(infGPUs / 8) : 0
+  var platGPUs = Math.ceil((infGPUs + agentGPUs) * 0.15)
+  var totalGPUs = infGPUs + agentGPUs + platGPUs
+  html += '<div class="gpu-est"><div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:10px">MaaS GPU Estimate (auto-calculated)</div>'
+    + '<div class="gpu-est-grid">'
+    + '<div class="gpu-est-item"><div class="gpu-est-val">' + infGPUs + '</div><div class="gpu-est-lbl">Inference GPUs</div></div>'
+    + '<div class="gpu-est-item"><div class="gpu-est-val">' + agentGPUs + '</div><div class="gpu-est-lbl">Agent GPUs</div></div>'
+    + '<div class="gpu-est-item"><div class="gpu-est-val">' + platGPUs + '</div><div class="gpu-est-lbl">Platform Overhead</div></div>'
+    + '<div class="gpu-est-item"><div class="gpu-est-val" style="color:var(--amber)">' + totalGPUs + '</div><div class="gpu-est-lbl">Total MaaS GPUs</div></div>'
+    + '</div><div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.5);text-align:center">Added to UC infrastructure in SASC BOM</div>'
+    + '</div>'
+
+  html += '<div style="margin-top:12px;display:flex;justify-content:flex-end">'
+    + '<button class="btn btn-teal" onclick="saveMaasConfig()">&#8593; Save MaaS Config</button>'
+    + '</div>'
+
+  return html
+}
+
+function toggleArch(id, el) {
+  window.MAAS_ARCHS = window.MAAS_ARCHS || []
+  var idx = window.MAAS_ARCHS.indexOf(id)
+  if (idx >= 0) window.MAAS_ARCHS.splice(idx, 1)
+  else window.MAAS_ARCHS.push(id)
+  el.classList.toggle('on')
+}
+
+function toggleMaasModel(id) {
+  var idx = MAAS_MODELS_SELECTED.findIndex(function(m){ return m.id === id })
+  if (idx >= 0) MAAS_MODELS_SELECTED.splice(idx, 1)
+  else {
+    var m = MC_ROWS_D.find(function(r){ return r.id === id })
+    if (m) MAAS_MODELS_SELECTED.push(m)
+  }
+  switchTab('maas')
+}
+
+function toggleAgent() {
+  AGENT_ON = !AGENT_ON
+  var sw = document.getElementById('agent-sw')
+  var cfg = document.getElementById('agent-cfg')
+  if (sw) sw.classList.toggle('on', AGENT_ON)
+  if (cfg) cfg.classList.toggle('on', AGENT_ON)
+  // Re-render GPU estimate
+  var gpu = document.querySelectorAll('.gpu-est-val')
+  var infG = MAAS_MODELS_SELECTED.length * 2
+  var agG = AGENT_ON ? Math.ceil(infG/8) : 0
+  var plG = Math.ceil((infG+agG)*0.15)
+  if (gpu[0]) gpu[0].textContent = infG
+  if (gpu[1]) gpu[1].textContent = agG
+  if (gpu[2]) gpu[2].textContent = plG
+  if (gpu[3]) gpu[3].textContent = infG+agG+plG
+}
+
+async function saveMaasConfig() {
+  var eng = CURRENT_ENG
+  if (!eng) return
+  var sb = getSB()
+  if (!sb.url) { showToast('Supabase not configured'); return }
+  var body = {
+    docket_id: CURRENT_DOCKET_ID,
+    engagement_id: eng.id,
+    section: 'output',
+    item_subtype: 'maas_config',
+    item_type: 'maas_config',
+    title: 'MaaS Configuration',
+    data: JSON.stringify({
+      archetypes: window.MAAS_ARCHS || [],
+      models: MAAS_MODELS_SELECTED.map(function(m){ return { id:m.id, name:m.name, vendor:m.vendor } }),
+      agent_enabled: AGENT_ON
+    }),
+    status: 'done'
+  }
+  await sbPost('docket_items', body)
+  showToast('✓ MaaS config saved')
+}
+
+// ── TERRITORY PROFILE TAB ────────────────────────────────────────────────────
+function renderTerritoryTab() {
+  var eng = CURRENT_ENG || {}
+  var territory = eng.territory || ''
+  var engType = eng.engagement_type || eng.type || ''
+
+  if (!['TSAP','tsap'].includes(engType)) {
+    return '<div class="empty"><div class="empty-icon">🗺️</div>'
+      + '<div class="empty-title">Territory Profile — TSAP engagements only</div>'
+      + '<div class="empty-sub">This tab is only available for Territory Sovereign AI Programme engagements.</div></div>'
+  }
+
+  if (!territory) {
+    return '<div class="empty"><div class="empty-icon">📍</div>'
+      + '<div class="empty-title">No territory set</div>'
+      + '<div class="empty-sub">Update the engagement to set the territory field.</div></div>'
+  }
+
+  var fmUrl = '../../tools/tsap-financial-model/index.html?eng=' + (eng.id||'')
+
+  return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
+    + '<div style="font-size:16px;font-weight:700;color:var(--navy)">' + esc(territory) + '</div>'
+    + '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:#FFF3F1;color:#991B1B;font-weight:700">TSAP</span>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'
+    + '<div class="card"><div class="card-title">S1–S4 Pipeline</div>'
+    + '<div class="terr-status"><div class="terr-dot" style="background:var(--amber)"></div>'
+    + '<div><div style="font-size:12px;font-weight:700;color:var(--navy)">Not yet run</div>'
+    + '<div style="font-size:10px;color:var(--mid)">Open TSAP Financial Model to run S1 territory intelligence</div></div></div>'
+    + '<a href="' + fmUrl + '" class="btn btn-primary" style="display:inline-block;text-decoration:none;font-size:12px">Open Territory Profile →</a>'
+    + '</div>'
+    + '<div class="card"><div class="card-title">Territory Config</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:10px;line-height:1.5">Cost overrides for this territory — power tariff, civil index, manpower multiplier. Managed in TSAP FM Territory Config tab.</div>'
+    + '<a href="' + fmUrl + '" class="btn btn-outline" style="display:inline-block;text-decoration:none;font-size:12px">Open Territory Config →</a>'
+    + '</div></div>'
+    + '<div style="background:#EFF3FF;border:1px solid #BDD7FF;border-radius:8px;padding:12px 16px;font-size:12px;color:#1C38F5">'
+    + 'ℹ Territory Profile (S1–S4) and Territory Config live in the TSAP Financial Model tool. Once S3 is complete, the profile summary will appear here automatically.'
+    + '</div>'
+}
+
+// ── EDIT REQUIREMENTS ────────────────────────────────────────────────────────
+function editRequirements() {
+  var eng = CURRENT_ENG || {}
+  var req = eng.requirements || {}
+  var html = '<div style="padding:20px">'
+    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:14px">Edit Requirements</div>'
+    + '<div style="margin-bottom:12px"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Objective *</label>'
+    + '<textarea id="req-obj" rows="5" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;min-height:100px">'+esc(req.objective||'')+'</textarea></div>'
+    + '<div style="margin-bottom:12px"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Problem Statement</label>'
+    + '<textarea id="req-prob" rows="4" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;min-height:80px">'+esc(req.problem||'')+'</textarea></div>'
+    + '<div style="margin-bottom:12px"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Success Criteria</label>'
+    + '<textarea id="req-succ" rows="4" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;min-height:80px">'+esc(req.success_criteria||'')+'</textarea></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    + '<button onclick="closeModal()" class="btn btn-outline">Cancel</button>'
+    + '<button onclick="saveRequirements()" class="btn btn-primary">Save Requirements</button>'
+    + '</div></div>'
+  document.getElementById('modal-body').innerHTML = html
+  openModal()
+}
+
+async function saveRequirements() {
+  var eng = CURRENT_ENG
+  if (!eng) return
+  var req = eng.requirements || {}
+  req.objective = (document.getElementById('req-obj').value||'').trim()
+  req.problem   = (document.getElementById('req-prob').value||'').trim() || null
+  req.success_criteria = (document.getElementById('req-succ').value||'').trim() || null
+  if (!req.objective) { showToast('Objective is required'); return }
+  // Patch engagement
+  var sb = getSB()
+  if (sb.url) {
+    try {
+      await fetch(sb.url + '/rest/v1/engagements?id=eq.' + eng.id, {
+        method: 'PATCH',
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+          'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ requirements: req })
+      })
+    } catch(e) {}
+  }
+  CURRENT_ENG.requirements = req
+  closeModal()
+  showToast('✓ Requirements saved')
+  renderDocket()
+}
+
 async function init() {
   var sb = getSB()
   if (!sb.url) {
@@ -486,6 +1053,30 @@ async function openEngagement(eng) {
   var cust = ALL_CUSTOMERS.find(function(c){ return c.id === eng.customer_id }) || {}
   CURRENT_ENG._cust = cust
 
+  // Reset new tab state when opening a new engagement
+  PORTFOLIO_SELECTION = []
+  MAAS_MODELS_SELECTED = []
+  INTEL_ITEMS = []
+  MC_ROWS_D = []
+  MC_LOAD_D = ''
+  AGENT_ON = false
+  window.MAAS_ARCHS = []
+  // Load portfolio selection if saved as docket_item
+  if (CURRENT_DOCKET_ID) {
+    var piItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'portfolio_selection' || i.item_type === 'portfolio_selection' })
+    if (piItems.length) {
+      try { var d = JSON.parse(piItems[0].data||'{}'); PORTFOLIO_SELECTION = d.items || [] } catch(e) {}
+    }
+    var maasItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'maas_config' || i.item_type === 'maas_config' })
+    if (maasItems.length) {
+      try {
+        var md = JSON.parse(maasItems[0].data||'{}')
+        window.MAAS_ARCHS = md.archetypes || []
+        AGENT_ON = md.agent_enabled || false
+        MAAS_MODELS_SELECTED = md.models || []
+      } catch(e) {}
+    }
+  }
   renderSidebar(document.getElementById('sb-search').value)
   renderDocket()
 }
@@ -535,8 +1126,16 @@ function renderDocket() {
 
     // Tab bar
     + '<div class="tab-bar">'
-    + ['overview','uc','actions','strategy','outputs','history'].map(function(t) {
-        var labels = { overview:'Overview', uc:'Use Cases', actions:'Actions', strategy:'Strategy', outputs:'Outputs', history:'History' }
+    + (function() {
+        var tabs = ['overview','intel','portfolio','uc']
+        var eng = CURRENT_ENG || {}
+        var pi = PORTFOLIO_SELECTION || []
+        if (pi.some(function(p){ return p.startsWith('L2-MAAS') })) tabs.push('maas')
+        if ((eng.engagement_type||eng.type) === 'TSAP' || (eng.engagement_type||eng.type) === 'tsap') tabs.push('territory')
+        tabs = tabs.concat(['actions','outputs','history'])
+        return tabs
+      }()).map(function(t) {
+        var labels = { overview:'Overview', intel:'Intelligence', portfolio:'Portfolio', uc:'Use Cases', maas:'MaaS Config', territory:'Territory', actions:'Actions', outputs:'Outputs', history:'History' }
         var cnt = t === 'uc' ? counts.uc : t === 'actions' ? counts.action : t === 'outputs' ? counts.output : 0
         return '<button class="tab-btn' + (ACTIVE_TAB===t?' active':'') + '" onclick="switchTab(\'' + t + '\')">'
           + labels[t]
@@ -566,12 +1165,15 @@ function switchTab(tab) {
 
 //    Tab renderers                                                              
 function renderTab(tab) {
-  if (tab === 'overview')  return renderOverview()
-  if (tab === 'uc')        return renderUCTab()
-  if (tab === 'actions')   return renderActionsTab()
-  if (tab === 'strategy')  return renderStrategyTab()
-  if (tab === 'outputs')   return renderOutputsTab()
-  if (tab === 'history')   return renderHistoryTab()
+  if (tab === 'overview')   return renderOverview()
+  if (tab === 'intel')      return renderIntelTab()
+  if (tab === 'portfolio')  return renderPortfolioTab()
+  if (tab === 'uc')         return renderUCTab()
+  if (tab === 'maas')       return renderMaasTab()
+  if (tab === 'territory')  return renderTerritoryTab()
+  if (tab === 'actions')    return renderActionsTab()
+  if (tab === 'outputs')    return renderOutputsTab()
+  if (tab === 'history')    return renderHistoryTab()
   return ''
 }
 
@@ -585,7 +1187,30 @@ function renderOverview() {
   var openActions = actions.filter(function(i){ return i.status !== 'done' })
   var strat = getStrategyItems()
 
-  var html = '<div class="kpi-row">'
+  // Requirements block from engagement
+  var req = eng.requirements || {}
+  var reqHtml = ''
+  if (req.objective) {
+    reqHtml = '<div class="req-block">'
+      + '<div class="req-block-title">📌 Engagement Requirement</div>'
+      + '<div class="req-obj">' + esc(req.objective) + '</div>'
+      + (req.problem ? '<div class="req-meta"><strong>Problem:</strong> ' + esc(req.problem) + '</div>' : '')
+      + (req.success_criteria ? '<div class="req-meta"><strong>Success:</strong> ' + esc(req.success_criteria) + '</div>' : '')
+      + '<div class="req-chips" style="margin-top:8px">'
+      + (req.budget_range ? '<span class="req-chip" style="background:#E1F5EE;color:#065F46">' + esc(req.budget_range) + '</span>' : '')
+      + (req.timeline ? '<span class="req-chip" style="background:#EFF3FF;color:#1C38F5">' + esc(req.timeline) + '</span>' : '')
+      + (req.constraints||[]).map(function(c){ return '<span class="req-chip" style="background:#FFF3F1;color:#991B1B">' + esc(c) + '</span>' }).join('')
+      + '</div>'
+      + '<div style="margin-top:8px"><button class="btn btn-sm btn-ghost" onclick="editRequirements()">✏️ Edit</button></div>'
+      + '</div>'
+  } else {
+    reqHtml = '<div style="background:#FFF8E7;border:1px solid var(--amber);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#92400E;display:flex;align-items:center;justify-content:space-between">'
+      + '<span>⚠ No requirements defined for this engagement.</span>'
+      + '<button class="btn btn-sm" style="background:#92400E;color:#fff;padding:4px 10px;font-size:11px" onclick="editRequirements()">+ Add Requirements</button>'
+      + '</div>'
+  }
+
+  var html = reqHtml + '<div class="kpi-row">'
     + kpi(String(ucs.length), 'Use cases')
     + kpi(String(openActions.length), 'Open actions', openActions.length > 0 ? 'var(--orange)' : null)
     + kpi(String(outputs.length), 'Outputs')
