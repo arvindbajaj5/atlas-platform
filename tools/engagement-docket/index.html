@@ -686,9 +686,10 @@ async function renderMaasTab() {
         if (r.ok) { MC_ROWS_D = await r.json(); MC_LOAD_D = 'loaded' }
         else MC_LOAD_D = 'error'
       } catch(e) { MC_LOAD_D = 'error' }
-      // Re-render now that data is loaded
-      switchTab('maas')
-      return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue...</div>'
+      // Data loaded — loadAndRenderMaas will pick it up
+      MC_LOAD_D = 'loaded'
+      var el = document.getElementById('tab-body'); if (el && ACTIVE_TAB==='maas') el.innerHTML = await renderMaasTab()
+      return ''
     } else {
       MC_LOAD_D = 'no-creds'
     }
@@ -1111,8 +1112,7 @@ function renderDocket() {
     + '<span>Opened ' + fmtDate(eng.opened_at||eng.created_at) + '</span>'
     + '</div>'
     + '<div class="docket-badges">'
-    + (typeLabel ? '<span class="sb-badge badge-tsap">' + esc(typeLabel) + '</span>' : '')
-    + '<span class="sb-badge ' + statusClass + '">' + esc(statusLabel) + '</span>'
+    + '<select onchange="setEngagementType(this.value)" style="padding:3px 8px;border:1.5px solid rgba(255,255,255,.2);border-radius:6px;font-size:11px;font-weight:600;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-family:inherit;outline:none">'    + ['','TSAP','Domain','Generic'].map(function(v){        var lbl = v||'— Set Type';        var engT = eng.engagement_type||eng.type||'';        var sel = (v && (engT===v||engT===v.toLowerCase())) ? ' selected' : (!v && !['TSAP','Domain','Generic'].some(function(t){return engT===t||engT===t.toLowerCase()}) ? ' selected' : '');        return '<option value="'+v+'"'+sel+'>'+lbl+'</option>';      }).join('')    + '</select>'    + '<span class="sb-badge ' + statusClass + '">' + esc(statusLabel) + '</span>'
     + (openActions > 0 ? '<span class="sb-badge" style="background:#FEE2E2;color:#991B1B">' + openActions + ' open action' + (openActions>1?'s':'') + '</span>' : '')
     + '</div></div>'
     + '<div class="docket-hdr-actions">'
@@ -1130,8 +1130,8 @@ function renderDocket() {
         var tabs = ['overview','intel','portfolio','uc']
         var eng = CURRENT_ENG || {}
         var pi = PORTFOLIO_SELECTION || []
-        if (pi.some(function(p){ return p.startsWith('L2-MAAS') })) tabs.push('maas')
-        if ((eng.engagement_type||eng.type) === 'TSAP' || (eng.engagement_type||eng.type) === 'tsap') tabs.push('territory')
+        if (PORTFOLIO_SELECTION.some(function(p){ return p.startsWith('L2-MAAS') })) tabs.push('maas')
+        var _et = (eng.engagement_type||eng.type||''); if (_et==='TSAP'||_et==='tsap') tabs.push('territory')
         tabs = tabs.concat(['actions','outputs','history'])
         return tabs
       }()).map(function(t) {
@@ -1166,15 +1166,27 @@ function switchTab(tab) {
 //    Tab renderers                                                              
 function renderTab(tab) {
   if (tab === 'overview')   return renderOverview()
-  if (tab === 'intel')      return renderIntelTab()
+  if (tab === 'intel')      { loadAndRenderIntel(); return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading intelligence...</div>' }
   if (tab === 'portfolio')  return renderPortfolioTab()
   if (tab === 'uc')         return renderUCTab()
-  if (tab === 'maas')       return renderMaasTab()
+  if (tab === 'maas')       { loadAndRenderMaas(); return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue...</div>' }
   if (tab === 'territory')  return renderTerritoryTab()
   if (tab === 'actions')    return renderActionsTab()
   if (tab === 'outputs')    return renderOutputsTab()
   if (tab === 'history')    return renderHistoryTab()
   return ''
+}
+
+async function loadAndRenderIntel() {
+  var html = await renderIntelTab()
+  var el = document.getElementById('tab-body')
+  if (el && ACTIVE_TAB === 'intel') el.innerHTML = html
+}
+
+async function loadAndRenderMaas() {
+  var html = await renderMaasTab()
+  var el = document.getElementById('tab-body')
+  if (el && ACTIVE_TAB === 'maas') el.innerHTML = html
 }
 
 //    Overview                                                                   
@@ -1715,6 +1727,28 @@ function openFM() {
 //    Modal helpers                                                              
 function openModal(id) { document.getElementById(id).classList.add('open') }
 function closeModal(id) { document.getElementById(id).classList.remove('open') }
+async function setEngagementType(val) {
+  var eng = CURRENT_ENG
+  if (!eng || !val) return
+  var sb = getSB()
+  if (!sb.url) return
+  try {
+    await fetch(sb.url + '/rest/v1/engagements?id=eq.' + eng.id, {
+      method: 'PATCH',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+        'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ engagement_type: val })
+    })
+    CURRENT_ENG.engagement_type = val
+    showToast('✓ Engagement type set to ' + val)
+    // Re-render to show/hide Territory tab
+    renderDocket()
+  } catch(e) {
+    showToast('Failed to update engagement type', 'error')
+  }
+}
+
+
 
 // Close on overlay click
 document.querySelectorAll('.modal-overlay').forEach(function(el) {
