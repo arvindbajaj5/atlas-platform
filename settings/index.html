@@ -179,6 +179,30 @@ var GEMINI_MODELS = [
 ]
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+function uploadLogo(input, key, previewId) {
+  var file = input.files && input.files[0]
+  if (!file) return
+  var reader = new FileReader()
+  reader.onload = function(e) {
+    var dataUrl = e.target.result
+    CFG[key] = dataUrl
+    // Update the URL text input to show it's been uploaded
+    var inp = document.getElementById('cfg-' + key)
+    if (inp) inp.value = '(uploaded: ' + file.name + ')'
+    // Update preview
+    var prev = document.getElementById(previewId + '-preview')
+    if (prev) {
+      var img = document.createElement('img')
+      img.src = dataUrl
+      img.style.cssText = 'height:40px;border:1px solid #E5E7EB;border-radius:4px;padding:4px'
+      prev.innerHTML = ''
+      prev.appendChild(img)
+    }
+    showToast('✓ Logo uploaded: ' + file.name)
+  }
+  reader.readAsDataURL(file)
+}
+
 function boot() {
   try { CFG = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}') } catch(e) { CFG = {} }
   showTab('company')
@@ -332,13 +356,19 @@ function renderCompany() {
     + '</div>'
     + '<div class="field-row">'
     + '<div class="field"><label>Tool Logo (simple)</label>'
-    + '<input type="text" id="cfg-logoUrl" value="' + esc(g.logoUrl||'') + '" placeholder="https://... PNG/SVG" oninput="live(\'logoUrl\',this.value);refreshLogo(\'logoUrl\',\'tool-logo\')">'
-    + '<div class="field-note">Small square/horizontal logo for tool headers and nav bar</div>'
+    + '<div style="display:flex;gap:6px;align-items:center">'
+    + '<input type="text" id="cfg-logoUrl" value="' + esc(g.logoUrl||'') + '" placeholder="https://... or upload below" oninput="live(\'logoUrl\',this.value);refreshLogo(\'logoUrl\',\'tool-logo\')" style="flex:1">'
+    + '<label style="padding:5px 10px;background:var(--light);border:1.5px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer;white-space:nowrap">&#128190; Upload<input type="file" accept="image/*" style="display:none" onchange="uploadLogo(this,\'logoUrl\',\'tool-logo\')"></label>'
+    + '</div>'
+    + '<div class="field-note">Upload a file or paste a hosted URL. PNG/SVG recommended. For tool headers and nav bar.</div>'
     + logoPreview('logoUrl', 'tool-logo')
     + '</div>'
     + '<div class="field"><label>Document Logo (formal)</label>'
-    + '<input type="text" id="cfg-docLogoUrl" value="' + esc(g.docLogoUrl||'') + '" placeholder="https://... PNG/SVG" oninput="live(\'docLogoUrl\',this.value);refreshLogo(\'docLogoUrl\',\'doc-logo\')">'
-    + '<div class="field-note">Full/formal logo for Word docs, PowerPoint covers, Vision Document</div>'
+    + '<div style="display:flex;gap:6px;align-items:center">'
+    + '<input type="text" id="cfg-docLogoUrl" value="' + esc(g.docLogoUrl||'') + '" placeholder="https://... or upload below" oninput="live(\'docLogoUrl\',this.value);refreshLogo(\'docLogoUrl\',\'doc-logo\')" style="flex:1">'
+    + '<label style="padding:5px 10px;background:var(--light);border:1.5px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer;white-space:nowrap">&#128190; Upload<input type="file" accept="image/*" style="display:none" onchange="uploadLogo(this,\'docLogoUrl\',\'doc-logo\')"></label>'
+    + '</div>'
+    + '<div class="field-note">Upload a file or paste a hosted URL. Full/formal logo for Word docs, PowerPoint covers, Vision Document.</div>'
     + logoPreview('docLogoUrl', 'doc-logo')
     + '</div>'
     + '</div>'
@@ -518,8 +548,9 @@ function renderHardware() {
     + '<tr><th style="width:32px"></th><th>SKU ID</th><th>Vendor</th><th>Model Name</th><th>Type</th><th>TDP (W)</th><th>FP8 TFLOPS</th><th>USD/Unit</th><th>GPUs/Chassis</th><th>Cooling</th><th>Enabled</th><th></th></tr>'
     + skus.map(function(sku, i) {
         var isPrimary = sku.id === primarySku
-        return '<tr style="cursor:pointer;' + (isPrimary ? 'background:#E1F5EE' : '') + '" onclick="setSkuPrimary(' + i + ')">'
-          + '<td style="text-align:center">' + (isPrimary ? '<span style="color:var(--teal);font-weight:700" title="Primary">&#9679;</span>' : '<span style="color:var(--border)">&#9675;</span>') + '</td>'
+        return '<tr style="' + (isPrimary ? 'background:#E1F5EE' : '') + '">'
+          + '<td style="text-align:center;cursor:pointer" onclick="setSkuPrimary(' + i + ')" title="Set as primary">' + (isPrimary ? '<span style="color:var(--teal);font-weight:700">&#9679;</span>' : '<span style="color:var(--border);cursor:pointer">&#9675;</span>') + '</td>'
+
           + '<td><input type="text" value="' + esc(sku.id) + '" oninput="updateSku(' + i + ',\'id\',this.value)" style="width:90px"></td>'
           + '<td><input type="text" value="' + esc(sku.vendor) + '" oninput="updateSku(' + i + ',\'vendor\',this.value)" style="width:70px"></td>'
           + '<td><input type="text" value="' + esc(sku.name) + '" oninput="updateSku(' + i + ',\'name\',this.value)" style="width:120px"></td>'
