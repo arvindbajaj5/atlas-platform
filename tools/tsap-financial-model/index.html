@@ -119,6 +119,7 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
   <button class="tab-btn" data-tab="revenue"  onclick="switchTab('revenue')">Revenue Model</button>
   <button class="tab-btn" data-tab="cashflow" onclick="switchTab('cashflow')">Cash Flow</button>
   <button class="tab-btn" data-tab="whatif"    onclick="switchTab('whatif')">What-If</button>
+  <button class="tab-btn" data-tab="terrconfig" onclick="switchTab('terrconfig')" style="margin-left:auto;color:var(--mid)">&#128205; Territory Config</button>
 </div>
 <div style="display:flex;gap:3px;align-items:center;padding:4px 12px;border-bottom:1px solid #E5E7EB;background:#fff"><span style="font-size:10px;color:#6B7280;margin-right:4px">Currency:</span><span id="curr-btns"></span></div>
 
@@ -731,13 +732,14 @@ function switchTab(tab, fromTabBar) {
 }
 
 function renderTab(tab) {
-  if (tab === 'profile')  return renderProfileTab()
-  if (tab === 'cost')     return renderCostTab()
-  if (tab === 'supply')   return renderSupplyTab()
-  if (tab === 'gap')      return renderGapTab()
-  if (tab === 'revenue')  return renderRevenueTab()
-  if (tab === 'cashflow') return renderCashFlowTab()
-  if (tab === 'whatif')    return renderWhatIfTab()
+  if (tab === 'profile')     return renderProfileTab()
+  if (tab === 'cost')        return renderCostTab()
+  if (tab === 'supply')      return renderSupplyTab()
+  if (tab === 'gap')         return renderGapTab()
+  if (tab === 'revenue')     return renderRevenueTab()
+  if (tab === 'cashflow')    return renderCashFlowTab()
+  if (tab === 'whatif')      return renderWhatIfTab()
+  if (tab === 'terrconfig')  return renderTerrConfigTab()
   return ''
 }
 
@@ -3535,6 +3537,185 @@ async function saveScenario(name, label) {
 // Stores all config in localStorage under key 'atlas_global_cfg'
 // Company info, API keys, model preferences, hardware SKUs
 
+
+
+// ── Territory Config Tab ──────────────────────────────────────────────────────
+// Manual inputs for cost calculations — separate from AI-generated S1-S4 data
+// Stored in atlas_global_cfg.territory_config (localStorage)
+// Used by getTerritoryCosts() to override national averages
+
+function renderTerrConfigTab() {
+  var g  = atlasGetGlobal()
+  var tc = g.territory_config || {}
+  var na = g.national_averages || {}
+  var terr = TP.territory || MODEL.territory || ''
+
+  // Get current S1 extracted values
+  var e = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.energy  || {}
+  var w = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.water   || {}
+  var l = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.land    || {}
+  var k = TP.s1 && TP.s1.hard_stats && TP.s1.hard_stats.workers || {}
+
+  // Compute effective costs using priority chain
+  var tc_costs = getTerritoryCosts()
+
+  // National avg baselines
+  var natPower = na.power_tariff_inr      || NAT_AVG.power_tariff_inr
+  var natWater = na.water_cost_inr_kl     || NAT_AVG.water_cost_inr_kl
+  var natLand  = na.land_cost_lakh_acre   || NAT_AVG.land_cost_lakh_acre
+  var natSal   = na.engineer_salary_lakh  || NAT_AVG.engineer_salary_lakh
+  var natCivil = na.civil_cost_index      || NAT_AVG.civil_cost_index
+
+  function row(label, key, unit, s1val, s1label, natVal, natUnit, effVal, effNote) {
+    var override = tc[key] !== undefined && tc[key] !== '' ? tc[key] : ''
+    var s1Display = s1val ? String(s1val) + ' ' + s1label : 'N/A'
+    var natDisplay = natVal ? String(natVal) + ' ' + natUnit : '—'
+    // Source indicator
+    var src = override ? 'override' : (s1val ? 's1' : 'nat')
+    var srcColor = src==='override' ? 'var(--orange)' : src==='s1' ? 'var(--teal)' : 'var(--mid)'
+    var srcLabel = src==='override' ? 'Config' : src==='s1' ? 'S1 Data' : 'Nat Avg'
+    return '<tr style="border-bottom:1px solid var(--border)">'
+      + '<td style="padding:8px 10px;font-weight:600">' + esc(label) + '</td>'
+      + '<td style="padding:8px 10px;color:var(--mid);font-size:11px">' + esc(unit) + '</td>'
+      + '<td style="padding:8px 10px">'
+      + '<input type="number" step="0.01" value="' + esc(String(override)) + '" placeholder="' + esc(natDisplay) + '" '
+      + 'onchange="tcSave(\'' + key + '\',this.value)" '
+      + 'style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:12px;font-family:inherit">'
+      + '</td>'
+      + '<td style="padding:8px 10px;font-size:11px;color:var(--mid)">' + esc(s1Display) + '</td>'
+      + '<td style="padding:8px 10px;font-size:11px;color:var(--mid)">' + esc(natDisplay) + '</td>'
+      + '<td style="padding:8px 10px">'
+      + '<span style="font-size:12px;font-weight:700;color:var(--navy)">' + esc(String(effVal)) + '</span>'
+      + '<span style="font-size:9px;margin-left:4px;padding:1px 5px;border-radius:8px;background:' + srcColor + ';color:#fff;font-weight:700">' + srcLabel + '</span>'
+      + '</td>'
+      + '</tr>'
+  }
+
+  var html = '<div style="max-width:900px;margin:0 auto;padding:20px 0">'
+
+  // Territory header
+  if (terr) {
+    html += '<div style="background:var(--navy);border-radius:8px;padding:12px 18px;color:#fff;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">'
+      + '<div><div style="font-size:11px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Active Territory</div>'
+      + '<div style="font-size:16px;font-weight:700">' + esc(terr) + '</div></div>'
+      + (TP.s1 ? '<div style="font-size:11px;color:rgba(255,255,255,.6)">S1 data available \u2014 indices applied</div>'
+               : '<div style="font-size:11px;color:rgba(255,255,255,.4)">No S1 data \u2014 national averages in use</div>')
+      + '</div>'
+  } else {
+    html += '<div style="background:#FFF8E7;border:1px solid var(--amber);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#92400E">'
+      + '&#9888; No territory selected. Complete Territory Profile (S1) first to populate S1 extracted values.'
+      + '</div>'
+  }
+
+  // Priority chain visual
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:11px;flex-wrap:wrap">'
+    + '<span style="color:var(--mid);font-weight:600">Cost priority:</span>'
+    + '<span style="padding:4px 10px;background:var(--orange);color:#fff;border-radius:12px;font-weight:700">1\ufe0f\u20e3 Config Override</span>'
+    + '<span style="color:var(--mid)">&#8250;</span>'
+    + '<span style="padding:4px 10px;background:var(--teal);color:#fff;border-radius:12px;font-weight:700">2\ufe0f\u20e3 S1 Index Ratio</span>'
+    + '<span style="color:var(--mid)">&#8250;</span>'
+    + '<span style="padding:4px 10px;background:var(--navy);color:#fff;border-radius:12px;font-weight:700">3\ufe0f\u20e3 National Average</span>'
+    + '</div>'
+
+  // Cost overrides table
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden">'
+    + '<div style="padding:14px 18px;border-bottom:1px solid var(--border)">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy)">Cost Overrides</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-top:2px">Leave blank to use S1 extracted data or national averages. Badge shows which source is active.</div>'
+    + '</div>'
+    + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    + '<tr style="background:var(--light);border-bottom:2px solid var(--border)">'
+    + '<th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Parameter</th>'
+    + '<th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Unit</th>'
+    + '<th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Override</th>'
+    + '<th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">S1 Extracted</th>'
+    + '<th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">National Avg</th>'
+    + '<th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Effective (FM uses)</th>'
+    + '</tr>'
+    + row('Power Tariff',        'power_tariff_inr',    'Rs/kWh',
+          e.industrial_tariff ? e.industrial_tariff : null,
+          'Rs/kWh (' + (e.tariff_index_pct||'?') + '% of avg)',
+          natPower, 'Rs/kWh',
+          tc_costs.power_tariff, '')
+    + row('Civil Cost Index',    'civil_cost_index',    'base 100',
+          l.land_cost_index_pct ? l.land_cost_index_pct : null,
+          '% index',
+          natCivil, '',
+          tc_costs.civil_index, '')
+    + row('Manpower Multiplier', 'manpower_mult',       '\u00d7 1.0 = avg',
+          k.salary_index_pct ? (k.salary_index_pct/100).toFixed(2) : null,
+          'x ratio',
+          '1.00', '\u00d7',
+          tc_costs.civil_ratio, '')
+    + row('Land Cost',           'land_cost_lakh_acre', 'Rs lakh/acre',
+          l.cost_per_acre_lakh ? l.cost_per_acre_lakh : null,
+          'Rs lakh/acre (' + (l.land_cost_index_pct||'?') + '% of avg)',
+          natLand, 'Rs L/acre',
+          tc_costs.land_cost, '')
+    + row('Water Cost',          'water_cost_inr_kl',   'Rs/kL',
+          w.industrial_cost_per_kl ? w.industrial_cost_per_kl : null,
+          'Rs/kL (' + (w.water_cost_index_pct||'?') + '% of avg)',
+          natWater, 'Rs/kL',
+          tc_costs.water_cost, '')
+    + row('GST Rate',            'gst_rate',            '%',
+          null, '', '18', '%', tc[gst_rate]||'18', '')
+    + '</table></div>'
+    + '<div style="padding:10px 18px;display:flex;align-items:center;justify-content:space-between">'
+    + '<button onclick="tcClearAll()" style="padding:6px 12px;background:#FEE2E2;border:none;border-radius:5px;font-size:11px;cursor:pointer;color:#991B1B">&#10005; Clear All Overrides</button>'
+    + '<div style="font-size:11px;color:var(--mid)">Changes apply immediately to Programme Cost calculations</div>'
+    + '</div>'
+    + '</div>'
+
+  // Programme defaults
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:14px">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px">Programme Defaults</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">Default values for this engagement\'s financial model</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">'
+    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Programme Period (years)</label>'
+    + '<select onchange="tcSave(\'programme_years\',parseInt(this.value))" style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit">'
+    + [5,7,10,15,20].map(function(y){ return '<option value="'+y+'"'+(y===(tc.programme_years||10)?' selected':'')+'>'+y+' years</option>' }).join('')
+    + '</select></div>'
+    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Currency</label>'
+    + '<select onchange="tcSave(\'currency\',this.value)" style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit">'
+    + [{v:'INR',l:'INR \u2014 Indian Rupee'},{v:'USD',l:'USD \u2014 US Dollar'},{v:'AED',l:'AED \u2014 UAE Dirham'},{v:'SGD',l:'SGD \u2014 Singapore Dollar'}]
+        .map(function(o){ return '<option value="'+o.v+'"'+(o.v===(tc.currency||'INR')?' selected':'')+'>'+o.l+'</option>' }).join('')
+    + '</select></div>'
+    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Investment Scenario</label>'
+    + '<select onchange="tcSave(\'investment_scenario\',this.value)" style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit">'
+    + [{v:'state',l:'State Funded'},{v:'operator',l:'Operator / OEM'},{v:'hybrid',l:'Hybrid (State + Operator)'},{v:'vgf',l:'Viability Gap Funding'}]
+        .map(function(o){ return '<option value="'+o.v+'"'+(o.v===(tc.investment_scenario||'state')?' selected':'')+'>'+o.l+'</option>' }).join('')
+    + '</select></div>'
+    + '</div>'
+    + '</div>'
+
+  html += '</div>'
+  return html
+}
+
+function tcSave(key, val) {
+  var g = atlasGetGlobal()
+  var tc = g.territory_config || {}
+  if (val === '' || val === null || val === undefined || val === 0) {
+    delete tc[key]
+  } else {
+    tc[key] = (typeof val === 'string' && !isNaN(parseFloat(val))) ? parseFloat(val) : val
+  }
+  g.territory_config = tc
+  try { localStorage.setItem('atlas_global_cfg', JSON.stringify(g)) } catch(e) {}
+  // Sync to MODEL if programme fields changed
+  if (key === 'programme_years') MODEL.programme_years = tc[key]
+  if (key === 'currency') MODEL.currency = tc[key]
+  showToast((val === '' ? 'Cleared' : 'Saved') + ': ' + key.replace(/_/g,' '))
+}
+
+function tcClearAll() {
+  if (!confirm('Clear all territory cost overrides?')) return
+  var g = atlasGetGlobal()
+  g.territory_config = {}
+  try { localStorage.setItem('atlas_global_cfg', JSON.stringify(g)) } catch(e) {}
+  switchTab('terrconfig')
+  showToast('Territory overrides cleared')
+}
 
 
 async function init() {
