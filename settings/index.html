@@ -104,6 +104,28 @@ body{font-family:'Inter',sans-serif;font-size:13px;color:var(--dark);background:
 .conn-result{font-size:11px;padding:6px 10px;border-radius:4px;margin-top:6px;display:none}
 .conn-result.ok{background:#E1F5EE;color:#065F46}
 .conn-result.err{background:#FEE2E2;color:#991B1B}
+/* Model catalogue */
+.mc-table{width:100%;border-collapse:collapse;font-size:11px}
+.mc-table th{text-align:left;padding:6px 8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border);background:var(--light);white-space:nowrap;position:sticky;top:0;z-index:2}
+.mc-table td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+.mc-table tr:hover td{background:#FAFBFF}
+.mc-table tr.disabled td{opacity:.45}
+.mc-name{font-weight:700;color:var(--navy);font-size:11px}
+.mc-vendor{font-size:10px;color:var(--mid)}
+.mc-arch{font-size:9px;padding:1px 5px;border-radius:8px;background:#EFF3FF;color:var(--blue);font-weight:600;margin-right:2px;white-space:nowrap}
+.mc-bench{font-size:11px;font-weight:600}
+.mc-bench.hi{color:#065F46}.mc-bench.md{color:#92400E}.mc-bench.lo{color:var(--mid)}
+.mc-lic{font-size:9px;padding:1px 5px;border-radius:8px;font-weight:600}
+.mc-lic.open{background:#E1F5EE;color:#065F46}
+.mc-lic.comm{background:#FFF8E7;color:#92400E}
+.mc-toggle{width:28px;height:16px;background:var(--border);border-radius:8px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;display:inline-block}
+.mc-toggle.on{background:var(--teal)}
+.mc-toggle::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.mc-toggle.on::after{left:14px}
+.staging-item{background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px}
+.staging-badge{font-size:9px;padding:2px 7px;border-radius:8px;font-weight:700;flex-shrink:0}
+.mc-filter{padding:5px 9px;border:1.5px solid var(--border);border-radius:5px;font-size:11px;font-family:inherit;outline:none;background:#fff}
+.mc-filter:focus{border-color:var(--navy)}
 </style>
 </head>
 <body>
@@ -129,6 +151,7 @@ body{font-family:'Inter',sans-serif;font-size:13px;color:var(--dark);background:
     <button class="tab-btn"    data-tab="models"     onclick="showTab('models')">&#129302; AI Models</button>
     <button class="tab-btn"    data-tab="hardware"   onclick="showTab('hardware')">&#9881; Hardware &amp; Costs</button>
     <button class="tab-btn"    data-tab="natavg"     onclick="showTab('natavg')">&#127758; National Averages</button>
+    <button class="tab-btn"    data-tab="catalogue"  onclick="showTab('catalogue')">&#129302; Model Catalogue</button>
   </div>
 
   <!-- Tab content -->
@@ -203,12 +226,280 @@ function uploadLogo(input, key, previewId) {
   reader.readAsDataURL(file)
 }
 
+
+// ── Model Catalogue tab ───────────────────────────────────────────────────────
+var MC_ROWS = []         // loaded from Supabase
+var MC_STAGING = []      // pending review
+var MC_FILTER_ARCH = ''
+var MC_FILTER_VENDOR = ''
+var MC_FILTER_ENABLED = 'all'
+
+async function loadModelCatalogue() {
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) return
+  try {
+    var r = await fetch(url + '/rest/v1/model_catalogue?order=vendor.asc,name.asc&limit=200', {
+      headers: { apikey: key, Authorization: 'Bearer ' + key }
+    })
+    if (r.ok) { MC_ROWS = await r.json(); console.log('[Catalogue] loaded', MC_ROWS.length, 'models') }
+    var r2 = await fetch(url + '/rest/v1/model_catalogue_staging?status=eq.pending&order=created_at.desc&limit=50', {
+      headers: { apikey: key, Authorization: 'Bearer ' + key }
+    })
+    if (r2.ok) MC_STAGING = await r2.json()
+  } catch(e) { console.warn('[Catalogue] load error:', e.message) }
+}
+
+function renderCatalogue() {
+  // Load from Supabase if not yet loaded
+  if (!MC_ROWS.length) {
+    loadModelCatalogue().then(function() {
+      var el = document.getElementById('tab-content')
+      if (el) el.innerHTML = renderCatalogue()
+    })
+  }
+
+  var vendors = Array.from(new Set(MC_ROWS.map(function(r){ return r.vendor }))).sort()
+  var archetypes = ['all','coding','document','audio','video','vision','multimodal','embedding','reranking','general','indic']
+
+  function benchColor(v) {
+    if (!v) return 'lo'
+    return v >= 80 ? 'hi' : v >= 65 ? 'md' : 'lo'
+  }
+  function licClass(l) {
+    if (!l) return 'open'
+    return ['Apache2','MIT','CC-BY','Gemma','Llama-Community'].includes(l) ? 'open' : 'comm'
+  }
+
+  // Filter rows
+  var rows = MC_ROWS.filter(function(r) {
+    if (MC_FILTER_ARCH && MC_FILTER_ARCH !== 'all' && !(r.archetype||[]).includes(MC_FILTER_ARCH)) return false
+    if (MC_FILTER_VENDOR && r.vendor !== MC_FILTER_VENDOR) return false
+    if (MC_FILTER_ENABLED === 'enabled' && !r.enabled) return false
+    if (MC_FILTER_ENABLED === 'disabled' && r.enabled) return false
+    return true
+  })
+
+  var html = '<div class="card">'
+    + '<div class="card-title">Model Catalogue <span style="font-size:11px;font-weight:400;color:var(--mid)">(' + MC_ROWS.length + ' models · ' + rows.length + ' shown)</span></div>'
+    + '<div class="card-sub">Full open-source model catalogue. Enable/disable per row. New models detected by Intel Scraper appear in the Staging Queue below. All changes sync to Supabase.</div>'
+    + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">'
+    + '<select class="mc-filter" onchange="MC_FILTER_ARCH=this.value;refreshCatalogue()">'
+    + archetypes.map(function(a){ return '<option value="'+a+'"'+(a===MC_FILTER_ARCH?' selected':'')+'>'+( a==='all'?'All archetypes':a.charAt(0).toUpperCase()+a.slice(1))+'</option>' }).join('')
+    + '</select>'
+    + '<select class="mc-filter" onchange="MC_FILTER_VENDOR=this.value;refreshCatalogue()">'
+    + '<option value="">All vendors</option>'
+    + vendors.map(function(v){ return '<option value="'+esc(v)+'"'+(v===MC_FILTER_VENDOR?' selected':'')+'>'+esc(v)+'</option>' }).join('')
+    + '</select>'
+    + '<select class="mc-filter" onchange="MC_FILTER_ENABLED=this.value;refreshCatalogue()">'
+    + ['all','enabled','disabled'].map(function(v){ return '<option value="'+v+'"'+(v===MC_FILTER_ENABLED?' selected':'')+'>'+{all:'All',enabled:'Enabled only',disabled:'Disabled only'}[v]+'</option>' }).join('')
+    + '</select>'
+    + '<div style="flex:1"></div>'
+    + '<button class="btn btn-teal" onclick="saveCatalogueChanges()" style="font-size:11px;padding:5px 12px">&#8593; Sync changes</button>'
+    + '<button class="btn btn-outline" onclick="addModelRow()" style="font-size:11px;padding:5px 12px">+ Add model</button>'
+    + '</div>'
+
+  if (!rows.length) {
+    html += '<div style="padding:20px;text-align:center;color:var(--mid);font-size:12px">'
+      + (MC_ROWS.length ? 'No models match the current filters.' : 'Loading model catalogue from Supabase...')
+      + '</div>'
+  } else {
+    html += '<div style="overflow-x:auto;max-height:480px;overflow-y:auto">'
+      + '<table class="mc-table">'
+      + '<tr><th>On</th><th>Model</th><th>Vendor</th><th>Archetypes</th><th>Params</th>'
+      + '<th>Quant options</th><th>Context</th><th>MMLU</th><th>HumanEval</th>'
+      + '<th>License</th><th>Featured</th><th></th></tr>'
+      + rows.map(function(r, i) {
+          var realIdx = MC_ROWS.indexOf(r)
+          return '<tr class="'+(r.enabled?'':'disabled')+'">'
+            + '<td><div class="mc-toggle '+(r.enabled?'on':'')+'" onclick="toggleModelEnabled('+realIdx+')"></div></td>'
+            + '<td><div class="mc-name">'+esc(r.name||'')+'</div><div class="mc-vendor">'+esc(r.vendor||'')+'</div></td>'
+            + '<td style="white-space:nowrap;font-size:11px">'+esc(r.vendor||'')+'</td>'
+            + '<td>'+(r.archetype||[]).map(function(a){ return '<span class="mc-arch">'+esc(a)+'</span>' }).join('')+'</td>'
+            + '<td style="font-size:11px;white-space:nowrap">'+(r.params_b?r.params_b+'B':'—')+'</td>'
+            + '<td style="font-size:10px;color:var(--mid)">'+(r.quant_options||[]).join(' · ')+'</td>'
+            + '<td style="font-size:11px">'+(r.context_length_k?r.context_length_k+'K':'—')+'</td>'
+            + '<td><span class="mc-bench '+(r.bench_mmlu?benchColor(r.bench_mmlu):'lo')+'">'+(r.bench_mmlu||'—')+'</span></td>'
+            + '<td><span class="mc-bench '+(r.bench_humaneval?benchColor(r.bench_humaneval):'lo')+'">'+(r.bench_humaneval||'—')+'</span></td>'
+            + '<td><span class="mc-lic '+(licClass(r.license))+'">'+esc(r.license||'—')+'</span></td>'
+            + '<td style="text-align:center"><input type="checkbox" '+(r.featured?'checked':'')+' onchange="toggleFeatured('+realIdx+',this.checked)" title="Show prominently in Docket MaaS picker"></td>'
+            + '<td><button onclick="editModelRow('+realIdx+')" style="padding:2px 7px;font-size:10px;background:var(--light);border:1px solid var(--border);border-radius:4px;cursor:pointer" title="Edit">✏️</button></td>'
+            + '</tr>'
+        }).join('')
+      + '</table></div>'
+  }
+  html += '</div>'
+
+  // Staging queue
+  html += '<div class="card">'
+    + '<div class="card-title">Staging Queue — Scraper Detected Models'
+    + ' <span style="font-size:11px;font-weight:400;color:var(--mid)">('+ MC_STAGING.length +' pending review)</span></div>'
+    + '<div class="card-sub">New models detected by the Intel Scraper from model release news. Review and approve to add to the catalogue, or reject to dismiss. Enrich GPU/benchmark data before approving.</div>'
+
+  if (!MC_STAGING.length) {
+    html += '<div style="padding:16px;text-align:center;color:var(--mid);font-size:12px;background:var(--light);border-radius:6px">No pending items — scraper will populate this when new model releases are detected</div>'
+  } else {
+    MC_STAGING.forEach(function(item, i) {
+      html += '<div class="staging-item">'
+        + '<div style="flex:1">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        + '<span class="staging-badge" style="background:#FFF8E7;color:#92400E">Pending</span>'
+        + '<div style="font-size:12px;font-weight:700;color:var(--navy)">'+esc(item.detected_name||'Unknown')+'</div>'
+        + '<div style="font-size:10px;color:var(--mid)">'+esc(item.detected_vendor||'')+(item.detected_params_b?' · '+item.detected_params_b+'B':'')+'</div>'
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--mid);margin-bottom:6px">'
+        + (item.source_title?'Source: '+esc(item.source_title)+' · ':'')
+        + (item.source_date?new Date(item.source_date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'')
+        + '</div>'
+        + (item.detected_benchmarks && Object.keys(item.detected_benchmarks).length
+            ? '<div style="font-size:10px;color:var(--mid)">Benchmarks detected: '+JSON.stringify(item.detected_benchmarks)+'</div>'
+            : '')
+        + '</div>'
+        + '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">'
+        + '<button onclick="approveStaging(\''+esc(item.id)+'\')" class="btn btn-teal" style="font-size:11px;padding:5px 12px">&#10003; Approve</button>'
+        + '<button onclick="rejectStaging(\''+esc(item.id)+'\')" class="btn btn-outline" style="font-size:11px;padding:5px 12px">&#10005; Reject</button>'
+        + '</div></div>'
+    })
+  }
+  html += '</div>'
+  return html
+}
+
+function refreshCatalogue() {
+  var el = document.getElementById('tab-content')
+  if (el) el.innerHTML = renderCatalogue()
+}
+
+function toggleModelEnabled(idx) {
+  if (MC_ROWS[idx]) {
+    MC_ROWS[idx].enabled = !MC_ROWS[idx].enabled
+    refreshCatalogue()
+  }
+}
+
+function toggleFeatured(idx, val) {
+  if (MC_ROWS[idx]) MC_ROWS[idx].featured = val
+}
+
+function addModelRow() {
+  MC_ROWS.unshift({
+    id: 'new-' + Date.now(),
+    name: 'New Model', vendor: '', family: '', archetype: [],
+    params_b: null, quant_options: [], context_length_k: null,
+    gpu_memory_gb: {}, gpus_per_instance: {}, throughput_rps: {},
+    bench_mmlu: null, bench_humaneval: null, license: 'Apache2',
+    enabled: true, featured: false, source: 'manual'
+  })
+  refreshCatalogue()
+  showToast('New model row added — edit and sync')
+}
+
+function editModelRow(idx) {
+  var r = MC_ROWS[idx]
+  if (!r) return
+  var newName = prompt('Model name:', r.name)
+  if (newName === null) return
+  r.name = newName.trim()
+  var newVendor = prompt('Vendor:', r.vendor || '')
+  if (newVendor !== null) r.vendor = newVendor.trim()
+  var newArch = prompt('Archetypes (comma-separated):\ncoding,document,audio,video,vision,multimodal,embedding,reranking,general,indic', (r.archetype||[]).join(','))
+  if (newArch !== null) r.archetype = newArch.split(',').map(function(a){ return a.trim() }).filter(Boolean)
+  var newParams = prompt('Parameters (billions):', r.params_b || '')
+  if (newParams !== null) r.params_b = parseFloat(newParams) || null
+  var newLic = prompt('License (Apache2/MIT/Llama-Community/CC-BY/Custom):', r.license || 'Apache2')
+  if (newLic !== null) r.license = newLic.trim()
+  refreshCatalogue()
+  showToast('Row updated — sync to save')
+}
+
+async function saveCatalogueChanges() {
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) { showToast('Configure Supabase first', 'error'); return }
+  showToast('Syncing catalogue to Supabase...')
+  var errors = 0
+  for (var i = 0; i < MC_ROWS.length; i++) {
+    var row = MC_ROWS[i]
+    if (!row.id || row.id.startsWith('new-')) continue // new rows need full data first
+    try {
+      var r = await fetch(url + '/rest/v1/model_catalogue?id=eq.' + encodeURIComponent(row.id), {
+        method: 'PATCH',
+        headers: { apikey: key, Authorization: 'Bearer ' + key,
+          'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ enabled: row.enabled, featured: row.featured,
+          name: row.name, vendor: row.vendor, archetype: row.archetype,
+          params_b: row.params_b, license: row.license, updated_at: new Date().toISOString() })
+      })
+      if (!r.ok) errors++
+    } catch(e) { errors++ }
+  }
+  if (errors === 0) showToast('\u2713 Catalogue synced to Supabase')
+  else showToast('Synced with ' + errors + ' errors — check console', 'error')
+}
+
+async function approveStaging(id) {
+  var item = MC_STAGING.find(function(i){ return i.id === id })
+  if (!item) return
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) { showToast('Configure Supabase first', 'error'); return }
+  // Move to model_catalogue
+  try {
+    var newRow = {
+      name: item.detected_name, vendor: item.detected_vendor || '',
+      params_b: item.detected_params_b, context_length_k: item.detected_context_k,
+      license: item.detected_license,
+      bench_mmlu: (item.detected_benchmarks||{}).mmlu || null,
+      bench_humaneval: (item.detected_benchmarks||{}).humaneval || null,
+      source: 'scraper_detected', enabled: true, featured: false
+    }
+    var r1 = await fetch(url + '/rest/v1/model_catalogue', {
+      method: 'POST',
+      headers: { apikey: key, Authorization: 'Bearer ' + key,
+        'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(newRow)
+    })
+    if (r1.ok) {
+      // Update staging status
+      await fetch(url + '/rest/v1/model_catalogue_staging?id=eq.' + encodeURIComponent(id), {
+        method: 'PATCH',
+        headers: { apikey: key, Authorization: 'Bearer ' + key,
+          'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: 'approved', reviewed_at: new Date().toISOString() })
+      })
+      MC_STAGING = MC_STAGING.filter(function(i){ return i.id !== id })
+      await loadModelCatalogue()
+      refreshCatalogue()
+      showToast('\u2713 Model approved and added to catalogue')
+    }
+  } catch(e) { showToast('Approve failed: ' + e.message, 'error') }
+}
+
+async function rejectStaging(id) {
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) return
+  try {
+    await fetch(url + '/rest/v1/model_catalogue_staging?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { apikey: key, Authorization: 'Bearer ' + key,
+        'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'rejected', reviewed_at: new Date().toISOString() })
+    })
+    MC_STAGING = MC_STAGING.filter(function(i){ return i.id !== id })
+    refreshCatalogue()
+    showToast('Model rejected')
+  } catch(e) { showToast('Reject failed: ' + e.message, 'error') }
+}
+
 function boot() {
   try { CFG = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}') } catch(e) { CFG = {} }
   showTab('company')
   updateStatusBar()
   // Load additional fields from Supabase (async, fills gaps from root index)
   loadFromSupabase()
+  // Pre-load model catalogue in background
+  loadModelCatalogue()
 }
 
 async function loadFromSupabase() {
