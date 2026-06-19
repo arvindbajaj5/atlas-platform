@@ -228,8 +228,9 @@ function uploadLogo(input, key, previewId) {
 
 
 // ── Model Catalogue tab ───────────────────────────────────────────────────────
-var MC_ROWS = []         // loaded from Supabase
-var MC_STAGING = []      // pending review
+var MC_ROWS = []
+var MC_STAGING = []
+var MC_LOAD_STATE = ''
 var MC_FILTER_ARCH = ''
 var MC_FILTER_VENDOR = ''
 var MC_FILTER_ENABLED = 'all'
@@ -237,41 +238,100 @@ var MC_FILTER_ENABLED = 'all'
 async function loadModelCatalogue() {
   var url = CFG.sbUrl || CFG.sb_url || ''
   var key = CFG.sbKey || CFG.sb_key || ''
-  if (!url || !key) return
+  if (!url || !key) {
+    MC_LOAD_STATE = 'no-creds'
+    return
+  }
+  MC_LOAD_STATE = 'loading'
   try {
     var r = await fetch(url + '/rest/v1/model_catalogue?order=vendor.asc,name.asc&limit=200', {
       headers: { apikey: key, Authorization: 'Bearer ' + key }
     })
-    if (r.ok) { MC_ROWS = await r.json(); console.log('[Catalogue] loaded', MC_ROWS.length, 'models') }
+    if (r.ok) {
+      MC_ROWS = await r.json()
+      console.log('[Catalogue] loaded', MC_ROWS.length, 'models')
+    } else {
+      MC_LOAD_STATE = 'error'
+      return
+    }
     var r2 = await fetch(url + '/rest/v1/model_catalogue_staging?status=eq.pending&order=created_at.desc&limit=50', {
       headers: { apikey: key, Authorization: 'Bearer ' + key }
     })
     if (r2.ok) MC_STAGING = await r2.json()
-  } catch(e) { console.warn('[Catalogue] load error:', e.message) }
+    MC_LOAD_STATE = 'loaded'
+  } catch(e) {
+    console.warn('[Catalogue] load error:', e.message)
+    MC_LOAD_STATE = 'error'
+  }
 }
 
 function renderCatalogue() {
-  // Load from Supabase if not yet loaded
-  if (!MC_ROWS.length) {
-    loadModelCatalogue().then(function() {
-      var el = document.getElementById('tab-content')
-      if (el) el.innerHTML = renderCatalogue()
-    })
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+
+  // No credentials
+  if (!url || !key) {
+    return '<div class="card">'
+      + '<div class="card-title">Model Catalogue</div>'
+      + '<div style="background:#FFF8E7;border:1px solid var(--amber);border-radius:8px;padding:16px 18px;font-size:12px;color:#92400E">'
+      + '&#9888; Supabase credentials not configured. Go to <strong>API Keys</strong> tab and enter your Supabase URL and key, then save.'
+      + '</div></div>'
   }
 
+  // Not yet loaded — trigger load and show spinner
+  if (MC_LOAD_STATE === 'idle' || MC_LOAD_STATE === '') {
+    MC_LOAD_STATE = 'loading'
+    loadModelCatalogue().then(function() {
+      var el = document.getElementById('tab-content')
+      if (el && document.querySelector('.tab-btn[data-tab="catalogue"]') &&
+          document.querySelector('.tab-btn[data-tab="catalogue"].on')) {
+        el.innerHTML = renderCatalogue()
+      }
+    })
+    return '<div class="card"><div class="card-title">Model Catalogue</div>'
+      + '<div style="padding:32px;text-align:center;color:var(--mid);font-size:12px">'
+      + '<div style="font-size:32px;margin-bottom:10px">⏳</div>'
+      + '<div style="font-weight:600;color:var(--navy);margin-bottom:4px">Loading model catalogue from Supabase...</div>'
+      + '<div style="font-size:11px">Fetching from model_catalogue table</div>'
+      + '</div></div>'
+  }
+
+  // Still in flight
+  if (MC_LOAD_STATE === 'loading') {
+    return '<div class="card"><div class="card-title">Model Catalogue</div>'
+      + '<div style="padding:32px;text-align:center;color:var(--mid);font-size:12px">'
+      + '<div style="font-size:32px;margin-bottom:10px">⏳</div>'
+      + '<div style="font-weight:600;color:var(--navy)">Loading...</div>'
+      + '</div></div>'
+  }
+
+  // Error
+  if (MC_LOAD_STATE === 'error') {
+    return '<div class="card"><div class="card-title">Model Catalogue</div>'
+      + '<div style="background:#FEE2E2;border:1px solid #FECACA;border-radius:8px;padding:14px 18px;font-size:12px;color:#991B1B">'
+      + '&#10060; Failed to load from Supabase. Check your credentials and that the model_catalogue table exists. '
+      + '<button onclick="MC_LOAD_STATE=\'idle\';showTab(\'catalogue\')" style="margin-left:8px;padding:3px 10px;background:#991B1B;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">Retry</button>'
+      + '</div></div>'
+  }
+
+  // No-creds state (caught after initial load attempt)
+  if (MC_LOAD_STATE === 'no-creds') {
+    return '<div class="card"><div class="card-title">Model Catalogue</div>'
+      + '<div style="background:#FFF8E7;border:1px solid var(--amber);border-radius:8px;padding:14px 18px;font-size:12px;color:#92400E">'
+      + '&#9888; Supabase credentials not set. Configure in <strong>API Keys</strong> tab first. '
+      + '<button onclick="MC_LOAD_STATE=\'idle\';showTab(\'catalogue\')" style="margin-left:8px;padding:3px 10px;background:#92400E;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">Retry</button>'
+      + '</div></div>'
+  }
+
+  // ── Loaded — render the table ─────────────────────────────────────────────
   var vendors = Array.from(new Set(MC_ROWS.map(function(r){ return r.vendor }))).sort()
   var archetypes = ['all','coding','document','audio','video','vision','multimodal','embedding','reranking','general','indic']
 
-  function benchColor(v) {
-    if (!v) return 'lo'
-    return v >= 80 ? 'hi' : v >= 65 ? 'md' : 'lo'
-  }
+  function benchColor(v) { return !v ? 'lo' : v >= 80 ? 'hi' : v >= 65 ? 'md' : 'lo' }
   function licClass(l) {
-    if (!l) return 'open'
-    return ['Apache2','MIT','CC-BY','Gemma','Llama-Community'].includes(l) ? 'open' : 'comm'
+    return ['Apache2','MIT','CC-BY','Gemma','Llama-Community'].includes(l||'') ? 'open' : 'comm'
   }
 
-  // Filter rows
   var rows = MC_ROWS.filter(function(r) {
     if (MC_FILTER_ARCH && MC_FILTER_ARCH !== 'all' && !(r.archetype||[]).includes(MC_FILTER_ARCH)) return false
     if (MC_FILTER_VENDOR && r.vendor !== MC_FILTER_VENDOR) return false
@@ -282,7 +342,7 @@ function renderCatalogue() {
 
   var html = '<div class="card">'
     + '<div class="card-title">Model Catalogue <span style="font-size:11px;font-weight:400;color:var(--mid)">(' + MC_ROWS.length + ' models · ' + rows.length + ' shown)</span></div>'
-    + '<div class="card-sub">Full open-source model catalogue. Enable/disable per row. New models detected by Intel Scraper appear in the Staging Queue below. All changes sync to Supabase.</div>'
+    + '<div class="card-sub">Enable/disable models per row. Featured models appear prominently in Docket MaaS Config. Sync changes saves to Supabase.</div>'
     + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">'
     + '<select class="mc-filter" onchange="MC_FILTER_ARCH=this.value;refreshCatalogue()">'
     + archetypes.map(function(a){ return '<option value="'+a+'"'+(a===MC_FILTER_ARCH?' selected':'')+'>'+( a==='all'?'All archetypes':a.charAt(0).toUpperCase()+a.slice(1))+'</option>' }).join('')
@@ -295,35 +355,33 @@ function renderCatalogue() {
     + ['all','enabled','disabled'].map(function(v){ return '<option value="'+v+'"'+(v===MC_FILTER_ENABLED?' selected':'')+'>'+{all:'All',enabled:'Enabled only',disabled:'Disabled only'}[v]+'</option>' }).join('')
     + '</select>'
     + '<div style="flex:1"></div>'
+    + '<button class="btn btn-outline" onclick="MC_LOAD_STATE=\'idle\';MC_ROWS=[];MC_STAGING=[];showTab(\'catalogue\')" style="font-size:11px;padding:5px 10px">&#8635; Reload</button>'
     + '<button class="btn btn-teal" onclick="saveCatalogueChanges()" style="font-size:11px;padding:5px 12px">&#8593; Sync changes</button>'
-    + '<button class="btn btn-outline" onclick="addModelRow()" style="font-size:11px;padding:5px 12px">+ Add model</button>'
+    + '<button class="btn btn-outline" onclick="addModelRow()" style="font-size:11px;padding:5px 12px">+ Add</button>'
     + '</div>'
 
   if (!rows.length) {
-    html += '<div style="padding:20px;text-align:center;color:var(--mid);font-size:12px">'
-      + (MC_ROWS.length ? 'No models match the current filters.' : 'Loading model catalogue from Supabase...')
-      + '</div>'
+    html += '<div style="padding:20px;text-align:center;color:var(--mid);font-size:12px">No models match the current filters.</div>'
   } else {
-    html += '<div style="overflow-x:auto;max-height:480px;overflow-y:auto">'
-      + '<table class="mc-table">'
-      + '<tr><th>On</th><th>Model</th><th>Vendor</th><th>Archetypes</th><th>Params</th>'
-      + '<th>Quant options</th><th>Context</th><th>MMLU</th><th>HumanEval</th>'
-      + '<th>License</th><th>Featured</th><th></th></tr>'
-      + rows.map(function(r, i) {
-          var realIdx = MC_ROWS.indexOf(r)
+    html += '<div style="overflow-x:auto;max-height:440px;overflow-y:auto">'
+      + '<table class="mc-table"><tr>'
+      + '<th>On</th><th>Model</th><th>Archetypes</th><th>Params</th>'
+      + '<th>Quant</th><th>Ctx</th><th>MMLU</th><th>HumanEval</th>'
+      + '<th>License</th><th>★</th><th></th></tr>'
+      + rows.map(function(r) {
+          var i = MC_ROWS.indexOf(r)
           return '<tr class="'+(r.enabled?'':'disabled')+'">'
-            + '<td><div class="mc-toggle '+(r.enabled?'on':'')+'" onclick="toggleModelEnabled('+realIdx+')"></div></td>'
-            + '<td><div class="mc-name">'+esc(r.name||'')+'</div><div class="mc-vendor">'+esc(r.vendor||'')+'</div></td>'
-            + '<td style="white-space:nowrap;font-size:11px">'+esc(r.vendor||'')+'</td>'
-            + '<td>'+(r.archetype||[]).map(function(a){ return '<span class="mc-arch">'+esc(a)+'</span>' }).join('')+'</td>'
+            + '<td><div class="mc-toggle '+(r.enabled?'on':'')+'" onclick="toggleModelEnabled('+i+')"></div></td>'
+            + '<td style="min-width:140px"><div class="mc-name">'+esc(r.name||'')+'</div><div class="mc-vendor">'+esc(r.vendor||'')+'</div></td>'
+            + '<td>'+(r.archetype||[]).slice(0,3).map(function(a){ return '<span class="mc-arch">'+esc(a)+'</span>' }).join('')+'</td>'
             + '<td style="font-size:11px;white-space:nowrap">'+(r.params_b?r.params_b+'B':'—')+'</td>'
-            + '<td style="font-size:10px;color:var(--mid)">'+(r.quant_options||[]).join(' · ')+'</td>'
+            + '<td style="font-size:10px;color:var(--mid)">'+(r.quant_options||[]).slice(0,3).join(' · ')+'</td>'
             + '<td style="font-size:11px">'+(r.context_length_k?r.context_length_k+'K':'—')+'</td>'
-            + '<td><span class="mc-bench '+(r.bench_mmlu?benchColor(r.bench_mmlu):'lo')+'">'+(r.bench_mmlu||'—')+'</span></td>'
-            + '<td><span class="mc-bench '+(r.bench_humaneval?benchColor(r.bench_humaneval):'lo')+'">'+(r.bench_humaneval||'—')+'</span></td>'
-            + '<td><span class="mc-lic '+(licClass(r.license))+'">'+esc(r.license||'—')+'</span></td>'
-            + '<td style="text-align:center"><input type="checkbox" '+(r.featured?'checked':'')+' onchange="toggleFeatured('+realIdx+',this.checked)" title="Show prominently in Docket MaaS picker"></td>'
-            + '<td><button onclick="editModelRow('+realIdx+')" style="padding:2px 7px;font-size:10px;background:var(--light);border:1px solid var(--border);border-radius:4px;cursor:pointer" title="Edit">✏️</button></td>'
+            + '<td><span class="mc-bench '+benchColor(r.bench_mmlu)+'">'+(r.bench_mmlu||'—')+'</span></td>'
+            + '<td><span class="mc-bench '+benchColor(r.bench_humaneval)+'">'+(r.bench_humaneval||'—')+'</span></td>'
+            + '<td><span class="mc-lic '+licClass(r.license)+'">'+esc(r.license||'—')+'</span></td>'
+            + '<td><input type="checkbox" '+(r.featured?'checked':'')+' onchange="toggleFeatured('+i+',this.checked)" title="Featured"></td>'
+            + '<td><button onclick="editModelRow('+i+')" style="padding:2px 6px;font-size:10px;background:var(--light);border:1px solid var(--border);border-radius:4px;cursor:pointer">✏️</button></td>'
             + '</tr>'
         }).join('')
       + '</table></div>'
@@ -332,32 +390,25 @@ function renderCatalogue() {
 
   // Staging queue
   html += '<div class="card">'
-    + '<div class="card-title">Staging Queue — Scraper Detected Models'
-    + ' <span style="font-size:11px;font-weight:400;color:var(--mid)">('+ MC_STAGING.length +' pending review)</span></div>'
-    + '<div class="card-sub">New models detected by the Intel Scraper from model release news. Review and approve to add to the catalogue, or reject to dismiss. Enrich GPU/benchmark data before approving.</div>'
-
+    + '<div class="card-title">Staging Queue <span style="font-size:11px;font-weight:400;color:var(--mid)">('+ MC_STAGING.length +' pending)</span></div>'
+    + '<div class="card-sub">New models detected by Intel Scraper. Approve to add to catalogue, reject to dismiss.</div>'
   if (!MC_STAGING.length) {
-    html += '<div style="padding:16px;text-align:center;color:var(--mid);font-size:12px;background:var(--light);border-radius:6px">No pending items — scraper will populate this when new model releases are detected</div>'
+    html += '<div style="padding:12px;text-align:center;color:var(--mid);font-size:12px;background:var(--light);border-radius:6px">No pending items</div>'
   } else {
-    MC_STAGING.forEach(function(item, i) {
+    MC_STAGING.forEach(function(item) {
       html += '<div class="staging-item">'
         + '<div style="flex:1">'
-        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'
         + '<span class="staging-badge" style="background:#FFF8E7;color:#92400E">Pending</span>'
-        + '<div style="font-size:12px;font-weight:700;color:var(--navy)">'+esc(item.detected_name||'Unknown')+'</div>'
-        + '<div style="font-size:10px;color:var(--mid)">'+esc(item.detected_vendor||'')+(item.detected_params_b?' · '+item.detected_params_b+'B':'')+'</div>'
+        + '<span style="font-size:12px;font-weight:700;color:var(--navy)">'+esc(item.detected_name||'Unknown')+'</span>'
+        + (item.detected_vendor?'<span style="font-size:10px;color:var(--mid)">'+esc(item.detected_vendor)+'</span>':'')
+        + (item.detected_params_b?'<span style="font-size:10px;color:var(--mid)">'+item.detected_params_b+'B</span>':'')
         + '</div>'
-        + '<div style="font-size:11px;color:var(--mid);margin-bottom:6px">'
-        + (item.source_title?'Source: '+esc(item.source_title)+' · ':'')
-        + (item.source_date?new Date(item.source_date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'')
+        + (item.source_title?'<div style="font-size:10px;color:var(--mid)">'+esc(item.source_title)+'</div>':'')
         + '</div>'
-        + (item.detected_benchmarks && Object.keys(item.detected_benchmarks).length
-            ? '<div style="font-size:10px;color:var(--mid)">Benchmarks detected: '+JSON.stringify(item.detected_benchmarks)+'</div>'
-            : '')
-        + '</div>'
-        + '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">'
-        + '<button onclick="approveStaging(\''+esc(item.id)+'\')" class="btn btn-teal" style="font-size:11px;padding:5px 12px">&#10003; Approve</button>'
-        + '<button onclick="rejectStaging(\''+esc(item.id)+'\')" class="btn btn-outline" style="font-size:11px;padding:5px 12px">&#10005; Reject</button>'
+        + '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">'
+        + '<button onclick="approveStaging(\''+esc(item.id)+'\')" class="btn btn-teal" style="font-size:11px;padding:5px 10px">&#10003; Approve</button>'
+        + '<button onclick="rejectStaging(\''+esc(item.id)+'\')" class="btn btn-outline" style="font-size:11px;padding:5px 10px">&#10005; Reject</button>'
         + '</div></div>'
     })
   }
@@ -498,8 +549,7 @@ function boot() {
   updateStatusBar()
   // Load additional fields from Supabase (async, fills gaps from root index)
   loadFromSupabase()
-  // Pre-load model catalogue in background
-  loadModelCatalogue()
+  // Model catalogue loads lazily when tab is opened (not on every boot)
 }
 
 async function loadFromSupabase() {
@@ -589,6 +639,7 @@ function showTab(tab) {
     case 'models':    el.innerHTML = renderModels();    break
     case 'hardware':  el.innerHTML = renderHardware();  break
     case 'natavg':    el.innerHTML = renderNatAvg();    break
+    case 'catalogue': el.innerHTML = renderCatalogue(); break
 
   }
 }
