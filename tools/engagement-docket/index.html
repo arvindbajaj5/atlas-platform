@@ -1112,7 +1112,8 @@ function renderDocket() {
     + '<span>Opened ' + fmtDate(eng.opened_at||eng.created_at) + '</span>'
     + '</div>'
     + '<div class="docket-badges">'
-    + '<select onchange="setEngagementType(this.value)" style="padding:3px 8px;border:1.5px solid rgba(255,255,255,.2);border-radius:6px;font-size:11px;font-weight:600;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-family:inherit;outline:none">'    + ['','TSAP','Domain','Generic'].map(function(v){        var lbl = v||'— Set Type';        var engT = eng.engagement_type||eng.type||'';        var sel = (v && (engT===v||engT===v.toLowerCase())) ? ' selected' : (!v && !['TSAP','Domain','Generic'].some(function(t){return engT===t||engT===t.toLowerCase()}) ? ' selected' : '');        return '<option value="'+v+'"'+sel+'>'+lbl+'</option>';      }).join('')    + '</select>'    + '<span class="sb-badge ' + statusClass + '">' + esc(statusLabel) + '</span>'
+    + buildTypeDropdown(eng)
+    + '<span class="sb-badge ' + statusClass + '">' + esc(statusLabel) + '</span>'
     + (openActions > 0 ? '<span class="sb-badge" style="background:#FEE2E2;color:#991B1B">' + openActions + ' open action' + (openActions>1?'s':'') + '</span>' : '')
     + '</div></div>'
     + '<div class="docket-hdr-actions">'
@@ -1727,6 +1728,22 @@ function openFM() {
 //    Modal helpers                                                              
 function openModal(id) { document.getElementById(id).classList.add('open') }
 function closeModal(id) { document.getElementById(id).classList.remove('open') }
+function buildTypeDropdown(eng) {
+  var engT = eng.engagement_type || eng.type || ''
+  var types = ['TSAP','Domain','Generic']
+  var isKnown = types.some(function(t){ return engT===t||engT===t.toLowerCase() })
+  return '<select onchange="setEngagementType(this.value)" '
+    + 'style="padding:3px 8px;border:1.5px solid rgba(255,255,255,.3);border-radius:6px;'
+    + 'font-size:11px;font-weight:600;background:rgba(255,255,255,.12);color:#fff;'
+    + 'cursor:pointer;font-family:inherit;outline:none;margin-right:4px">'
+    + '<option value=""' + (!isKnown?' selected':'') + '>— Set Type</option>'
+    + types.map(function(v){
+        var sel = (engT===v||engT===v.toLowerCase()) ? ' selected' : ''
+        return '<option value="'+v+'"'+sel+'>'+v+'</option>'
+      }).join('')
+    + '</select>'
+}
+
 async function setEngagementType(val) {
   var eng = CURRENT_ENG
   if (!eng || !val) return
