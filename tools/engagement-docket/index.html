@@ -577,11 +577,19 @@ async function loadProfileFromSB() {
           // If session has s1/s2/s3/s4 structure (from TSAP FM), extract s1
           var profileData = row.session
           if (profileData && profileData.s1) {
-            // TSAP FM format — extract S1 wiki sections
+            // TSAP FM ran S1 — extract S1 wiki sections into _wiki
             row._source = 'tsap_fm'
             row._wiki = profileData.s1
-          } else if (profileData && typeof profileData === 'object') {
-            // Our format from Docket generate
+          } else if (profileData && (profileData.s2 || profileData.s3 || profileData.s4) && !profileData.s1) {
+            // TSAP FM has S2+ data but S1 not generated yet
+            // Do NOT set _wiki — renderTerritoryProfileWiki shows hasTSAPFMData message
+            row._source = 'tsap_fm_no_s1'
+          } else if (profileData && profileData.docket) {
+            // Generated from Docket — nested under .docket key
+            row._source = 'docket'
+            row._wiki = profileData.docket
+          } else if (profileData && typeof profileData === 'object' && !profileData.s2) {
+            // Generated from Docket — flat structure
             row._source = 'docket'
             row._wiki = profileData
           }
