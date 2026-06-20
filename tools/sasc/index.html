@@ -2165,6 +2165,8 @@ async function saveToDocket() {
     id: itemId,
     docket_id: SASC_DATA.docketId,
     item_type: 'solution',
+    item_subtype: 'sasc_bom',
+    engagement_id: SASC_DATA.engId || null,
     title: 'SASC: ' + SASC_DATA.mdc.tshirt.toUpperCase() + ' MDC x' + (SASC_DATA.mdc.sites||1) + ' -- ' + SASC_DATA.scope + ' stack',
     notes: 'ROM: ' + fmtMoney(SASC_DATA.rom.total_usd, 'USD') + ' (' + fmtMoney(SASC_DATA.rom.total_usd, 'INR') + ')',
     content: {
@@ -2179,7 +2181,17 @@ async function saveToDocket() {
       },
       bom_lines: SASC_DATA.bom.map(function(l){ return { component: l.component, qty: l.qty, usd_total: l.usd_total } }),
       rom_usd: SASC_DATA.rom.total_usd,
-      rom_inr: SASC_DATA.rom.total_usd * (FX_RATES.INR || 84.2)
+      rom_inr: SASC_DATA.rom.total_usd * (FX_RATES.INR || 84.2),
+      // Flat fields for FM to read directly
+      bom: {
+        capex_usd: SASC_DATA.rom.capex_usd,
+        opex_usd:  SASC_DATA.rom.opex_usd,
+        ucdev_usd: SASC_DATA.rom.ucdev_usd,
+        total_usd: SASC_DATA.rom.total_usd
+      },
+      mdc_tshirt: SASC_DATA.mdc.tshirt,
+      selected_ucs: SASC_DATA.selectedUCs,
+      phase1_mw: { xs:2, s:5, m:10, l:15, xl:20 }[SASC_DATA.mdc.tshirt] || 10
     },
     status: 'active',
     created_at: new Date().toISOString()
