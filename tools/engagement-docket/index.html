@@ -553,51 +553,54 @@ async function loadProfileFromSB() {
   var engType = eng.engagement_type || eng.type || ''
   var isTSAP = engType === 'TSAP' || engType === 'tsap'
   var sb = getSB()
-  if (!sb.url || !eng.id) return
+  if (!sb.url) return
   window.PROFILE_DATA = null
   try {
     if (isTSAP) {
       var territory = eng.territory || ''
-      // Try by engagement_id first
-      var r1 = await fetch(sb.url + '/rest/v1/territory_profiles?engagement_id=eq.' + eng.id + '&order=updated_at.desc&limit=1', {
+      if (!territory) return
+      // territory_profiles schema: id, territory, profile, session, generated_at, expires_at
+      // Load by territory name — this is the key the TSAP FM uses
+      var r = await fetch(sb.url + '/rest/v1/territory_profiles?territory=eq.' + encodeURIComponent(territory) + '&order=generated_at.desc&limit=1', {
         headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
       })
-      if (r1.ok) {
-        var rows1 = await r1.json()
-        if (rows1.length && rows1[0].session) {
-          window.PROFILE_DATA = rows1[0]
-          console.log('[Profile] Loaded from SB by engagement_id:', Object.keys(rows1[0].session||{}))
-          return
-        }
-      }
-      // Fallback: try by territory name
-      if (territory) {
-        var r2 = await fetch(sb.url + '/rest/v1/territory_profiles?territory=eq.' + encodeURIComponent(territory) + '&order=updated_at.desc&limit=1', {
-          headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
-        })
-        if (r2.ok) {
-          var rows2 = await r2.json()
-          if (rows2.length && rows2[0].session) {
-            window.PROFILE_DATA = rows2[0]
-            console.log('[Profile] Loaded from SB by territory:', territory, Object.keys(rows2[0].session||{}))
+      if (r.ok) {
+        var rows = await r.json()
+        if (rows.length) {
+          var row = rows[0]
+          // Normalise: session may be full S1-S4 data or our simple profile
+          // If session has s1/s2/s3/s4 structure (from TSAP FM), extract s1
+          var profileData = row.session
+          if (profileData && profileData.s1) {
+            // TSAP FM format — extract S1 wiki sections
+            row._source = 'tsap_fm'
+            row._wiki = profileData.s1
+          } else if (profileData && typeof profileData === 'object') {
+            // Our format from Docket generate
+            row._source = 'docket'
+            row._wiki = profileData
           }
+          window.PROFILE_DATA = row
+          console.log('[Profile] Territory profile loaded:', territory, 'source:', row._source, 'keys:', Object.keys(row._wiki||{}))
         }
       }
     } else {
-      var r3 = await fetch(sb.url + '/rest/v1/intelligence_items?engagement_id=eq.' + eng.id + '&tier=eq.pei_profile&order=created_at.desc&limit=1', {
+      // PEI — stored in intelligence_items with tier='pei_profile'
+      if (!eng.id) return
+      var r2 = await fetch(sb.url + '/rest/v1/intelligence_items?engagement_id=eq.' + eng.id + '&tier=eq.pei_profile&order=created_at.desc&limit=1', {
         headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
       })
-      if (r3.ok) {
-        var rows3 = await r3.json()
-        if (rows3.length) {
-          var item = rows3[0]
+      if (r2.ok) {
+        var rows2 = await r2.json()
+        if (rows2.length) {
+          var item = rows2[0]
           if (!item.data && item.content) {
             try { item.data = JSON.parse(item.content) } catch(e2) { item.data = { _raw: item.content } }
           } else if (item.data && typeof item.data === 'string') {
             try { item.data = JSON.parse(item.data) } catch(e3) { item.data = { _raw: item.data } }
           }
           window.PROFILE_DATA = item
-          console.log('[Profile] Loaded PEI from SB:', item.title)
+          console.log('[Profile] PEI loaded:', item.title)
         }
       }
     }
@@ -607,7 +610,14 @@ async function loadProfileFromSB() {
 // ── Territory Profile Wiki (TSAP) ────────────────────────────────────────────
 function renderTerritoryProfileWiki(territory, eng) {
   var pd = window.PROFILE_DATA
-  var session = pd && pd.session ? pd.session : null
+  var session = null
+  if (pd) {
+    if (pd._wiki) session = pd._wiki           // normalised by loadProfileFromSB
+    else if (pd.session && pd.session.docket) session = pd.session.docket  // our docket format
+    else if (pd.session && pd.session.s1) session = pd.session.s1          // TSAP FM S1
+    else if (pd.session) session = pd.session  // raw
+    else if (pd.profile) session = pd.profile  // old format
+  }
   var generatedDate = pd && pd.updated_at ? fmtDate(pd.updated_at) : null
   var isStale = generatedDate && (new Date() - new Date(pd.updated_at)) > 90*24*60*60*1000
 
@@ -803,11 +813,12 @@ async function generateTerritoryProfile() {
           'Content-Type': 'application/json',
           Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify({
-          engagement_id: eng.id,
+          id: (eng.territory||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'),
           territory: eng.territory,
-          stage: 'profile',
-          session: parsed,
-          updated_at: new Date().toISOString()
+          profile: parsed,
+          session: { docket: parsed },
+          generated_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 90*24*60*60*1000).toISOString()
         })
       })
     }
@@ -1970,7 +1981,12 @@ function renderDocket() {
     + renderTab(ACTIVE_TAB)
     + '</div>'
 
-  var _ma = document.getElementById('main-area'); _ma.innerHTML = html; _ma.scrollTop = 0; setTimeout(wireTabEvents, 50)
+  var _ma = document.getElementById('main-area'); _ma.innerHTML = html; _ma.scrollTop = 0; setTimeout(function() {
+    var btn = document.getElementById('btn-fill-req')
+    if (btn) {
+      btn.onclick = function(e) { e.preventDefault(); e.stopPropagation(); editRequirements(); return false; }
+    }
+  }, 100)
 }
 
 function switchTab(tab) {
@@ -1984,13 +2000,10 @@ function switchTab(tab) {
   renderDocket()
 }
 function wireTabEvents() {
-  // Wire .req-placeholder clicks — these appear in #main-area (Overview)
-  // Use document-level querySelectorAll since they can be in either container
-  document.querySelectorAll('.req-placeholder').forEach(function(el) {
-    // Remove old listener first to avoid duplicates
-    el.removeEventListener('click', editRequirements)
-    el.addEventListener('click', editRequirements)
-  })
+  var btn = document.getElementById('btn-fill-req')
+  if (btn) {
+    btn.onclick = function(e) { e.preventDefault(); e.stopPropagation(); editRequirements(); return false; }
+  }
 }
 
 
@@ -2037,24 +2050,24 @@ async function loadAndRenderMaas() {
 
 //    Overview                                                                   
 function renderEmptyReq() {
-  return '<div style="background:var(--light);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:14px">'
+  return '<div id="req-empty-block" style="background:var(--light);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:14px">'
     + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);margin-bottom:12px">📋 Engagement Requirements — Post-Meeting</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
-    + '<div class="req-placeholder" style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;cursor:pointer">'
+    + '<div style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px">'
     + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Objective</div>'
-    + '<div style="font-size:12px;color:var(--mid);font-style:italic">What does the customer want to achieve? Click to add...</div>'
+    + '<div style="font-size:12px;color:var(--mid);font-style:italic">What does the customer want to achieve?</div>'
     + '</div>'
-    + '<div class="req-placeholder" style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;cursor:pointer">'
+    + '<div style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px">'
     + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Problem Statement</div>'
-    + '<div style="font-size:12px;color:var(--mid);font-style:italic">What problem are they solving? Click to add...</div>'
+    + '<div style="font-size:12px;color:var(--mid);font-style:italic">What problem are they solving?</div>'
     + '</div>'
     + '</div>'
-    + '<div class="req-placeholder" style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;margin-bottom:12px;cursor:pointer">'
+    + '<div style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;margin-bottom:12px">'
     + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:2px">Success Criteria</div>'
-    + '<div style="font-size:12px;color:var(--mid);font-style:italic">How will the customer know this worked? Click to add...</div>'
+    + '<div style="font-size:12px;color:var(--mid);font-style:italic">How will the customer know this worked?</div>'
     + '</div>'
     + '<div style="display:flex;gap:8px;align-items:center">'
-    + '<button class="req-placeholder btn btn-sm" style="background:var(--navy);color:#fff;padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">+ Fill Requirements</button>'
+    + '<button id="btn-fill-req" type="button" style="background:var(--navy);color:#fff;padding:7px 16px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">+ Fill in Requirements</button>'
     + '<span style="font-size:11px;color:var(--mid)">Fill in after the customer meeting</span>'
     + '</div></div>'
 }
