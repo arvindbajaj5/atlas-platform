@@ -631,10 +631,14 @@ function renderTerritoryProfileWiki(territory, eng) {
       + '</div>'
   })
 
-  // Fallback: raw summary if no structured sections
-  if (!sections.some(function(s){ return session[s.key] })) {
-    var raw = session.summary || session.s1_summary || session.profile || JSON.stringify(session).substring(0,500)
-    html += '<div style="font-size:12px;color:var(--dark);line-height:1.7;padding:12px 0">' + esc(raw) + '</div>'
+  // Fallback: raw text if no structured sections
+  var hasTerritoryStructured = sections.some(function(sec){ return session[sec.key] })
+  if (!hasTerritoryStructured) {
+    var rawTerr = session._raw || session.summary || session.s1_summary || session.profile || JSON.stringify(session).substring(0,1500)
+    var paras2 = String(rawTerr).split(/\n\n+/).filter(Boolean)
+    html += paras2.map(function(p) {
+      return '<div style="font-size:12px;color:var(--dark);line-height:1.7;padding:8px 0;border-bottom:1px solid var(--border)">' + esc(p.trim()) + '</div>'
+    }).join('')
   }
 
   return html + '</div>'
@@ -690,10 +694,15 @@ function renderOrgProfileWiki(custName, eng) {
       + '</div>'
   })
 
-  // Fallback: raw summary
-  if (!peiSections.some(function(s){ return data[s.key] })) {
-    var raw = data.summary || data.profile || (typeof data === 'string' ? data : JSON.stringify(data)).substring(0,800)
-    html += '<div style="font-size:12px;color:var(--dark);line-height:1.7;padding:12px 0">' + esc(raw) + '</div>'
+  // Fallback: raw text or summary
+  var hasStructured = peiSections.some(function(sec){ return data[sec.key] })
+  if (!hasStructured) {
+    var raw = data._raw || data.summary || data.profile || (typeof data === 'string' ? data : JSON.stringify(data).substring(0,1500))
+    // Format raw text nicely — split on double newlines for paragraphs
+    var paras = String(raw).split(/\n\n+/).filter(Boolean)
+    html += paras.map(function(p) {
+      return '<div style="font-size:12px;color:var(--dark);line-height:1.7;padding:8px 0;border-bottom:1px solid var(--border)">' + esc(p.trim()) + '</div>'
+    }).join('')
   }
 
   return html + '</div>'
@@ -703,11 +712,8 @@ function renderOrgProfileWiki(custName, eng) {
 async function generateTerritoryProfile() {
   var eng = CURRENT_ENG || {}
   if (!eng.territory) { showToast('Set territory first in Territory tab'); return }
-
-  // Check if atlasAI is available
   var ai = typeof atlasAI !== 'undefined' ? atlasAI : null
   if (!ai) {
-    // Fallback: load atlasAI dynamically
     showToast('Loading AI module...')
     try {
       await new Promise(function(res, rej) {
@@ -721,59 +727,55 @@ async function generateTerritoryProfile() {
       var sb = getSB()
       await ai.init(sb.url, sb.key)
     } catch(e) {
-      showToast('AI module unavailable — opening in TSAP FM instead')
-      window.open('../../tools/tsap-financial-model/index.html?eng=' + eng.id, '_blank')
+      showToast('AI not available — check shared/atlasAI.js')
       return
     }
   }
-
-  // Show loading state inline
   var el = document.getElementById('tab-body')
-  if (el) {
-    el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--mid)">'
-      + '<div style="font-size:28px;margin-bottom:12px">⚡</div>'
-      + '<div style="font-weight:600;color:var(--navy);margin-bottom:6px">Generating Territory Profile for ' + esc(eng.territory) + '...</div>'
-      + '<div style="font-size:12px;margin-bottom:14px">Running Gemini search grounding on energy, land, workforce, connectivity and government programmes.</div>'
-      + '<div style="font-size:11px;color:var(--mid)">This may take 15-30 seconds. Profile will be cached in Supabase.</div>'
-      + '</div>'
-  }
-
+  if (el) el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--mid)">'
+    + '<div style="font-size:28px;margin-bottom:12px">⚡</div>'
+    + '<div style="font-weight:600;color:var(--navy);margin-bottom:6px">Generating Territory Profile for ' + esc(eng.territory) + '...</div>'
+    + '<div style="font-size:12px;color:var(--mid)">Running Gemini search grounding. This may take 15-30 seconds.</div>'
+    + '</div>'
   try {
-    var prompt = 'Generate a comprehensive territory intelligence profile for ' + eng.territory + ', India. '
-      + 'Cover these sections as structured JSON: energy (power tariffs, availability, renewable potential), '
-      + 'geography (climate, terrain, natural features), workforce (skilled workforce, salaries, institutions), '
-      + 'connectivity (internet, NKN, transport), programmes (state AI/tech initiatives, budgets, schemes), '
-      + 'economy (GSDP, growth, key industries), positioning (AI infrastructure opportunity summary, suggested 2x2 quadrant). '
-      + 'Return ONLY valid JSON with these exact keys: energy, geography, workforce, connectivity, programmes, economy, positioning.'
-
-    var result = await ai.callAndParse(prompt, { tool: 'territory-profile', _timeout: 45000 })
-    if (!result) throw new Error('No result from AI')
-
-    // Save to territory_profiles table
-    var sb = getSB()
-    var row = {
-      engagement_id: eng.id,
-      territory: eng.territory,
-      stage: 'profile',
-      session: result,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+    var prompt = 'Generate a territory intelligence profile for ' + eng.territory + ', India for AI infrastructure investment planning. '
+      + 'Return ONLY a valid JSON object with exactly these keys (no markdown, no code fences, just raw JSON): '
+      + '{"energy": "power tariffs, availability, renewable potential", '
+      + '"geography": "climate, terrain, natural features", '
+      + '"workforce": "skilled workforce, salaries, institutions", '
+      + '"connectivity": "internet, NKN, transport infrastructure", '
+      + '"programmes": "state AI/tech initiatives, budgets, schemes", '
+      + '"economy": "GSDP, growth, key industries", '
+      + '"positioning": "AI infrastructure opportunity summary and suggested 2x2 quadrant (Q1/Q2/Q3/Q4)"}'
+    var rawResult = await ai.call(prompt, { tool: 'territory-profile', _timeout: 45000 })
+    var parsed = null
+    try {
+      var clean = (rawResult||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim()
+      parsed = JSON.parse(clean)
+    } catch(e) {
+      parsed = { _raw: rawResult }
     }
+    var sb = getSB()
     if (sb.url) {
       await fetch(sb.url + '/rest/v1/territory_profiles', {
         method: 'POST',
         headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
           'Content-Type': 'application/json',
           Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify(row)
+        body: JSON.stringify({
+          engagement_id: eng.id,
+          territory: eng.territory,
+          stage: 'profile',
+          session: parsed,
+          updated_at: new Date().toISOString()
+        })
       })
     }
-    window.PROFILE_DATA = { session: result, updated_at: new Date().toISOString() }
-    showToast('✓ Territory profile generated and cached')
+    window.PROFILE_DATA = { session: parsed, updated_at: new Date().toISOString() }
+    showToast('✓ Territory profile generated')
     loadAndRenderProfile()
   } catch(e) {
-    console.error('[generateTerritoryProfile]', e)
-    showToast('Generation failed: ' + e.message + ' — try opening TSAP FM')
+    showToast('Generation failed: ' + e.message)
     loadAndRenderProfile()
   }
 }
@@ -781,7 +783,6 @@ async function generateTerritoryProfile() {
 async function generateOrgProfile() {
   var eng  = CURRENT_ENG || {}
   var cust = (eng._cust && eng._cust.name) || eng.customer_name || 'Organisation'
-
   var ai = typeof atlasAI !== 'undefined' ? atlasAI : null
   if (!ai) {
     showToast('Loading AI module...')
@@ -797,36 +798,31 @@ async function generateOrgProfile() {
       var sb = getSB()
       await ai.init(sb.url, sb.key)
     } catch(e) {
-      showToast('AI module unavailable — opening PEI Tool instead')
-      window.open('../../tools/pei-tool/index.html?eng=' + eng.id, '_blank')
+      showToast('AI not available — check shared/atlasAI.js')
       return
     }
   }
-
   var el = document.getElementById('tab-body')
-  if (el) {
-    el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--mid)">'
-      + '<div style="font-size:28px;margin-bottom:12px">🔍</div>'
-      + '<div style="font-weight:600;color:var(--navy);margin-bottom:6px">Generating Organisation Profile for ' + esc(cust) + '...</div>'
-      + '<div style="font-size:12px;margin-bottom:14px">Analysing AI maturity, budget signals, stakeholders, mandates and peer activity.</div>'
-      + '<div style="font-size:11px;color:var(--mid)">This may take 15-30 seconds. Profile cached after first run.</div>'
-      + '</div>'
-  }
-
+  if (el) el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--mid)">'
+    + '<div style="font-size:28px;margin-bottom:12px">🔍</div>'
+    + '<div style="font-weight:600;color:var(--navy);margin-bottom:6px">Generating Organisation Profile for ' + esc(cust) + '...</div>'
+    + '<div style="font-size:12px;color:var(--mid)">This may take 15-30 seconds. Cached after first run.</div>'
+    + '</div>'
   try {
-    var prompt = 'Generate a Pre-Engagement Intelligence (PEI) profile for ' + cust + ', India. '
-      + 'Return ONLY valid JSON with these exact keys: '
-      + 'ai_maturity (current AI state, initiatives, maturity score 1-5), '
-      + 'budget_signals (known budgets, spending patterns, procurement history), '
-      + 'stakeholders (key decision makers, technical champions, procurement contacts), '
-      + 'mandate (regulatory mandates, government directives, stated priorities), '
-      + 'peer_activity (what similar organisations are doing, benchmarks), '
-      + 'risks_opps (key risks to engagement, key opportunities to lead with), '
-      + 'approach (recommended engagement angle based on above).'
-
-    var result = await ai.callAndParse(prompt, { tool: 'pei-profile', _timeout: 45000 })
-    if (!result) throw new Error('No result from AI')
-
+    var prompt = 'Generate a Pre-Engagement Intelligence (PEI) profile for ' + cust + ', India as a government or enterprise organisation. '
+      + 'Return ONLY a valid JSON object with exactly these keys (no markdown, no code fences, just raw JSON): '
+      + '{"ai_maturity": "text", "budget_signals": "text", "stakeholders": "text", "mandate": "text", "peer_activity": "text", "risks_opps": "text", "approach": "text"}'
+    var rawResult = await ai.call(prompt, { tool: 'pei-profile', _timeout: 45000 })
+    // Try to parse — if fails, use as raw text
+    var parsed = null
+    try {
+      // Strip markdown fences if present
+      var clean = (rawResult||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim()
+      parsed = JSON.parse(clean)
+    } catch(e) {
+      // Parse failed — store raw text, renderOrgProfileWiki handles it
+      parsed = { _raw: rawResult }
+    }
     var sb = getSB()
     if (sb.url) {
       await fetch(sb.url + '/rest/v1/intelligence_items', {
@@ -838,17 +834,16 @@ async function generateOrgProfile() {
           engagement_id: eng.id,
           tier: 'pei_profile',
           title: 'PEI — ' + cust,
-          data: result,
-          content: JSON.stringify(result),
+          data: parsed,
+          content: JSON.stringify(parsed),
           created_at: new Date().toISOString()
         })
       })
     }
-    window.PROFILE_DATA = { data: result, created_at: new Date().toISOString() }
-    showToast('✓ Organisation profile generated and cached')
+    window.PROFILE_DATA = { data: parsed, created_at: new Date().toISOString() }
+    showToast('✓ Organisation profile generated')
     loadAndRenderProfile()
   } catch(e) {
-    console.error('[generateOrgProfile]', e)
     showToast('Generation failed: ' + e.message)
     loadAndRenderProfile()
   }
@@ -1941,7 +1936,7 @@ function renderDocket() {
 function switchTab(tab) {
   ACTIVE_TAB = tab
   var el = document.getElementById('tab-body')
-  if (el) { el.innerHTML = renderTab(tab); wireTabEvents() }
+  if (el) { el.innerHTML = renderTab(tab); setTimeout(wireTabEvents, 0) }
   document.querySelectorAll('.tab-btn').forEach(function(b){
     b.className = 'tab-btn' + (b.textContent.trim().toLowerCase().startsWith(tab) ? ' active' : '')
   })
@@ -2685,6 +2680,7 @@ async function setEngagementType(val) {
     })
     CURRENT_ENG.engagement_type = val
     if (body.territory) CURRENT_ENG.territory = body.territory
+    window.PROFILE_DATA = null  // clear cached profile when type changes
     showToast('✓ Engagement type set to ' + val + (body.territory ? ' · ' + body.territory : ''))
     renderDocket()
   } catch(e) {
