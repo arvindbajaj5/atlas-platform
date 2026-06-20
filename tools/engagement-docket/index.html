@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ATLAS Engagement Docket v2.2</title>
+<title>ATLAS Engagement Docket v2.3</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -258,7 +258,7 @@ textarea{resize:vertical;min-height:60px}
     <div class="atlas-tool-name">Engagement Docket</div>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
-    <span class="atlas-ver">v2.1</span>
+    <span class="atlas-ver">v2.3</span>
     <button class="atlas-nav-btn" onclick="window.location.href='../../'">&#8592; Portal</button>
   </div>
 </div>
@@ -577,11 +577,10 @@ function renderPortfolioTab() {
       ['L2.1-INF','L2.1-INF GeoAI Centre','M'],['L2.2-INF','L2.2-INF Defence AI Centre','L'],
       ['L2.3-INF','L2.3-INF Health AI Centre','M'],['L2.4-INF','L2.4-INF FinAI Centre','M']
     ]},
-    { title: 'L2-MAAS — Model as a Service', badge: 'MaaS', items: [
-      ['L2-MAAS-DOC','Document Intelligence','M'],['L2-MAAS-AUD','Audio / Speech Package','S'],
-      ['L2-MAAS-COD','Coding Assistant Package','M'],['L2-MAAS-VIS','Vision & Video Package','M'],
-      ['L2-MAAS-MUL','Multimodal Suite','L'],['L2-MAAS-EMB','Embedding & Reranking','S'],
-      ['L2-MAAS-AGT','Agent Harness Package','M'],['L2-MAAS-GPU','GPUaaS / BMaaS','—']
+    { title: 'L2 — Managed AI Services', badge: 'Services', items: [
+      ['L2-MAAS',   'MaaS — Model as a Service',   '—'],
+      ['L2-GPUAAS', 'GPUaaS — GPU as a Service',   '—'],
+      ['L2-BMAAS',  'BMaaS — Bare Metal as a Service','—']
     ]},
     { title: 'L3 — Lifecycle Services', items: [
       ['L3-DEP','L3-DEP Deployment & Integration','L'],['L3-SKL','L3-SKL AI Skills Academy','M'],
@@ -602,12 +601,10 @@ function renderPortfolioTab() {
       + '</div></div>'
   })
 
-  var hasMaas = PORTFOLIO_SELECTION.some(function(p){ return p.startsWith('L2-MAAS') })
-  if (hasMaas) {
-    html += '<div style="background:#FFF3F1;border:1px solid #FECACA;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#991B1B">'
-      + '⚡ MaaS items selected — <strong>MaaS Config</strong> tab is now available to configure models and agents.'
-      + '</div>'
-  }
+  var hasMaas = PORTFOLIO_SELECTION.includes('L2-MAAS')
+  html += '<div id="maas-pi-hint" style="display:' + (hasMaas?'block':'none') + ';background:#FFF3F1;border:1px solid #FECACA;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#991B1B">'
+    + '⚡ MaaS selected — <strong>MaaS Config</strong> tab is now available in the tab bar.'
+    + '</div>'
 
   html += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">'
     + '<button class="btn btn-outline" onclick="savePortfolioSelection()">Save Scope</button>'
@@ -629,9 +626,42 @@ function togglePI(id, el) {
     el.classList.remove('ai')
     el.querySelector('.pi-ck').textContent = '✓'
   }
-  // Update count in tab bar and re-render if MaaS state changed
-  var hasMaas = PORTFOLIO_SELECTION.some(function(p){ return p.startsWith('L2-MAAS') })
-  renderDocket()
+  // Update count display inline without full re-render
+  var cnt = PORTFOLIO_SELECTION.length
+  var hdr = document.querySelector('.section-title')
+  if (hdr && hdr.textContent.startsWith('Portfolio')) hdr.textContent = 'Portfolio Map (' + cnt + ' selected)'
+  // Show/hide MaaS hint
+  var hint = document.getElementById('maas-pi-hint')
+  var hasMaas = PORTFOLIO_SELECTION.includes('L2-MAAS')
+  if (hint) hint.style.display = hasMaas ? 'block' : 'none'
+  // Update tab bar — add/remove MaaS tab without full re-render
+  updateTabBar()
+}
+
+function updateTabBar() {
+  var eng = CURRENT_ENG || {}
+  var tabs = ['overview','intel','portfolio','uc']
+  if (PORTFOLIO_SELECTION.includes('L2-MAAS')) tabs.push('maas')
+  var _et = eng.engagement_type || eng.type || ''
+  if (_et==='TSAP'||_et==='tsap') tabs.push('territory')
+  tabs = tabs.concat(['actions','outputs','history'])
+  var labels = { overview:'Overview', intel:'Intelligence', portfolio:'Portfolio', uc:'Use Cases',
+    maas:'MaaS Config', territory:'Territory', actions:'Actions', outputs:'Outputs', history:'History' }
+  var counts = { uc:0, action:0, output:0 }
+  DOCKET_ITEMS.forEach(function(item) {
+    if (item.section==='uc') counts.uc++
+    else if (item.section==='action') counts.action++
+    else if (item.section==='output') counts.output++
+  })
+  var tabBar = document.querySelector('.tab-bar')
+  if (!tabBar) return
+  tabBar.innerHTML = tabs.map(function(t) {
+    var cnt = t==='uc' ? counts.uc : t==='actions' ? counts.action : t==='outputs' ? counts.output : 0
+    return '<button class="tab-btn' + (ACTIVE_TAB===t?' active':'') + '" onclick="switchTab(\'' + t + '\')">'
+      + labels[t]
+      + (cnt > 0 ? '<span class="tab-count">' + cnt + '</span>' : '')
+      + '</button>'
+  }).join('')
 }
 
 async function runAIPortfolioMap() {
@@ -674,8 +704,7 @@ async function savePortfolioSelection() {
 
 // ── MAAS CONFIG TAB ───────────────────────────────────────────────────────────
 async function renderMaasTab() {
-  // Load model catalogue if not yet loaded
-  if (!MC_ROWS_D.length && MC_LOAD_D !== 'loading') {
+  if (!MC_ROWS_D.length && MC_LOAD_D !== 'loading' && MC_LOAD_D !== 'loaded') {
     MC_LOAD_D = 'loading'
     var sb = getSB()
     if (sb.url) {
@@ -686,132 +715,128 @@ async function renderMaasTab() {
         if (r.ok) { MC_ROWS_D = await r.json(); MC_LOAD_D = 'loaded' }
         else MC_LOAD_D = 'error'
       } catch(e) { MC_LOAD_D = 'error' }
-      // Data loaded — loadAndRenderMaas will pick it up
-      MC_LOAD_D = 'loaded'
-      var el = document.getElementById('tab-body'); if (el && ACTIVE_TAB==='maas') el.innerHTML = await renderMaasTab()
-      return ''
-    } else {
-      MC_LOAD_D = 'no-creds'
-    }
+    } else { MC_LOAD_D = 'no-creds' }
   }
 
-  if (MC_LOAD_D === 'loading') {
-    return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue...</div>'
-  }
-  if (MC_LOAD_D === 'no-creds' || MC_LOAD_D === 'error') {
-    return '<div style="padding:24px;text-align:center;color:var(--mid)">⚠ Model catalogue unavailable — check Settings → API Keys</div>'
-  }
+  if (MC_LOAD_D === 'loading') return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue...</div>'
+  if (MC_LOAD_D === 'no-creds') return '<div style="padding:20px;background:#FFF8E7;border-radius:8px;font-size:12px;color:#92400E">⚠ Configure Supabase in Settings → API Keys first.</div>'
+  if (MC_LOAD_D === 'error') return '<div style="padding:20px;background:#FEE2E2;border-radius:8px;font-size:12px;color:#991B1B">✗ Failed to load model catalogue. <button onclick="MC_LOAD_D=\'\';switchTab(\'maas\')" style="margin-left:8px;padding:2px 8px;background:#991B1B;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px">Retry</button></div>'
 
-  // Archetype cards
-  var archetypes = [
-    { id:'document', icon:'📄', label:'Document Intelligence' },
-    { id:'audio',    icon:'🎙️', label:'Audio / Speech' },
-    { id:'coding',   icon:'💻', label:'Coding Assistant' },
-    { id:'vision',   icon:'👁️', label:'Vision & Video' },
-    { id:'multimodal',icon:'🔮',label:'Multimodal' },
-    { id:'embedding',icon:'🔗', label:'Embedding & RAG' },
-    { id:'indic',    icon:'🌐', label:'Indic / Indian Languages' },
-    { id:'general',  icon:'🎯', label:'General Purpose LLM' }
+  // Capability types — these help select the right models, not sub-offerings
+  var capTypes = [
+    { id:'general',    icon:'🎯', label:'Text Generation',     desc:'General LLMs — reasoning, chat, summarisation' },
+    { id:'coding',     icon:'💻', label:'Coding',              desc:'Code generation, completion, review' },
+    { id:'vision',     icon:'👁️', label:'Vision / Multimodal', desc:'Image understanding, visual Q&A' },
+    { id:'audio',      icon:'🎙️', label:'Audio / Speech',      desc:'ASR, TTS, translation' },
+    { id:'embedding',  icon:'🔗', label:'Embedding & RAG',     desc:'Vector search, retrieval, reranking' },
+    { id:'video',      icon:'🎬', label:'Video Generation',    desc:'Text-to-video, video understanding' },
+    { id:'indic',      icon:'🌐', label:'Indic Languages',     desc:'Indian language models — Sarvam, IndicBERT' },
+    { id:'multimodal', icon:'🔮', label:'Multimodal',          desc:'Combined text + vision + audio' }
   ]
 
-  var MAAS_ARCHS = window.MAAS_ARCHS || []
+  window.MAAS_ARCHS = window.MAAS_ARCHS || []
+  window.MAAS_VENDOR_FILTER = window.MAAS_VENDOR_FILTER || ''
 
   var html = '<div class="card">'
-    + '<div class="card-title">Model Archetypes — Select what to offer</div>'
-    + '<div class="card-sub">Select capability archetypes. Models from the catalogue will be shown for each selected archetype.</div>'
+    + '<div class="card-title">MaaS — Model as a Service</div>'
+    + '<div class="card-sub">Select the AI capability types your customer wants to offer. Models are then chosen per type. GPU sizing is computed automatically.</div>'
     + '<div class="arch-grid">'
-    + archetypes.map(function(a) {
-        var cnt = MC_ROWS_D.filter(function(m){ return (m.archetype||[]).includes(a.id) }).length
-        var on = MAAS_ARCHS.includes(a.id)
-        return '<div class="arch-card' + (on?' on':'') + '" onclick="toggleArch(\'' + a.id + '\',this)">'
-          + '<div class="arch-icon">' + a.icon + '</div>'
-          + '<div class="arch-name">' + a.label + '</div>'
+    + capTypes.map(function(c) {
+        var cnt = MC_ROWS_D.filter(function(m){ return (m.archetype||[]).includes(c.id) }).length
+        var on = window.MAAS_ARCHS.includes(c.id)
+        return '<div class="arch-card' + (on?' on':'') + '" onclick="toggleArch(\'' + c.id + '\',this)" title="' + esc(c.desc) + '">'
+          + '<div class="arch-icon">' + c.icon + '</div>'
+          + '<div class="arch-name">' + c.label + '</div>'
           + '<div class="arch-cnt">' + cnt + ' models</div>'
           + '</div>'
       }).join('')
     + '</div></div>'
 
-  // Model table
-  var selArchs = MAAS_ARCHS.length ? MAAS_ARCHS : []
+  // Model selection table — filtered by selected capability types
+  var selArchs = window.MAAS_ARCHS
+  var vendors = Array.from(new Set(MC_ROWS_D.map(function(m){ return m.vendor }))).sort()
   var filteredModels = MC_ROWS_D.filter(function(m) {
-    if (!selArchs.length) return true
-    return selArchs.some(function(a){ return (m.archetype||[]).includes(a) })
+    if (selArchs.length && !selArchs.some(function(a){ return (m.archetype||[]).includes(a) })) return false
+    if (window.MAAS_VENDOR_FILTER && m.vendor !== window.MAAS_VENDOR_FILTER) return false
+    return true
   })
 
   html += '<div class="card">'
     + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between">'
-    + '<span>Model Catalogue (' + filteredModels.length + ' shown)</span>'
+    + '<span>Select Models <span style="font-size:11px;font-weight:400;color:var(--mid)">(' + filteredModels.length + ' shown · ' + MAAS_MODELS_SELECTED.length + ' selected)</span></span>'
     + '<div style="display:flex;gap:6px">'
-    + '<select class="mc-filter" onchange="MAAS_VENDOR_FILTER=this.value;switchTab(\'maas\')">'
+    + '<select class="mc-filter" onchange="window.MAAS_VENDOR_FILTER=this.value;switchTab(\'maas\')">'
     + '<option value="">All vendors</option>'
-    + Array.from(new Set(MC_ROWS_D.map(function(m){ return m.vendor }))).sort().map(function(v){ return '<option>' + esc(v) + '</option>' }).join('')
-    + '</select></div></div>'
-    + '<div class="card-sub">Select models for this MaaS offering. Featured models are pre-highlighted.</div>'
-    + '<div style="overflow-x:auto;max-height:380px;overflow-y:auto">'
+    + vendors.map(function(v){ return '<option value="'+esc(v)+'"'+(window.MAAS_VENDOR_FILTER===v?' selected':'')+'>'+esc(v)+'</option>' }).join('')
+    + '</select>'
+    + '<button class="btn btn-sm btn-teal" onclick="saveMaasConfig()" style="white-space:nowrap">&#8593; Save Config</button>'
+    + '</div></div>'
+    + '<div class="card-sub">' + (selArchs.length ? 'Showing models for: ' + selArchs.join(', ') : 'Select capability types above to filter. All models shown.') + '</div>'
+    + '<div style="overflow-x:auto;max-height:340px;overflow-y:auto">'
     + '<table class="mc-table"><tr>'
-    + '<th></th><th>Model</th><th>Archetypes</th><th>Params</th><th>Context</th>'
-    + '<th>MMLU</th><th>HumanEval</th><th>Quant</th><th>License</th></tr>'
+    + '<th></th><th>Model</th><th>Vendor</th><th>Capability</th>'
+    + '<th>Params</th><th>Context</th><th>MMLU</th><th>License</th></tr>'
     + filteredModels.map(function(m) {
-        var sel = MAAS_MODELS_SELECTED.some(function(s){ return s.id === m.id })
+        var sel = MAAS_MODELS_SELECTED.some(function(x){ return x.id === m.id })
         function bc(v){ return !v?'lo':v>=80?'hi':v>=65?'md':'lo' }
         function lc(l){ return ['Apache2','MIT','CC-BY','Gemma','Llama-Community'].includes(l||'')?'open':'comm' }
-        return '<tr class="' + (sel?'on':'') + '" onclick="toggleMaasModel(\'' + m.id + '\')">'
-          + '<td><div class="mc-toggle ' + (sel?'on':'') + '"></div></td>'
-          + '<td><div class="mc-name">' + esc(m.name||'') + '</div><div class="mc-vendor">' + esc(m.vendor||'') + '</div></td>'
-          + '<td>' + (m.archetype||[]).slice(0,3).map(function(a){ return '<span class="mc-arch">'+esc(a)+'</span>' }).join('') + '</td>'
+        return '<tr class="' + (sel?'on':'') + '" onclick="toggleMaasModel(\'' + m.id + '\')" style="cursor:pointer">'
+          + '<td><div class="mc-toggle ' + (sel?'on':'') + '" style="pointer-events:none"></div></td>'
+          + '<td style="min-width:130px"><div class="mc-name">' + esc(m.name||'') + '</div><div class="mc-vendor">' + esc(m.vendor||'') + '</div></td>'
+          + '<td style="font-size:11px">' + esc(m.vendor||'') + '</td>'
+          + '<td>' + (m.archetype||[]).slice(0,2).map(function(a){ return '<span class="mc-arch">'+esc(a)+'</span>' }).join('') + '</td>'
           + '<td style="font-size:11px;white-space:nowrap">' + (m.params_b?m.params_b+'B':'—') + '</td>'
           + '<td style="font-size:11px">' + (m.context_length_k?m.context_length_k+'K':'—') + '</td>'
           + '<td><span class="mc-bench ' + bc(m.bench_mmlu) + '">' + (m.bench_mmlu||'—') + '</span></td>'
-          + '<td><span class="mc-bench ' + bc(m.bench_humaneval) + '">' + (m.bench_humaneval||'—') + '</span></td>'
-          + '<td style="font-size:10px;color:var(--mid)">' + (m.quant_options||[]).slice(0,3).join(' · ') + '</td>'
           + '<td><span class="mc-lic ' + lc(m.license) + '">' + esc(m.license||'—') + '</span></td>'
           + '</tr>'
       }).join('')
     + '</table></div></div>'
 
-  // Agent harness
+  // Agent harness — optional add-on to MaaS
   html += '<div class="card">'
-    + '<div class="card-title">Agent Configuration</div>'
-    + '<div class="card-sub">Enable if the customer wants to offer agentic AI workflows — multi-step, tool-calling, memory-enabled.</div>'
+    + '<div class="card-title">Agent Harness <span style="font-size:11px;font-weight:400;color:var(--mid)">— optional add-on to MaaS</span></div>'
+    + '<div class="card-sub">Enable agentic AI workflows on top of the MaaS models — multi-step, tool-calling, memory-enabled. Adds compute overhead.</div>'
     + '<div class="agent-toggle" onclick="toggleAgent()">'
     + '<div class="toggle-sw' + (AGENT_ON?' on':'') + '" id="agent-sw"></div>'
     + '<div><div style="font-size:13px;font-weight:600;color:var(--navy)">Enable Agent Harness</div>'
-    + '<div style="font-size:11px;color:var(--mid)">Adds orchestration compute + memory store to BOM (~1 GPU per 8 inference GPUs)</div></div>'
+    + '<div style="font-size:11px;color:var(--mid)">Adds ~1 GPU per 8 inference GPUs for orchestration</div></div>'
     + '</div>'
     + '<div class="agent-cfg' + (AGENT_ON?' on':'') + '" id="agent-cfg">'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
     + '<div><div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">Harness Type</div>'
     + '<div style="display:flex;flex-direction:column;gap:6px">'
-    + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="radio" name="harness" checked> <span style="font-size:12px"><strong>Our Harness</strong> — pre-configured (LangGraph/AutoGen/CrewAI)</span></label>'
-    + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="radio" name="harness"> <span style="font-size:12px"><strong>BYO Harness</strong> — customer brings own framework (~15% compute buffer)</span></label>'
+    + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px"><input type="radio" name="harness" checked> <strong>Our Harness</strong> — LangGraph / AutoGen / CrewAI, pre-configured</label>'
+    + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px"><input type="radio" name="harness"> <strong>BYO Harness</strong> — customer brings framework, we provide ~15% compute buffer</label>'
     + '</div></div>'
     + '<div><div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">Orchestration Model</div>'
-    + '<select style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none">'
-    + '<option>Llama 3.1 8B INT4 (fast, lightweight)</option><option>Mistral 7B INT4</option><option>Phi-4 INT4</option><option>Qwen 2.5 7B INT4</option>'
+    + '<select style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;margin-bottom:6px">'
+    + '<option>Llama 3.1 8B INT4 (fast, recommended)</option><option>Mistral 7B INT4</option><option>Phi-4 Mini INT4</option><option>Qwen 2.5 7B INT4</option>'
     + '</select>'
-    + '<div style="font-size:10px;color:var(--mid);margin-top:4px">Memory Store</div>'
-    + '<select style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;margin-top:3px">'
+    + '<div style="font-size:10px;color:var(--mid);margin-bottom:3px">Memory Store</div>'
+    + '<select style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none">'
     + '<option>pgvector (PostgreSQL)</option><option>Redis</option><option>ChromaDB</option><option>Qdrant</option>'
     + '</select></div></div>'
     + '</div>'
 
   // GPU estimate
-  var infGPUs = MAAS_MODELS_SELECTED.length * 2
-  var agentGPUs = AGENT_ON ? Math.ceil(infGPUs / 8) : 0
-  var platGPUs = Math.ceil((infGPUs + agentGPUs) * 0.15)
+  var infGPUs = Math.max(MAAS_MODELS_SELECTED.length * 2, 0)
+  var agentGPUs = AGENT_ON ? Math.max(Math.ceil(infGPUs / 8), 1) : 0
+  var platGPUs = Math.ceil((infGPUs + agentGPUs) * 0.15) || 0
   var totalGPUs = infGPUs + agentGPUs + platGPUs
-  html += '<div class="gpu-est"><div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:10px">MaaS GPU Estimate (auto-calculated)</div>'
+  html += '<div class="gpu-est" style="margin-top:12px">'
+    + '<div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">'
+    + '<span>MaaS GPU Estimate (auto-calculated from model selection)</span>'
+    + '<span style="font-size:9px;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:8px">±20%</span>'
+    + '</div>'
     + '<div class="gpu-est-grid">'
     + '<div class="gpu-est-item"><div class="gpu-est-val">' + infGPUs + '</div><div class="gpu-est-lbl">Inference GPUs</div></div>'
     + '<div class="gpu-est-item"><div class="gpu-est-val">' + agentGPUs + '</div><div class="gpu-est-lbl">Agent GPUs</div></div>'
     + '<div class="gpu-est-item"><div class="gpu-est-val">' + platGPUs + '</div><div class="gpu-est-lbl">Platform Overhead</div></div>'
     + '<div class="gpu-est-item"><div class="gpu-est-val" style="color:var(--amber)">' + totalGPUs + '</div><div class="gpu-est-lbl">Total MaaS GPUs</div></div>'
-    + '</div><div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.5);text-align:center">Added to UC infrastructure in SASC BOM</div>'
     + '</div>'
-
-  html += '<div style="margin-top:12px;display:flex;justify-content:flex-end">'
-    + '<button class="btn btn-teal" onclick="saveMaasConfig()">&#8593; Save MaaS Config</button>'
-    + '</div>'
+    + '<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.5);text-align:center">Added to UC infrastructure requirement in SASC BOM</div>'
+    + '</div></div>'
 
   return html
 }
@@ -882,36 +907,69 @@ function renderTerritoryTab() {
 
   if (!['TSAP','tsap'].includes(engType)) {
     return '<div class="empty"><div class="empty-icon">🗺️</div>'
-      + '<div class="empty-title">Territory Profile — TSAP engagements only</div>'
-      + '<div class="empty-sub">This tab is only available for Territory Sovereign AI Programme engagements.</div></div>'
+      + '<div class="empty-title">Territory Profile — TSAP only</div>'
+      + '<div class="empty-sub">Available for Territory Sovereign AI Programme engagements only.</div></div>'
   }
 
+  // No territory set — show input form
   if (!territory) {
-    return '<div class="empty"><div class="empty-icon">📍</div>'
-      + '<div class="empty-title">No territory set</div>'
-      + '<div class="empty-sub">Update the engagement to set the territory field.</div></div>'
+    return '<div class="card" style="max-width:500px">'
+      + '<div class="card-title">Set Territory</div>'
+      + '<div class="card-sub">This TSAP engagement needs a territory defined before the S1–S4 intelligence pipeline can run.</div>'
+      + '<div style="margin-bottom:14px">'
+      + '<label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Territory Name *</label>'
+      + '<input type="text" id="terr-input" placeholder="e.g. Himachal Pradesh" '
+      + 'style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;outline:none" '
+      + 'onkeydown="if(event.key==String.fromCharCode(13))saveTerritory()">'
+      + '</div>'
+      + '<button onclick="saveTerritory()" style="padding:9px 20px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Set Territory & Open Profile →</button>'
+      + '</div>'
   }
 
   var fmUrl = '../../tools/tsap-financial-model/index.html?eng=' + (eng.id||'')
 
-  return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
+  return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
     + '<div style="font-size:16px;font-weight:700;color:var(--navy)">' + esc(territory) + '</div>'
     + '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:#FFF3F1;color:#991B1B;font-weight:700">TSAP</span>'
+    + '<button onclick="saveTerritory(true)" style="margin-left:auto;padding:4px 10px;background:transparent;border:1.5px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer">✏️ Change</button>'
     + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'
-    + '<div class="card"><div class="card-title">S1–S4 Pipeline</div>'
+    + '<div class="card"><div class="card-title">Territory Profile (S1–S4)</div>'
     + '<div class="terr-status"><div class="terr-dot" style="background:var(--amber)"></div>'
-    + '<div><div style="font-size:12px;font-weight:700;color:var(--navy)">Not yet run</div>'
-    + '<div style="font-size:10px;color:var(--mid)">Open TSAP Financial Model to run S1 territory intelligence</div></div></div>'
-    + '<a href="' + fmUrl + '" class="btn btn-primary" style="display:inline-block;text-decoration:none;font-size:12px">Open Territory Profile →</a>'
+    + '<div><div style="font-size:12px;font-weight:700;color:var(--navy)">Ready to run</div>'
+    + '<div style="font-size:10px;color:var(--mid)">Open TSAP Financial Model to run S1 territory intelligence for ' + esc(territory) + '</div></div></div>'
+    + '<a href="' + fmUrl + '" class="btn btn-primary" style="display:inline-block;text-decoration:none;font-size:12px;padding:8px 14px;background:var(--navy);color:#fff;border-radius:6px">Open Territory Profile →</a>'
     + '</div>'
     + '<div class="card"><div class="card-title">Territory Config</div>'
-    + '<div style="font-size:11px;color:var(--mid);margin-bottom:10px;line-height:1.5">Cost overrides for this territory — power tariff, civil index, manpower multiplier. Managed in TSAP FM Territory Config tab.</div>'
-    + '<a href="' + fmUrl + '" class="btn btn-outline" style="display:inline-block;text-decoration:none;font-size:12px">Open Territory Config →</a>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:10px;line-height:1.5">Cost overrides for ' + esc(territory) + ' — power tariff, civil index, manpower multiplier. Managed in TSAP FM Territory Config tab.</div>'
+    + '<a href="' + fmUrl + '" class="btn btn-outline" style="display:inline-block;text-decoration:none;font-size:12px;padding:7px 14px;border:1.5px solid var(--border);border-radius:6px;color:var(--dark)">Open Territory Config →</a>'
     + '</div></div>'
     + '<div style="background:#EFF3FF;border:1px solid #BDD7FF;border-radius:8px;padding:12px 16px;font-size:12px;color:#1C38F5">'
-    + 'ℹ Territory Profile (S1–S4) and Territory Config live in the TSAP Financial Model tool. Once S3 is complete, the profile summary will appear here automatically.'
+    + 'ℹ Once S3 profile is complete in the TSAP FM, the territory intelligence summary will appear here automatically.'
     + '</div>'
+}
+
+async function saveTerritory(changeMode) {
+  var eng = CURRENT_ENG
+  if (!eng) return
+  var current = eng.territory || ''
+  var terr = changeMode
+    ? prompt('Change territory:', current)
+    : (document.getElementById('terr-input') ? document.getElementById('terr-input').value.trim() : prompt('Territory name:', ''))
+  if (!terr || !terr.trim()) return
+  var sb = getSB()
+  if (!sb.url) { showToast('Supabase not configured'); return }
+  try {
+    await fetch(sb.url + '/rest/v1/engagements?id=eq.' + eng.id, {
+      method: 'PATCH',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+        'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ territory: terr.trim() })
+    })
+    CURRENT_ENG.territory = terr.trim()
+    showToast('✓ Territory set to ' + terr.trim())
+    renderDocket()
+  } catch(e) { showToast('Failed to save territory'); }
 }
 
 // ── EDIT REQUIREMENTS ────────────────────────────────────────────────────────
@@ -1131,7 +1189,7 @@ function renderDocket() {
         var tabs = ['overview','intel','portfolio','uc']
         var eng = CURRENT_ENG || {}
         var pi = PORTFOLIO_SELECTION || []
-        if (PORTFOLIO_SELECTION.some(function(p){ return p.startsWith('L2-MAAS') })) tabs.push('maas')
+        if (PORTFOLIO_SELECTION.includes('L2-MAAS')) tabs.push('maas')
         var _et = (eng.engagement_type||eng.type||''); if (_et==='TSAP'||_et==='tsap') tabs.push('territory')
         tabs = tabs.concat(['actions','outputs','history'])
         return tabs
@@ -1750,17 +1808,23 @@ async function setEngagementType(val) {
   var eng = CURRENT_ENG
   if (!eng || !val) return
   var sb = getSB()
-  if (!sb.url) return
+  if (!sb.url) { showToast('Supabase not configured'); return }
+  var body = { engagement_type: val }
+  // If TSAP and no territory set, ask for it now
+  if (val === 'TSAP' && !eng.territory) {
+    var terr = prompt('Enter territory name for this TSAP engagement:', '')
+    if (terr && terr.trim()) body.territory = terr.trim()
+  }
   try {
     await fetch(sb.url + '/rest/v1/engagements?id=eq.' + eng.id, {
       method: 'PATCH',
       headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
         'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ engagement_type: val })
+      body: JSON.stringify(body)
     })
     CURRENT_ENG.engagement_type = val
-    showToast('✓ Engagement type set to ' + val)
-    // Re-render to show/hide Territory tab
+    if (body.territory) CURRENT_ENG.territory = body.territory
+    showToast('✓ Engagement type set to ' + val + (body.territory ? ' · ' + body.territory : ''))
     renderDocket()
   } catch(e) {
     showToast('Failed to update engagement type', 'error')
