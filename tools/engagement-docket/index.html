@@ -248,6 +248,12 @@ textarea{resize:vertical;min-height:60px}
 .sla-sel{padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:10px;font-family:inherit;outline:none;background:#fff}
 .mc-filter{padding:5px 9px;border:1.5px solid var(--border);border-radius:5px;font-size:11px;font-family:inherit;outline:none;background:#fff}
 </style>
+  <!-- atlasExport.js CDN dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script src="../../shared/atlasExport.js"></script>
 </head>
 <body>
 
@@ -460,7 +466,7 @@ var CURRENT_ENG = null       // current engagement object
 var CURRENT_DOCKET_ID = null // current docket_id
 var DOCKET_ITEMS = []        // all items for current engagement
 var UC_LIBRARY = []          // all active UCs
-var ACTIVE_TAB = 'intel'
+var ACTIVE_TAB = 'overview'
 var UC_MODAL_FILTER = 'all'
 
 //    Load                                                                       
@@ -470,7 +476,7 @@ var UC_MODAL_FILTER = 'all'
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── INTELLIGENCE TAB ─────────────────────────────────────────────────────────
-async function renderIntelTab() {
+async function renderProfileTab() {
   var eng = CURRENT_ENG || {}
   var engType = eng.engagement_type || eng.type || ''
   var isTSAP = engType === 'TSAP' || engType === 'tsap'
@@ -679,7 +685,7 @@ function togglePI(id, el) {
 function updateTabBar() {
   var eng = CURRENT_ENG || {}
   var _et = eng.engagement_type || eng.type || ''
-  var tabs = ['intel','overview','portfolio']
+  var tabs = ['overview','profile','portfolio']
   var hasUCScope = PORTFOLIO_SELECTION.some(function(p){ return !['L2-MAAS','L2-GPUAAS','L2-BMAAS'].includes(p) })
   if (hasUCScope || !PORTFOLIO_SELECTION.length) tabs.push('uc')
   var hasSvc = ['L2-MAAS','L2-GPUAAS','L2-BMAAS'].some(function(p){ return PORTFOLIO_SELECTION.includes(p) })
@@ -687,7 +693,7 @@ function updateTabBar() {
   if (_et==='TSAP'||_et==='tsap') tabs.push('territory')
   tabs = tabs.concat(['actions','outputs','history'])
   var labels = {
-    intel:'Intelligence', overview:'Overview', portfolio:'Portfolio',
+    overview:'Overview', profile:'Profile & Intelligence', portfolio:'Portfolio',
     uc:'Use Cases', svcmodel:'Service Model', territory:'Territory',
     actions:'Actions', outputs:'Outputs', history:'History'
   }
@@ -1416,7 +1422,7 @@ function renderDocket() {
     // Tab bar
     + '<div class="tab-bar">'
     + (function() {
-        var tabs = ['intel','overview','portfolio']
+        var tabs = ['overview','profile','portfolio']
         var eng = CURRENT_ENG || {}
         var _et = eng.engagement_type || eng.type || ''
         // UC tab — visible when portfolio has any non-service items
@@ -1430,7 +1436,7 @@ function renderDocket() {
         tabs = tabs.concat(['actions','outputs','history'])
         return tabs
       }()).map(function(t) {
-        var labels = { intel:'Intelligence', overview:'Overview', portfolio:'Portfolio', uc:'Use Cases', svcmodel:'Service Model', territory:'Territory', actions:'Actions', outputs:'Outputs', history:'History' }
+        var labels = { overview:'Overview', profile:'Profile & Intelligence', portfolio:'Portfolio', uc:'Use Cases', svcmodel:'Service Model', territory:'Territory', actions:'Actions', outputs:'Outputs', history:'History' }
         var cnt = t === 'uc' ? counts.uc : t === 'actions' ? counts.action : t === 'outputs' ? counts.output : 0
         return '<button class="tab-btn' + (ACTIVE_TAB===t?' active':'') + '" onclick="switchTab(\'' + t + '\')">'
           + labels[t]
@@ -1460,8 +1466,8 @@ function switchTab(tab) {
 
 //    Tab renderers                                                              
 function renderTab(tab) {
-  if (tab === 'intel')     { loadAndRenderIntel(); return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading intelligence...</div>' }
   if (tab === 'overview')  return renderOverview()
+  if (tab === 'profile')   { loadAndRenderProfile(); return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading profile & intelligence...</div>' }
   if (tab === 'portfolio') return renderPortfolioTab()
   if (tab === 'uc')        return renderUCTab()
   if (tab === 'svcmodel')  { loadAndRenderSvcModel(); return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading service model...</div>' }
@@ -1472,16 +1478,10 @@ function renderTab(tab) {
   return ''
 }
 
-async function loadAndRenderIntel() {
-  var html = await renderIntelTab()
+async function loadAndRenderProfile() {
+  var html = await renderProfileTab()
   var el = document.getElementById('tab-body')
-  if (el && ACTIVE_TAB === 'intel') el.innerHTML = html
-}
-
-async function loadAndRenderMaas() {
-  var html = await renderMaasTab()
-  var el = document.getElementById('tab-body')
-  if (el && ACTIVE_TAB === 'maas') el.innerHTML = html
+  if (el && ACTIVE_TAB === 'profile') el.innerHTML = html
 }
 
 async function loadAndRenderSvcModel() {
@@ -1489,6 +1489,16 @@ async function loadAndRenderSvcModel() {
   var el = document.getElementById('tab-body')
   if (el && ACTIVE_TAB === 'svcmodel') el.innerHTML = html
 }
+
+
+
+async function loadAndRenderMaas() {
+  var html = await renderMaasTab()
+  var el = document.getElementById('tab-body')
+  if (el && ACTIVE_TAB === 'maas') el.innerHTML = html
+}
+
+
 
 
 
@@ -1767,23 +1777,108 @@ async function removeUC(itemId) {
 //    Actions                                                                    
 function renderActionsTab() {
   var actions = DOCKET_ITEMS.filter(function(i){ return i.section === 'action' })
-  var open   = actions.filter(function(i){ return i.status !== 'done' && i.status !== 'blocked' })
-  var blocked = actions.filter(function(i){ return i.status === 'blocked' })
-  var done   = actions.filter(function(i){ return i.status === 'done' })
 
   var html = '<div class="section-hdr"><div class="section-title">Actions (' + actions.length + ')</div>'
-    + '<button class="btn btn-sm btn-primary" onclick="openActionModal()">+ Action</button></div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button class="btn btn-sm btn-ghost" onclick="exportActionsExcel()" title="Download as Excel">&#8595; Excel</button>'
+    + '<button class="btn btn-sm btn-primary" onclick="openActionModal()">+ Action</button>'
+    + '</div></div>'
 
   if (!actions.length) {
     return html + '<div class="empty"><div class="empty-icon">&#9989;</div>'
       + '<div class="empty-title">No actions yet</div>'
-      + '<div class="empty-sub">Track what needs to happen and who owns it</div></div>'
+      + '<div class="empty-sub">Track what needs to happen, who owns it, and when it is due</div></div>'
   }
 
-  if (open.length)    html += '<div class="section-title" style="margin-bottom:8px;color:var(--amber)">Open (' + open.length + ')</div>' + renderActionList(open)
-  if (blocked.length) html += '<div class="section-title" style="margin:12px 0 8px;color:var(--orange)">Blocked (' + blocked.length + ')</div>' + renderActionList(blocked)
-  if (done.length)    html += '<div class="section-title" style="margin:12px 0 8px;color:var(--teal)">Done (' + done.length + ')</div>' + renderActionList(done)
+  html += '<div style="overflow-x:auto">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    + '<thead><tr style="background:var(--light)">'
+    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Action</th>'
+    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border);white-space:nowrap">Owner</th>'
+    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border);white-space:nowrap">Due Date</th>'
+    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Status</th>'
+    + '<th style="text-align:center;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">RAG</th>'
+    + '<th style="padding:8px 10px;border-bottom:2px solid var(--border)"></th>'
+    + '</tr></thead><tbody id="actions-tbody"></tbody></table></div>'
+
+  // Build rows after insert using JS (avoids nested quote escaping)
+  html += '<script>renderActionRows()<\/script>'
   return html
+}
+
+function renderActionRows() {
+  var tbody = document.getElementById('actions-tbody')
+  if (!tbody) return
+  var actions = DOCKET_ITEMS.filter(function(i){ return i.section === 'action' })
+  tbody.innerHTML = actions.map(function(item) {
+    var rag    = item.rag || 'amber'
+    var status = item.status || 'open'
+    var isDone = status === 'done'
+    var isOverdue = item.due_date && !isDone && new Date(item.due_date) < new Date()
+    var ragColors  = { red:['#FEE2E2','#991B1B'], amber:['#FFF8E7','#92400E'], green:['#D1FAE5','#065F46'] }
+    var statColors = { open:['#EFF3FF','#1C38F5'], wip:['#FFF8E7','#92400E'], done:['#D1FAE5','#065F46'], blocked:['#FEE2E2','#991B1B'] }
+    var rc = ragColors[rag]  || ragColors.amber
+    var sc = statColors[status] || statColors.open
+    return '<tr data-id="' + esc(item.id) + '" style="border-bottom:1px solid var(--border);' + (isDone?'opacity:.55':'') + '">'
+      + '<td style="padding:10px;max-width:320px">'
+      + '<div style="font-size:12px;color:var(--dark);line-height:1.4;' + (isDone?'text-decoration:line-through;color:var(--mid)':'') + '">' + esc(item.title||item.text||'') + '</div>'
+      + (item.notes ? '<div style="font-size:10px;color:var(--mid);margin-top:3px">' + esc(item.notes) + '</div>' : '')
+      + '</td>'
+      + '<td style="padding:10px;white-space:nowrap;font-size:11px;color:var(--mid)">' + esc(item.assigned_to||item.owner||'—') + '</td>'
+      + '<td style="padding:10px;white-space:nowrap;font-size:11px;' + (isOverdue?'color:#991B1B;font-weight:600':'color:var(--mid)') + '">'
+      + (item.due_date ? (isOverdue?'⚠ ':'') + fmtDate(item.due_date) : '—') + '</td>'
+      + '<td style="padding:10px">'
+      + '<select data-id="' + esc(item.id) + '" onchange="setActionStatus(this.dataset.id,this.value)" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:11px;font-family:inherit;outline:none;background:' + sc[0] + ';color:' + sc[1] + ';font-weight:600;cursor:pointer">'
+      + ['open','wip','done','blocked'].map(function(v){ return '<option value="' + v + '"' + (status===v?' selected':'') + '>' + v.toUpperCase() + '</option>' }).join('')
+      + '</select></td>'
+      + '<td style="padding:10px;text-align:center">'
+      + '<div data-id="' + esc(item.id) + '" onclick="cycleRAG(this.dataset.id)" title="Click to cycle R/A/G" style="width:28px;height:28px;border-radius:50%;background:' + rc[0] + ';display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid ' + rc[1] + ';font-size:11px;font-weight:700;color:' + rc[1] + '">' + rag.charAt(0).toUpperCase() + '</div></td>'
+      + '<td style="padding:10px;text-align:right;white-space:nowrap">'
+      + '<button data-id="' + esc(item.id) + '" onclick="editAction(this.dataset.id)" style="padding:3px 8px;background:var(--light);border:1px solid var(--border);border-radius:4px;font-size:10px;cursor:pointer;margin-right:4px">&#9998;</button>'
+      + '<button data-id="' + esc(item.id) + '" onclick="deleteAction(this.dataset.id)" style="padding:3px 8px;background:var(--light);border:1px solid var(--border);border-radius:4px;font-size:10px;cursor:pointer;color:#991B1B">&#10005;</button>'
+      + '</td></tr>'
+  }).join('')
+}
+
+
+
+
+
+
+
+async function setActionStatus(id, status) {
+  var item = DOCKET_ITEMS.find(function(i){ return i.id === id })
+  if (!item) return
+  item.status = status
+  await sbPatch('docket_items', 'id=eq.'+id, { status: status })
+  switchTab('actions')
+}
+
+async function cycleRAG(id) {
+  var item = DOCKET_ITEMS.find(function(i){ return i.id === id })
+  if (!item) return
+  var cycle = { amber:'green', green:'red', red:'amber' }
+  item.rag = cycle[item.rag||'amber'] || 'amber'
+  await sbPatch('docket_items', 'id=eq.'+id, { rag: item.rag })
+  switchTab('actions')
+}
+
+function exportActionsExcel() {
+  var eng = CURRENT_ENG || {}
+  var actions = DOCKET_ITEMS.filter(function(i){ return i.section === 'action' })
+  if (!actions.length) { showToast('No actions to export'); return }
+  if (typeof atlasExport === 'undefined') { showToast('Export library not loaded'); return }
+  atlasExport.actionsExcel(actions.map(function(a) {
+    return {
+      title:       a.title || a.text || '',
+      owner:       a.assigned_to || a.owner || '',
+      target_date: a.due_date || a.target_date || '',
+      status:      (a.status||'open').toUpperCase(),
+      rag:         (a.rag||'Amber').charAt(0).toUpperCase() + (a.rag||'amber').slice(1),
+      notes:       a.notes || ''
+    }
+  }), eng.name || eng.opportunity_name || 'Engagement')
+  showToast('✓ Actions exported to Excel')
 }
 
 function renderActionList(actions) {
@@ -1843,6 +1938,7 @@ async function saveAction() {
     title: title,
     assigned_to: document.getElementById('action-owner').value.trim() || null,
     due_date: document.getElementById('action-due').value || null,
+    rag: 'amber',
     notes: document.getElementById('action-notes').value.trim() || null
   }
   if (id) {
