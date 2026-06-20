@@ -703,14 +703,155 @@ function renderOrgProfileWiki(custName, eng) {
 async function generateTerritoryProfile() {
   var eng = CURRENT_ENG || {}
   if (!eng.territory) { showToast('Set territory first in Territory tab'); return }
-  showToast('Opening TSAP Financial Model to generate territory profile')
-  window.open('../../tools/tsap-financial-model/index.html?eng=' + eng.id, '_blank')
+
+  // Check if atlasAI is available
+  var ai = typeof atlasAI !== 'undefined' ? atlasAI : null
+  if (!ai) {
+    // Fallback: load atlasAI dynamically
+    showToast('Loading AI module...')
+    try {
+      await new Promise(function(res, rej) {
+        var sc = document.createElement('script')
+        sc.src = '../../shared/atlasAI.js'
+        sc.onload = res
+        sc.onerror = function() { rej(new Error('Could not load atlasAI.js')) }
+        document.head.appendChild(sc)
+      })
+      ai = atlasAI
+      var sb = getSB()
+      await ai.init(sb.url, sb.key)
+    } catch(e) {
+      showToast('AI module unavailable — opening in TSAP FM instead')
+      window.open('../../tools/tsap-financial-model/index.html?eng=' + eng.id, '_blank')
+      return
+    }
+  }
+
+  // Show loading state inline
+  var el = document.getElementById('tab-body')
+  if (el) {
+    el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--mid)">'
+      + '<div style="font-size:28px;margin-bottom:12px">⚡</div>'
+      + '<div style="font-weight:600;color:var(--navy);margin-bottom:6px">Generating Territory Profile for ' + esc(eng.territory) + '...</div>'
+      + '<div style="font-size:12px;margin-bottom:14px">Running Gemini search grounding on energy, land, workforce, connectivity and government programmes.</div>'
+      + '<div style="font-size:11px;color:var(--mid)">This may take 15-30 seconds. Profile will be cached in Supabase.</div>'
+      + '</div>'
+  }
+
+  try {
+    var prompt = 'Generate a comprehensive territory intelligence profile for ' + eng.territory + ', India. '
+      + 'Cover these sections as structured JSON: energy (power tariffs, availability, renewable potential), '
+      + 'geography (climate, terrain, natural features), workforce (skilled workforce, salaries, institutions), '
+      + 'connectivity (internet, NKN, transport), programmes (state AI/tech initiatives, budgets, schemes), '
+      + 'economy (GSDP, growth, key industries), positioning (AI infrastructure opportunity summary, suggested 2x2 quadrant). '
+      + 'Return ONLY valid JSON with these exact keys: energy, geography, workforce, connectivity, programmes, economy, positioning.'
+
+    var result = await ai.callAndParse(prompt, { tool: 'territory-profile', _timeout: 45000 })
+    if (!result) throw new Error('No result from AI')
+
+    // Save to territory_profiles table
+    var sb = getSB()
+    var row = {
+      engagement_id: eng.id,
+      territory: eng.territory,
+      stage: 'profile',
+      session: result,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+    if (sb.url) {
+      await fetch(sb.url + '/rest/v1/territory_profiles', {
+        method: 'POST',
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(row)
+      })
+    }
+    window.PROFILE_DATA = { session: result, updated_at: new Date().toISOString() }
+    showToast('✓ Territory profile generated and cached')
+    loadAndRenderProfile()
+  } catch(e) {
+    console.error('[generateTerritoryProfile]', e)
+    showToast('Generation failed: ' + e.message + ' — try opening TSAP FM')
+    loadAndRenderProfile()
+  }
 }
 
 async function generateOrgProfile() {
-  var eng = CURRENT_ENG || {}
-  showToast('Opening PEI Tool to generate profile')
-  window.open('../../tools/pei-tool/index.html?eng=' + eng.id, '_blank')
+  var eng  = CURRENT_ENG || {}
+  var cust = (eng._cust && eng._cust.name) || eng.customer_name || 'Organisation'
+
+  var ai = typeof atlasAI !== 'undefined' ? atlasAI : null
+  if (!ai) {
+    showToast('Loading AI module...')
+    try {
+      await new Promise(function(res, rej) {
+        var sc = document.createElement('script')
+        sc.src = '../../shared/atlasAI.js'
+        sc.onload = res
+        sc.onerror = function() { rej(new Error('Could not load atlasAI.js')) }
+        document.head.appendChild(sc)
+      })
+      ai = atlasAI
+      var sb = getSB()
+      await ai.init(sb.url, sb.key)
+    } catch(e) {
+      showToast('AI module unavailable — opening PEI Tool instead')
+      window.open('../../tools/pei-tool/index.html?eng=' + eng.id, '_blank')
+      return
+    }
+  }
+
+  var el = document.getElementById('tab-body')
+  if (el) {
+    el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--mid)">'
+      + '<div style="font-size:28px;margin-bottom:12px">🔍</div>'
+      + '<div style="font-weight:600;color:var(--navy);margin-bottom:6px">Generating Organisation Profile for ' + esc(cust) + '...</div>'
+      + '<div style="font-size:12px;margin-bottom:14px">Analysing AI maturity, budget signals, stakeholders, mandates and peer activity.</div>'
+      + '<div style="font-size:11px;color:var(--mid)">This may take 15-30 seconds. Profile cached after first run.</div>'
+      + '</div>'
+  }
+
+  try {
+    var prompt = 'Generate a Pre-Engagement Intelligence (PEI) profile for ' + cust + ', India. '
+      + 'Return ONLY valid JSON with these exact keys: '
+      + 'ai_maturity (current AI state, initiatives, maturity score 1-5), '
+      + 'budget_signals (known budgets, spending patterns, procurement history), '
+      + 'stakeholders (key decision makers, technical champions, procurement contacts), '
+      + 'mandate (regulatory mandates, government directives, stated priorities), '
+      + 'peer_activity (what similar organisations are doing, benchmarks), '
+      + 'risks_opps (key risks to engagement, key opportunities to lead with), '
+      + 'approach (recommended engagement angle based on above).'
+
+    var result = await ai.callAndParse(prompt, { tool: 'pei-profile', _timeout: 45000 })
+    if (!result) throw new Error('No result from AI')
+
+    var sb = getSB()
+    if (sb.url) {
+      await fetch(sb.url + '/rest/v1/intelligence_items', {
+        method: 'POST',
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({
+          engagement_id: eng.id,
+          tier: 'pei_profile',
+          title: 'PEI — ' + cust,
+          data: result,
+          content: JSON.stringify(result),
+          created_at: new Date().toISOString()
+        })
+      })
+    }
+    window.PROFILE_DATA = { data: result, created_at: new Date().toISOString() }
+    showToast('✓ Organisation profile generated and cached')
+    loadAndRenderProfile()
+  } catch(e) {
+    console.error('[generateOrgProfile]', e)
+    showToast('Generation failed: ' + e.message)
+    loadAndRenderProfile()
+  }
 }
 
 function toggleIntel(i) {
@@ -1800,13 +1941,22 @@ function renderDocket() {
 function switchTab(tab) {
   ACTIVE_TAB = tab
   var el = document.getElementById('tab-body')
-  if (el) el.innerHTML = renderTab(tab)
+  if (el) { el.innerHTML = renderTab(tab); wireTabEvents() }
   document.querySelectorAll('.tab-btn').forEach(function(b){
     b.className = 'tab-btn' + (b.textContent.trim().toLowerCase().startsWith(tab) ? ' active' : '')
   })
   // Re-render full docket to update tab active states
   renderDocket()
 }
+function wireTabEvents() {
+  // Wire .req-placeholder clicks to editRequirements()
+  var reqEls = document.querySelectorAll('.req-placeholder')
+  reqEls.forEach(function(el) {
+    el.addEventListener('click', function() { editRequirements() })
+  })
+}
+
+
 
 //    Tab renderers                                                              
 function renderTab(tab) {
@@ -1849,6 +1999,29 @@ async function loadAndRenderMaas() {
 
 
 //    Overview                                                                   
+function renderEmptyReq() {
+  return '<div style="background:var(--light);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:14px">'
+    + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);margin-bottom:12px">📋 Engagement Requirements — Post-Meeting</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
+    + '<div class="req-placeholder" style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;cursor:pointer">'
+    + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Objective</div>'
+    + '<div style="font-size:12px;color:var(--mid);font-style:italic">What does the customer want to achieve? Click to add...</div>'
+    + '</div>'
+    + '<div class="req-placeholder" style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;cursor:pointer">'
+    + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Problem Statement</div>'
+    + '<div style="font-size:12px;color:var(--mid);font-style:italic">What problem are they solving? Click to add...</div>'
+    + '</div>'
+    + '</div>'
+    + '<div class="req-placeholder" style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;margin-bottom:12px;cursor:pointer">'
+    + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:2px">Success Criteria</div>'
+    + '<div style="font-size:12px;color:var(--mid);font-style:italic">How will the customer know this worked? Click to add...</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;align-items:center">'
+    + '<button class="req-placeholder btn btn-sm" style="background:var(--navy);color:#fff;padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">+ Fill Requirements</button>'
+    + '<span style="font-size:11px;color:var(--mid)">Fill in after the customer meeting</span>'
+    + '</div></div>'
+}
+
 function renderOverview() {
   var eng = CURRENT_ENG
   var cust = eng._cust || {}
@@ -1875,19 +2048,7 @@ function renderOverview() {
       + '<div style="margin-top:8px"><button class="btn btn-sm btn-ghost" onclick="editRequirements()">✏️ Edit Requirements</button><button onclick="generateVisionDoc()" style="margin-left:8px;padding:5px 12px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">📄 Generate Vision Doc</button></div>'
       + '</div>'
   } else {
-    reqHtml = '<div style="background:var(--light);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:14px">'
-      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);margin-bottom:12px">📋 Engagement Requirements — Post-Meeting</div>'
-      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
-      + '<div style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;cursor:pointer" onclick="editRequirements()"><div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Objective</div><div style="font-size:12px;color:var(--mid);font-style:italic">What does the customer want to achieve? Click to add...</div></div>'
-      + '<div style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;cursor:pointer" onclick="editRequirements()"><div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Problem Statement</div><div style="font-size:12px;color:var(--mid);font-style:italic">What problem are they solving? Click to add...</div></div>'
-      + '</div>'
-      + '<div style="display:flex;gap:8px;align-items:center;padding:10px 12px;background:#fff;border:1.5px dashed var(--border);border-radius:6px;margin-bottom:12px;cursor:pointer" onclick="editRequirements()">'
-      + '<div style="flex:1"><div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:2px">Success Criteria</div><div style="font-size:12px;color:var(--mid);font-style:italic">How will the customer know this worked? Click to add...</div></div>'
-      + '</div>'
-      + '<div style="display:flex;gap:8px">'
-      + '<button class="btn btn-sm" style="background:var(--navy);color:#fff;padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer" onclick="editRequirements()">+ Fill Requirements</button>'
-      + '<span style="font-size:11px;color:var(--mid);align-self:center">Fill in after the customer meeting</span>'
-      + '</div></div>'
+    reqHtml = renderEmptyReq()
   }
 
   var html = reqHtml + '<div class="kpi-row">'
