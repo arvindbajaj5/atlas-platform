@@ -156,6 +156,30 @@ input:focus,select:focus{border-color:var(--blue);}
 .atlas-nav-btn.orange:hover{background:#e04530;}
 .atlas-nav-btn.teal{background:rgba(0,178,144,0.15);border-color:#00B290;color:#00B290;}
 .atlas-nav-btn.teal:hover{background:rgba(0,178,144,0.25);}
+
+/* Service Model section */
+.svc-card{border:2px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;background:#fff;transition:border-color .15s}
+.svc-card.on{border-color:var(--teal)}
+.svc-hdr{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:0}
+.svc-hdr.on{margin-bottom:12px}
+.svc-toggle{width:32px;height:18px;background:var(--border);border-radius:9px;position:relative;transition:background .2s;flex-shrink:0}
+.svc-toggle.on{background:var(--teal)}
+.svc-toggle::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.svc-toggle.on::after{left:16px}
+.svc-title{font-size:13px;font-weight:700;color:var(--navy)}
+.svc-desc{font-size:11px;color:var(--mid);margin-left:auto}
+.svc-body{display:none}
+.svc-card.on .svc-body{display:block}
+.svc-model-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.svc-model-item{border:1.5px solid var(--border);border-radius:6px;padding:6px 9px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;transition:all .15s}
+.svc-model-item:hover{border-color:var(--mid)}.svc-model-item.on{border-color:var(--teal);background:#E1F5EE;font-weight:600}
+.svc-model-ck{width:13px;height:13px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+.svc-model-item.on .svc-model-ck{background:var(--teal);border-color:var(--teal);color:#fff}
+.svc-arch-chip{display:inline-block;font-size:9px;padding:1px 5px;border-radius:8px;background:#EFF3FF;color:#1C38F5;margin-right:2px}
+.svc-gpu-est{background:var(--navy);color:#fff;border-radius:6px;padding:10px 14px;margin-top:10px;font-size:12px}
+.svc-input{padding:6px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;width:100%}
+.svc-input:focus{border-color:var(--navy)}
+.svc-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -323,7 +347,11 @@ var SASC_DATA = {
   ucWorkloads: {},
   layerCfg: {},
   gpuConfigId: null,
-  deratingPct: 80
+  serviceModel: {
+    maas:   { enabled: false, models: [], agentEnabled: false, agentModel: 'Llama 3.1 8B INT4' },
+    gpuaas: { enabled: false, gpus: 0, gpu_hour_price_usd: 3.50 },
+    bmaas:  { enabled: false, servers: 0, server_hour_price_usd: 1.20 }
+  }
 }
 
 var ALL_UCS = []
@@ -1240,6 +1268,199 @@ function setUCComplexity(ucId, tier) {
 }
 
 //    renderScreen2                                                              
+
+// ── SERVICE MODEL (MaaS / GPUaaS / BMaaS) ────────────────────────────────────
+// These add infrastructure capacity to the BOM for service delivery.
+// No revenue calculations here — that belongs in TSAP FM.
+
+var SVC_MC_ROWS = []       // model catalogue rows (loaded async)
+var SVC_MC_STATE = ''      // idle|loading|loaded|error
+
+async function loadSvcModelCatalogue() {
+  if (SVC_MC_STATE === 'loading' || SVC_MC_STATE === 'loaded') return
+  SVC_MC_STATE = 'loading'
+  var sb = getSB()
+  if (!sb.url) { SVC_MC_STATE = 'error'; return }
+  try {
+    var r = await fetch(sb.url + '/rest/v1/model_catalogue?enabled=eq.true&order=vendor.asc,name.asc&limit=200', {
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+    })
+    if (r.ok) { SVC_MC_ROWS = await r.json(); SVC_MC_STATE = 'loaded' }
+    else SVC_MC_STATE = 'error'
+  } catch(e) { SVC_MC_STATE = 'error' }
+}
+
+function toggleSvcModel(id) {
+  var sm = SASC_DATA.serviceModel.maas
+  var idx = sm.models.findIndex(function(m){ return m.id === id })
+  if (idx >= 0) sm.models.splice(idx, 1)
+  else {
+    var m = SVC_MC_ROWS.find(function(r){ return r.id === id })
+    if (m) sm.models.push({ id:m.id, name:m.name, vendor:m.vendor,
+      params_b:m.params_b, gpus_per_instance: m.gpus_per_instance||{'INT4':1},
+      quant: 'INT4', archetype: m.archetype||[] })
+  }
+  // Re-render just the model section
+  var el = document.getElementById('maas-model-section')
+  if (el) el.innerHTML = renderMaasModelSection()
+  updateSvcGPUEst()
+}
+
+function renderMaasModelSection() {
+  var sm = SASC_DATA.serviceModel.maas
+  var capTypes = [
+    { id:'general', label:'Text Generation' }, { id:'coding', label:'Coding' },
+    { id:'vision', label:'Vision' }, { id:'audio', label:'Audio/Speech' },
+    { id:'embedding', label:'Embedding' }, { id:'indic', label:'Indic Languages' },
+    { id:'multimodal', label:'Multimodal' }, { id:'video', label:'Video' }
+  ]
+  // Filter chips for capability type
+  var activeArch = SASC_DATA._maasArchFilter || ''
+  var filtered = SVC_MC_ROWS.filter(function(m){
+    if (!activeArch) return true
+    return (m.archetype||[]).includes(activeArch)
+  }).slice(0, 30) // limit display
+
+  var html = '<div style="margin-bottom:8px">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:5px">Filter by capability</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">'
+    + '<div class="svc-arch-chip" style="cursor:pointer;padding:3px 8px;' + (!activeArch?'background:var(--navy);color:#fff':'') + '" onclick="SASC_DATA._maasArchFilter=\'\';document.getElementById(\'maas-model-section\').innerHTML=renderMaasModelSection()">All</div>'
+    + capTypes.map(function(c){
+        var active = activeArch===c.id
+        return '<div class="svc-arch-chip" style="cursor:pointer;padding:3px 8px;' + (active?'background:var(--navy);color:#fff':'') + '" '
+          + 'onclick="SASC_DATA._maasArchFilter=\'' + c.id + '\';document.getElementById(\'maas-model-section\').innerHTML=renderMaasModelSection()">'
+          + c.label + '</div>'
+      }).join('')
+    + '</div>'
+
+  if (SVC_MC_STATE === 'loading') return html + '<div style="color:var(--mid);font-size:11px">⏳ Loading models...</div></div>'
+  if (SVC_MC_STATE === 'error')   return html + '<div style="color:#991B1B;font-size:11px">✗ Cannot load model catalogue — check Settings → API Keys</div></div>'
+
+  html += '<div class="svc-model-grid">'
+    + filtered.map(function(m) {
+        var sel = sm.models.some(function(x){ return x.id === m.id })
+        var gpuEst = (m.gpus_per_instance && m.gpus_per_instance.INT4) || 1
+        return '<div class="svc-model-item' + (sel?' on':'') + '" onclick="toggleSvcModel(\'' + m.id + '\')">'
+          + '<div class="svc-model-ck">' + (sel?'✓':'') + '</div>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-weight:600;font-size:11px;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(m.name||'') + '</div>'
+          + '<div style="font-size:9px;color:var(--mid)">' + esc(m.vendor||'') + (m.params_b?' · '+m.params_b+'B':'') + ' · ~' + gpuEst + ' GPU/inst</div>'
+          + '</div></div>'
+      }).join('')
+    + '</div>'
+    + (sm.models.length ? '<div style="font-size:11px;color:var(--teal);margin-top:5px">✓ ' + sm.models.length + ' model(s) selected</div>' : '')
+    + '</div>'
+
+  return html
+}
+
+function updateSvcGPUEst() {
+  var el = document.getElementById('svc-gpu-est')
+  if (!el) return
+  var sm = SASC_DATA.serviceModel
+  var maasGPUs = sm.maas.enabled
+    ? sm.maas.models.reduce(function(s,m){ return s + ((m.gpus_per_instance&&m.gpus_per_instance.INT4)||1) }, 0)
+    : 0
+  if (sm.maas.enabled && sm.maas.agentEnabled) maasGPUs += Math.ceil(maasGPUs / 8) || 1
+  var gpuaasGPUs = sm.gpuaas.enabled ? (parseInt(sm.gpuaas.gpus)||0) : 0
+  var bmaasSrvs  = sm.bmaas.enabled  ? (parseInt(sm.bmaas.servers)||0) : 0
+  var totalExtra = maasGPUs + gpuaasGPUs
+  el.innerHTML = totalExtra || bmaasSrvs
+    ? '<div style="display:flex;gap:16px;font-size:11px">'
+      + (maasGPUs   ? '<div>🤖 MaaS: <strong>' + maasGPUs + ' GPUs</strong></div>' : '')
+      + (gpuaasGPUs ? '<div>⚡ GPUaaS: <strong>' + gpuaasGPUs + ' GPUs</strong></div>' : '')
+      + (bmaasSrvs  ? '<div>🖥️ BMaaS: <strong>' + bmaasSrvs + ' servers</strong></div>' : '')
+      + '<div style="margin-left:auto;color:var(--amber);font-weight:700">+' + (totalExtra+bmaasSrvs) + ' additional units → added to BOM</div>'
+      + '</div>'
+    : '<div style="font-size:11px;color:rgba(255,255,255,.5)">Enable a service model above to see additional GPU/server requirements</div>'
+}
+
+function renderServiceModelSection() {
+  var sm = SASC_DATA.serviceModel
+
+  // Load model catalogue in background
+  if (SVC_MC_STATE === '') {
+    SVC_MC_STATE = 'loading'
+    loadSvcModelCatalogue().then(function(){
+      var el = document.getElementById('maas-model-section')
+      if (el) el.innerHTML = renderMaasModelSection()
+    })
+  }
+
+  function svcToggle(type, el) {
+    SASC_DATA.serviceModel[type].enabled = !SASC_DATA.serviceModel[type].enabled
+    var card = el.closest('.svc-card')
+    card.classList.toggle('on', SASC_DATA.serviceModel[type].enabled)
+    el.classList.toggle('on', SASC_DATA.serviceModel[type].enabled)
+    var hdr = card.querySelector('.svc-hdr')
+    if (hdr) hdr.classList.toggle('on', SASC_DATA.serviceModel[type].enabled)
+    updateSvcGPUEst()
+  }
+
+  var html = '<div class="card" style="margin-top:0">'
+    + '<div class="card-title">Service Model <span style="font-size:11px;font-weight:400;color:var(--mid)">— optional, adds infrastructure to BOM</span></div>'
+    + '<div class="card-sub">If this territory will offer AI services to others, select the service delivery models. Each adds GPU or server capacity to the infrastructure BOM. Revenue modelling is in the Financial Model.</div>'
+
+  // MaaS card
+  html += '<div class="svc-card' + (sm.maas.enabled?' on':'') + '">'
+    + '<div class="svc-hdr' + (sm.maas.enabled?' on':'') + '" onclick="this.querySelector(\'.svc-toggle\').click()">'
+    + '<div class="svc-toggle' + (sm.maas.enabled?' on':'') + '" onclick="event.stopPropagation();SASC_DATA.serviceModel.maas.enabled=!SASC_DATA.serviceModel.maas.enabled;this.classList.toggle(\'on\');this.closest(\'.svc-card\').classList.toggle(\'on\');this.closest(\'.svc-hdr\').classList.toggle(\'on\');updateSvcGPUEst()"></div>'
+    + '<div class="svc-title">🤖 MaaS — Model as a Service</div>'
+    + '<div class="svc-desc">Adds GPU capacity to host and serve open-source models via API</div>'
+    + '</div>'
+    + '<div class="svc-body">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">Select models to host</div>'
+    + '<div id="maas-model-section">' + renderMaasModelSection() + '</div>'
+    + '<div style="margin-top:10px">'
+    + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">'
+    + '<input type="checkbox"' + (sm.maas.agentEnabled?' checked':'') + ' onchange="SASC_DATA.serviceModel.maas.agentEnabled=this.checked;updateSvcGPUEst()"> '
+    + '<strong>Include Agent Harness</strong> — adds ~1 GPU per 8 inference GPUs for orchestration</label>'
+    + '</div></div></div>'
+
+  // GPUaaS card
+  html += '<div class="svc-card' + (sm.gpuaas.enabled?' on':'') + '">'
+    + '<div class="svc-hdr' + (sm.gpuaas.enabled?' on':'') + '" onclick="this.querySelector(\'.svc-toggle\').click()">'
+    + '<div class="svc-toggle' + (sm.gpuaas.enabled?' on':'') + '" onclick="event.stopPropagation();SASC_DATA.serviceModel.gpuaas.enabled=!SASC_DATA.serviceModel.gpuaas.enabled;this.classList.toggle(\'on\');this.closest(\'.svc-card\').classList.toggle(\'on\');this.closest(\'.svc-hdr\').classList.toggle(\'on\');updateSvcGPUEst()"></div>'
+    + '<div class="svc-title">⚡ GPUaaS — GPU as a Service</div>'
+    + '<div class="svc-desc">Adds raw GPU capacity for rent to developers/researchers</div>'
+    + '</div>'
+    + '<div class="svc-body">'
+    + '<div class="svc-row">'
+    + '<div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">GPUs to offer as a service</label>'
+    + '<input class="svc-input" type="number" min="0" step="8" value="' + (sm.gpuaas.gpus||0) + '" placeholder="e.g. 32" onchange="SASC_DATA.serviceModel.gpuaas.gpus=+this.value;updateSvcGPUEst()"></div>'
+    + '<div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Indicative price (USD/GPU-hour)</label>'
+    + '<input class="svc-input" type="number" min="0" step="0.1" value="' + (sm.gpuaas.gpu_hour_price_usd||3.50) + '" onchange="SASC_DATA.serviceModel.gpuaas.gpu_hour_price_usd=+this.value"></div>'
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--mid)">Revenue modelling (utilisation × hours × price) is in the TSAP Financial Model → Revenue tab.</div>'
+    + '</div></div>'
+
+  // BMaaS card
+  html += '<div class="svc-card' + (sm.bmaas.enabled?' on':'') + '">'
+    + '<div class="svc-hdr' + (sm.bmaas.enabled?' on':'') + '" onclick="this.querySelector(\'.svc-toggle\').click()">'
+    + '<div class="svc-toggle' + (sm.bmaas.enabled?' on':'') + '" onclick="event.stopPropagation();SASC_DATA.serviceModel.bmaas.enabled=!SASC_DATA.serviceModel.bmaas.enabled;this.classList.toggle(\'on\');this.closest(\'.svc-card\').classList.toggle(\'on\');this.closest(\'.svc-hdr\').classList.toggle(\'on\');updateSvcGPUEst()"></div>'
+    + '<div class="svc-title">🖥️ BMaaS — Bare Metal as a Service</div>'
+    + '<div class="svc-desc">Adds CPU server capacity for HPC/research rental</div>'
+    + '</div>'
+    + '<div class="svc-body">'
+    + '<div class="svc-row">'
+    + '<div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Servers to offer as a service</label>'
+    + '<input class="svc-input" type="number" min="0" value="' + (sm.bmaas.servers||0) + '" placeholder="e.g. 10" onchange="SASC_DATA.serviceModel.bmaas.servers=+this.value;updateSvcGPUEst()"></div>'
+    + '<div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Indicative price (USD/server-hour)</label>'
+    + '<input class="svc-input" type="number" min="0" step="0.1" value="' + (sm.bmaas.server_hour_price_usd||1.20) + '" onchange="SASC_DATA.serviceModel.bmaas.server_hour_price_usd=+this.value"></div>'
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--mid)">Revenue modelling is in the TSAP Financial Model → Revenue tab.</div>'
+    + '</div></div>'
+
+  // GPU estimate box
+  html += '<div class="svc-gpu-est" id="svc-gpu-est">'
+    + '<div style="font-size:10px;color:rgba(255,255,255,.5);margin-bottom:6px">Additional capacity from service models (added to UC infrastructure in BOM)</div>'
+    + '<div style="font-size:11px;color:rgba(255,255,255,.5)">Enable a service model above to see requirements</div>'
+    + '</div>'
+    + '</div>'
+
+  return html
+}
+
 function renderScreen2() {
   var s = SASC_DATA
   // Guard: if ALL_UCS not yet loaded, show loading state
@@ -1452,6 +1673,9 @@ function renderScreen2() {
     + '</div>'
     + (headroom < 0 ? '<div style="font-size:11px;color:#9a6800;margin-top:8px;padding:8px;background:rgba(255,182,0,0.08);border-radius:var(--r-sm)">&#9888; UC requirements exceed selected MDC. Consider upgrading T-shirt size or adding more sites in Step 1.</div>' : '')
     + '</div>'
+
+  // Service model section
+  html += renderServiceModelSection()
 
   html += '<div class="actions-bar">'
     + '<button class="btn btn-ghost" onclick="renderStep(2)">&larr; Back</button>'
@@ -1928,6 +2152,39 @@ function calculateBOM(pricing, ucProfiles) {
     })
     var uatParam = findParam('UAT and Acceptance Testing')
     if (uatParam) totalUcdev += addLine('UC Development', 'UAT and Acceptance Testing', ucCount, 'per_uc', uatParam.base_price_usd, '')
+  }
+
+  // -- SERVICE MODEL ADDITIONS -----------------------------------------------
+  var sm = SASC_DATA.serviceModel || {}
+
+  // MaaS — add GPU servers for model hosting
+  if (sm.maas && sm.maas.enabled && sm.maas.models && sm.maas.models.length) {
+    var maasGPUs = sm.maas.models.reduce(function(sum, m) {
+      var gpuPerInst = (m.gpus_per_instance && (m.gpus_per_instance.INT4 || m.gpus_per_instance.INT8)) || 1
+      return sum + gpuPerInst
+    }, 0)
+    if (sm.maas.agentEnabled) maasGPUs += Math.max(1, Math.ceil(maasGPUs / 8))
+    var maasServers = Math.ceil(maasGPUs / 8)
+    var gpuSvcParam = findParam('GPU Server H100 SXM5 8x')
+    if (gpuSvcParam && maasServers > 0) {
+      totalCapex += addLine('MaaS Infrastructure', 'GPU Servers for MaaS (' + sm.maas.models.length + ' models)', maasServers, 'per_server', gpuSvcParam.base_price_usd, maasGPUs + ' GPUs for model hosting' + (sm.maas.agentEnabled ? ' + agent harness' : ''))
+    }
+    // Platform overhead for MaaS (API gateway, billing, routing)
+    var platSvcParam = findParam('Data Fusion Platform')
+    if (platSvcParam) totalOpex += addLine('MaaS Infrastructure', 'MaaS API Gateway + Billing (annual)', 1, 'per_instance', platSvcParam.base_price_usd * 0.5, 'Model serving + token billing platform')
+  }
+
+  // GPUaaS — add GPU servers for raw compute rental
+  if (sm.gpuaas && sm.gpuaas.enabled && sm.gpuaas.gpus > 0) {
+    var gpuaasServers = Math.ceil(sm.gpuaas.gpus / 8)
+    var gpuaasParam = findParam('GPU Server H100 SXM5 8x')
+    if (gpuaasParam) totalCapex += addLine('GPUaaS Infrastructure', 'GPU Servers for GPUaaS (' + sm.gpuaas.gpus + ' GPUs)', gpuaasServers, 'per_server', gpuaasParam.base_price_usd, 'Raw GPU rental capacity')
+  }
+
+  // BMaaS — add CPU servers for bare metal rental
+  if (sm.bmaas && sm.bmaas.enabled && sm.bmaas.servers > 0) {
+    var bmaasParam = findParam('CPU Server AMD EPYC 9654')
+    if (bmaasParam) totalCapex += addLine('BMaaS Infrastructure', 'CPU Servers for BMaaS (' + sm.bmaas.servers + ' servers)', sm.bmaas.servers, 'per_server', bmaasParam.base_price_usd, 'Bare metal rental capacity')
   }
 
   SASC_DATA.rom = {
