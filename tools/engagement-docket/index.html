@@ -707,9 +707,12 @@ function renderTerritoryProfileWiki(territory, eng) {
   sections.forEach(function(sec) {
     var rawVal = session[sec.key] || session[sec.key + '_summary']
     if (!rawVal) return
-    var content = typeof rawVal === 'string'
-      ? rawVal
-      : (typeof rawVal === 'object' ? JSON.stringify(rawVal, null, 2) : String(rawVal))
+    var content = ''
+    if (typeof rawVal === 'string') { content = rawVal }
+    else if (Array.isArray(rawVal)) { content = rawVal.map(function(v){ return typeof v==='string'?v:JSON.stringify(v) }).join('\n') }
+    else if (typeof rawVal === 'object') { content = Object.keys(rawVal).map(function(k){ var v=rawVal[k]; return k+': '+(typeof v==='string'?v:JSON.stringify(v)) }).join('\n') }
+    else { content = String(rawVal) }
+    if (!content) return
     html += '<div style="border-bottom:1px solid var(--border);padding:12px 0">'
       + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">' + sec.icon + ' ' + sec.title + '</div>'
       + '<div style="font-size:12px;color:var(--dark);line-height:1.7;white-space:pre-wrap">' + esc(content) + '</div>'
@@ -773,9 +776,12 @@ function renderOrgProfileWiki(custName, eng) {
   peiSections.forEach(function(sec) {
     var rawVal = data[sec.key]
     if (!rawVal) return
-    var content = typeof rawVal === 'string'
-      ? rawVal
-      : (typeof rawVal === 'object' ? JSON.stringify(rawVal, null, 2) : String(rawVal))
+    var content = ''
+    if (typeof rawVal === 'string') { content = rawVal }
+    else if (Array.isArray(rawVal)) { content = rawVal.map(function(v){ return typeof v==='string'?v:JSON.stringify(v) }).join('\n') }
+    else if (typeof rawVal === 'object') { content = Object.keys(rawVal).map(function(k){ var v=rawVal[k]; return k+': '+(typeof v==='string'?v:JSON.stringify(v)) }).join('\n') }
+    else { content = String(rawVal) }
+    if (!content) return
     html += '<div style="border-bottom:1px solid var(--border);padding:12px 0">'
       + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">' + sec.icon + ' ' + sec.title + '</div>'
       + '<div style="font-size:12px;color:var(--dark);line-height:1.7;white-space:pre-wrap">' + esc(content) + '</div>'
@@ -823,8 +829,10 @@ async function generateTerritoryProfile() {
       + 'Return ONLY a valid JSON object (no markdown, no code fences) with exactly these string keys: '
       + '{"energy":"power tariffs kWh rates availability renewable potential","geography":"climate terrain natural features advantages","workforce":"skilled workforce availability salaries key institutions","connectivity":"internet NKN transport road rail infrastructure","programmes":"state AI tech government initiatives budgets schemes","economy":"GSDP growth rate key industries investment climate","positioning":"AI infrastructure opportunity summary and recommended 2x2 quadrant Q1 Green AI Hub Q2 Knowledge Exporter Q3 Governance Moderniser Q4 Heritage Renaissance"}'
 
-    var raw = await ai.call(prompt, { tool: 'territory-profile-s1', _timeout: 60000 })
-    if (!raw) throw new Error('Empty response from AI')
+    var rawResp1 = await ai.call(prompt, { tool: 'territory-profile-s1', _timeout: 60000 })
+    if (!rawResp1) throw new Error('Empty response from AI')
+    var raw = typeof rawResp1 === 'string' ? rawResp1 : (rawResp1.text || rawResp1.raw || rawResp1.content || JSON.stringify(rawResp1))
+    if (!raw) throw new Error('No text in AI response')
 
     // Parse — strip any markdown fences
     var parsed = null
@@ -884,7 +892,8 @@ async function generateOrgProfile() {
   if (el) el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--mid)"><div style="font-size:28px;margin-bottom:12px">🔍</div><div style="font-weight:600;color:var(--navy);margin-bottom:6px">Generating Organisation Profile...</div><div style="font-size:12px;color:var(--mid)">15-30 seconds. Cached after first run.</div></div>'
   try {
     var prompt = 'Generate a Pre-Engagement Intelligence (PEI) profile for ' + cust + ' as a government or enterprise organisation in India. Return ONLY a valid JSON object with exactly these keys (no markdown, no code fences, just raw JSON): {"ai_maturity":"text","budget_signals":"text","stakeholders":"text","mandate":"text","peer_activity":"text","risks_opps":"text","approach":"text"}'
-    var rawResult = await ai.call(prompt, { tool: 'pei-profile', _timeout: 45000 })
+    var rawResp2 = await ai.call(prompt, { tool: 'pei-profile', _timeout: 45000 })
+    var rawResult = typeof rawResp2 === 'string' ? rawResp2 : (rawResp2.text || rawResp2.raw || rawResp2.content || JSON.stringify(rawResp2))
     var parsed = null
     try {
       var clean = rawResult ? rawResult.replace(/^```json\n?/,'').replace(/```$/,'').trim() : ''
