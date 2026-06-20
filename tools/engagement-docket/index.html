@@ -637,6 +637,8 @@ function renderTerritoryProfileWiki(territory, eng) {
 
   var statusBadge = !pd
     ? '<span style="background:#FFF8E7;color:#92400E;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">NOT GENERATED</span>'
+    : hasTSAPFMData
+    ? '<span style="background:#EFF3FF;color:#1C38F5;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">S1 PENDING</span>'
     : isStale
     ? '<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">STALE</span>'
     : '<span style="background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">✓ GENERATED</span>'
@@ -649,7 +651,7 @@ function renderTerritoryProfileWiki(territory, eng) {
     + '<div style="margin-left:auto;display:flex;gap:8px">'
     + (territory
         ? '<button onclick="generateTerritoryProfile()" style="padding:7px 14px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">'
-          + (pd ? '↻ Regenerate Profile' : '⚡ Generate Profile') + '</button>'
+          + (hasTSAPFMData ? 'Run S1 in TSAP FM →' : pd ? '↻ Regenerate Profile' : '⚡ Generate Profile') + '</button>'
         : '<button onclick="switchTab(\'territory\')" style="padding:7px 14px;background:var(--orange);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Set Territory First →</button>')
     + '</div></div>'
 
@@ -796,73 +798,10 @@ function renderOrgProfileWiki(custName, eng) {
 async function generateTerritoryProfile() {
   var eng = CURRENT_ENG || {}
   if (!eng.territory) { showToast('Set territory first in Territory tab'); return }
-  var ai = typeof atlasAI !== 'undefined' ? atlasAI : null
-  if (!ai) {
-    showToast('Loading AI module...')
-    try {
-      await new Promise(function(res, rej) {
-        var sc = document.createElement('script')
-        sc.src = '../../shared/atlasAI.js'
-        sc.onload = res
-        sc.onerror = function() { rej(new Error('Could not load atlasAI.js')) }
-        document.head.appendChild(sc)
-      })
-      ai = atlasAI
-      var sb = getSB()
-      await ai.init(sb.url, sb.key)
-    } catch(e) {
-      showToast('AI not available — check shared/atlasAI.js')
-      return
-    }
-  }
-  var el = document.getElementById('tab-body')
-  if (el) el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--mid)">'
-    + '<div style="font-size:28px;margin-bottom:12px">⚡</div>'
-    + '<div style="font-weight:600;color:var(--navy);margin-bottom:6px">Generating Territory Profile for ' + esc(eng.territory) + '...</div>'
-    + '<div style="font-size:12px;color:var(--mid)">Running Gemini search grounding. This may take 15-30 seconds.</div>'
-    + '</div>'
-  try {
-    var prompt = 'Generate a territory intelligence profile for ' + eng.territory + ', India for AI infrastructure investment planning. '
-      + 'Return ONLY a valid JSON object with exactly these keys (no markdown, no code fences, just raw JSON): '
-      + '{"energy": "power tariffs, availability, renewable potential", '
-      + '"geography": "climate, terrain, natural features", '
-      + '"workforce": "skilled workforce, salaries, institutions", '
-      + '"connectivity": "internet, NKN, transport infrastructure", '
-      + '"programmes": "state AI/tech initiatives, budgets, schemes", '
-      + '"economy": "GSDP, growth, key industries", '
-      + '"positioning": "AI infrastructure opportunity summary and suggested 2x2 quadrant (Q1/Q2/Q3/Q4)"}'
-    var rawResult = await ai.call(prompt, { tool: 'territory-profile', _timeout: 45000 })
-    var parsed = null
-    try {
-      var clean = (rawResult||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim()
-      parsed = JSON.parse(clean)
-    } catch(e) {
-      parsed = { _raw: rawResult }
-    }
-    var sb = getSB()
-    if (sb.url) {
-      await fetch(sb.url + '/rest/v1/territory_profiles', {
-        method: 'POST',
-        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify({
-          id: (eng.territory||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'),
-          territory: eng.territory,
-          profile: parsed,
-          session: { docket: parsed },
-          generated_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 90*24*60*60*1000).toISOString()
-        })
-      })
-    }
-    window.PROFILE_DATA = { session: parsed, updated_at: new Date().toISOString() }
-    showToast('✓ Territory profile generated')
-    loadAndRenderProfile()
-  } catch(e) {
-    showToast('Generation failed: ' + e.message)
-    loadAndRenderProfile()
-  }
+  showToast('Opening TSAP Financial Model — run S1 to generate territory profile')
+  setTimeout(function() {
+    window.open('../../tools/tsap-financial-model/index.html?eng=' + (eng.id||''), '_blank')
+  }, 300)
 }
 
 async function generateOrgProfile() {
@@ -870,68 +809,32 @@ async function generateOrgProfile() {
   var cust = (eng._cust && eng._cust.name) || eng.customer_name || 'Organisation'
   var ai = typeof atlasAI !== 'undefined' ? atlasAI : null
   if (!ai) {
-    showToast('Loading AI module...')
-    try {
-      await new Promise(function(res, rej) {
-        var sc = document.createElement('script')
-        sc.src = '../../shared/atlasAI.js'
-        sc.onload = res
-        sc.onerror = function() { rej(new Error('Could not load atlasAI.js')) }
-        document.head.appendChild(sc)
-      })
-      ai = atlasAI
-      var sb = getSB()
-      await ai.init(sb.url, sb.key)
-    } catch(e) {
-      showToast('AI not available — check shared/atlasAI.js')
-      return
-    }
+    showToast('Opening PEI Tool to generate organisation profile')
+    setTimeout(function() { window.open('../../tools/pei-tool/index.html?eng=' + (eng.id||''), '_blank') }, 300)
+    return
   }
   var el = document.getElementById('tab-body')
-  if (el) el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--mid)">'
-    + '<div style="font-size:28px;margin-bottom:12px">🔍</div>'
-    + '<div style="font-weight:600;color:var(--navy);margin-bottom:6px">Generating Organisation Profile for ' + esc(cust) + '...</div>'
-    + '<div style="font-size:12px;color:var(--mid)">This may take 15-30 seconds. Cached after first run.</div>'
-    + '</div>'
+  if (el) el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--mid)"><div style="font-size:28px;margin-bottom:12px">🔍</div><div style="font-weight:600;color:var(--navy);margin-bottom:6px">Generating Organisation Profile...</div><div style="font-size:12px;color:var(--mid)">15-30 seconds. Cached after first run.</div></div>'
   try {
-    var prompt = 'Generate a Pre-Engagement Intelligence (PEI) profile for ' + cust + ', India as a government or enterprise organisation. '
-      + 'Return ONLY a valid JSON object with exactly these keys (no markdown, no code fences, just raw JSON): '
-      + '{"ai_maturity": "text", "budget_signals": "text", "stakeholders": "text", "mandate": "text", "peer_activity": "text", "risks_opps": "text", "approach": "text"}'
+    var prompt = 'Generate a Pre-Engagement Intelligence (PEI) profile for ' + cust + ' as a government or enterprise organisation in India. Return ONLY a valid JSON object with exactly these keys (no markdown, no code fences, just raw JSON): {"ai_maturity":"text","budget_signals":"text","stakeholders":"text","mandate":"text","peer_activity":"text","risks_opps":"text","approach":"text"}'
     var rawResult = await ai.call(prompt, { tool: 'pei-profile', _timeout: 45000 })
-    // Try to parse — if fails, use as raw text
     var parsed = null
     try {
-      // Strip markdown fences if present
-      var clean = (rawResult||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim()
+      var clean = rawResult ? rawResult.replace(/^```json\n?/,'').replace(/```$/,'').trim() : ''
       parsed = JSON.parse(clean)
-    } catch(e) {
-      // Parse failed — store raw text, renderOrgProfileWiki handles it
-      parsed = { _raw: rawResult }
-    }
+    } catch(e2) { parsed = { _raw: rawResult } }
     var sb = getSB()
     if (sb.url) {
       await fetch(sb.url + '/rest/v1/intelligence_items', {
         method: 'POST',
-        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify({
-          engagement_id: eng.id,
-          tier: 'pei_profile',
-          title: 'PEI — ' + cust,
-          data: parsed,
-          content: JSON.stringify(parsed),
-          created_at: new Date().toISOString()
-        })
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ engagement_id: eng.id, tier: 'pei_profile', title: 'PEI — ' + cust, data: parsed, content: JSON.stringify(parsed), created_at: new Date().toISOString() })
       })
     }
     window.PROFILE_DATA = { data: parsed, created_at: new Date().toISOString() }
-    showToast('✓ Organisation profile generated')
+    showToast('Organisation profile generated')
     loadAndRenderProfile()
-  } catch(e) {
-    showToast('Generation failed: ' + e.message)
-    loadAndRenderProfile()
-  }
+  } catch(e) { showToast('Generation failed: ' + e.message); loadAndRenderProfile() }
 }
 
 function toggleIntel(i) {
