@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ATLAS Engagement Docket v2.1</title>
+<title>ATLAS Engagement Docket v2.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1150,7 +1150,7 @@ function renderDocket() {
     + renderTab(ACTIVE_TAB)
     + '</div>'
 
-  document.getElementById('main-area').innerHTML = html
+  var _ma = document.getElementById('main-area'); _ma.innerHTML = html; _ma.scrollTop = 0
 }
 
 function switchTab(tab) {
@@ -1732,11 +1732,13 @@ function buildTypeDropdown(eng) {
   var engT = eng.engagement_type || eng.type || ''
   var types = ['TSAP','Domain','Generic']
   var isKnown = types.some(function(t){ return engT===t||engT===t.toLowerCase() })
+  var col = isKnown ? 'var(--navy)' : 'var(--orange)'
+  var lbl = isKnown ? (engT.charAt(0).toUpperCase()+engT.slice(1).toLowerCase()) : '⚠ Set Type'
   return '<select onchange="setEngagementType(this.value)" '
-    + 'style="padding:3px 8px;border:1.5px solid rgba(255,255,255,.3);border-radius:6px;'
-    + 'font-size:11px;font-weight:600;background:rgba(255,255,255,.12);color:#fff;'
-    + 'cursor:pointer;font-family:inherit;outline:none;margin-right:4px">'
-    + '<option value=""' + (!isKnown?' selected':'') + '>— Set Type</option>'
+    + 'style="padding:3px 10px;border:1.5px solid '+col+';border-radius:6px;'
+    + 'font-size:11px;font-weight:700;background:#fff;color:'+col+';'
+    + 'cursor:pointer;font-family:inherit;outline:none;margin-right:6px">'
+    + '<option value=""' + (!isKnown?' selected':'') + '>⚠ Set Type</option>'
     + types.map(function(v){
         var sel = (engT===v||engT===v.toLowerCase()) ? ' selected' : ''
         return '<option value="'+v+'"'+sel+'>'+v+'</option>'
