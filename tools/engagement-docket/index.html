@@ -1774,8 +1774,13 @@ async function saveEngagement() {
 //    Tool shortcuts                                                             
 function openSASC() {
   var eng = CURRENT_ENG
-  if (!eng) return
-  window.location.href = '../../tools/sasc/index.html?eng=' + eng.id
+  if (!eng) { showToast('No engagement loaded'); return }
+  var url = '../../tools/sasc/index.html?eng=' + eng.id
+  if (CURRENT_DOCKET_ID) url += '&docket=' + CURRENT_DOCKET_ID
+  // Pass existing SASC docket item if one exists
+  var sascItem = DOCKET_ITEMS.find(function(i){ return i.item_type==='solution' || i.item_subtype==='sasc_bom' })
+  if (sascItem) url += '&item=' + sascItem.id
+  window.location.href = url
 }
 function openFM() {
   var eng = CURRENT_ENG
