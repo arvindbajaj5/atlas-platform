@@ -247,6 +247,8 @@ textarea{resize:vertical;min-height:60px}
 .q-sel{padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:10px;font-family:inherit;outline:none;background:#fff}
 .sla-sel{padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:10px;font-family:inherit;outline:none;background:#fff}
 .mc-filter{padding:5px 9px;border:1.5px solid var(--border);border-radius:5px;font-size:11px;font-family:inherit;outline:none;background:#fff}
+.req-chip-opt{transition:all .15s}
+.req-chip-opt.req-chip-on{border-color:var(--navy)!important;background:var(--navy)!important;color:#fff!important}
 </style>
   <!-- atlasExport.js CDN dependencies -->
   <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
@@ -701,31 +703,14 @@ function renderOrgProfileWiki(custName, eng) {
 async function generateTerritoryProfile() {
   var eng = CURRENT_ENG || {}
   if (!eng.territory) { showToast('Set territory first in Territory tab'); return }
-  showToast('⚡ Generating territory profile for ' + eng.territory + '...')
-  // In production this calls atlasAI.search() with territory context
-  // For now show informative message
-  if (typeof atlasAI === 'undefined' || !atlasAI.ready) {
-    showToast('atlasAI not loaded — check shared/atlasAI.js')
-    return
-  }
-  // Trigger via atlasAI.search (same as S1 in TSAP FM)
-  showToast('Opening Territory Profile in TSAP Financial Model to generate S1...')
-  setTimeout(function() {
-    window.open('../../tools/tsap-financial-model/index.html?eng=' + eng.id + '&tab=profile', '_blank')
-  }, 800)
+  showToast('Opening TSAP Financial Model to generate territory profile')
+  window.open('../../tools/tsap-financial-model/index.html?eng=' + eng.id, '_blank')
 }
 
 async function generateOrgProfile() {
   var eng = CURRENT_ENG || {}
-  showToast('⚡ Generating organisation profile...')
-  if (typeof atlasAI === 'undefined' || !atlasAI.ready) {
-    showToast('atlasAI not loaded — check shared/atlasAI.js')
-    return
-  }
-  showToast('Opening PEI Tool to generate profile...')
-  setTimeout(function() {
-    window.open('../../tools/pei-tool/index.html?eng=' + eng.id, '_blank')
-  }, 800)
+  showToast('Opening PEI Tool to generate profile')
+  window.open('../../tools/pei-tool/index.html?eng=' + eng.id, '_blank')
 }
 
 function toggleIntel(i) {
@@ -1417,31 +1402,67 @@ async function saveTerritory(changeMode) {
 function editRequirements() {
   var eng = CURRENT_ENG || {}
   var req = eng.requirements || {}
-  var html = '<div style="padding:20px">'
-    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:14px">Edit Requirements</div>'
-    + '<div style="margin-bottom:12px"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Objective *</label>'
-    + '<textarea id="req-obj" rows="5" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;min-height:100px">'+esc(req.objective||'')+'</textarea></div>'
-    + '<div style="margin-bottom:12px"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Problem Statement</label>'
-    + '<textarea id="req-prob" rows="4" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;min-height:80px">'+esc(req.problem||'')+'</textarea></div>'
-    + '<div style="margin-bottom:12px"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Success Criteria</label>'
-    + '<textarea id="req-succ" rows="4" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;min-height:80px">'+esc(req.success_criteria||'')+'</textarea></div>'
-    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
-    + '<button onclick="closeModal()" class="btn btn-outline">Cancel</button>'
-    + '<button onclick="saveRequirements()" class="btn btn-primary">Save Requirements</button>'
+  var constraintsList = ['Sovereign data','Air-gap required','MeitY empanelled','GFR compliance','Phased investment','Green / renewable','MEITY TEC certified','Offline / no internet']
+  var budgetOpts = ['Not defined','Under ₹50 Cr','₹50–200 Cr','₹200–500 Cr','₹500 Cr+','Under $5M','$5M–$25M','$25M+']
+  var timelineOpts = ['Under 6 months','6–12 months','1–2 years','2–5 years','5+ years']
+
+  var chipHtml = constraintsList.map(function(c) {
+    var on = (req.constraints||[]).includes(c)
+    var style = on
+      ? 'padding:4px 10px;border:1.5px solid var(--navy);border-radius:14px;font-size:11px;cursor:pointer;background:var(--navy);color:#fff;margin:2px'
+      : 'padding:4px 10px;border:1.5px solid var(--border);border-radius:14px;font-size:11px;cursor:pointer;background:#fff;color:var(--mid);margin:2px'
+    return '<span class="req-chip-opt' + (on ? ' req-chip-on' : '') + '" style="' + style + '" data-val="' + c + '" onclick="toggleReqChip(this)">' + c + '</span>'
+  }).join('')
+
+  var html = '<div style="padding:20px;max-height:70vh;overflow-y:auto">'
+    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:16px">Requirements — Post Meeting Capture</div>'
+    + '<div style="margin-bottom:14px"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px;letter-spacing:.3px">Objective *</label>'
+    + '<textarea id="req-obj" rows="5" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;min-height:100px;line-height:1.6">' + esc(req.objective||'') + '</textarea></div>'
+    + '<div style="margin-bottom:14px"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px;letter-spacing:.3px">Problem Statement</label>'
+    + '<textarea id="req-prob" rows="4" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;min-height:80px;line-height:1.6">' + esc(req.problem||'') + '</textarea></div>'
+    + '<div style="margin-bottom:14px"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px;letter-spacing:.3px">Success Criteria</label>'
+    + '<textarea id="req-succ" rows="4" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;min-height:80px;line-height:1.6">' + esc(req.success_criteria||'') + '</textarea></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'
+    + '<div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px;letter-spacing:.3px">Budget Range</label>'
+    + '<select id="req-budget" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:#fff">'
+    + budgetOpts.map(function(v){ return '<option' + (req.budget_range===v?' selected':'') + '>' + v + '</option>' }).join('')
+    + '</select></div>'
+    + '<div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px;letter-spacing:.3px">Timeline</label>'
+    + '<select id="req-timeline" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:#fff">'
+    + timelineOpts.map(function(v){ return '<option' + (req.timeline===v?' selected':'') + '>' + v + '</option>' }).join('')
+    + '</select></div></div>'
+    + '<div style="margin-bottom:14px"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:6px;letter-spacing:.3px">Compliance & Constraints</label>'
+    + '<div id="req-constraints" style="display:flex;flex-wrap:wrap;gap:4px">' + chipHtml + '</div></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">'
+    + '<button onclick="closeModal()" style="padding:8px 16px;background:transparent;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>'
+    + '<button onclick="saveRequirements()" style="padding:8px 18px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Save Requirements</button>'
     + '</div></div>'
   document.getElementById('modal-body').innerHTML = html
   openModal()
+}
+
+function toggleReqChip(el) {
+  el.classList.toggle('req-chip-on')
+  if (el.classList.contains('req-chip-on')) {
+    el.style.cssText = 'padding:4px 10px;border:1.5px solid var(--navy);border-radius:14px;font-size:11px;cursor:pointer;background:var(--navy);color:#fff;margin:2px'
+  } else {
+    el.style.cssText = 'padding:4px 10px;border:1.5px solid var(--border);border-radius:14px;font-size:11px;cursor:pointer;background:#fff;color:var(--mid);margin:2px'
+  }
 }
 
 async function saveRequirements() {
   var eng = CURRENT_ENG
   if (!eng) return
   var req = eng.requirements || {}
-  req.objective = (document.getElementById('req-obj').value||'').trim()
-  req.problem   = (document.getElementById('req-prob').value||'').trim() || null
-  req.success_criteria = (document.getElementById('req-succ').value||'').trim() || null
+  req.objective       = (document.getElementById('req-obj').value||'').trim()
+  req.problem         = (document.getElementById('req-prob').value||'').trim() || null
+  req.success_criteria= (document.getElementById('req-succ').value||'').trim() || null
+  req.budget_range    = document.getElementById('req-budget') ? document.getElementById('req-budget').value : req.budget_range
+  req.timeline        = document.getElementById('req-timeline') ? document.getElementById('req-timeline').value : req.timeline
+  // Read constraints from chip selection
+  var chips = document.querySelectorAll('.req-chip-opt.req-chip-on')
+  if (chips.length) req.constraints = Array.from(chips).map(function(c){ return c.textContent.trim() })
   if (!req.objective) { showToast('Objective is required'); return }
-  // Patch engagement
   var sb = getSB()
   if (sb.url) {
     try {
@@ -1451,11 +1472,11 @@ async function saveRequirements() {
           'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({ requirements: req })
       })
-    } catch(e) {}
+    } catch(e) { console.warn('[saveRequirements]', e) }
   }
   CURRENT_ENG.requirements = req
   closeModal()
-  showToast('✓ Requirements saved')
+  showToast('Requirements saved')
   renderDocket()
 }
 
@@ -1854,10 +1875,19 @@ function renderOverview() {
       + '<div style="margin-top:8px"><button class="btn btn-sm btn-ghost" onclick="editRequirements()">✏️ Edit Requirements</button><button onclick="generateVisionDoc()" style="margin-left:8px;padding:5px 12px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">📄 Generate Vision Doc</button></div>'
       + '</div>'
   } else {
-    reqHtml = '<div style="background:#FFF8E7;border:1px solid var(--amber);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#92400E;display:flex;align-items:center;justify-content:space-between">'
-      + '<span>⚠ No requirements defined for this engagement.</span>'
-      + '<button class="btn btn-sm" style="background:#92400E;color:#fff;padding:4px 10px;font-size:11px" onclick="editRequirements()">+ Add Requirements</button>'
+    reqHtml = '<div style="background:var(--light);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:14px">'
+      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);margin-bottom:12px">📋 Engagement Requirements — Post-Meeting</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
+      + '<div style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;cursor:pointer" onclick="editRequirements()"><div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Objective</div><div style="font-size:12px;color:var(--mid);font-style:italic">What does the customer want to achieve? Click to add...</div></div>'
+      + '<div style="background:#fff;border:1.5px dashed var(--border);border-radius:6px;padding:12px;cursor:pointer" onclick="editRequirements()"><div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Problem Statement</div><div style="font-size:12px;color:var(--mid);font-style:italic">What problem are they solving? Click to add...</div></div>'
       + '</div>'
+      + '<div style="display:flex;gap:8px;align-items:center;padding:10px 12px;background:#fff;border:1.5px dashed var(--border);border-radius:6px;margin-bottom:12px;cursor:pointer" onclick="editRequirements()">'
+      + '<div style="flex:1"><div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;margin-bottom:2px">Success Criteria</div><div style="font-size:12px;color:var(--mid);font-style:italic">How will the customer know this worked? Click to add...</div></div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px">'
+      + '<button class="btn btn-sm" style="background:var(--navy);color:#fff;padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer" onclick="editRequirements()">+ Fill Requirements</button>'
+      + '<span style="font-size:11px;color:var(--mid);align-self:center">Fill in after the customer meeting</span>'
+      + '</div></div>'
   }
 
   var html = reqHtml + '<div class="kpi-row">'
