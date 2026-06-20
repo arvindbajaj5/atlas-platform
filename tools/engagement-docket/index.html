@@ -499,6 +499,14 @@ async function renderProfileTab() {
   }
 
   // Load existing profile from Supabase if not cached
+  // Also clear if cached data is wrong type (e.g. PEI cached but now TSAP)
+  if (window.PROFILE_DATA) {
+    var isCachedPEI  = window.PROFILE_DATA.tier === 'pei_profile' || window.PROFILE_DATA.data
+    var isCachedTerr = window.PROFILE_DATA.session
+    if ((isTSAP && isCachedPEI && !isCachedTerr) || (!isTSAP && isCachedTerr && !isCachedPEI)) {
+      window.PROFILE_DATA = null  // type mismatch — reload
+    }
+  }
   if (!window.PROFILE_DATA) {
     await loadProfileFromSB()
   }
@@ -564,7 +572,17 @@ async function loadProfileFromSB() {
       })
       if (r2.ok) {
         var rows2 = await r2.json()
-        if (rows2.length) window.PROFILE_DATA = rows2[0]
+        if (rows2.length) {
+          var item = rows2[0]
+          // Supabase returns JSONB as object, string column as string
+          // Normalise: ensure data is an object
+          if (item.data && typeof item.data === 'string') {
+            try { item.data = JSON.parse(item.data) } catch(e) {}
+          } else if (!item.data && item.content) {
+            try { item.data = JSON.parse(item.content) } catch(e) { item.data = { _raw: item.content } }
+          }
+          window.PROFILE_DATA = item
+        }
       }
     }
   } catch(e) { console.warn('[Profile] load error:', e.message) }
@@ -623,11 +641,12 @@ function renderTerritoryProfileWiki(territory, eng) {
   ]
 
   sections.forEach(function(sec) {
-    var content = session[sec.key] || session[sec.key + '_summary'] || ''
-    if (!content) return
+    var rawContent = session[sec.key] || session[sec.key + '_summary']
+    if (!rawContent) return
+    var content = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent, null, 2)
     html += '<div style="border-bottom:1px solid var(--border);padding:12px 0">'
       + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">' + sec.icon + ' ' + sec.title + '</div>'
-      + '<div style="font-size:12px;color:var(--dark);line-height:1.7">' + esc(content) + '</div>'
+      + '<div style="font-size:12px;color:var(--dark);line-height:1.7;white-space:pre-wrap">' + esc(content) + '</div>'
       + '</div>'
   })
 
@@ -686,11 +705,12 @@ function renderOrgProfileWiki(custName, eng) {
 
   var data = pd.data || pd.content || pd
   peiSections.forEach(function(sec) {
-    var content = data[sec.key] || ''
-    if (!content) return
+    var rawContent = data[sec.key]
+    if (!rawContent) return
+    var content = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent, null, 2)
     html += '<div style="border-bottom:1px solid var(--border);padding:12px 0">'
       + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">' + sec.icon + ' ' + sec.title + '</div>'
-      + '<div style="font-size:12px;color:var(--dark);line-height:1.7">' + esc(content) + '</div>'
+      + '<div style="font-size:12px;color:var(--dark);line-height:1.7;white-space:pre-wrap">' + esc(content) + '</div>'
       + '</div>'
   })
 
@@ -1944,10 +1964,12 @@ function switchTab(tab) {
   renderDocket()
 }
 function wireTabEvents() {
-  // Wire .req-placeholder clicks to editRequirements()
-  var reqEls = document.querySelectorAll('.req-placeholder')
-  reqEls.forEach(function(el) {
-    el.addEventListener('click', function() { editRequirements() })
+  // Wire .req-placeholder clicks — these appear in #main-area (Overview)
+  // Use document-level querySelectorAll since they can be in either container
+  document.querySelectorAll('.req-placeholder').forEach(function(el) {
+    // Remove old listener first to avoid duplicates
+    el.removeEventListener('click', editRequirements)
+    el.addEventListener('click', editRequirements)
   })
 }
 
