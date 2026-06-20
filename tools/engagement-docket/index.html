@@ -477,14 +477,13 @@ var UC_MODAL_FILTER = 'all'
 
 // ── INTELLIGENCE TAB ─────────────────────────────────────────────────────────
 async function renderProfileTab() {
-  var eng = CURRENT_ENG || {}
-  var engType = eng.engagement_type || eng.type || ''
-  var isTSAP = engType === 'TSAP' || engType === 'tsap'
+  var eng  = CURRENT_ENG || {}
+  var engType  = eng.engagement_type || eng.type || ''
+  var isTSAP   = engType === 'TSAP' || engType === 'tsap'
   var territory = eng.territory || ''
-  var fmUrl = '../../tools/tsap-financial-model/index.html?eng=' + (eng.id||'')
-  var peiUrl = '../../tools/pei-tool/index.html?eng=' + (eng.id||'')
+  var custName  = (eng._cust && eng._cust.name) || eng.customer_name || 'Organisation'
 
-  // Load intel items
+  // Load intel items if not yet loaded
   if (!INTEL_ITEMS.length) {
     var sb = getSB()
     if (sb.url) {
@@ -497,37 +496,26 @@ async function renderProfileTab() {
     }
   }
 
-  var html = '<div style="display:grid;grid-template-columns:1fr 300px;gap:14px">'
-    + '<div>'
-
-  // ── Pre-meeting intelligence status banner ──────────────────────────────
-  if (isTSAP) {
-    html += '<div style="background:linear-gradient(135deg,var(--navy),#003090);border-radius:8px;padding:16px 20px;margin-bottom:14px;color:#fff">'
-      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin-bottom:6px">TSAP Territory Profile (S1→S4)</div>'
-      + '<div style="font-size:15px;font-weight:700;margin-bottom:6px">'
-      + (territory ? '📍 ' + esc(territory) : '⚠ No territory set — go to Territory tab')
-      + '</div>'
-      + '<div style="font-size:12px;color:rgba(255,255,255,.7);margin-bottom:12px">Territory intelligence pipeline. Run before the customer meeting to understand energy costs, land availability, workforce, government programmes and the 2×2 positioning.</div>'
-      + '<div style="display:flex;gap:8px">'
-      + (territory
-          ? '<a href="' + fmUrl + '" style="padding:7px 14px;background:var(--teal);color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600">Open Territory Profile →</a>'
-          : '<button onclick="switchTab(\'territory\')" style="padding:7px 14px;background:var(--orange);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">Set Territory First →</button>'
-        )
-      + '<button onclick="INTEL_ITEMS=[];switchTab(\'intel\')" style="padding:7px 12px;background:rgba(255,255,255,.1);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">↻ Refresh Intel</button>'
-      + '</div></div>'
-  } else {
-    html += '<div style="background:linear-gradient(135deg,#1C38F5,#0026C0);border-radius:8px;padding:16px 20px;margin-bottom:14px;color:#fff">'
-      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin-bottom:6px">Pre-Engagement Intelligence (PEI)</div>'
-      + '<div style="font-size:15px;font-weight:700;margin-bottom:6px">🔍 ' + esc((eng._cust&&eng._cust.name)||'Organisation') + '</div>'
-      + '<div style="font-size:12px;color:rgba(255,255,255,.7);margin-bottom:12px">Organisation intelligence brief. Run before the customer meeting to understand AI maturity, budget signals, key contacts, mandates and peer activity.</div>'
-      + '<div style="display:flex;gap:8px">'
-      + '<a href="' + peiUrl + '" style="padding:7px 14px;background:rgba(255,255,255,.15);color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600">Open PEI Tool →</a>'
-      + '<button onclick="INTEL_ITEMS=[];switchTab(\'intel\')" style="padding:7px 12px;background:rgba(255,255,255,.1);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">↻ Refresh Intel</button>'
-      + '</div></div>'
+  // Load existing profile from Supabase if not cached
+  if (!window.PROFILE_DATA) {
+    await loadProfileFromSB()
   }
 
-  // ── Intel items from scraper ────────────────────────────────────────────
-  html += '<div class="section-hdr" style="margin-bottom:10px"><div class="section-title">Relevant Intelligence (' + INTEL_ITEMS.length + ')</div></div>'
+  var html = ''
+
+  // ── Profile wiki section ─────────────────────────────────────────────────
+  if (isTSAP) {
+    html += renderTerritoryProfileWiki(territory, eng)
+  } else {
+    html += renderOrgProfileWiki(custName, eng)
+  }
+
+  // ── Relevant intel items ─────────────────────────────────────────────────
+  html += '<div class="section-hdr" style="margin-top:20px;margin-bottom:10px">'
+    + '<div class="section-title">Relevant Intelligence (' + INTEL_ITEMS.length + ')</div>'
+    + '<button class="btn btn-sm btn-ghost" onclick="INTEL_ITEMS=[];window.PROFILE_DATA=null;loadAndRenderProfile()">↻ Refresh</button>'
+    + '</div>'
+
   if (!INTEL_ITEMS.length) {
     html += '<div class="empty"><div class="empty-icon">🔍</div>'
       + '<div class="empty-title">No intelligence loaded</div>'
@@ -546,34 +534,198 @@ async function renderProfileTab() {
     })
   }
 
-  html += '</div>'
-
-  // Right panel
-  html += '<div>'
-  if (isTSAP) {
-    html += '<div class="card" style="margin-bottom:10px">'
-      + '<div class="card-title">Territory Profile Status</div>'
-      + '<div style="font-size:11px;color:var(--mid);line-height:1.6;margin-bottom:10px">'
-      + (territory
-          ? 'Territory: <strong>' + esc(territory) + '</strong><br>Run S1→S4 in the TSAP Financial Model to generate the full intelligence profile before your customer meeting.'
-          : 'No territory set. Go to the Territory tab to set the territory first.')
-      + '</div>'
-      + (territory ? '<a href="' + fmUrl + '" class="btn btn-sm btn-primary" style="display:inline-block;text-decoration:none;padding:6px 12px">Open Territory Profile →</a>' : '')
-      + '</div>'
-  } else {
-    html += '<div class="card" style="margin-bottom:10px">'
-      + '<div class="card-title">PEI Status</div>'
-      + '<div style="font-size:11px;color:var(--mid);line-height:1.6;margin-bottom:10px">Pre-Engagement Intelligence brief. Run before the customer meeting to walk in informed.</div>'
-      + '<a href="' + peiUrl + '" class="btn btn-sm btn-primary" style="display:inline-block;text-decoration:none;padding:6px 12px">Open PEI Tool →</a>'
-      + '</div>'
-  }
-  html += '<div class="card" style="background:#FFF8E7;border-color:var(--amber)">'
-    + '<div style="font-size:11px;color:#92400E;line-height:1.5">'
-    + '<strong>Pre-meeting intelligence.</strong> Use this to prepare for the customer meeting. After the meeting, fill in Requirements in the Overview tab and select scope in Portfolio.'
-    + '</div></div>'
-    + '</div></div>'
-
   return html
+}
+
+// ── Load profile data from Supabase ─────────────────────────────────────────
+async function loadProfileFromSB() {
+  var eng = CURRENT_ENG || {}
+  var engType = eng.engagement_type || eng.type || ''
+  var isTSAP = engType === 'TSAP' || engType === 'tsap'
+  var sb = getSB()
+  if (!sb.url || !eng.id) return
+  window.PROFILE_DATA = null
+  try {
+    if (isTSAP) {
+      // Load from territory_profiles table (S1 session)
+      var r = await fetch(sb.url + '/rest/v1/territory_profiles?engagement_id=eq.' + eng.id + '&order=created_at.desc&limit=1', {
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+      })
+      if (r.ok) {
+        var rows = await r.json()
+        if (rows.length) window.PROFILE_DATA = rows[0]
+      }
+    } else {
+      // Load from intelligence_items with type='pei_profile'
+      var r2 = await fetch(sb.url + '/rest/v1/intelligence_items?engagement_id=eq.' + eng.id + '&tier=eq.pei_profile&order=created_at.desc&limit=1', {
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+      })
+      if (r2.ok) {
+        var rows2 = await r2.json()
+        if (rows2.length) window.PROFILE_DATA = rows2[0]
+      }
+    }
+  } catch(e) { console.warn('[Profile] load error:', e.message) }
+}
+
+// ── Territory Profile Wiki (TSAP) ────────────────────────────────────────────
+function renderTerritoryProfileWiki(territory, eng) {
+  var pd = window.PROFILE_DATA
+  var session = pd && pd.session ? pd.session : null
+  var generatedDate = pd && pd.updated_at ? fmtDate(pd.updated_at) : null
+  var isStale = generatedDate && (new Date() - new Date(pd.updated_at)) > 90*24*60*60*1000
+
+  var statusBadge = !pd
+    ? '<span style="background:#FFF8E7;color:#92400E;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">NOT GENERATED</span>'
+    : isStale
+    ? '<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">STALE</span>'
+    : '<span style="background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">✓ GENERATED</span>'
+
+  var html = '<div style="background:var(--light);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin-bottom:16px">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+    + '<div><div style="font-size:17px;font-weight:700;color:var(--navy)">📍 ' + esc(territory||'Territory not set') + '</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-top:2px">Territory Profile ' + statusBadge
+    + (generatedDate ? ' · Generated ' + generatedDate : '') + '</div></div>'
+    + '<div style="margin-left:auto;display:flex;gap:8px">'
+    + (territory
+        ? '<button onclick="generateTerritoryProfile()" style="padding:7px 14px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">'
+          + (pd ? '↻ Regenerate Profile' : '⚡ Generate Profile') + '</button>'
+        : '<button onclick="switchTab(\'territory\')" style="padding:7px 14px;background:var(--orange);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Set Territory First →</button>')
+    + '</div></div>'
+
+  if (!territory) {
+    html += '<div style="padding:14px;background:#FFF8E7;border-radius:6px;font-size:12px;color:#92400E">Set the territory in the Territory tab to enable profile generation.</div>'
+    return html + '</div>'
+  }
+
+  if (!pd || !session) {
+    // Not yet generated
+    html += '<div style="padding:20px;text-align:center;color:var(--mid);font-size:12px">'
+      + '<div style="font-size:32px;margin-bottom:10px">🗺️</div>'
+      + '<div style="font-weight:600;color:var(--navy);margin-bottom:6px">No profile generated yet</div>'
+      + '<div style="margin-bottom:14px">Click "Generate Profile" to run territory intelligence. Profile is cached in Supabase — tokens are used once, then it reads from cache.</div>'
+      + '<button onclick="generateTerritoryProfile()" style="padding:9px 20px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">⚡ Generate Territory Profile</button>'
+      + '</div>'
+    return html + '</div>'
+  }
+
+  // Render wiki sections from session data
+  var sections = [
+    { key:'energy',       icon:'⚡', title:'Energy & Power' },
+    { key:'geography',    icon:'🏔️', title:'Geography & Climate' },
+    { key:'workforce',    icon:'👥', title:'Workforce & Skills' },
+    { key:'connectivity', icon:'🌐', title:'Connectivity & Infrastructure' },
+    { key:'programmes',   icon:'🏛️', title:'Government Programmes & Policy' },
+    { key:'economy',      icon:'💰', title:'Economy & Investment Climate' },
+    { key:'positioning',  icon:'🎯', title:'2×2 Positioning' }
+  ]
+
+  sections.forEach(function(sec) {
+    var content = session[sec.key] || session[sec.key + '_summary'] || ''
+    if (!content) return
+    html += '<div style="border-bottom:1px solid var(--border);padding:12px 0">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">' + sec.icon + ' ' + sec.title + '</div>'
+      + '<div style="font-size:12px;color:var(--dark);line-height:1.7">' + esc(content) + '</div>'
+      + '</div>'
+  })
+
+  // Fallback: raw summary if no structured sections
+  if (!sections.some(function(s){ return session[s.key] })) {
+    var raw = session.summary || session.s1_summary || session.profile || JSON.stringify(session).substring(0,500)
+    html += '<div style="font-size:12px;color:var(--dark);line-height:1.7;padding:12px 0">' + esc(raw) + '</div>'
+  }
+
+  return html + '</div>'
+}
+
+// ── Org Profile Wiki (non-TSAP / PEI) ───────────────────────────────────────
+function renderOrgProfileWiki(custName, eng) {
+  var pd = window.PROFILE_DATA
+  var generatedDate = pd && pd.created_at ? fmtDate(pd.created_at) : null
+
+  var statusBadge = !pd
+    ? '<span style="background:#FFF8E7;color:#92400E;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">NOT GENERATED</span>'
+    : '<span style="background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">✓ GENERATED</span>'
+
+  var html = '<div style="background:var(--light);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin-bottom:16px">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+    + '<div><div style="font-size:17px;font-weight:700;color:var(--navy)">🔍 ' + esc(custName) + '</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-top:2px">Organisation Profile (PEI) ' + statusBadge
+    + (generatedDate ? ' · Generated ' + generatedDate : '') + '</div></div>'
+    + '<div style="margin-left:auto;display:flex;gap:8px">'
+    + '<button onclick="generateOrgProfile()" style="padding:7px 14px;background:#1C38F5;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">'
+    + (pd ? '↻ Regenerate PEI' : '⚡ Generate PEI') + '</button>'
+    + '</div></div>'
+
+  if (!pd) {
+    html += '<div style="padding:20px;text-align:center;color:var(--mid);font-size:12px">'
+      + '<div style="font-size:32px;margin-bottom:10px">🔍</div>'
+      + '<div style="font-weight:600;color:var(--navy);margin-bottom:6px">No profile generated yet</div>'
+      + '<div style="margin-bottom:14px">Click "Generate PEI" to run organisation intelligence. Cached in Supabase after first run.</div>'
+      + '<button onclick="generateOrgProfile()" style="padding:9px 20px;background:#1C38F5;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">⚡ Generate Organisation Profile</button>'
+      + '</div>'
+    return html + '</div>'
+  }
+
+  // Render PEI wiki sections
+  var peiSections = [
+    { key:'ai_maturity',      icon:'🤖', title:'AI Maturity Assessment' },
+    { key:'budget_signals',   icon:'💰', title:'Budget & Investment Signals' },
+    { key:'stakeholders',     icon:'👥', title:'Key Stakeholders & Contacts' },
+    { key:'mandate',          icon:'🏛️', title:'Mandate & Policy Context' },
+    { key:'peer_activity',    icon:'🔭', title:'Peer & Competitor Activity' },
+    { key:'risks_opps',       icon:'⚖️', title:'Risks & Opportunities' },
+    { key:'approach',         icon:'🎯', title:'Recommended Approach' }
+  ]
+
+  var data = pd.data || pd.content || pd
+  peiSections.forEach(function(sec) {
+    var content = data[sec.key] || ''
+    if (!content) return
+    html += '<div style="border-bottom:1px solid var(--border);padding:12px 0">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">' + sec.icon + ' ' + sec.title + '</div>'
+      + '<div style="font-size:12px;color:var(--dark);line-height:1.7">' + esc(content) + '</div>'
+      + '</div>'
+  })
+
+  // Fallback: raw summary
+  if (!peiSections.some(function(s){ return data[s.key] })) {
+    var raw = data.summary || data.profile || (typeof data === 'string' ? data : JSON.stringify(data)).substring(0,800)
+    html += '<div style="font-size:12px;color:var(--dark);line-height:1.7;padding:12px 0">' + esc(raw) + '</div>'
+  }
+
+  return html + '</div>'
+}
+
+// ── Profile generation functions ─────────────────────────────────────────────
+async function generateTerritoryProfile() {
+  var eng = CURRENT_ENG || {}
+  if (!eng.territory) { showToast('Set territory first in Territory tab'); return }
+  showToast('⚡ Generating territory profile for ' + eng.territory + '...')
+  // In production this calls atlasAI.search() with territory context
+  // For now show informative message
+  if (typeof atlasAI === 'undefined' || !atlasAI.ready) {
+    showToast('atlasAI not loaded — check shared/atlasAI.js')
+    return
+  }
+  // Trigger via atlasAI.search (same as S1 in TSAP FM)
+  showToast('Opening Territory Profile in TSAP Financial Model to generate S1...')
+  setTimeout(function() {
+    window.open('../../tools/tsap-financial-model/index.html?eng=' + eng.id + '&tab=profile', '_blank')
+  }, 800)
+}
+
+async function generateOrgProfile() {
+  var eng = CURRENT_ENG || {}
+  showToast('⚡ Generating organisation profile...')
+  if (typeof atlasAI === 'undefined' || !atlasAI.ready) {
+    showToast('atlasAI not loaded — check shared/atlasAI.js')
+    return
+  }
+  showToast('Opening PEI Tool to generate profile...')
+  setTimeout(function() {
+    window.open('../../tools/pei-tool/index.html?eng=' + eng.id, '_blank')
+  }, 800)
 }
 
 function toggleIntel(i) {
@@ -1140,49 +1292,102 @@ function renderTerritoryTab() {
   var eng = CURRENT_ENG || {}
   var territory = eng.territory || ''
   var engType = eng.engagement_type || eng.type || ''
+  var fmUrl = '../../tools/tsap-financial-model/index.html?eng=' + (eng.id||'')
 
   if (!['TSAP','tsap'].includes(engType)) {
     return '<div class="empty"><div class="empty-icon">🗺️</div>'
-      + '<div class="empty-title">Territory Profile — TSAP only</div>'
+      + '<div class="empty-title">Territory — TSAP engagements only</div>'
       + '<div class="empty-sub">Available for Territory Sovereign AI Programme engagements only.</div></div>'
   }
 
-  // No territory set — show input form
+  // No territory set
   if (!territory) {
     return '<div class="card" style="max-width:500px">'
       + '<div class="card-title">Set Territory</div>'
-      + '<div class="card-sub">This TSAP engagement needs a territory defined before the S1–S4 intelligence pipeline can run.</div>'
+      + '<div class="card-sub">This TSAP engagement needs a territory defined before financial modelling can begin.</div>'
       + '<div style="margin-bottom:14px">'
-      + '<label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Territory Name *</label>'
+      + '<label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px;letter-spacing:.3px">Territory Name *</label>'
       + '<input type="text" id="terr-input" placeholder="e.g. Himachal Pradesh" '
-      + 'style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;outline:none" '
-      + 'onkeydown="if(event.key==String.fromCharCode(13))saveTerritory()">'
+      + 'style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;outline:none">'
       + '</div>'
-      + '<button onclick="saveTerritory()" style="padding:9px 20px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Set Territory & Open Profile →</button>'
+      + '<button onclick="saveTerritory()" style="padding:9px 20px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Set Territory →</button>'
       + '</div>'
   }
 
-  var fmUrl = '../../tools/tsap-financial-model/index.html?eng=' + (eng.id||'')
-
-  return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
-    + '<div style="font-size:16px;font-weight:700;color:var(--navy)">' + esc(territory) + '</div>'
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'
+    + '<div style="font-size:17px;font-weight:700;color:var(--navy)">📍 ' + esc(territory) + '</div>'
     + '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:#FFF3F1;color:#991B1B;font-weight:700">TSAP</span>'
-    + '<button onclick="saveTerritory(true)" style="margin-left:auto;padding:4px 10px;background:transparent;border:1.5px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer">✏️ Change</button>'
+    + '<button onclick="saveTerritory(true)" style="margin-left:auto;padding:5px 12px;background:transparent;border:1.5px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer">✏️ Change</button>'
     + '</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'
-    + '<div class="card"><div class="card-title">Territory Profile (S1–S4)</div>'
-    + '<div class="terr-status"><div class="terr-dot" style="background:var(--amber)"></div>'
-    + '<div><div style="font-size:12px;font-weight:700;color:var(--navy)">Ready to run</div>'
-    + '<div style="font-size:10px;color:var(--mid)">Open TSAP Financial Model to run S1 territory intelligence for ' + esc(territory) + '</div></div></div>'
-    + '<a href="' + fmUrl + '" class="btn btn-primary" style="display:inline-block;text-decoration:none;font-size:12px;padding:8px 14px;background:var(--navy);color:#fff;border-radius:6px">Open Territory Profile →</a>'
+
+    // Territory Config card
+    + '<div class="card" style="margin-bottom:14px">'
+    + '<div class="card-title">Territory Cost Configuration</div>'
+    + '<div class="card-sub">Cost multipliers and overrides for ' + esc(territory) + '. These values are used in the TSAP Financial Model to adjust national average costs for this specific territory.</div>'
+    + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    + '<thead><tr style="background:var(--light)">'
+    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Parameter</th>'
+    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Unit</th>'
+    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Territory Override</th>'
+    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">National Avg</th>'
+    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Source</th>'
+    + '</tr></thead><tbody>'
+    + [
+        ['Power Tariff',         'Rs/kWh',     'power_tariff',    '7.50'],
+        ['Water Cost',           'Rs/kL',      'water_cost',      '45.00'],
+        ['Land Cost',            'Rs L/acre',  'land_cost',       '80.00'],
+        ['Engineer Salary',      'Rs L/yr',    'engineer_salary', '12.00'],
+        ['Civil Cost Index',     'base 100',   'civil_index',     '100'],
+        ['Construction Cost',    'Rs Cr/MW',   'construction_cr', '8.00']
+      ].map(function(row, ri) {
+        var key = row[2]
+        var tc = getTerritoryConfig()
+        var override = tc[key] || ''
+        return '<tr style="border-bottom:1px solid var(--border);' + (ri%2===1?'background:var(--light)':'') + '">'
+          + '<td style="padding:9px 10px;font-weight:600;color:var(--navy)">' + row[0] + '</td>'
+          + '<td style="padding:9px 10px;color:var(--mid);font-size:11px">' + row[1] + '</td>'
+          + '<td style="padding:9px 10px">'
+          + '<input type="number" value="' + (override||'') + '" placeholder="' + row[3] + '" data-key="' + key + '" '
+          + 'onchange="saveTerritoryConfig(this.dataset.key, this.value)" '
+          + 'style="width:100%;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;max-width:120px">'
+          + '</td>'
+          + '<td style="padding:9px 10px;color:var(--mid);font-size:12px">' + row[3] + '</td>'
+          + '<td style="padding:9px 10px">'
+          + (override
+              ? '<span style="font-size:9px;padding:2px 7px;border-radius:8px;background:#FFF3F1;color:var(--orange);font-weight:700">OVERRIDE</span>'
+              : '<span style="font-size:9px;padding:2px 7px;border-radius:8px;background:var(--light);color:var(--mid);font-weight:700">NAT AVG</span>')
+          + '</td></tr>'
+      }).join('')
+    + '</tbody></table></div>'
+    + '<div style="margin-top:10px;font-size:11px;color:var(--mid)">Leave blank to use national average. Changes apply immediately to the TSAP Financial Model.</div>'
     + '</div>'
-    + '<div class="card"><div class="card-title">Territory Config</div>'
-    + '<div style="font-size:11px;color:var(--mid);margin-bottom:10px;line-height:1.5">Cost overrides for ' + esc(territory) + ' — power tariff, civil index, manpower multiplier. Managed in TSAP FM Territory Config tab.</div>'
-    + '<a href="' + fmUrl + '" class="btn btn-outline" style="display:inline-block;text-decoration:none;font-size:12px;padding:7px 14px;border:1.5px solid var(--border);border-radius:6px;color:var(--dark)">Open Territory Config →</a>'
-    + '</div></div>'
-    + '<div style="background:#EFF3FF;border:1px solid #BDD7FF;border-radius:8px;padding:12px 16px;font-size:12px;color:#1C38F5">'
-    + 'ℹ Once S3 profile is complete in the TSAP FM, the territory intelligence summary will appear here automatically.'
+
+    // Financial Model link
+    + '<div class="card" style="background:#EFF3FF;border-color:#BDD7FF">'
+    + '<div class="card-title" style="color:var(--blue)">TSAP Financial Model</div>'
+    + '<div style="font-size:12px;color:var(--mid);margin-bottom:12px;line-height:1.5">The financial model reads the territory profile and cost configuration above to calculate programme cost, funding structure and revenue model.</div>'
+    + '<a href="' + fmUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open Financial Model →</a>'
     + '</div>'
+}
+
+function getTerritoryConfig() {
+  try { return JSON.parse(localStorage.getItem('atlas_territory_config_' + (CURRENT_ENG&&CURRENT_ENG.id||'')) || '{}') } catch(e) { return {} }
+}
+
+function saveTerritoryConfig(key, val) {
+  var tc = getTerritoryConfig()
+  if (!val || !val.trim()) { delete tc[key] } else { tc[key] = parseFloat(val) }
+  localStorage.setItem('atlas_territory_config_' + (CURRENT_ENG&&CURRENT_ENG.id||''), JSON.stringify(tc))
+  // Also sync to Supabase app_config if possible
+  var sb = getSB()
+  if (sb.url) {
+    fetch(sb.url + '/rest/v1/app_config?key=eq.territory_config_' + (CURRENT_ENG&&CURRENT_ENG.id||''), {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+        'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ key: 'territory_config_' + (CURRENT_ENG&&CURRENT_ENG.id||''), value: JSON.stringify(tc) })
+    }).catch(function(){})
+  }
 }
 
 async function saveTerritory(changeMode) {
@@ -1252,6 +1457,123 @@ async function saveRequirements() {
   closeModal()
   showToast('✓ Requirements saved')
   renderDocket()
+}
+
+
+async function generateVisionDoc() {
+  var eng = CURRENT_ENG || {}
+  var req = eng.requirements || {}
+  if (!req.objective) {
+    showToast('Add requirements first — click Edit Requirements')
+    return
+  }
+  showToast('📄 Generating Vision Document...')
+  // Build doc using atlasExport.js
+  if (typeof atlasExport === 'undefined') {
+    showToast('Export library not loaded — check network')
+    return
+  }
+  var b = atlasExport.getBrand()
+  var custName = (eng._cust && eng._cust.name) || 'Customer'
+  var engName  = eng.name || eng.opportunity_name || 'Engagement'
+  var territory = eng.territory || ''
+
+  var sections = []
+
+  // Overview section
+  sections.push({
+    heading: 'Engagement Overview',
+    color: '#002870',
+    metadata: {
+      'Customer':    custName,
+      'Engagement':  engName,
+      'Type':        eng.engagement_type || eng.type || '—',
+      'Stage':       eng.stage || '—',
+      'Territory':   territory || '—',
+      'Date':        new Date().toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' })
+    }
+  })
+
+  // Objective
+  if (req.objective) {
+    sections.push({ heading: 'Objective', color: '#00B290', body: req.objective })
+  }
+
+  // Problem Statement
+  if (req.problem) {
+    sections.push({ heading: 'Problem Statement', color: '#1C38F5', body: req.problem })
+  }
+
+  // Scope — Portfolio selection
+  if (PORTFOLIO_SELECTION.length) {
+    sections.push({
+      heading: 'Scope of Work',
+      color: '#002870',
+      bullets: PORTFOLIO_SELECTION,
+      body: 'The following portfolio items have been agreed upon as the scope of this engagement:'
+    })
+  }
+
+  // Budget & Timeline
+  if (req.budget_range || req.timeline || (req.constraints && req.constraints.length)) {
+    var meta = {}
+    if (req.budget_range) meta['Budget Range'] = req.budget_range
+    if (req.timeline)     meta['Timeline']     = req.timeline
+    if (req.constraints && req.constraints.length) meta['Constraints'] = req.constraints.join(' · ')
+    sections.push({ heading: 'Investment & Timeline', color: '#FFB600', metadata: meta })
+  }
+
+  // Success Criteria
+  if (req.success_criteria) {
+    sections.push({ heading: 'Success Criteria', color: '#00B290', body: req.success_criteria })
+  }
+
+  // Next Steps
+  var openActions = DOCKET_ITEMS.filter(function(i){ return i.section==='action' && i.status!=='done' })
+  if (openActions.length) {
+    sections.push({
+      heading: 'Next Steps',
+      color: '#FF5539',
+      table: {
+        headers: ['Action', 'Owner', 'Due Date', 'Status'],
+        rows: openActions.map(function(a) {
+          return [a.title||a.text||'', a.assigned_to||'—', a.due_date||'—', (a.status||'open').toUpperCase()]
+        })
+      }
+    })
+  }
+
+  var filename = 'VisionDoc_' + (custName+' '+engName).replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+$/,'')
+    + '_' + new Date().toISOString().slice(0,10)
+
+  try {
+    await atlasExport.word({
+      title: engName,
+      subtitle: custName + (territory ? ' · ' + territory : ''),
+      filename: filename,
+      sections: sections,
+      footer: 'Prepared by ' + b.companyName + ' · Confidential · ' + new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
+    })
+    showToast('✓ Vision Document available — ' + filename + '.docx')
+    // Save to docket_items as output
+    var row = {
+      id: genId('DI'),
+      docket_id: CURRENT_DOCKET_ID,
+      engagement_id: eng.id,
+      section: 'output',
+      item_type: 'exec_doc',
+      item_subtype: 'vision_doc',
+      title: 'Vision Document — ' + engName,
+      status: 'done',
+      data: JSON.stringify({ filename: filename + '.docx', generated_at: new Date().toISOString() }),
+      created_by: 'ATLAS'
+    }
+    await sbPost('docket_items', row)
+    DOCKET_ITEMS.push(row)
+  } catch(e) {
+    showToast('Generation failed: ' + e.message)
+    console.error('[generateVisionDoc]', e)
+  }
 }
 
 async function init() {
@@ -1356,6 +1678,7 @@ async function openEngagement(eng) {
   MC_LOAD_D = ''
   AGENT_ON = false
   window.MAAS_ARCHS = []
+  window.PROFILE_DATA = null
   // Load portfolio selection if saved as docket_item
   if (CURRENT_DOCKET_ID) {
     var piItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'portfolio_selection' || i.item_type === 'portfolio_selection' })
@@ -1528,7 +1851,7 @@ function renderOverview() {
       + (req.timeline ? '<span class="req-chip" style="background:#EFF3FF;color:#1C38F5">' + esc(req.timeline) + '</span>' : '')
       + (req.constraints||[]).map(function(c){ return '<span class="req-chip" style="background:#FFF3F1;color:#991B1B">' + esc(c) + '</span>' }).join('')
       + '</div>'
-      + '<div style="margin-top:8px"><button class="btn btn-sm btn-ghost" onclick="editRequirements()">✏️ Edit</button></div>'
+      + '<div style="margin-top:8px"><button class="btn btn-sm btn-ghost" onclick="editRequirements()">✏️ Edit Requirements</button><button onclick="generateVisionDoc()" style="margin-left:8px;padding:5px 12px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">📄 Generate Vision Doc</button></div>'
       + '</div>'
   } else {
     reqHtml = '<div style="background:#FFF8E7;border:1px solid var(--amber);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#92400E;display:flex;align-items:center;justify-content:space-between">'
