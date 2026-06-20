@@ -256,6 +256,7 @@ textarea{resize:vertical;min-height:60px}
   <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <script src="../../shared/atlasExport.js"></script>
+  <script src="../../shared/atlasAI.js"></script>
 </head>
 <body>
 
@@ -398,12 +399,7 @@ textarea{resize:vertical;min-height:60px}
     <div id="uc-modal-list" style="max-height:320px;overflow-y:auto"></div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-uc')">Cancel</button>
-      <button class="btn btn-primary" onclick="addSelectedUC()">Add</button>
-    </div>
-  </div>
-</div>
-
-<script>
+      <button class="btn btn-primary" onclick="addSelectedUC()"
 // -- Config                               
 function getSB() {
   try {
@@ -651,7 +647,7 @@ function renderTerritoryProfileWiki(territory, eng) {
     + '<div style="margin-left:auto;display:flex;gap:8px">'
     + (territory
         ? '<button onclick="generateTerritoryProfile()" style="padding:7px 14px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">'
-          + (hasTSAPFMData ? 'Run S1 in TSAP FM →' : pd ? '↻ Regenerate Profile' : '⚡ Generate Profile') + '</button>'
+          + (hasTSAPFMData ? '⚡ Generate S1 Profile' : pd ? '↻ Regenerate Profile' : '⚡ Generate Profile') + '</button>'
         : '<button onclick="switchTab(\'territory\')" style="padding:7px 14px;background:var(--orange);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Set Territory First →</button>')
     + '</div></div>'
 
@@ -662,9 +658,10 @@ function renderTerritoryProfileWiki(territory, eng) {
 
   // TSAP FM has run S2+ but not S1 — S1 is the territory intelligence wiki
   if (hasTSAPFMData) {
-    html += '<div style="padding:16px;background:#EFF3FF;border:1px solid #BDD7FF;border-radius:8px;font-size:12px;color:var(--blue)">'
-      + '<strong>Territory data found (S2-S4 from Financial Model)</strong> but the S1 Territory Intelligence wiki has not been generated yet.<br>'
-      + '<span style="color:var(--mid)">In the TSAP Financial Model, go to the S1 tab and generate the territory intelligence profile. It will appear here automatically.</span>'
+    html += '<div style="padding:16px;background:#EFF3FF;border:1px solid #BDD7FF;border-radius:8px;font-size:12px;line-height:1.6">'
+      + '<div style="font-weight:700;color:var(--blue);margin-bottom:6px">Territory financial data found (S2-S4) — S1 Intelligence not yet generated</div>'
+      + '<div style="color:var(--mid);margin-bottom:10px">Click Generate S1 Profile to run Gemini territory intelligence — energy costs, workforce, connectivity, government programmes and 2×2 positioning. Cached in Supabase after first run.</div>'
+      + '<button onclick="generateTerritoryProfile()" style="padding:7px 14px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">⚡ Generate S1 Profile</button>'
       + '</div>'
     return html + '</div>'
   }
@@ -798,10 +795,75 @@ function renderOrgProfileWiki(custName, eng) {
 async function generateTerritoryProfile() {
   var eng = CURRENT_ENG || {}
   if (!eng.territory) { showToast('Set territory first in Territory tab'); return }
-  showToast('Opening TSAP Financial Model — run S1 to generate territory profile')
-  setTimeout(function() {
-    window.open('../../tools/tsap-financial-model/index.html?eng=' + (eng.id||''), '_blank')
-  }, 300)
+  var sb = getSB()
+
+  // Check atlasAI available
+  var ai = (typeof atlasAI !== 'undefined') ? atlasAI : null
+  if (!ai || !ai.ready) {
+    showToast('AI module not ready — check shared/atlasAI.js is deployed')
+    return
+  }
+
+  // Show loading state
+  var el = document.getElementById('tab-body')
+  if (el) el.innerHTML = '<div style="padding:48px;text-align:center;color:var(--mid)">'
+    + '<div style="font-size:36px;margin-bottom:12px">⚡</div>'
+    + '<div style="font-weight:700;color:var(--navy);font-size:15px;margin-bottom:8px">Generating Territory Profile for ' + esc(eng.territory) + '</div>'
+    + '<div style="font-size:12px;margin-bottom:6px">Running Gemini search grounding on energy, land, workforce, connectivity and government programmes.</div>'
+    + '<div style="font-size:11px;color:var(--mid)">15–30 seconds. Profile cached in Supabase — tokens used once only.</div>'
+    + '</div>'
+
+  try {
+    var prompt = 'Generate a territory intelligence profile for ' + eng.territory + ', India for AI infrastructure investment planning. '
+      + 'Return ONLY a valid JSON object (no markdown, no code fences) with exactly these string keys: '
+      + '{"energy":"power tariffs kWh rates availability renewable potential","geography":"climate terrain natural features advantages","workforce":"skilled workforce availability salaries key institutions","connectivity":"internet NKN transport road rail infrastructure","programmes":"state AI tech government initiatives budgets schemes","economy":"GSDP growth rate key industries investment climate","positioning":"AI infrastructure opportunity summary and recommended 2x2 quadrant Q1 Green AI Hub Q2 Knowledge Exporter Q3 Governance Moderniser Q4 Heritage Renaissance"}'
+
+    var raw = await ai.call(prompt, { tool: 'territory-profile-s1', _timeout: 60000 })
+    if (!raw) throw new Error('Empty response from AI')
+
+    // Parse — strip any markdown fences
+    var parsed = null
+    try {
+      var clean = raw.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim()
+      parsed = JSON.parse(clean)
+    } catch(pe) {
+      // Couldn't parse JSON — store raw with line breaks as fallback
+      parsed = { _raw: raw }
+    }
+
+    // Save to territory_profiles
+    if (sb.url) {
+      var slug = eng.territory.toLowerCase().replace(/[^a-z0-9]+/g,'-')
+      await fetch(sb.url + '/rest/v1/territory_profiles', {
+        method: 'POST',
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({
+          id: slug,
+          territory: eng.territory,
+          profile: parsed,
+          session: { docket: parsed },
+          generated_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 90*24*60*60*1000).toISOString()
+        })
+      })
+    }
+
+    window.PROFILE_DATA = {
+      territory: eng.territory,
+      session: { docket: parsed },
+      _wiki: parsed,
+      _source: 'docket',
+      updated_at: new Date().toISOString()
+    }
+    showToast('Territory profile generated and saved')
+    loadAndRenderProfile()
+  } catch(e) {
+    console.error('[generateTerritoryProfile]', e)
+    showToast('Generation failed: ' + (e.message||'unknown error'))
+    loadAndRenderProfile()
+  }
 }
 
 async function generateOrgProfile() {
@@ -1723,6 +1785,10 @@ async function generateVisionDoc() {
 
 async function init() {
   var sb = getSB()
+  // Init atlasAI for inline profile generation
+  if (typeof atlasAI !== 'undefined' && atlasAI.init) {
+    try { await atlasAI.init(sb.url, sb.key) } catch(e) { console.warn('[ATLAS] atlasAI init failed:', e.message) }
+  }
   if (!sb.url) {
     document.getElementById('sb-customers').innerHTML = '<div class="sb-empty">Configure Supabase in Settings first</div>'
     return
@@ -2690,6 +2756,8 @@ document.querySelectorAll('.modal-overlay').forEach(function(el) {
 })
 
 //    Boot                                                                       
+init()
+                                          
 init()
 </script>
 </body>
