@@ -447,8 +447,8 @@ function calcCapex() {
     { label: 'Seismic risk + insurance',         cr: usdToCr(ucUsd(isMDC ? 'capex_seismic_mdc_per_mw' : 'capex_seismic_bm_per_mw') * mw), source: 'HAICE FM v2.1' },
     { label: 'Regulatory + environmental',       cr: ucInr(isMDC ? 'capex_regulatory_mdc' : 'capex_regulatory_bm'),       source: 'HAICE FM v2.1' },
   ]
-  if (SASC_DATA && SASC_DATA.bom && SASC_DATA.bom.capex_usd) {
-    var sascCr = usdToCr(SASC_DATA.bom.capex_usd / 1e6)
+  if (SASC_DATA && (SASC_DATA.bom || (SASC_DATA.sasc && SASC_DATA.sasc.rom))) {
+    var sascCr = usdToCr(((SASC_DATA.bom && SASC_DATA.bom.capex_usd) || (SASC_DATA.sasc && SASC_DATA.sasc.rom && SASC_DATA.sasc.rom.capex_usd) || 0) / 1e6)
     lines.push({ label: 'SASC BOM additional items', cr: Math.max(0, sascCr - lines.reduce(function(s,l){ return s+l.cr },0)), source: 'SASC' })
   }
   var total = lines.reduce(function(s, l) { return s + l.cr }, 0)
@@ -480,7 +480,9 @@ function calcOpex() {
 
 function calcUCDev() {
   if (MODEL.ucdev_override_cr !== null) return { total: MODEL.ucdev_override_cr, lines: [{ label: 'Override', cr: MODEL.ucdev_override_cr }] }
-  if (!SASC_DATA || !SASC_DATA.selectedUCs) return { total: 0, lines: [] }
+  var _sasc_ucs = SASC_DATA && (SASC_DATA.selected_ucs || (SASC_DATA.sasc && SASC_DATA.sasc.selectedUCs) || SASC_DATA.selectedUCs)
+  if (!SASC_DATA || !_sasc_ucs) return { total: 0, lines: [] }
+  SASC_DATA.selectedUCs = _sasc_ucs
   var complexity = { simple:0, medium:0, complex:0, research:0 }
   var globalComp = (SASC_DATA.layerCfg && SASC_DATA.layerCfg.ucdev && SASC_DATA.layerCfg.ucdev.complexity) || 'medium'
   ;(SASC_DATA.selectedUCs || []).forEach(function(ucId) {
@@ -3718,6 +3720,53 @@ function tcClearAll() {
 }
 
 
+
+// ── Populate MODEL from SASC BOM docket_item ─────────────────────────────────
+// Called after SASC_DATA is loaded. Maps SASC output → FM MODEL fields.
+// Only sets values not already overridden by user.
+function populateModelFromSASC(data) {
+  if (!data) return
+  // Try both flat structure (new) and nested structure (legacy)
+  var bom      = data.bom      || (data.sasc && data.sasc.rom) || {}
+  var mdc      = data.sasc && data.sasc.mdc || {}
+  var tshirt   = data.mdc_tshirt || mdc.tshirt || 'm'
+  var phase1mw = data.phase1_mw || { xs:2, s:5, m:10, l:15, xl:20 }[tshirt] || 10
+
+  // MW sizing from MDC tshirt
+  if (!MODEL.phase1_mw || MODEL.phase1_mw === 10) {
+    MODEL.phase1_mw = phase1mw
+    console.log('[FM] phase1_mw from SASC:', phase1mw, '(tshirt:', tshirt, ')')
+  }
+
+  // CapEx override from SASC BOM (only if no manual override set)
+  if (MODEL.capex_override_cr === null && (bom.capex_usd || data.rom_usd)) {
+    var capexUsd = bom.capex_usd || (data.rom_usd * 0.85) // 85% of total as CapEx est
+    MODEL._sasc_capex_cr = usdToCr(capexUsd / 1e6)  // store as reference, don't override
+    console.log('[FM] SASC CapEx reference:', MODEL._sasc_capex_cr, 'Cr')
+  }
+
+  // OpEx reference from SASC
+  if (bom.opex_usd) {
+    MODEL._sasc_opex_cr = usdToCr(bom.opex_usd / 1e6)
+    console.log('[FM] SASC OpEx reference:', MODEL._sasc_opex_cr, 'Cr')
+  }
+
+  // UC dev reference from SASC
+  if (bom.ucdev_usd) {
+    MODEL._sasc_ucdev_cr = usdToCr(bom.ucdev_usd / 1e6)
+  }
+
+  // DC type from SASC
+  if (data.sasc && data.sasc.dcType) {
+    MODEL.dc_type = data.sasc.dcType
+  }
+
+  console.log('[FM] MODEL populated from SASC BOM. territory:', MODEL.territory, 'phase1_mw:', MODEL.phase1_mw)
+}
+
+// usdToCr: convert USD (millions) to INR Crore
+
+
 async function init() {
   // Initialise atlasAI (loads model list + behaviour config from Supabase)
   var _sb = getSB()
@@ -3762,6 +3811,8 @@ async function init() {
     if (sascItems && sascItems[0] && sascItems[0].content) {
       SASC_DATA = sascItems[0].content
       console.log('SASC data loaded for engagement:', ENGAGEMENT_ID)
+      // Populate MODEL from SASC BOM
+      populateModelFromSASC(SASC_DATA)
     }
 
     // Load funding sources
