@@ -557,31 +557,47 @@ async function loadProfileFromSB() {
   window.PROFILE_DATA = null
   try {
     if (isTSAP) {
-      // Load from territory_profiles table (S1 session)
-      var r = await fetch(sb.url + '/rest/v1/territory_profiles?engagement_id=eq.' + eng.id + '&order=created_at.desc&limit=1', {
+      var territory = eng.territory || ''
+      // Try by engagement_id first
+      var r1 = await fetch(sb.url + '/rest/v1/territory_profiles?engagement_id=eq.' + eng.id + '&order=updated_at.desc&limit=1', {
         headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
       })
-      if (r.ok) {
-        var rows = await r.json()
-        if (rows.length) window.PROFILE_DATA = rows[0]
+      if (r1.ok) {
+        var rows1 = await r1.json()
+        if (rows1.length && rows1[0].session) {
+          window.PROFILE_DATA = rows1[0]
+          console.log('[Profile] Loaded from SB by engagement_id:', Object.keys(rows1[0].session||{}))
+          return
+        }
+      }
+      // Fallback: try by territory name
+      if (territory) {
+        var r2 = await fetch(sb.url + '/rest/v1/territory_profiles?territory=eq.' + encodeURIComponent(territory) + '&order=updated_at.desc&limit=1', {
+          headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+        })
+        if (r2.ok) {
+          var rows2 = await r2.json()
+          if (rows2.length && rows2[0].session) {
+            window.PROFILE_DATA = rows2[0]
+            console.log('[Profile] Loaded from SB by territory:', territory, Object.keys(rows2[0].session||{}))
+          }
+        }
       }
     } else {
-      // Load from intelligence_items with type='pei_profile'
-      var r2 = await fetch(sb.url + '/rest/v1/intelligence_items?engagement_id=eq.' + eng.id + '&tier=eq.pei_profile&order=created_at.desc&limit=1', {
+      var r3 = await fetch(sb.url + '/rest/v1/intelligence_items?engagement_id=eq.' + eng.id + '&tier=eq.pei_profile&order=created_at.desc&limit=1', {
         headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
       })
-      if (r2.ok) {
-        var rows2 = await r2.json()
-        if (rows2.length) {
-          var item = rows2[0]
-          // Supabase returns JSONB as object, string column as string
-          // Normalise: ensure data is an object
-          if (item.data && typeof item.data === 'string') {
-            try { item.data = JSON.parse(item.data) } catch(e) {}
-          } else if (!item.data && item.content) {
-            try { item.data = JSON.parse(item.content) } catch(e) { item.data = { _raw: item.content } }
+      if (r3.ok) {
+        var rows3 = await r3.json()
+        if (rows3.length) {
+          var item = rows3[0]
+          if (!item.data && item.content) {
+            try { item.data = JSON.parse(item.content) } catch(e2) { item.data = { _raw: item.content } }
+          } else if (item.data && typeof item.data === 'string') {
+            try { item.data = JSON.parse(item.data) } catch(e3) { item.data = { _raw: item.data } }
           }
           window.PROFILE_DATA = item
+          console.log('[Profile] Loaded PEI from SB:', item.title)
         }
       }
     }
@@ -641,9 +657,11 @@ function renderTerritoryProfileWiki(territory, eng) {
   ]
 
   sections.forEach(function(sec) {
-    var rawContent = session[sec.key] || session[sec.key + '_summary']
-    if (!rawContent) return
-    var content = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent, null, 2)
+    var rawVal = session[sec.key] || session[sec.key + '_summary']
+    if (!rawVal) return
+    var content = typeof rawVal === 'string'
+      ? rawVal
+      : (typeof rawVal === 'object' ? JSON.stringify(rawVal, null, 2) : String(rawVal))
     html += '<div style="border-bottom:1px solid var(--border);padding:12px 0">'
       + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">' + sec.icon + ' ' + sec.title + '</div>'
       + '<div style="font-size:12px;color:var(--dark);line-height:1.7;white-space:pre-wrap">' + esc(content) + '</div>'
@@ -705,9 +723,11 @@ function renderOrgProfileWiki(custName, eng) {
 
   var data = pd.data || pd.content || pd
   peiSections.forEach(function(sec) {
-    var rawContent = data[sec.key]
-    if (!rawContent) return
-    var content = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent, null, 2)
+    var rawVal = data[sec.key]
+    if (!rawVal) return
+    var content = typeof rawVal === 'string'
+      ? rawVal
+      : (typeof rawVal === 'object' ? JSON.stringify(rawVal, null, 2) : String(rawVal))
     html += '<div style="border-bottom:1px solid var(--border);padding:12px 0">'
       + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">' + sec.icon + ' ' + sec.title + '</div>'
       + '<div style="font-size:12px;color:var(--dark);line-height:1.7;white-space:pre-wrap">' + esc(content) + '</div>'
@@ -1950,13 +1970,13 @@ function renderDocket() {
     + renderTab(ACTIVE_TAB)
     + '</div>'
 
-  var _ma = document.getElementById('main-area'); _ma.innerHTML = html; _ma.scrollTop = 0
+  var _ma = document.getElementById('main-area'); _ma.innerHTML = html; _ma.scrollTop = 0; setTimeout(wireTabEvents, 50)
 }
 
 function switchTab(tab) {
   ACTIVE_TAB = tab
   var el = document.getElementById('tab-body')
-  if (el) { el.innerHTML = renderTab(tab); setTimeout(wireTabEvents, 0) }
+  if (el) { el.innerHTML = renderTab(tab); setTimeout(wireTabEvents, 50) }
   document.querySelectorAll('.tab-btn').forEach(function(b){
     b.className = 'tab-btn' + (b.textContent.trim().toLowerCase().startsWith(tab) ? ' active' : '')
   })
