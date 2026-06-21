@@ -475,6 +475,7 @@ function fmtDate(d) {
 }
 function showToast(msg, type) {
   var t = document.getElementById('toast')
+  if (!t) { console.warn('[showToast] #toast missing:', msg); return }
   t.textContent = msg
   t.className = 'toast show' + (type === 'err' ? ' err' : '')
   setTimeout(function(){ t.className = 'toast' }, 2800)
@@ -4795,5 +4796,6 @@ init()
                                           
 init()
 </script>
+<div class="toast" id="toast"></div>
 </body>
 </html>
