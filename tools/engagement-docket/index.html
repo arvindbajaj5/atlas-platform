@@ -903,100 +903,18 @@ function renderOrgProfileWiki(custName, eng) {
 async function generateTerritoryProfile() {
   var eng = CURRENT_ENG || {}
   if (!eng.territory) { showToast('Set territory first in Territory tab'); return }
-  var sb = getSB()
-  var el = document.getElementById('tab-body')
-
-  // Show loading immediately so user sees something
-  if (el) el.innerHTML = '<div style="padding:48px;text-align:center;color:var(--mid)">'
-    + '<div style="font-size:36px;margin-bottom:12px">⚡</div>'
-    + '<div style="font-weight:700;color:var(--navy);font-size:15px;margin-bottom:8px">Generating Territory Profile for ' + esc(eng.territory) + '</div>'
-    + '<div style="font-size:12px;margin-bottom:6px">Running Gemini search grounding — energy, land, workforce, connectivity, government programmes.</div>'
-    + '<div style="font-size:11px;color:var(--mid)">15–30 seconds. Profile cached in Supabase — tokens used once only.</div>'
-    + '</div>'
-
-  // Get atlasAI — init if needed
-  var ai = (typeof atlasAI !== 'undefined') ? atlasAI : null
-  if (!ai) {
-    if (el) el.innerHTML = '<div style="padding:32px;text-align:center"><div style="font-size:32px;margin-bottom:12px">⚠️</div>'
-      + '<div style="font-weight:700;color:#991B1B;margin-bottom:8px">atlasAI not loaded</div>'
-      + '<div style="font-size:12px;color:var(--mid)">Ensure atlasAI.js is deployed to atlas-platform/shared/atlasAI.js and the page is refreshed.</div></div>'
-    return
-  }
-  // Init if not yet ready
-  if (!ai.ready && ai.init) {
-    try {
-      await ai.init(sb.url, sb.key)
-    } catch(initErr) {
-      if (el) el.innerHTML = '<div style="padding:32px;text-align:center"><div style="font-size:32px;margin-bottom:12px">⚠️</div>'
-        + '<div style="font-weight:700;color:#991B1B;margin-bottom:8px">atlasAI init failed</div>'
-        + '<div style="font-size:12px;color:var(--mid)">' + esc(initErr.message||'Unknown error') + '<br>Check Gemini API key in Settings.</div></div>'
-      return
-    }
-  }
-
-  try {
-    var prompt = 'Generate a territory intelligence profile for ' + eng.territory + ', India for AI infrastructure investment planning. '
-      + 'Return ONLY a valid JSON object with no markdown, no code fences, just raw JSON, with exactly these string-valued keys: '
-      + '{"energy":"","geography":"","workforce":"","connectivity":"","programmes":"","economy":"","positioning":""}'
-      + ' where each value is a descriptive paragraph. Keys: energy=power tariffs and renewable potential, '
-      + 'geography=climate and terrain, workforce=skills and salaries, connectivity=internet and transport, '
-      + 'programmes=state govt AI and tech initiatives, economy=GSDP and industries, '
-      + 'positioning=2x2 quadrant recommendation (Q1 Green AI Hub / Q2 Knowledge Exporter / Q3 Governance Moderniser / Q4 Heritage Renaissance) with rationale.'
-
-    var rawResp1 = await ai.call(prompt, { tool: 'territory-profile-s1', _timeout: 60000 })
-    if (!rawResp1) throw new Error('Empty response from AI')
-
-    // Extract text — atlasAI.call() may return string OR object {ok, text, raw, tokens}
-    var raw = typeof rawResp1 === 'string' ? rawResp1
-      : (rawResp1.text || rawResp1.raw || rawResp1.content || '')
-    if (!raw) throw new Error('No text in AI response — got: ' + JSON.stringify(rawResp1).substring(0,80))
-
-    // Strip markdown fences if present, then parse
-    var parsed = null
-    try {
-      var clean = raw.replace(/^```json\s*/m,'').replace(/^```\s*/m,'').replace(/```\s*$/m,'').trim()
-      // Find JSON object boundaries
-      var jStart = clean.indexOf('{')
-      var jEnd   = clean.lastIndexOf('}')
-      if (jStart >= 0 && jEnd > jStart) clean = clean.substring(jStart, jEnd+1)
-      parsed = JSON.parse(clean)
-    } catch(pe) {
-      console.warn('[generateTerritoryProfile] JSON parse failed, storing raw:', pe.message)
-      parsed = { _raw: raw }
-    }
-
-    // Save to territory_profiles (correct schema)
-    if (sb.url) {
-      var slug = eng.territory.toLowerCase().replace(/[^a-z0-9]+/g,'-')
-      var saveResp = await fetch(sb.url + '/rest/v1/territory_profiles', {
-        method: 'POST',
-        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify({
-          id: slug, territory: eng.territory,
-          profile: parsed, session: { docket: parsed },
-          generated_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 90*24*60*60*1000).toISOString()
-        })
-      })
-      if (!saveResp.ok) console.warn('[generateTerritoryProfile] Save failed:', saveResp.status)
-    }
-
-    window.PROFILE_DATA = {
-      territory: eng.territory, _source: 'docket',
-      session: { docket: parsed }, _wiki: parsed,
-      updated_at: new Date().toISOString()
-    }
-    showToast('Territory profile generated')
-    loadAndRenderProfile()
-  } catch(e) {
-    console.error('[generateTerritoryProfile]', e)
-    if (el) el.innerHTML = '<div style="padding:32px;text-align:center"><div style="font-size:32px;margin-bottom:12px">⚠️</div>'
-      + '<div style="font-weight:700;color:#991B1B;margin-bottom:8px">Generation failed</div>'
-      + '<div style="font-size:12px;color:var(--mid)">' + esc(e.message||'Unknown error') + '</div>'
-      + '<div style="margin-top:12px"><button onclick="loadAndRenderProfile()" style="padding:6px 14px;background:var(--light);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px">← Back</button></div></div>'
-  }
+  // Reset TP and open modal — tpStartS1 runs the full 12-section pipeline
+  // This preserves TSAP FM format and does NOT overwrite with flat format
+  TP.territory = eng.territory
+  TP.stage = 'home'
+  TP.s1 = null; TP.s2 = null; TP._rawIntel = null
+  await openIntelModal()
+  // Auto-start S1 generation after modal opens
+  setTimeout(async function() {
+    var inp = document.getElementById('tp-territory-input')
+    if (inp) inp.value = eng.territory
+    try { await tpStartS1() } catch(e) { console.error('[generateTerritoryProfile]', e) }
+  }, 500)
 }
 
 async function generateOrgProfile() {
@@ -1923,7 +1841,19 @@ function tpRender() {
   if (!body) return
   var modal = document.getElementById('modal-intelligence')
   if (!modal || modal.style.display === 'none') return
-  body.innerHTML = tpRenderModal()
+  try {
+    body.innerHTML = tpRenderModal()
+  } catch(e) {
+    console.error('[tpRender] stage=' + TP.stage, e)
+    body.innerHTML = '<div style="padding:24px;background:#FEE2E2;border-radius:8px;margin:16px">'
+      + '<div style="font-weight:700;color:#991B1B;margin-bottom:8px">⚠ Render error (stage: ' + TP.stage + ')</div>'
+      + '<div style="font-size:12px;color:#7F1D1D;font-family:monospace">' + esc(e.message||String(e)) + '</div>'
+      + '<div style="margin-top:12px;display:flex;gap:8px">'
+      + '<button onclick="TP.stage=\'s1_done\';tpRender()" style="padding:5px 12px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer">← Back to S1</button>'
+      + '<button onclick="TP.stage=\'home\';tpRender()" style="padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:5px;font-size:12px;cursor:pointer">Home</button>'
+      + '</div></div>'
+    return
+  }
   // Init chart if S3
   if (TP.stage === 's3') {
     setTimeout(function() {
@@ -2027,6 +1957,51 @@ var TP = {
 }
 var TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
 
+
+// ── geminiCall — thin wrapper over atlasAI for S1 raw search + section extract ─
+async function geminiCall(prompt, useSearch, maxTokens) {
+  var opts = {
+    maxTokens: maxTokens || (atlasAI.config && atlasAI.config.default_max_tokens ? atlasAI.config.default_max_tokens : 8192),
+    _captureGrounding: !!useSearch
+  }
+  if (useSearch) {
+    if (atlasAI.search) return await atlasAI.search(prompt, opts)
+    // Fallback if search not available — use regular call
+    return await atlasAI.call(prompt, opts)
+  }
+  return await atlasAI.call(prompt, opts)
+}
+
+// ── buildRawIntelPrompt — main S1 territory intelligence search prompt ──────────
+function buildRawIntelPrompt(territory) {
+  return 'Research ' + territory + ', India for an AI data centre and AI deployment feasibility study. '
+    + 'Use web search for the most CURRENT available data (2023-2025). Write as plain factual paragraphs. No JSON. No bullets. Just facts with specific numbers.\n\n'
+    + 'Cover ALL of the following:\n'
+    + 'ECONOMY: GSDP Rs crore, GSDP growth % (last 5 years trend), per capita income, per capita vs national average %, fiscal surplus or deficit, fiscal deficit % of GSDP, debt-to-GSDP %, own tax revenue Rs crore, % budget from central transfers, sectoral split agri/industry/services %.\n'
+    + 'POWER: Total installed capacity MW, hydel MW, solar MW, wind MW, power surplus or deficit, grid reliability hours per day, industrial power tariff Rs per kWh (MUST state this number), how this tariff compares to national average of Rs 7.5 per unit (e.g. 40% cheaper = index 60), renewable energy %, green energy index, carbon intensity gCO2/kWh, stranded renewable MW, 24x7 green power feasibility, data centre power feasibility.\n'
+    + 'WATER: Annual rainfall mm, names of perennial rivers, water stress level (low/medium/high), suitability for data centre cooling (high/medium/low), industrial water cost Rs per kL, how water cost compares to national average of Rs 45 per kL.\n'
+    + 'LAND: Total area sqkm, topography (plains/hilly/mountainous/coastal/mixed), number of industrial parks, number of SEZs, government land availability (high/medium/low), construction ease (easy/moderate/difficult), industrial land cost Rs lakh per acre, how land cost compares to national average of Rs 80 lakh per acre.\n'
+    + 'WORKFORCE: Population in lakh, literacy %, urbanisation %, unemployment %, engineering graduates per year, average software/AI engineer salary Rs lakh per year, how salary compares to national average of Rs 12 lakh, skilled labour availability (abundant/adequate/scarce), migration trend (net_in/net_out/balanced).\n'
+    + 'DIGITAL: Internet penetration %, optical fibre backbone km, NKN presence yes/no, smart cities count, BharatNet gram panchayat coverage %, government data centres count, SWAN status.\n'
+    + 'INFRASTRUCTURE: Total road km, national highway km, rail network km, airports count, logistics performance index score and national rank, power T&D losses %.\n'
+    + 'DEMOGRAPHICS: Population in lakh, urbanisation %, working age population %, youth (15-29) %, female workforce participation %, top 3-5 major districts by population.\n'
+    + 'POLICY: Named state AI or digital policies, IT and data centre policies, relevant central scheme allocations.\n'
+    + 'SCHEMES: Central and state schemes for AI, digital infrastructure, skill development - with funding amounts where available.\n'
+    + 'GEOGRAPHY: Key geographic advantages for data centres (cooling, power, land), key constraints.\n'
+    + 'AI OPPORTUNITIES: Top 6-8 specific AI use cases for this territory with domain name, why high/medium/low relevance, and 1-2 example applications.'
+}
+
+// ── atlasAI.parseJSON shim — in case atlasAI version doesn't have it ───────────
+function tp_parseJSON(text) {
+  if (typeof atlasAI !== 'undefined' && atlasAI.parseJSON) return tp_parseJSON(text)
+  try {
+    var clean = (text||'').replace(/^```json\s*/m,'').replace(/\s*```$/m,'').trim()
+    var jStart = clean.indexOf('{'), jEnd = clean.lastIndexOf('}')
+    if (jStart >= 0 && jEnd > jStart) clean = clean.substring(jStart, jEnd+1)
+    return { ok: true, data: JSON.parse(clean) }
+  } catch(e) { return { ok: false, error: e.message, raw: text } }
+}
+
 var SECTION_SCHEMAS = {
   macro:'{"gsdp_cr":234000,"gsdp_growth_pct":7.5,"per_capita_inr":185000,"vs_national_pct":78,"fiscal_health":"surplus","fiscal_deficit_pct":3.2,"debt_to_gsdp_pct":28,"sectoral_agri_pct":22,"sectoral_industry_pct":35,"sectoral_services_pct":43,"own_revenue_cr":45000,"central_transfers_pct":62,"gsdp_5yr_trend":[6.1,6.8,7.2,7.0,7.5]}',
   energy:'{"installed_mw":10281,"status":"surplus","grid_hrs":23,"renewable_pct":94,"industrial_tariff":4.5,"tariff_index_pct":62,"dc_feasibility":"high","green_energy_index":88,"carbon_intensity_gco2":18,"hydel_mw":9850,"solar_mw":280,"wind_mw":0,"green_24x7_feasibility":"high","stranded_renewable_mw":450,"green_corridor":true}',
@@ -2068,7 +2043,7 @@ function buildSectionPrompt(name, rawText, territory) {
 //    Parse section response                                                     
 
 async function tpExtractOneSection(sectionName, rawText, territory) {
-  var maxTok = atlasAI.sectionMaxTokens(sectionName)
+  var maxTok = (atlasAI.sectionMaxTokens ? atlasAI.sectionMaxTokens(sectionName) : 2048)
   var prompt = buildSectionPrompt(sectionName, rawText, territory)
   var result = await atlasAI.call(prompt, {
     maxTokens: maxTok,
@@ -2077,7 +2052,7 @@ async function tpExtractOneSection(sectionName, rawText, territory) {
   })
   if (!result.ok) return { ok: false, section: sectionName, error: result.error }
   TP_TOKENS.s1_extract += (result.tokens || 0)
-  var parsed = atlasAI.parseJSON(result.text)
+  var parsed = tp_parseJSON(result.text)
   if (!parsed.ok) {
     console.log('[TP] ' + sectionName + ' parse fail [' + parsed.error + '] raw:', result.text.substring(0, 100))
     return { ok: false, section: sectionName, error: parsed.error, raw_response: result.text }
@@ -2268,7 +2243,11 @@ async function tpLoadCached(id) {
     TP.objectives       = sess.objectives  || []
     TP.freeText         = sess.freeText    || ''
     TP.s2               = sess.s2
-    TP.overrides        = sess.overrides   || { working:[], attention:[] }
+    var _ov = sess.overrides || {}
+    TP.overrides = {
+      working:   Array.isArray(_ov.working)   ? _ov.working   : [],
+      attention: Array.isArray(_ov.attention) ? _ov.attention : []
+    }
     TP._2x2             = sess.twoByTwo    || null
     TP.s4               = sess.s4          || null
     TP._sources         = sess.sources     || []
@@ -2413,12 +2392,13 @@ var OBJECTIVES = [
 
 function buildS2Prompt(territory, s1data, objectives, freeText) {
   // Condensed s1 summary   only strategically relevant metrics
-  var e = s1data.hard_stats.energy || {}
-  var w = s1data.hard_stats.water  || {}
-  var l = s1data.hard_stats.land   || {}
-  var k = s1data.hard_stats.workers|| {}
-  var m = s1data.hard_stats.macro  || {}
-  var d = s1data.hard_stats.digital|| {}
+  var hs = (s1data && s1data.hard_stats) || {}
+  var e = hs.energy   || {}
+  var w = hs.water    || {}
+  var l = hs.land     || {}
+  var k = hs.workers  || {}
+  var m = hs.macro    || {}
+  var d = hs.digital  || {}
 
   var condensed = {
     territory:    territory,
@@ -3129,6 +3109,7 @@ async function tpRunS2() {
   TP.s2._objectives_fingerprint = JSON.stringify(TP.objectives.slice().sort())
   // Save S2 to territory_profiles for cache restore
   setTimeout(function(){ if(typeof tpSaveProfile==='function') tpSaveProfile() }, 200)
+  if (!TP.overrides) TP.overrides = { working:[], attention:[] }
   TP.overrides.working   = (TP.s2.working_in_favour || []).map(function(p){ return { text: p.point, metric: p.metric, confidence: p.confidence, removed: false } })
   TP.overrides.attention = (TP.s2.needs_attention   || []).map(function(p){ return { text: p.point, severity: p.severity, mitigation: p.mitigation, removed: false } })
   TP.stage = 's3'
@@ -3392,7 +3373,7 @@ function tpS3Result() {
   // Working in favour
   html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
     + '<div style="font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">&#9989; Working in favour</div>'
-    + TP.overrides.working.filter(function(p){ return !p.removed }).map(function(p,i){
+    + (TP.overrides.working||[]).filter(function(p){ return !p.removed }).map(function(p,i){
         return '<div style="padding:7px 9px;background:#F0FDF4;border-radius:5px;margin-bottom:6px;border-left:3px solid var(--teal)">'
           + '<div style="font-size:11px;line-height:1.4">' + esc(p.text) + '</div>'
           + (p.metric ? '<div style="font-size:10px;color:var(--mid);margin-top:3px">&#128202; ' + esc(p.metric) + '</div>' : '')
@@ -3407,7 +3388,7 @@ function tpS3Result() {
   // Needs attention
   html += '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px">'
     + '<div style="font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">&#9888; Needs attention</div>'
-    + TP.overrides.attention.filter(function(p){ return !p.removed }).map(function(p,i){
+    + (TP.overrides.attention||[]).filter(function(p){ return !p.removed }).map(function(p,i){
         var sevCol = p.severity==='critical'?'var(--orange)':p.severity==='moderate'?'var(--amber)':'var(--mid)'
         return '<div style="padding:7px 9px;background:#FFF8F0;border-radius:5px;margin-bottom:6px;border-left:3px solid '+sevCol+'">'
           + '<div style="font-size:11px;line-height:1.4">' + esc(p.text) + '</div>'
