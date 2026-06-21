@@ -835,13 +835,16 @@ async function init() {
       // Load UCs (by section — more reliable than item_type alone)
       var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&section=eq.uc', 100)
       // Also load portfolio selection to pre-configure service model
-      var portfolioItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_subtype=eq.portfolio_selection', 1)
+      var portfolioItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_type=eq.portfolio_selection', 1)
       if (portfolioItems && portfolioItems[0]) {
         try {
           var portData = JSON.parse(portfolioItems[0].data || '{}')
           var portSel = portData.items || []
           SASC_DATA._portfolioItems = portSel
           // Pre-enable service models from portfolio selection
+          // Domain centre → UC scope (L2-DAC is the new generic item)
+          var _domItems = ['L2-DAC','L2.1-INF','L2.2-INF','L2.3-INF','L2.4-INF']
+          SASC_DATA._hasDomainCentre = portSel.some(function(p){ return _domItems.includes(p) })
           if (portSel.includes('L2-MAAS'))   SASC_DATA.serviceModel.maas.enabled   = true
           if (portSel.includes('L2-GPUAAS')) SASC_DATA.serviceModel.gpuaas.enabled = true
           if (portSel.includes('L2-BMAAS'))  SASC_DATA.serviceModel.bmaas.enabled  = true
@@ -851,7 +854,11 @@ async function init() {
           console.log('[SASC] Portfolio loaded:', portSel.length, 'items | MaaS:', SASC_DATA.serviceModel.maas.enabled, '| GPUaaS:', SASC_DATA.serviceModel.gpuaas.enabled, '| BMaaS:', SASC_DATA.serviceModel.bmaas.enabled)
         } catch(e) { console.warn('[SASC] Portfolio parse error:', e.message) }
       }
-      var docketRefs = (docketUCItems || []).map(function(d) { return d.ref_id }).filter(Boolean)
+      var docketRefs = (docketUCItems || []).map(function(di) {
+        // ref_id may be a direct column or stored in data JSON
+        if (di.ref_id) return di.ref_id
+        try { var _dd = JSON.parse(di.data||'{}'); return _dd.ref_id || null } catch(e) { return null }
+      }).filter(Boolean)
       // Always sync from docket — docket is the source of truth
       DOCKET_UC_ITEMS = docketUCItems || []
       if (docketRefs.length) {
