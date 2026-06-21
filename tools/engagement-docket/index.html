@@ -1964,6 +1964,7 @@ var TP = {
   s4: null
 }
 var TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
+var TP_TIMER  = { start:0, elapsed:0, interval:null, _estPrompt:0 }
 
 
 async function callS2(territory, s1data, objectives, freeText) {
@@ -2005,6 +2006,43 @@ async function callS2(territory, s1data, objectives, freeText) {
   TP_TOKENS.s2_response = Math.round((result.tokens || 0) * 0.4)
   return { ok: true, data: result.data }
 }
+
+// ── TP timer functions (lifted from TSAP FM) ────────────────────────────────
+function tpTimerStart(estimatedPromptTokens) {
+  console.log('[TP] tpTimerStart stage='+TP.stage)
+  TP_TIMER.start = Date.now(); TP_TIMER.elapsed = 0
+  TP_TIMER._estPrompt = estimatedPromptTokens || 0
+  if (TP_TIMER.interval) clearInterval(TP_TIMER.interval)
+  TP_TIMER.interval = setInterval(function() {
+    TP_TIMER.elapsed = Math.floor((Date.now()-TP_TIMER.start)/1000)
+    var tel = document.getElementById('tp-timer-display')
+    if (!tel) { console.log('[TP] timer el missing at t='+TP_TIMER.elapsed); return }
+    tel.textContent = (TP_TIMER.elapsed>=60?Math.floor(TP_TIMER.elapsed/60)+'m ':'')+
+      (TP_TIMER.elapsed%60)+'s'
+    var kel = document.getElementById('tp-token-live')
+    if (kel) kel.textContent = '~'+(TP_TIMER._estPrompt+Math.min(TP_TIMER.elapsed*40,4096)).toLocaleString('en-IN')+' tokens'
+  }, 1000)
+}
+
+function tpTimerStop() {
+  if (TP_TIMER.interval) { clearInterval(TP_TIMER.interval); TP_TIMER.interval=null }
+  return TP_TIMER.elapsed
+}
+
+function tpTokenDisplay() {
+  var total = TP_TOKENS.s1_raw+TP_TOKENS.s1_extract+TP_TOKENS.s2_prompt+TP_TOKENS.s2_response
+  if (!total) return ''
+  var costRs = (total/1000000*0.075*84).toFixed(2)
+  return '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--light);border-radius:6px;margin-bottom:10px;flex-wrap:wrap">'
+    +'<span style="font-size:10px;color:var(--mid)">Tokens used:</span>'
+    +(TP_TOKENS.s1_raw?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Search: '+TP_TOKENS.s1_raw.toLocaleString('en-IN')+'</span>':'')
+    +(TP_TOKENS.s1_extract?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Extract: '+TP_TOKENS.s1_extract.toLocaleString('en-IN')+'</span>':'')
+    +(TP_TOKENS.s2_prompt?'<span style="font-size:11px;font-weight:600;color:var(--navy)">Profile: '+(TP_TOKENS.s2_prompt+TP_TOKENS.s2_response).toLocaleString('en-IN')+'</span>':'')
+    +'<span style="font-size:11px;font-weight:700;color:var(--teal)">Total: '+total.toLocaleString('en-IN')+'</span>'
+    +'<span style="font-size:11px;color:var(--mid)">~Rs '+costRs+'</span>'
+    +'</div>'
+}
+
 
 // ── geminiCall — thin wrapper over atlasAI for S1 raw search + section extract ─
 async function geminiCall(prompt, useSearch, maxTokens) {
