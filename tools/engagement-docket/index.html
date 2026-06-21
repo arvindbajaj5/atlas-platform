@@ -2219,21 +2219,15 @@ function tpRenderFailedSections(failed) {
   if (!failed||!Object.keys(failed).length) return ''
   var LABELS={macro:'Macroeconomics',energy:'Energy',water:'Water',land:'Land',
     workers:'Workforce',digital:'Digital',policy:'Policy',
-    programmes:'Programmes',geography:'Geography',opportunities:'AI Opportunities'}
-  return '<div style="background:#FEF3C7;border:1px solid var(--amber);border-radius:8px;padding:14px 18px;margin-bottom:14px">'
-    +'<div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:10px">&#9888; '
-    +Object.keys(failed).length+' section(s) could not be extracted</div>'
+    programmes:'Programmes',geography:'Geography',opportunities:'AI Opportunities',
+    demographics:'Demographics',infrastructure:'Infrastructure'}
+  // Subtle pill badges — no prominent error cards (matches TSAP FM blank behaviour)
+  return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:8px 12px;background:#FFF8E7;border-radius:6px;border:1px solid #FDE68A">'
+    +'<span style="font-size:10px;font-weight:700;color:#92400E">&#9888; Sections with incomplete data:</span>'
     +Object.keys(failed).map(function(k){
-        return '<div style="background:#fff;border-radius:6px;padding:10px 12px;margin-bottom:8px">'
-          +'<div style="display:flex;align-items:center;justify-content:space-between">'
-          +'<span style="font-size:12px;font-weight:600;color:var(--orange)">&#10060; '+(LABELS[k]||k)+'</span>'
-          +'<div style="display:flex;gap:6px">'
-          +'<button onclick="tpRetrySection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--navy);background:transparent;border-radius:4px;cursor:pointer;color:var(--navy)">&#8635; Re-extract</button>'
-          +'<button onclick="tpSkipSection(\''+k+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);background:transparent;border-radius:4px;cursor:pointer;color:var(--mid)">Skip</button>'
-          +'</div></div>'
-          +'<div style="font-size:10px;color:var(--mid);margin-top:4px">'+esc(failed[k].error||'Parse failed')+'</div>'
-          +'</div>'
+        return '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#FEF3C7;color:#92400E;font-weight:600">'+(LABELS[k]||k)+'</span>'
       }).join('')
+    +'<button onclick="Object.keys('+JSON.stringify(Object.keys(failed)).replace(/"/g,"\'")+').forEach(tpRetrySection);tpRender()" style="margin-left:auto;font-size:10px;padding:2px 10px;border:1px solid #D97706;background:transparent;border-radius:4px;cursor:pointer;color:#92400E">↺ Retry all</button>'
     +'</div>'
 }
 
@@ -2386,10 +2380,9 @@ async function tpLoadCached(id) {
     TP._2x2             = sess.twoByTwo    || null
     TP.s4               = sess.s4          || null
     TP._sources         = sess.sources     || []
-    // Restore to S3 if we have a full session, otherwise S1
-    TP.stage = (TP.s1 && TP.s2) ? 's3' : (TP.s1 ? 's1_done' : 'home')
-    // MODEL is TSAP FM only — not used in Docket
-    showToast('\u21ba Session restored: ' + row.territory)
+    // Always open to S1 (intelligence view) — user navigates to S3 via button
+    TP.stage = TP.s1 ? 's1_done' : 'home'
+    showToast('\u21ba Session restored: ' + row.territory + (TP.s2 ? ' (S3 ready)' : ''))
     tpRender()
     return
   }
@@ -2439,9 +2432,8 @@ async function tpStartS1() {
           TP._2x2       = sess.twoByTwo   || null
           TP.s4         = sess.s4          || null
           TP._sources   = sess.sources     || []
-          TP.stage      = 's3'
-          // MODEL is TSAP FM only — not used in Docket
-          showToast('\u21ba Session restored: ' + territory)
+          TP.stage      = 's1_done'  // Open S1 first; S3 accessible via nav
+          showToast('\u21ba Session restored: ' + territory + ' (S3 ready)')
         } else {
           TP.stage = 's1_done'
         }
@@ -3075,11 +3067,21 @@ function tpS1View() {
   html += '</div>'
 
   // CTA
-  html += '<div style="background:#E1F5EE;border-radius:8px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">'
-    + '<div><div style="font-size:13px;font-weight:700;color:var(--navy)">Stage 1 complete. Set your objectives to generate the territory profile.</div>'
-    + '<div style="font-size:11px;color:var(--mid)">Select objectives \u2014 no limit. Gemini will auto-profile the territory against them.</div></div>'
-    + '<button onclick="tpGoS2()" style="padding:9px 18px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0">Set Objectives &#8594;</button>'
-    + '</div>'
+  if (TP.s2) {
+    html += '<div style="background:linear-gradient(135deg,#E1F5EE,#EFF3FF);border-radius:8px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px">'
+      + '<div><div style="font-size:13px;font-weight:700;color:var(--navy)">Strategic profile is ready.</div>'
+      + '<div style="font-size:11px;color:var(--mid)">S2 analysis and 2×2 positioning generated. View profile or update objectives.</div></div>'
+      + '<div style="display:flex;gap:8px;flex-shrink:0">'
+      + '<button onclick="tpGoS2()" style="padding:9px 14px;background:transparent;border:1.5px solid var(--teal);color:var(--teal);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✏ Objectives</button>'
+      + '<button onclick="TP.stage=\'s3\';tpRender()" style="padding:9px 18px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">View Strategic Profile →</button>'
+      + '</div></div>'
+  } else {
+    html += '<div style="background:#E1F5EE;border-radius:8px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">'
+      + '<div><div style="font-size:13px;font-weight:700;color:var(--navy)">Stage 1 complete. Set your objectives to generate the territory profile.</div>'
+      + '<div style="font-size:11px;color:var(--mid)">Select objectives \u2014 no limit. Gemini will auto-profile the territory against them.</div></div>'
+      + '<button onclick="tpGoS2()" style="padding:9px 18px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0">Set Objectives &#8594;</button>'
+      + '</div>'
+  }
 
   html += '</div>'
   return html
@@ -4576,7 +4578,13 @@ async function deleteAction(id) {
 //    Outputs                                                                    
 function renderOutputsTab() {
   var outputs = DOCKET_ITEMS.filter(function(i){ return i.section === 'output' })
-  var html = '<div class="section-hdr"><div class="section-title">Outputs & documents (' + outputs.length + ')</div></div>'
+  var eng2 = CURRENT_ENG || {}
+  var isTSAP = (eng2.engagement_type||eng2.type||'').toLowerCase() === 'tsap'
+  var hasProfile = isTSAP && TP.s1
+  var profileBtn = hasProfile
+    ? '<button onclick="switchTab(\'profile\')" style="padding:5px 14px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">\uD83D\uDD2C Territory Intelligence \u2190</button>'
+    : ''
+  var html = '<div class="section-hdr"><div class="section-title">Outputs & documents (' + outputs.length + ')</div>' + profileBtn + '</div>'
 
   if (!outputs.length) {
     return html + '<div class="empty"><div class="empty-icon">&#128196;</div>'
