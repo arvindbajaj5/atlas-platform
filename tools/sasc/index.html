@@ -680,6 +680,7 @@ function renderROMSummary() {
   var duration = pm.duration_months || calcAutoDuration()
   var peopleCost = calcPeopleCost(pm.team, duration)
   var confidence = 35
+  var tc = SASC_DATA.territory_costs
 
   var totalROM = rom.capex_usd + (rom.opex_usd * 3) + rom.ucdev_usd + adjustedPeopleCost
   var lo = Math.round(totalROM * (1 - confidence/100))
@@ -708,6 +709,22 @@ function renderROMSummary() {
     + '<div style="font-size:22px;font-weight:900;color:var(--orange)">' + fmtMoney(totalROM) + '</div>'
     + '</div>'
     + '<div style="font-size:11px;color:var(--mid);margin-bottom:14px">Range: ' + fmtMoney(lo) + ' &mdash; ' + fmtMoney(hi) + ' at &plusmn;' + confidence + '% confidence</div>'
+
+  // Territory cost override status
+  var salaryRatio2 = (SASC_DATA.territory_costs && SASC_DATA.territory_costs.salary_ratio) || 1.0
+  var tc2 = SASC_DATA.territory_costs
+  if (tc2) {
+    html += '<div style="background:linear-gradient(135deg,#E1F5EE,#EFF3FF);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:11px">'
+      + '<div style="font-weight:700;color:var(--navy);margin-bottom:4px">&#128205; Territory cost adjustments applied</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      + (tc2.power_tariff_inr ? '<span style="background:#fff;padding:2px 8px;border-radius:8px;color:var(--mid)">Power &#8377;' + tc2.power_tariff_inr + '/kWh</span>' : '')
+      + (tc2.engineer_salary_lakh ? '<span style="background:#fff;padding:2px 8px;border-radius:8px;color:var(--mid)">Engineers &#8377;' + tc2.engineer_salary_lakh + 'L/yr ('+(salaryRatio2<1?'&#9660;':'&#9650;')+Math.abs(Math.round((1-salaryRatio2)*100))+'% vs nat avg)</span>' : '')
+      + (tc2.civil_cost_index ? '<span style="background:#fff;padding:2px 8px;border-radius:8px;color:var(--mid)">Civil idx ' + tc2.civil_cost_index + '</span>' : '')
+      + (!tc2.power_tariff_inr && !tc2.engineer_salary_lakh ? '<span style="color:var(--mid)">No cost overrides set in Docket &#8594; Territory tab</span>' : '')
+      + '</div></div>'
+  } else {
+    html += '<div style="padding:8px 12px;background:#FFF8E7;border-radius:6px;margin-bottom:10px;font-size:11px;color:#92400E">&#9888; Territory costs not loaded &#8212; set territory in Docket &#8594; Territory tab</div>'
+  }
 
   // Contract-specific view
   if (pm.contract_type === 'tm') {
@@ -815,7 +832,25 @@ async function init() {
     var libraryUCs = await sbFetch('uc_library', 'status=eq.active&order=cluster.asc,uc_name.asc', 200)
     ALL_UCS = libraryUCs || []
     if (SASC_DATA.docketId) {
-      var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_type=eq.use_case', 100)
+      // Load UCs (by section — more reliable than item_type alone)
+      var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&section=eq.uc', 100)
+      // Also load portfolio selection to pre-configure service model
+      var portfolioItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_subtype=eq.portfolio_selection', 1)
+      if (portfolioItems && portfolioItems[0]) {
+        try {
+          var portData = JSON.parse(portfolioItems[0].data || '{}')
+          var portSel = portData.items || []
+          SASC_DATA._portfolioItems = portSel
+          // Pre-enable service models from portfolio selection
+          if (portSel.includes('L2-MAAS'))   SASC_DATA.serviceModel.maas.enabled   = true
+          if (portSel.includes('L2-GPUAAS')) SASC_DATA.serviceModel.gpuaas.enabled = true
+          if (portSel.includes('L2-BMAAS'))  SASC_DATA.serviceModel.bmaas.enabled  = true
+          // Pre-set DC type: MDC if MDC portfolio items selected
+          var mdcItems = ['L2-MDC','L2-AIC','L2-HPC','L2-AIF']
+          if (portSel.some(function(p){ return mdcItems.includes(p) })) SASC_DATA.dcType = 'mdc'
+          console.log('[SASC] Portfolio loaded:', portSel.length, 'items | MaaS:', SASC_DATA.serviceModel.maas.enabled, '| GPUaaS:', SASC_DATA.serviceModel.gpuaas.enabled, '| BMaaS:', SASC_DATA.serviceModel.bmaas.enabled)
+        } catch(e) { console.warn('[SASC] Portfolio parse error:', e.message) }
+      }
       var docketRefs = (docketUCItems || []).map(function(d) { return d.ref_id }).filter(Boolean)
       // Always sync from docket — docket is the source of truth
       DOCKET_UC_ITEMS = docketUCItems || []
@@ -942,6 +977,27 @@ function renderScreen1() {
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
     + '<div class="card-title">Use Cases from Docket <span style="font-size:11px;font-weight:400;color:var(--mid)">(' + s.selectedUCs.length + ' in scope)</span></div>'
     + '</div>'
+  // Portfolio items from docket
+  var portItems = SASC_DATA._portfolioItems || []
+  var portLabels = {
+    'L1-TSAP':'TSAP Programme','L2-AIC':'AI Centre (Flagship)','L2-MDC':'Modular Datacenter',
+    'L2-HPC':'HPC Cluster','L2-TRC':'GPU Training Cluster','L2-AIF':'AI Factory',
+    'L2-MAAS':'MaaS','L2-GPUAAS':'GPUaaS','L2-BMAAS':'BMaaS',
+    'L3-DEP':'Deployment','L3-GOV':'Governance','L3-SKL':'Skills Academy',
+    'L3-OPS':'Managed Ops','L3-RAG':'RAG Platform','L3-INT':'System Integration'
+  }
+  if (portItems.length) {
+    html += '<div class="card" style="margin-bottom:14px">'
+      + '<div class="card-title">Portfolio Scope <span style="font-size:11px;font-weight:400;color:var(--mid)">(' + portItems.length + ' items)</span></div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:5px">'
+      + portItems.map(function(p) {
+          var lbl = portLabels[p] || p
+          var isSvc = ['L2-MAAS','L2-GPUAAS','L2-BMAAS'].includes(p)
+          return '<span style="font-size:10px;padding:3px 10px;border-radius:10px;font-weight:600;background:' + (isSvc?'#EFF3FF':'var(--light)') + ';color:' + (isSvc?'#1C38F5':'var(--navy)') + '">' + lbl + '</span>'
+        }).join('')
+      + '</div></div>'
+  }
+
   if (!ucItems.length && !s.selectedUCs.length) {
     html += '<div style="font-size:12px;color:var(--mid);font-style:italic">No use cases added to this engagement yet. Add them in the Engagement Docket → Use Cases tab.</div>'
   } else {
@@ -1008,8 +1064,7 @@ function renderScreen1() {
 
   // Territory cost adjustment indicator
   if (SASC_DATA.territory_costs) {
-    var tc = SASC_DATA.territory_costs
-    html += '<div style="margin-top:12px;padding:10px 14px;background:linear-gradient(135deg,#E1F5EE,#EFF3FF);border-radius:6px;font-size:11px;color:var(--navy)">'
+        html += '<div style="margin-top:12px;padding:10px 14px;background:linear-gradient(135deg,#E1F5EE,#EFF3FF);border-radius:6px;font-size:11px;color:var(--navy)">'
       + '<strong>Territory cost adjustments active</strong> — '
       + (tc.power_tariff_inr ? 'Power: ₹' + tc.power_tariff_inr + '/kWh · ' : '')
       + (tc.engineer_salary_lakh ? 'Engineers: ₹' + tc.engineer_salary_lakh + 'L/yr · ' : '')
