@@ -1005,9 +1005,8 @@ function renderPortfolioTab() {
       ['L2-MDC','L2-MDC Modular Datacenter','L'],['L2-TRC','L2-TRC GPU Training Cluster','L'],
       ['L2-HPC','L2-HPC HPC Cluster','XL'],['L2-EDG','L2-EDG Edge AI Node','XS'],['L2-AIF','L2-AIF AI Factory','XL']
     ]},
-    { title: 'L2.x — Domain AI Centres', items: [
-      ['L2.1-INF','L2.1-INF GeoAI Centre','M'],['L2.2-INF','L2.2-INF Defence AI Centre','L'],
-      ['L2.3-INF','L2.3-INF Health AI Centre','M'],['L2.4-INF','L2.4-INF FinAI Centre','M']
+    { title: 'L2.x — Domain AI Centre', note:'UCs defined in Use Cases tab', items: [
+      ['L2-DAC','L2.x Domain AI Centre (UCs define scope)','M/L']
     ]},
     { title: 'L2 — Managed AI Services', badge: 'Services', items: [
       ['L2-MAAS',   'MaaS — Model as a Service',   '—'],
@@ -1074,8 +1073,9 @@ function updateTabBar() {
   var eng = CURRENT_ENG || {}
   var _et = eng.engagement_type || eng.type || ''
   var tabs = ['overview','profile','portfolio']
-  var hasUCScope = PORTFOLIO_SELECTION.some(function(p){ return !['L2-MAAS','L2-GPUAAS','L2-BMAAS'].includes(p) })
-  if (hasUCScope || !PORTFOLIO_SELECTION.length) tabs.push('uc')
+  var UC_TRIGGERS = ['L2-DAC','L2.1-INF','L2.2-INF','L2.3-INF','L2.4-INF']
+  var hasUCScope = PORTFOLIO_SELECTION.some(function(p){ return UC_TRIGGERS.includes(p) })
+  if (hasUCScope) tabs.push('uc')
   var hasSvc = ['L2-MAAS','L2-GPUAAS','L2-BMAAS'].some(function(p){ return PORTFOLIO_SELECTION.includes(p) })
   if (hasSvc) tabs.push('svcmodel')
   if (_et==='TSAP'||_et==='tsap') tabs.push('territory')
@@ -1126,17 +1126,34 @@ async function savePortfolioSelection() {
   var sb = getSB()
   if (!sb.url) { showToast('Supabase not configured'); return }
   // Save as docket_item with item_subtype = portfolio_selection
+  // Only columns that exist in docket_items schema
+  var _portId = CURRENT_DOCKET_ID + '-portfolio'
   var body = {
+    id: _portId,
     docket_id: CURRENT_DOCKET_ID,
-    engagement_id: eng.id,
     section: 'output',
-    item_subtype: 'portfolio_selection',
     item_type: 'portfolio_selection',
     title: 'Portfolio Selection',
     data: JSON.stringify({ items: PORTFOLIO_SELECTION }),
     status: 'done'
   }
-  await sbPost('docket_items', body)
+  // PATCH first (update), POST if not found
+  var sb = getSB()
+  var _pr = await fetch(sb.url + '/rest/v1/docket_items?id=eq.' + encodeURIComponent(_portId), {
+    method: 'PATCH',
+    headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+      'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ data: JSON.stringify({ items: PORTFOLIO_SELECTION }), status: 'done' })
+  })
+  if (!_pr.ok || (await (async function(){ var t = _pr.headers.get('content-range'); return t === '*/*' || t === null })())) {
+    // Row didn't exist — create it
+    await fetch(sb.url + '/rest/v1/docket_items', {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+        'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(body)
+    })
+  }
   showToast('✓ Portfolio selection saved')
 }
 
@@ -3991,8 +4008,10 @@ function renderDocket() {
         var eng = CURRENT_ENG || {}
         var _et = eng.engagement_type || eng.type || ''
         // UC tab — visible when portfolio has any non-service items
-        var hasUCScope = PORTFOLIO_SELECTION.some(function(p){ return !['L2-MAAS','L2-GPUAAS','L2-BMAAS'].includes(p) })
-        if (hasUCScope || !PORTFOLIO_SELECTION.length) tabs.push('uc')
+        // UC tab only when a Domain AI Centre is in portfolio
+        var UC_TRIGGERS = ['L2-DAC','L2.1-INF','L2.2-INF','L2.3-INF','L2.4-INF']
+        var hasUCScope = PORTFOLIO_SELECTION.some(function(p){ return UC_TRIGGERS.includes(p) })
+        if (hasUCScope) tabs.push('uc')
         // Service Model tab — visible when any service offering selected
         var hasSvc = ['L2-MAAS','L2-GPUAAS','L2-BMAAS'].some(function(p){ return PORTFOLIO_SELECTION.includes(p) })
         if (hasSvc) tabs.push('svcmodel')
@@ -4280,7 +4299,8 @@ function renderUCTab() {
   html += '<div class="uc-grid">'
   ucItems.forEach(function(item) {
     // Find UC from library
-    var uc = UC_LIBRARY.find(function(u){ return u.id === item.ref_id }) || {}
+    var _uid = item._ref_id || item.ref_id || (function(){ try{ return JSON.parse(item.data||'{}').ref_id }catch(e){ return null } })()
+    var uc = UC_LIBRARY.find(function(u){ return u.id === _uid }) || {}
     var ucName = uc.uc_name || item.title || 'UC'
     var status = item.status || 'proposed'
     var statusClass = status === 'agreed' ? 'uc-agreed' : status === 'scratched' ? 'uc-scratched' : 'uc-proposed'
@@ -4355,15 +4375,17 @@ function renderUCModalContent(q) {
 async function addUCToDocket(ucId) {
   if (!CURRENT_DOCKET_ID) { showToast('No docket for this engagement', 'err'); return }
   var uc = UC_LIBRARY.find(function(u){ return u.id === ucId }) || {}
+  // Only use columns that exist in docket_items schema
+  // ref_id + cluster stored in data JSON (ref_table/engagement_id cols don't exist)
   var row = {
     id: genId('DI'), docket_id: CURRENT_DOCKET_ID,
-    engagement_id: CURRENT_ENG ? CURRENT_ENG.id : null,
     section: 'uc', item_type: 'use_case',
     title: uc.uc_name || ucId,
-    ref_table: 'uc_library', ref_id: ucId,
     status: 'proposed', created_by: 'ATLAS',
-    created_at: new Date().toISOString()
+    data: JSON.stringify({ ref_id: ucId, cluster: uc.cluster||'', complexity: uc.complexity||'' })
   }
+  // Keep ref_id on the in-memory object for immediate rendering (not saved to DB)
+  row._ref_id = ucId
   // sbPost with error details
   var sb = getSB()
   var ok = false
