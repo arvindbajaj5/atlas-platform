@@ -1480,7 +1480,14 @@ function toggleMaasModel(id) {
     var m = MC_ROWS_D.find(function(r){ return r.id === id })
     if (m) MAAS_MODELS_SELECTED.push(m)
   }
-  switchTab('maas')
+  // Re-render just the model table section (don't navigate away)
+  var el = document.querySelector('#tab-body .mc-table')
+  if (el) {
+    var cnt = document.querySelector('.section-title')
+    if (cnt && cnt.textContent.includes('Model')) cnt.textContent = cnt.textContent.replace(/\d+ selected/, MAAS_MODELS_SELECTED.length + ' selected')
+  } else {
+    switchTab('svcmodel')
+  }
 }
 
 function toggleAgent() {
@@ -4350,20 +4357,39 @@ async function addUCToDocket(ucId) {
   var uc = UC_LIBRARY.find(function(u){ return u.id === ucId }) || {}
   var row = {
     id: genId('DI'), docket_id: CURRENT_DOCKET_ID,
+    engagement_id: CURRENT_ENG ? CURRENT_ENG.id : null,
     section: 'uc', item_type: 'use_case',
     title: uc.uc_name || ucId,
     ref_table: 'uc_library', ref_id: ucId,
-    status: 'proposed', created_by: 'ATLAS'
+    status: 'proposed', created_by: 'ATLAS',
+    created_at: new Date().toISOString()
   }
-  var ok = await sbPost('docket_items', row)
-  if (ok) {
-    DOCKET_ITEMS.push(row)
-    showToast('UC added to docket')
-    renderUCModalContent(document.getElementById('uc-search').value)
-    refreshItems()
-  } else {
-    showToast('Failed to add UC', 'err')
+  // sbPost with error details
+  var sb = getSB()
+  var ok = false
+  try {
+    var _r = await fetch(sb.url + '/rest/v1/docket_items', {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+        'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(row)
+    })
+    ok = _r.ok
+    if (!ok) {
+      var errBody = await _r.text()
+      console.error('[addUCToDocket] ' + _r.status + ':', errBody.substring(0,200))
+      showToast('UC add failed (' + _r.status + '): ' + errBody.substring(0,60), 'err')
+      return
+    }
+  } catch(e) {
+    console.error('[addUCToDocket]', e)
+    showToast('UC add error: ' + e.message, 'err')
+    return
   }
+  DOCKET_ITEMS.push(row)
+  showToast('UC added to docket')
+  renderUCModalContent(document.getElementById('uc-search').value)
+  refreshItems()
 }
 
 async function setUCStatus(itemId, status) {
