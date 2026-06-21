@@ -2204,7 +2204,7 @@ async function tpRefreshIntel() {
 
 async function tpSaveProfile() {
   // tpSaveProfile now saves full session (S1 profile + S2 result + objectives + overrides + stage)
-  if (!TP.s1) return
+  if (!TP.s1 && !TP._docket_s1) return
   var slug = TP.territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
   var session = TP.s2 ? {
     objectives: TP.objectives,
@@ -3127,6 +3127,8 @@ async function tpRunS2() {
   TP.s2 = result.data
   // Store objectives fingerprint so we can avoid re-generating for same objectives
   TP.s2._objectives_fingerprint = JSON.stringify(TP.objectives.slice().sort())
+  // Save S2 to territory_profiles for cache restore
+  setTimeout(function(){ if(typeof tpSaveProfile==='function') tpSaveProfile() }, 200)
   TP.overrides.working   = (TP.s2.working_in_favour || []).map(function(p){ return { text: p.point, metric: p.metric, confidence: p.confidence, removed: false } })
   TP.overrides.attention = (TP.s2.needs_attention   || []).map(function(p){ return { text: p.point, severity: p.severity, mitigation: p.mitigation, removed: false } })
   TP.stage = 's3'
@@ -3898,10 +3900,20 @@ function switchTab(tab) {
   renderDocket()
 }
 function wireTabEvents() {
+  // Empty placeholder button
   var btn = document.getElementById('btn-fill-req')
-  if (btn) {
-    btn.onclick = function(e) { e.preventDefault(); e.stopPropagation(); editRequirements(); return false; }
-  }
+  if (btn) btn.onclick = function(e){ e.preventDefault(); editRequirements(); return false }
+  // Edit button (filled state)
+  var btnE = document.getElementById('btn-edit-req')
+  if (btnE) btnE.onclick = function(e){ e.preventDefault(); editRequirements(); return false }
+  // Generate Vision Doc button
+  var btnV = document.getElementById('btn-gen-vision')
+  if (btnV) btnV.onclick = function(e){ e.preventDefault(); generateVisionDoc(); return false }
+  // Apply S2 button
+  var btnS2 = document.getElementById('btn-apply-s2')
+  if (btnS2) btnS2.onclick = function(e){ e.preventDefault(); applyS2ToRequirements(); return false }
+  // Placeholder divs
+  document.querySelectorAll('.req-placeholder').forEach(function(el){ el.onclick = editRequirements })
 }
 
 
@@ -3984,18 +3996,22 @@ function renderOverview() {
   var reqHtml = ''
   if (req.objective) {
     reqHtml = '<div class="req-block">'
-      + '<div class="req-block-title">📌 Engagement Requirement</div>'
+      + '<div class="req-block-title">' + ((eng.engagement_type||'').toUpperCase()==='TSAP' ? '🚀' : '📌') + ' Engagement Requirements</div>'
       + '<div class="req-obj">' + esc(req.objective) + '</div>'
-      + (req.problem ? '<div class="req-meta"><strong>Problem:</strong> ' + esc(req.problem) + '</div>' : '')
-      + (req.success_criteria ? '<div class="req-meta"><strong>Success:</strong> ' + esc(req.success_criteria) + '</div>' : '')
-      + '<div class="req-chips" style="margin-top:8px">'
-      + (req.budget_range ? '<span class="req-chip" style="background:#E1F5EE;color:#065F46">' + esc(req.budget_range) + '</span>' : '')
-      + (req.timeline ? '<span class="req-chip" style="background:#EFF3FF;color:#1C38F5">' + esc(req.timeline) + '</span>' : '')
-      + (req.constraints||[]).map(function(c){ return '<span class="req-chip" style="background:#FFF3F1;color:#991B1B">' + esc(c) + '</span>' }).join('')
+      + (req.problem ? '<div class="req-meta" style="margin-top:8px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:2px">Problem Statement</div><div style="font-size:12px;color:var(--dark);line-height:1.5">' + esc(req.problem) + '</div></div>' : '')
+      + (req.success_criteria ? '<div class="req-meta" style="margin-top:8px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:2px">Success Criteria</div><div style="font-size:12px;color:var(--dark);line-height:1.5">' + esc(req.success_criteria) + '</div></div>' : '')
+      + '<div class="req-chips" style="margin-top:10px">'
+      + (req.budget_range && req.budget_range !== 'Not defined' ? '<span class="req-chip" style="background:#E1F5EE;color:#065F46">💰 ' + esc(req.budget_range) + '</span>' : '')
+      + (req.timeline ? '<span class="req-chip" style="background:#EFF3FF;color:#1C38F5">📅 ' + esc(req.timeline) + '</span>' : '')
+      + (req.constraints && req.constraints.length ? req.constraints.map(function(c){ return '<span class="req-chip" style="background:#FFF3F1;color:#991B1B">' + esc(c) + '</span>' }).join('') : '')
       + '</div>'
-      + '<div style="margin-top:8px"><button class="btn btn-sm btn-ghost" onclick="editRequirements()">✏️ Edit Requirements</button><button onclick="generateVisionDoc()" style="margin-left:8px;padding:5px 12px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">📄 Generate Vision Doc</button></div>'
+      + '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button id="btn-edit-req" type="button" class="btn btn-sm btn-ghost">✏️ Edit Requirements</button>'
+      + '<button id="btn-gen-vision" type="button" style="padding:5px 12px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">📄 Generate Vision Doc</button>'
+      + (typeof TP !== 'undefined' && TP.s2 ? '<button id="btn-apply-s2" type="button" style="padding:5px 12px;background:var(--teal);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">↓ Apply S2</button>' : '')
       + '</div>'
-  } else {
+      + '</div>'
+    } else {
     reqHtml = renderEmptyReq()
   }
 
@@ -4011,10 +4027,10 @@ function renderOverview() {
     + '<div class="card"><div class="card-title">Customer profile</div>'
     + '<div class="profile-grid">'
     + profRow('Organisation', cust.name || eng.name)
-    + profRow('Type', formatType(cust.type || eng.type))
+    + profRow('Segment', esc(cust.segment || cust.tier || cust.type || '—'))
     + profRow('Location', cust.location || '')
     + profRow('Primary contact', cust.primary_contact || '')
-    + profRow('Engagement type', formatType(eng.type))
+    + profRow('Engagement type', esc(eng.engagement_type || eng.type || '—'))
     + profRow('Owner', eng.owner || '')
     + '</div></div>'
 
