@@ -200,7 +200,7 @@ input:focus,select:focus{border-color:var(--blue);}
 
 <script charset="utf-8">
 // -- Config -------------------------------------------------------------------
-const DOCKET_URL = '../engagement-docket/index.html'
+const DOCKET_URL = '../../tools/engagement-docket/'
 
 function getSB() {
   var g = typeof atlasGetGlobal === 'function' ? atlasGetGlobal() : (function(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } })()
@@ -351,7 +351,8 @@ var SASC_DATA = {
     maas:   { enabled: false, models: [], agentEnabled: false, agentModel: 'Llama 3.1 8B INT4' },
     gpuaas: { enabled: false, gpus: 0, gpu_hour_price_usd: 3.50 },
     bmaas:  { enabled: false, servers: 0, server_hour_price_usd: 1.20 }
-  }
+  },
+  territory_costs: null
 }
 
 var ALL_UCS = []
@@ -578,6 +579,13 @@ function renderPeopleTab() {
   var duration = pm.duration_months || calcAutoDuration()
   var autoDur  = calcAutoDuration()
   var peopleCost = calcPeopleCost(pm.team, duration)
+  // Apply territory salary adjustment if available
+  var salaryRatio = (SASC_DATA.territory_costs && SASC_DATA.territory_costs.salary_ratio) || 1.0
+  var adjustedPeopleCost = Math.round(peopleCost.total * salaryRatio)
+  var salaryAdjNote = salaryRatio !== 1.0
+    ? ' <span style="font-size:10px;color:' + (salaryRatio<1?'var(--teal)':'var(--orange)') + ';font-weight:600">' 
+      + (salaryRatio<1?'▼':'▲') + Math.abs(Math.round((1-salaryRatio)*100)) + '% territory adj.</span>'
+    : ''
 
   // Contract type selector
   var html = '<div class="card">'
@@ -673,7 +681,7 @@ function renderROMSummary() {
   var peopleCost = calcPeopleCost(pm.team, duration)
   var confidence = 35
 
-  var totalROM = rom.capex_usd + (rom.opex_usd * 3) + rom.ucdev_usd + peopleCost.total
+  var totalROM = rom.capex_usd + (rom.opex_usd * 3) + rom.ucdev_usd + adjustedPeopleCost
   var lo = Math.round(totalROM * (1 - confidence/100))
   var hi = Math.round(totalROM * (1 + confidence/100))
 
@@ -692,7 +700,7 @@ function renderROMSummary() {
     + '<tr><td>CapEx (hardware + networking + infrastructure)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(rom.capex_usd) + '</td></tr>'
     + '<tr><td>OpEx (software licences x 3 years)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(rom.opex_usd*3) + '</td></tr>'
     + '<tr><td>UC development (build + test)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(rom.ucdev_usd) + '</td></tr>'
-    + '<tr><td>People cost (' + duration + ' month programme)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(peopleCost.total) + '</td></tr>'
+    + '<tr><td>People cost (' + duration + ' month programme)' + salaryAdjNote + '</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(adjustedPeopleCost) + '</td></tr>'
     + '</tbody></table>'
 
     + '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:2px solid var(--navy);margin-top:4px">'
@@ -741,6 +749,39 @@ function renderROMSummary() {
   return html
 }
 
+// Load territory cost overrides from app_config (saved by Engagement Docket → Territory tab)
+async function loadTerritoryConfig(engId) {
+  if (!engId) return
+  var key = 'territory_config_' + engId
+  try {
+    var rows = await sbFetch('app_config', 'key=eq.' + encodeURIComponent(key), 1)
+    if (!rows || !rows[0] || !rows[0].value) return
+    var cfg = JSON.parse(rows[0].value)
+    // Map Docket field names → SASC usage
+    SASC_DATA.territory_costs = {
+      power_tariff_inr:     cfg.power_tariff     || null,
+      water_cost_inr_kl:    cfg.water_cost       || null,
+      land_cost_lakh_acre:  cfg.land_cost        || null,
+      engineer_salary_lakh: cfg.engineer_salary  || null,
+      civil_cost_index:     cfg.civil_index      || null,
+      construction_cr:      cfg.construction_cr  || null,
+      // Salary ratio vs national average (12L = 100%)
+      salary_ratio: cfg.engineer_salary ? (cfg.engineer_salary / 12.0) : 1.0
+    }
+    console.log('[SASC] Territory costs loaded:', SASC_DATA.territory_costs)
+  } catch(e) { console.warn('[SASC] Territory config load error:', e.message) }
+}
+
+// Back to Docket navigation
+function backToDocket() {
+  var url = DOCKET_URL
+  if (SASC_DATA.engId) url += '?eng=' + SASC_DATA.engId
+  if (SASC_DATA.docketId) url += '&docket=' + SASC_DATA.docketId
+  window.location.href = url
+}
+
+var DOCKET_UC_ITEMS = []
+
 async function init() {
   await loadFxRates()
   var params = new URLSearchParams(window.location.search)
@@ -765,6 +806,8 @@ async function init() {
       SASC_DATA.archetype = engs[0].archetype || ''
       var custs = await sbFetch('customers', 'id=eq.' + engs[0].customer_id, 1)
       if (custs && custs[0]) SASC_DATA.customerName = custs[0].name || ''
+      ENGAGEMENT = engs[0]
+      await loadTerritoryConfig(SASC_DATA.engId)
       document.getElementById('hdr-eng-label').innerHTML =
         '<strong>' + esc(SASC_DATA.customerName) + '</strong> &mdash; ' + esc(SASC_DATA.engName)
     }
@@ -774,7 +817,8 @@ async function init() {
     if (SASC_DATA.docketId) {
       var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_type=eq.use_case', 100)
       var docketRefs = (docketUCItems || []).map(function(d) { return d.ref_id }).filter(Boolean)
-      // Always sync from docket   docket is the source of truth
+      // Always sync from docket — docket is the source of truth
+      DOCKET_UC_ITEMS = docketUCItems || []
       if (docketRefs.length) {
         SASC_DATA.selectedUCs = docketRefs
       }
@@ -864,223 +908,123 @@ function renderStepNav() {
 // -- Screen 1: Scope & DC -----------------------------------------------------
 function renderScreen1() {
   var s = SASC_DATA
-  // Standalone mode -- show engagement selector
-  var engHtml = ''
-  if (!SASC_DATA.engId && ALL_ENGAGEMENTS.length) {
-    engHtml = '<div class="card" style="border-left:3px solid var(--orange)">'
-      + '<div class="card-title">Select engagement</div>'
-      + '<div class="card-sub">SASC was opened without an engagement context. Select one to load UCs.</div>'
-      + '<select onchange="selectEngagement(this.value)" style="width:100%">'
-      + '<option value="">-- Select engagement --</option>'
-      + ALL_ENGAGEMENTS.map(function(e){ return '<option value="' + e.id + '">' + esc(e.name||'Engagement') + '</option>' }).join('')
-      + '</select></div>'
-  } else if (!SASC_DATA.engId) {
-    engHtml = '<div class="card" style="border-left:3px solid var(--amber)">'
-      + '<div class="card-sub">No engagement loaded. Launch SASC from an Engagement Docket for full UC context, or continue without UCs for a generic configuration.</div></div>'
-  }
+  var eng = ENGAGEMENT || {}
+  var req = eng.requirements || {}
 
-  var ucHtml = ''
-  //    UC selector   domain accordion                                      
-  if (ALL_UCS.length) {
-    var selCount = s.selectedUCs.length
+  // ── Header — engagement context ──────────────────────────────────────────────
+  var html = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:14px 18px;background:var(--navy);border-radius:8px;color:#fff">'
+    + '<div><div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:2px">ENGAGEMENT</div>'
+    + '<div style="font-size:16px;font-weight:700">' + esc(s.customerName||'Customer') + ' — ' + esc(s.engName||'Engagement') + '</div></div>'
+    + '<div style="margin-left:auto;display:flex;gap:8px">'
+    + (s.docketId ? '<button onclick="backToDocket()" style="padding:5px 12px;background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">← Back to Docket</button>' : '')
+    + '</div></div>'
 
-    // Domain icons
-    var DOMAIN_ICONS = {
-      'Agriculture & Food Security':        '&#127807;',
-      'Water Resources & Hydrology':         '&#128167;',
-      'Emergency Management & Disaster Response': '&#128680;',
-      'Natural Resources & Environment':     '&#127795;',
-      'Climate & Carbon Intelligence':       '&#127754;',
-      'Renewable Energy Site Assessment':    '&#9728;',
-      'Urban Planning & Smart Cities':       '&#127963;',
-      'Aircraft Safety':                     '&#9992;',
-      'Crew Safety':                         '&#128119;'
-    }
-
-    // Complexity colour map
-    var CMAP = { simple:'#00B290', medium:'#6B7280', complex:'#FF5539', research:'#8B5CF6' }
-
-    // Build cluster groups preserving logical order
-    var CLUSTER_ORDER = [
-      'Agriculture & Food Security',
-      'Water Resources & Hydrology',
-      'Emergency Management & Disaster Response',
-      'Natural Resources & Environment',
-      'Climate & Carbon Intelligence',
-      'Renewable Energy Site Assessment',
-      'Urban Planning & Smart Cities',
-      'Aircraft Safety',
-      'Crew Safety'
-    ]
-    // Add any clusters in DB not in our order list (future-proof)
-    ALL_UCS.forEach(function(u) {
-      if (u.cluster && CLUSTER_ORDER.indexOf(u.cluster) < 0) CLUSTER_ORDER.push(u.cluster)
-    })
-
-    var expandedCluster = SASC_DATA.ucExpandedCluster || null
-
-    var clusterSections = CLUSTER_ORDER.map(function(cluster) {
-      var clusterUCs = ALL_UCS.filter(function(u) { return u.cluster === cluster })
-      if (!clusterUCs.length) return ''
-      var selInCluster = clusterUCs.filter(function(u) { return s.selectedUCs.indexOf(u.id) >= 0 }).length
-      var isExpanded   = expandedCluster === cluster || selInCluster > 0
-      var icon         = DOMAIN_ICONS[cluster] || '&#9632;'
-
-      // Header row
-      var header = '<div onclick="toggleSASCCluster(\'' + cluster.replace(/'/g, "\\'") + '\')" '
-        + 'style="display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;'
-        + 'background:' + (isExpanded ? 'rgba(0,40,112,0.04)' : 'var(--light)') + ';'
-        + 'border-radius:' + (isExpanded ? '6px 6px 0 0' : '6px') + ';'
-        + 'border:1px solid ' + (isExpanded ? 'var(--navy)' : 'var(--border)') + ';'
-        + (isExpanded ? '' : 'margin-bottom:4px') + '">'
-        + '<span style="font-size:14px">' + icon + '</span>'
-        + '<span style="font-size:12px;font-weight:700;color:var(--dark);flex:1">' + esc(cluster) + '</span>'
-        + (selInCluster > 0
-          ? '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--navy);color:#fff;font-weight:700">' + selInCluster + ' selected</span>'
-          : '<span style="font-size:10px;color:var(--mid)">' + clusterUCs.length + ' UCs</span>')
-        + '<span style="font-size:11px;color:var(--mid);margin-left:4px">' + (isExpanded ? '&#9650;' : '&#9660;') + '</span>'
-        + '</div>'
-
-      if (!isExpanded) return header
-
-      // Select-all / Clear row
-      var allSel = selInCluster === clusterUCs.length
-      var controls = '<div style="display:flex;align-items:center;justify-content:space-between;'
-        + 'padding:6px 12px;background:#fafafa;border-left:1px solid var(--navy);border-right:1px solid var(--navy)">'
-        + '<span style="font-size:11px;color:var(--mid)">' + clusterUCs.length + ' use cases</span>'
-        + '<div style="display:flex;gap:6px">'
-        + '<button onclick="selectAllCluster(\'' + cluster.replace(/'/g, "\\'") + '\')" '
-        + 'style="font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer;border:1px solid var(--teal);background:' + (allSel ? 'var(--teal)' : 'transparent') + ';color:' + (allSel ? '#fff' : 'var(--teal)') + ';font-weight:600">Select all</button>'
-        + '<button onclick="clearCluster(\'' + cluster.replace(/'/g, "\\'") + '\')" '
-        + 'style="font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--mid)">Clear</button>'
-        + '</div></div>'
-
-      // UC rows   clean table layout
-      var rows = clusterUCs.map(function(u) {
-        var sel  = s.selectedUCs.indexOf(u.id) >= 0
-        var ccol = u.complexity ? (CMAP[u.complexity] || '#6B7280') : '#6B7280'
-        return '<div onclick="toggleUC(\'' + u.id + '\')" '
-          + 'style="display:flex;align-items:center;gap:10px;padding:7px 12px;cursor:pointer;'
-          + 'border-left:1px solid var(--navy);border-right:1px solid var(--navy);border-bottom:1px solid var(--border);'
-          + 'background:' + (sel ? 'rgba(0,40,112,0.05)' : '#fff') + ';'
-          + 'transition:background 0.1s">'
-          // Checkbox
-          + '<div style="width:16px;height:16px;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
-          + 'background:' + (sel ? 'var(--navy)' : '#fff') + ';'
-          + 'border:1.5px solid ' + (sel ? 'var(--navy)' : 'var(--border)') + '">'
-          + (sel ? '<span style="color:#fff;font-size:10px;font-weight:700">&#10003;</span>' : '')
-          + '</div>'
-          // UC name
-          + '<span style="font-size:12px;color:' + (sel ? 'var(--navy)' : 'var(--dark)') + ';font-weight:' + (sel ? 600 : 400) + ';flex:1;line-height:1.3">' + esc(u.uc_name || 'UC') + '</span>'
-          // Complexity badge
-          + (u.complexity ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:' + ccol + '20;color:' + ccol + ';font-weight:600;flex-shrink:0">' + u.complexity + '</span>' : '')
-          + '</div>'
-      }).join('')
-
-      var closingBorder = '<div style="height:4px;background:var(--navy);opacity:0.15;border-radius:0 0 4px 4px;margin-bottom:6px;border-left:1px solid var(--navy);border-right:1px solid var(--navy)"></div>'
-
-      return header + controls + rows + closingBorder
-    }).join('')
-
-    ucHtml = '<div class="card">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
-      + '<div><div class="card-title" style="margin-bottom:2px">Use Cases '
-      + '<span style="font-size:11px;font-weight:400;color:var(--mid)">(' + selCount + ' of ' + ALL_UCS.length + ' selected)</span></div>'
-      + '<div class="card-sub">Click a domain to expand. Select the UCs relevant to this engagement.</div></div>'
-      + (selCount > 0
-        ? '<button onclick="clearAllUCs()" style="font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--mid);cursor:pointer">Clear all</button>'
-        : '')
-      + '</div>'
-      + '<div style="display:flex;flex-direction:column;gap:0">' + clusterSections + '</div>'
-      + '</div>'
-
+  // ── Requirements from Docket ──────────────────────────────────────────────────
+  if (req.objective) {
+    html += '<div class="card" style="border-left:4px solid var(--teal);margin-bottom:14px">'
+      + '<div class="card-title" style="color:var(--teal)">📋 Engagement Requirements</div>'
+      + '<div style="font-size:13px;font-weight:600;color:var(--navy);margin-bottom:8px;line-height:1.5">' + esc(req.objective) + '</div>'
+      + (req.problem ? '<div style="font-size:12px;color:var(--mid);margin-bottom:6px"><strong>Problem:</strong> ' + esc(req.problem) + '</div>' : '')
+      + (req.success_criteria ? '<div style="font-size:12px;color:var(--mid);margin-bottom:6px"><strong>Success:</strong> ' + esc(req.success_criteria) + '</div>' : '')
+      + '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">'
+      + (req.budget_range && req.budget_range !== 'Not defined' ? '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#E1F5EE;color:#065F46;font-weight:600">💰 ' + esc(req.budget_range) + '</span>' : '')
+      + (req.timeline ? '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#EFF3FF;color:#1C38F5;font-weight:600">📅 ' + esc(req.timeline) + '</span>' : '')
+      + (req.constraints||[]).map(function(c){ return '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#FFF3F1;color:#991B1B;font-weight:600">' + esc(c) + '</span>' }).join('')
+      + '</div></div>'
   } else {
-    ucHtml = '<div class="card" style="border-left:3px solid var(--amber)">'
-      + '<div class="card-sub">&#9888; No active UCs in UC Library. Approve UCs in Second Brain first.</div></div>'
+    html += '<div class="card" style="border-left:3px solid var(--amber);margin-bottom:14px">'
+      + '<div class="card-sub">No requirements captured yet. Add them in the Engagement Docket → Overview tab before configuring the solution.</div></div>'
   }
 
-  var scopeOpts = [
-    { v:'full',     t:'Full stack',              s:'DC, compute, network, platform, security, ops' },
-    { v:'hardware', t:'Hardware + networking',    s:'Customer handles software stack' },
-    { v:'software', t:'Platform + software only', s:'Customer has existing compute' },
-    { v:'custom',   t:'Custom',                   s:'You select which layers apply in Step 3' }
-  ]
+  // ── Agreed Use Cases from Docket ──────────────────────────────────────────────
+  var ucItems = DOCKET_UC_ITEMS || []
+  html += '<div class="card" style="margin-bottom:14px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    + '<div class="card-title">Use Cases from Docket <span style="font-size:11px;font-weight:400;color:var(--mid)">(' + s.selectedUCs.length + ' in scope)</span></div>'
+    + '</div>'
+  if (!ucItems.length && !s.selectedUCs.length) {
+    html += '<div style="font-size:12px;color:var(--mid);font-style:italic">No use cases added to this engagement yet. Add them in the Engagement Docket → Use Cases tab.</div>'
+  } else {
+    // Group by cluster
+    var byCluster = {}
+    ALL_UCS.filter(function(u){ return s.selectedUCs.includes(u.id) }).forEach(function(u) {
+      var cl = u.cluster || 'Other'
+      if (!byCluster[cl]) byCluster[cl] = []
+      byCluster[cl].push(u)
+    })
+    var cmap = { simple:'var(--teal)', medium:'var(--mid)', complex:'var(--orange)', research:'#8B5CF6' }
+    Object.keys(byCluster).forEach(function(cl) {
+      html += '<div style="margin-bottom:10px">'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:6px">' + esc(cl) + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'
+        + byCluster[cl].map(function(u) {
+            var statusColor = 'var(--mid)'
+            var dItem = (DOCKET_UC_ITEMS||[]).find(function(d){ return d.ref_id === u.id })
+            if (dItem && dItem.status === 'agreed') statusColor = 'var(--teal)'
+            return '<div style="padding:6px 10px;background:var(--light);border-radius:5px;border-left:3px solid ' + statusColor + ';font-size:11px">'
+              + '<span style="font-weight:500">' + esc(u.uc_name) + '</span>'
+              + (u.complexity ? '<span style="float:right;font-size:9px;color:' + (cmap[u.complexity]||'var(--mid)') + '">' + u.complexity + '</span>' : '')
+              + '</div>'
+          }).join('')
+        + '</div></div>'
+    })
+  }
+  html += '</div>'
 
-  var tshirtSizes = [
-    { v:'xs', l:'XS', sub:'&le;2MW' },
-    { v:'s',  l:'S',  sub:'5MW' },
-    { v:'m',  l:'M',  sub:'10MW' },
-    { v:'l',  l:'L',  sub:'15MW' },
-    { v:'xl', l:'XL', sub:'20MW+' }
-  ]
+  // ── DC Type + T-shirt ─────────────────────────────────────────────────────────
+  html += '<div class="card" style="margin-bottom:14px">'
+    + '<div class="card-title">Infrastructure Configuration</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
 
-  var mdc = s.mdc
-  var bm  = s.bm
-
-  return engHtml + ucHtml
-    + '<div class="card"><div class="card-title">Scope of supply</div>'
-    + '<div class="card-sub">What are we responsible for delivering?</div>'
-    + '<div class="scope-opts">'
-    + scopeOpts.map(function(o) {
-        return '<div class="scope-opt ' + (s.scope === o.v ? 'sel' : '') + '" data-scope="' + o.v + '" onclick="setScope(this.dataset.scope)">'
-          + '<div class="scope-opt-title">' + o.t + '</div>'
-          + '<div class="scope-opt-sub">' + o.s + '</div></div>'
+  // DC Type
+  html += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:8px">Data Centre Type</div>'
+    + '<div style="display:flex;gap:8px">'
+    + ['mdc','bm'].map(function(t) {
+        var labels = { mdc:'Modular DC', bm:'Bare Metal / Fixed' }
+        var icons  = { mdc:'📦', bm:'🏢' }
+        var on = s.dcType === t
+        return '<div onclick="setDCType(\'' + t + '\')" style="flex:1;padding:10px;border:2px solid '+(on?'var(--navy)':'var(--border)')+';border-radius:6px;cursor:pointer;text-align:center;background:'+(on?'rgba(0,40,112,.06)':'#fff')+'">'
+          + '<div style="font-size:18px;margin-bottom:4px">' + icons[t] + '</div>'
+          + '<div style="font-size:11px;font-weight:' + (on?700:400) + ';color:var(--navy)">' + labels[t] + '</div>'
+          + '</div>'
       }).join('')
     + '</div></div>'
 
-    + '<div class="card"><div class="card-title">DC / Infrastructure</div>'
-    + '<div class="card-sub">Does the customer have existing infrastructure, or are we supplying an MDC?</div>'
-    + '<div class="dc-opts">'
+  // T-shirt (MDC only)
+  if (s.dcType === 'mdc') {
+    html += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:8px">MDC Size</div>'
+      + '<div style="display:flex;gap:5px;flex-wrap:wrap">'
+      + ['xs','s','m','l','xl'].map(function(t) {
+          var on = s.mdc && s.mdc.tshirt === t
+          return '<div onclick="setTshirt(\'' + t + '\')" style="padding:6px 14px;border:2px solid '+(on?'var(--navy)':'var(--border)')+';border-radius:5px;cursor:pointer;font-size:11px;font-weight:'+(on?700:400)+';background:'+(on?'rgba(0,40,112,.06)':'#fff')+'">' + t.toUpperCase() + '</div>'
+        }).join('')
+      + '</div></div>'
+  } else {
+    html += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:8px">Scope</div>'
+      + '<div style="font-size:12px;color:var(--mid);padding-top:8px">Scope is derived from use case GPU requirements in the BOM.</div>'
+      + '</div>'
+  }
+  html += '</div>'
 
-    // MDC option
-    + '<div class="dc-opt ' + (s.dcType === 'mdc' ? 'sel' : '') + '" data-dc="mdc" onclick="setDCType(this.dataset.dc)">'
-    + '<div class="dc-opt-hdr"><div class="dc-dot"></div><div class="dc-opt-title">MDC &mdash; we supply</div></div>'
-    + '<div class="dc-opt-sub">Modular Datacenter, T-shirt sized, delivered to site</div>'
-    + '<div class="dc-detail">'
-    + '<label>T-shirt size per site</label>'
-    + '<div class="tshirt-btns">'
-    + tshirtSizes.map(function(t) {
-        return '<button class="tshirt-btn ' + (mdc.tshirt === t.v ? 'sel' : '') + '" data-ts="' + t.v + '" onclick="event.stopPropagation();setTshirt(this.dataset.ts)">'
-          + t.l + '<br><span style="font-weight:400;font-size:9px">' + t.sub + '</span></button>'
-      }).join('')
+  // Territory cost adjustment indicator
+  if (SASC_DATA.territory_costs) {
+    var tc = SASC_DATA.territory_costs
+    html += '<div style="margin-top:12px;padding:10px 14px;background:linear-gradient(135deg,#E1F5EE,#EFF3FF);border-radius:6px;font-size:11px;color:var(--navy)">'
+      + '<strong>Territory cost adjustments active</strong> — '
+      + (tc.power_tariff_inr ? 'Power: ₹' + tc.power_tariff_inr + '/kWh · ' : '')
+      + (tc.engineer_salary_lakh ? 'Engineers: ₹' + tc.engineer_salary_lakh + 'L/yr · ' : '')
+      + (tc.civil_cost_index ? 'Civil idx: ' + tc.civil_cost_index : '')
+      + '<span style="color:var(--mid)"> (applied to ROM)</span></div>'
+  }
+  html += '</div>'
+
+  html += '<div class="actions-bar">'
+    + '<div></div>'
+    + '<button class="btn btn-primary" onclick="goStep2()">Configure Stack →</button>'
     + '</div>'
-    + '<div class="form-grid">'
-    + '<div><label>Number of sites</label><input type="number" min="1" max="20" value="' + mdc.sites + '" id="mdc-sites" onchange="SASC_DATA.mdc.sites=parseInt(this.value)||1"></div>'
-    + '<div><label>Site names (optional)</label><input type="text" value="' + esc(mdc.siteNames) + '" id="mdc-sitenames" placeholder="e.g. Kangra, Bilaspur, Kullu" onchange="SASC_DATA.mdc.siteNames=this.value"></div>'
-    + '</div>'
-    + '<div style="font-size:11px;color:var(--teal);margin-top:6px;font-weight:600" id="mdc-summary"></div>'
-    + '</div></div>'
-
-    // B&M Existing
-    + '<div class="dc-opt ' + (s.dcType === 'bm_existing' ? 'sel' : '') + '" data-dc="bm_existing" onclick="setDCType(this.dataset.dc)">'
-    + '<div class="dc-opt-hdr"><div class="dc-dot"></div><div class="dc-opt-title">B&amp;M &mdash; existing building</div></div>'
-    + '<div class="dc-opt-sub">Customer has an existing data centre &mdash; specify available headroom</div>'
-    + '<div class="dc-detail">'
-    + '<div class="form-grid-3">'
-    + '<div><label>Available power (kW)</label><input type="number" value="' + (bm.power_kw||'') + '" id="bm-power" placeholder="e.g. 500" onchange="SASC_DATA.bm.power_kw=this.value"></div>'
-    + '<div><label>Rack positions</label><input type="number" value="' + (bm.racks||'') + '" id="bm-racks" placeholder="e.g. 40" onchange="SASC_DATA.bm.racks=this.value"></div>'
-    + '<div><label>Cooling type</label><select id="bm-cooling" onchange="SASC_DATA.bm.cooling=this.value">'
-    + ['dlc','air','hybrid'].map(function(c){ return '<option value="' + c + '" ' + (bm.cooling===c?'selected':'') + '>' + c.toUpperCase() + '</option>' }).join('')
-    + '</select></div></div>'
-    + '</div></div>'
-
-    // B&M New Build
-    + '<div class="dc-opt ' + (s.dcType === 'bm_new' ? 'sel' : '') + '" data-dc="bm_new" onclick="setDCType(this.dataset.dc)">'
-    + '<div class="dc-opt-hdr"><div class="dc-dot"></div><div class="dc-opt-title">B&amp;M &mdash; new build</div></div>'
-    + '<div class="dc-opt-sub">Customer is constructing a new data centre &mdash; specify planned capacity</div>'
-    + '<div class="dc-detail">'
-    + '<div class="form-grid-3">'
-    + '<div><label>Planned power (kW)</label><input type="number" value="' + (bm.power_kw||'') + '" id="bm-new-power" placeholder="e.g. 2000" onchange="SASC_DATA.bm.power_kw=this.value"></div>'
-    + '<div><label>Floor space (sqft)</label><input type="number" id="bm-sqft" placeholder="e.g. 5000"></div>'
-    + '<div><label>DC ready in (months)</label><input type="number" id="bm-timeline" placeholder="e.g. 18"></div>'
-    + '</div></div></div>'
-
-    + '</div></div>'
-
-    + '<div class="actions-bar"><div></div>'
-    + '<button class="btn btn-primary" onclick="goToStack()">Next: Configure stack &rarr;</button>'
-    + '</div>'
+  return html
 }
+
 
 // -- Screen 2: Stack layers ----------------------------------------------------
 
@@ -2487,13 +2431,6 @@ function exportBOM() {
   showToast('BOM exported as CSV')
 }
 
-function backToDocket() {
-  if (SASC_DATA.engId && SASC_DATA.docketId) {
-    window.location.href = DOCKET_URL + '?eng=' + SASC_DATA.engId + '&docket=' + SASC_DATA.docketId
-  } else {
-    window.location.href = DOCKET_URL
-  }
-}
 
 // -- Boot ----------------------------------------------------------------------
 init()
