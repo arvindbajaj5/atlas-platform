@@ -662,10 +662,14 @@ async function loadProfileFromSB() {
   var sb = getSB()
   if (!sb.url) return
   window.PROFILE_DATA = null
-  // Reset TP state for new engagement
-  TP.stage='home'; TP.territory=''; TP.s1=null; TP.s2=null
-  TP.objectives=[]; TP.freeText=''; TP._2x2=null; TP.s4=null
-  TP.overrides={working:[],attention:[]}
+  // Reset TP state — but NOT if the intelligence modal is open (user may be viewing S1-S3)
+  var _modalOpen = document.getElementById('modal-intelligence') &&
+                   document.getElementById('modal-intelligence').style.display !== 'none'
+  if (!_modalOpen) {
+    TP.stage='home'; TP.territory=''; TP.s1=null; TP.s2=null
+    TP.objectives=[]; TP.freeText=''; TP._2x2=null; TP.s4=null
+    TP.overrides={working:[],attention:[]}
+  }
   try {
     if (isTSAP) {
       var territory = eng.territory || ''
@@ -1863,6 +1867,10 @@ function tpRender() {
     return
   }
   // Init chart if S3
+  // Clear any running timer when we render (new state takes over)
+  if (TP_TIMER && TP_TIMER.interval && TP.stage !== 's1_loading' && TP.stage !== 's1_extracting' && TP.stage !== 's2_loading') {
+    clearInterval(TP_TIMER.interval); TP_TIMER.interval = null
+  }
   if (TP.stage === 's3') {
     setTimeout(function() {
       var ctx = document.getElementById('tp-radar-chart'); if (!ctx) return
@@ -1925,9 +1933,10 @@ async function openIntelModal() {
         + '<div style="font-size:12px;color:var(--mid)">' + esc(e.message||'Unknown error') + '</div></div>'
       return
     }
+  } else {
+    // Territory already loaded in TP — just render current stage
+    tpRender()
   }
-
-  tpRender()
 }
 
 function closeIntelModal() {
@@ -2079,7 +2088,7 @@ function buildRawIntelPrompt(territory) {
 
 // ── atlasAI.parseJSON shim — in case atlasAI version doesn't have it ───────────
 function tp_parseJSON(text) {
-  if (typeof atlasAI !== 'undefined' && atlasAI.parseJSON) return tp_parseJSON(text)
+  if (typeof atlasAI !== 'undefined' && atlasAI.parseJSON) return atlasAI.parseJSON(text)
   try {
     var clean = (text||'').replace(/^```json\s*/m,'').replace(/\s*```$/m,'').trim()
     var jStart = clean.indexOf('{'), jEnd = clean.lastIndexOf('}')
@@ -3113,7 +3122,7 @@ function tpS2Form() {
   var html = '<div style="padding:16px 0">'
 
   html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">'
-    + '<button onclick="TP.stage=\'s1_done\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Back to intelligence</button>'
+    + '<button onclick="TP.stage=\'s1_done\';tpRender()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Back to intelligence</button>'
     + '<div style="font-size:14px;font-weight:700;color:var(--navy)">' + esc(TP.territory) + '   Set Objectives</div>'
     + '<div style="font-size:11px;color:var(--mid)">Select objectives   no limit</div>'
     + '<span style="margin-left:auto;font-size:12px;font-weight:700;color:' + 'var(--teal)' + '">' + sel.length + ' selected</span>'
@@ -3460,8 +3469,8 @@ function tpS3Result() {
 
   // Nav
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
-    + '<button onclick="TP.stage=\'s1_done\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Intelligence</button>'
-    + '<button onclick="TP.stage=\'s2_form\';switchTab(\'profile\')" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#9997; Objectives</button>'
+    + '<button onclick="TP.stage=\'s1_done\';tpRender()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Intelligence</button>'
+    + '<button onclick="TP.stage=\'s2_form\';tpRender()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#9997; Objectives</button>'
     + '<div style="font-size:14px;font-weight:700;color:var(--navy);flex:1">' + esc(TP.territory) + '   Territory Profile</div>'
     + '<button onclick="closeIntelModal();switchTab(\'outputs\')" style="padding:5px 12px;border:1px solid var(--teal);background:var(--teal);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#128196; Outputs &amp; Vision Doc &rarr;</button>'
     + '<button onclick="tpExportPPT()" style="padding:5px 12px;border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#128190; PPT</button>'
