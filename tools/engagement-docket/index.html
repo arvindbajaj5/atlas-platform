@@ -581,7 +581,7 @@ async function renderProfileTab() {
             + '</div>'
         }
       } else {
-        html += '<div style="font-size:12px;color:var(--mid)">Click "Open Territory Intelligence" to generate the S1 intelligence profile and S3 strategic assessment.</div>'
+        html += '<div style="font-size:12px;color:var(--mid)">S1 intelligence generated. Open to view the full profile and run S3 strategic assessment — objectives, radar chart, 2×2 positioning.</div>'
       }
       html += '</div>'
     }
@@ -1891,6 +1891,8 @@ async function generateVisionDoc() {
 function tpRender() {
   var body = document.getElementById('intel-modal-body')
   if (!body) return
+  var modal = document.getElementById('modal-intelligence')
+  if (!modal || modal.style.display === 'none') return
   body.innerHTML = tpRenderModal()
   // Init chart if S3
   if (TP.stage === 's3') {
@@ -1922,28 +1924,48 @@ function tpRender() {
   }
 }
 
-function openIntelModal() {
+async function openIntelModal() {
   var eng = CURRENT_ENG || {}
   var custName = (eng._cust && eng._cust.name) || eng.customer_name || 'Customer'
   var territory = eng.territory || ''
   var title = document.getElementById('intel-modal-title')
   if (title) title.textContent = custName + (territory ? ' — ' + territory + ' Territory Intelligence' : ' — Territory Intelligence')
+
+  // Show modal first so user sees it opening
   document.getElementById('modal-intelligence').style.display = 'block'
   document.body.style.overflow = 'hidden'
-  // Set territory in TP if not set
-  if (territory && !TP.territory) {
+
+  // Set territory in TP
+  if (territory) TP.territory = territory
+
+  // Load cached profile if TP hasn't loaded for this territory
+  if (territory && (TP.stage === 'home' || TP.territory !== territory)) {
     TP.territory = territory
+    var slug = territory.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
+    // Show loading while checking cache
+    var body = document.getElementById('intel-modal-body')
+    if (body) body.innerHTML = '<div style="padding:48px;text-align:center;color:var(--mid)"><div style="font-size:28px;margin-bottom:12px">⏳</div><div style="font-weight:600;color:var(--navy)">Loading territory intelligence...</div></div>'
+    // Load archetypes if not loaded
+    if (!TP.archetypes.length) await loadTPData()
+    // Try to restore from cache
+    await tpLoadCached(slug)
   }
+
   tpRender()
 }
 
 function closeIntelModal() {
   document.getElementById('modal-intelligence').style.display = 'none'
   document.body.style.overflow = ''
-  // Refresh profile tab to show updated status
-  if (ACTIVE_TAB === 'profile') {
+  // Refresh profile tab status card
+  if (CURRENT_ENG) {
     window.PROFILE_DATA = null
-    loadAndRenderProfile()
+    if (ACTIVE_TAB === 'profile') {
+      loadAndRenderProfile()
+    } else {
+      // Just update the status badge without full reload
+      updateTabBar()
+    }
   }
 }
 
@@ -2208,7 +2230,7 @@ async function tpLoadCached(id) {
     TP._sources         = sess.sources     || []
     // Restore to S3 if we have a full session, otherwise S1
     TP.stage = (TP.s1 && TP.s2) ? 's3' : (TP.s1 ? 's1_done' : 'home')
-    MODEL.territory = row.territory; updateHeader()
+    // MODEL is TSAP FM only — not used in Docket
     showToast('\u21ba Session restored: ' + row.territory)
     tpRender()
     return
@@ -2260,7 +2282,7 @@ async function tpStartS1() {
           TP.s4         = sess.s4          || null
           TP._sources   = sess.sources     || []
           TP.stage      = 's3'
-          MODEL.territory = territory; updateHeader()
+          // MODEL is TSAP FM only — not used in Docket
           showToast('\u21ba Session restored: ' + territory)
         } else {
           TP.stage = 's1_done'
@@ -2307,8 +2329,7 @@ async function tpRunExtraction(territory, rawText, slug) {
   }))
   tpTimerStop()
   TP.s1=buildS1FromSections(r1.concat(r2),territory); TP.stage='s1_done'
-  MODEL.territory = TP.territory
-  updateHeader()
+  // MODEL is TSAP FM only
   tpSaveProfile(); tpRender()
 }
 
@@ -2547,7 +2568,7 @@ function tpHome() {
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px">Generate territory intelligence</div>'
     + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px">Enter any Indian state or UT. We search for current macroeconomic, energy, water, land, workforce and policy data.</div>'
     + '<div style="display:flex;gap:8px">'
-    + '<input id="tp-territory-input" type="text" placeholder="e.g. Himachal Pradesh, Assam, Maharashtra..." '
+    + '<input id="tp-territory-input" type="text" value="' + esc(TP.territory||'') + '" placeholder="e.g. Himachal Pradesh, Assam, Maharashtra..." '
     + 'style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit" '
     + 'onkeydown="if(event.key===\'Enter\')tpStartS1()">'
     + '<button onclick="tpStartS1()" style="padding:9px 18px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">&#9889; Generate</button>'
