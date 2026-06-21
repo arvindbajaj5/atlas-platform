@@ -1128,30 +1128,24 @@ async function savePortfolioSelection() {
   // Save as docket_item with item_subtype = portfolio_selection
   // Only columns that exist in docket_items schema
   var _portId = CURRENT_DOCKET_ID + '-portfolio'
-  var body = {
-    id: _portId,
-    docket_id: CURRENT_DOCKET_ID,
-    section: 'output',
-    item_type: 'portfolio_selection',
-    title: 'Portfolio Selection',
-    data: JSON.stringify({ items: PORTFOLIO_SELECTION }),
-    status: 'done'
-  }
-  // PATCH first (update), POST if not found
+  var _portNotes = JSON.stringify({ items: PORTFOLIO_SELECTION })
+  // PATCH existing row first, then POST to create
   var sb = getSB()
   var _pr = await fetch(sb.url + '/rest/v1/docket_items?id=eq.' + encodeURIComponent(_portId), {
     method: 'PATCH',
     headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
       'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ data: JSON.stringify({ items: PORTFOLIO_SELECTION }), status: 'done' })
+    body: JSON.stringify({ notes: _portNotes, status: 'done' })
   })
-  if (!_pr.ok || (await (async function(){ var t = _pr.headers.get('content-range'); return t === '*/*' || t === null })())) {
-    // Row didn't exist — create it
+  if (!_pr.ok) {
+    // Row doesn't exist — POST to create
     await fetch(sb.url + '/rest/v1/docket_items', {
       method: 'POST',
       headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
         'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ id: _portId, docket_id: CURRENT_DOCKET_ID, section: 'output',
+        item_type: 'portfolio_selection', title: 'Portfolio Selection',
+        notes: _portNotes, status: 'done', created_by: 'ATLAS' })
     })
   }
   showToast('✓ Portfolio selection saved')
@@ -1497,14 +1491,7 @@ function toggleMaasModel(id) {
     var m = MC_ROWS_D.find(function(r){ return r.id === id })
     if (m) MAAS_MODELS_SELECTED.push(m)
   }
-  // Re-render just the model table section (don't navigate away)
-  var el = document.querySelector('#tab-body .mc-table')
-  if (el) {
-    var cnt = document.querySelector('.section-title')
-    if (cnt && cnt.textContent.includes('Model')) cnt.textContent = cnt.textContent.replace(/\d+ selected/, MAAS_MODELS_SELECTED.length + ' selected')
-  } else {
-    switchTab('svcmodel')
-  }
+  switchTab('svcmodel')
 }
 
 function toggleAgent() {
@@ -4299,7 +4286,7 @@ function renderUCTab() {
   html += '<div class="uc-grid">'
   ucItems.forEach(function(item) {
     // Find UC from library
-    var _uid = item._ref_id || item.ref_id || (function(){ try{ return JSON.parse(item.data||'{}').ref_id }catch(e){ return null } })()
+    var _uid = item._ref_id || item.ref_id || item.notes || ''
     var uc = UC_LIBRARY.find(function(u){ return u.id === _uid }) || {}
     var ucName = uc.uc_name || item.title || 'UC'
     var status = item.status || 'proposed'
@@ -4375,17 +4362,14 @@ function renderUCModalContent(q) {
 async function addUCToDocket(ucId) {
   if (!CURRENT_DOCKET_ID) { showToast('No docket for this engagement', 'err'); return }
   var uc = UC_LIBRARY.find(function(u){ return u.id === ucId }) || {}
-  // Only use columns that exist in docket_items schema
-  // ref_id + cluster stored in data JSON (ref_table/engagement_id cols don't exist)
   var row = {
     id: genId('DI'), docket_id: CURRENT_DOCKET_ID,
     section: 'uc', item_type: 'use_case',
     title: uc.uc_name || ucId,
-    status: 'proposed', created_by: 'ATLAS',
-    data: JSON.stringify({ ref_id: ucId, cluster: uc.cluster||'', complexity: uc.complexity||'' })
+    notes: ucId,
+    status: 'proposed', created_by: 'ATLAS'
   }
-  // Keep ref_id on the in-memory object for immediate rendering (not saved to DB)
-  row._ref_id = ucId
+  row._ref_id = ucId  // in-memory only for immediate render
   // sbPost with error details
   var sb = getSB()
   var ok = false
