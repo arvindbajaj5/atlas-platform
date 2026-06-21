@@ -1853,6 +1853,13 @@ function tpRender() {
   if (!body) return
   var modal = document.getElementById('modal-intelligence')
   if (!modal || modal.style.display === 'none') return
+  // Clear any stale timer when we enter a non-loading state
+  if (TP_TIMER && TP_TIMER.interval
+      && TP.stage !== 's1_loading'
+      && TP.stage !== 's1_extracting'
+      && TP.stage !== 's2_loading') {
+    clearInterval(TP_TIMER.interval); TP_TIMER.interval = null
+  }
   try {
     body.innerHTML = tpRenderModal()
   } catch(e) {
@@ -1860,21 +1867,18 @@ function tpRender() {
     body.innerHTML = '<div style="padding:24px;background:#FEE2E2;border-radius:8px;margin:16px">'
       + '<div style="font-weight:700;color:#991B1B;margin-bottom:8px">⚠ Render error (stage: ' + TP.stage + ')</div>'
       + '<div style="font-size:12px;color:#7F1D1D;font-family:monospace">' + esc(e.message||String(e)) + '</div>'
-      + '<div style="margin-top:12px;display:flex;gap:8px">'
+      + '<pre style="font-size:10px;color:#7F1D1D;background:#FEE;padding:8px;border-radius:4px;margin-top:8px;overflow:auto;white-space:pre-wrap">' + esc((e.stack||'').split('\n').slice(0,4).join('\n')) + '</pre>'
+      + '<div style="margin-top:10px;display:flex;gap:8px">'
       + '<button onclick="TP.stage=\'s1_done\';tpRender()" style="padding:5px 12px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer">← Back to S1</button>'
       + '<button onclick="TP.stage=\'home\';tpRender()" style="padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:5px;font-size:12px;cursor:pointer">Home</button>'
       + '</div></div>'
     return
   }
-  // Init chart if S3
-  // Clear any running timer when we render (new state takes over)
-  if (TP_TIMER && TP_TIMER.interval && TP.stage !== 's1_loading' && TP.stage !== 's1_extracting' && TP.stage !== 's2_loading') {
-    clearInterval(TP_TIMER.interval); TP_TIMER.interval = null
-  }
+  // Init radar chart after S3 renders
   if (TP.stage === 's3') {
     setTimeout(function() {
       var ctx = document.getElementById('tp-radar-chart'); if (!ctx) return
-      if (TP.radarChart) { try{ TP.radarChart.destroy() }catch(e){} }
+      if (TP.radarChart) { try{ TP.radarChart.destroy() }catch(ex){} }
       var dimScores = TP.s2 ? (TP.s2.dim_scores||{}) : {}
       var dims = Object.keys(dimScores)
       var dimLabels = {
@@ -1884,6 +1888,7 @@ function tpRender() {
       }
       var labels = dims.map(function(d){ return dimLabels[d]||d })
       var userData = dims.map(function(d){ return Math.round(dimScores[d]||0) })
+      if (typeof Chart === 'undefined') { console.warn('[tpRender] Chart.js not loaded'); return }
       TP.radarChart = new Chart(ctx, {
         type:'radar',
         data:{ labels:labels, datasets:[
@@ -1896,7 +1901,7 @@ function tpRender() {
             pointLabels:{font:{size:9}} } },
           plugins:{ legend:{ position:'bottom',labels:{font:{size:10}} } } }
       })
-    }, 150)
+    }, 200)
   }
 }
 
@@ -1928,9 +1933,15 @@ async function openIntelModal() {
       await tpLoadCached(slug)
     } catch(e) {
       console.error('[openIntelModal] load error:', e)
-      if (body) body.innerHTML = '<div style="padding:32px;text-align:center"><div style="font-size:28px;margin-bottom:12px">⚠️</div>'
-        + '<div style="font-weight:700;color:#991B1B;margin-bottom:8px">Load error</div>'
-        + '<div style="font-size:12px;color:var(--mid)">' + esc(e.message||'Unknown error') + '</div></div>'
+      var _stack = (e.stack||'').split('\n').slice(0,5).join('\n')
+      if (body) body.innerHTML = '<div style="padding:24px;background:#FEE2E2;border-radius:8px;margin:16px">'
+        + '<div style="font-weight:700;color:#991B1B;margin-bottom:8px">⚠ Load error</div>'
+        + '<div style="font-size:12px;color:#7F1D1D;margin-bottom:8px">' + esc(e.message||'Unknown error') + '</div>'
+        + '<pre style="font-size:10px;color:#7F1D1D;background:#FEE;padding:8px;border-radius:4px;overflow:auto;white-space:pre-wrap">' + esc(_stack) + '</pre>'
+        + '<div style="margin-top:10px;display:flex;gap:8px">'
+        + '<button onclick="TP.stage=\'home\';tpRender()" style="padding:5px 12px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer">Try Again (Home)</button>'
+        + '<button onclick="closeIntelModal()" style="padding:5px 12px;border:1px solid var(--border);border-radius:5px;font-size:12px;cursor:pointer">Close</button>'
+        + '</div></div>'
       return
     }
   } else {
@@ -2344,7 +2355,7 @@ async function tpLoadPast() {
 
 async function tpLoadCached(id) {
   var rows = await sbFetch('territory_profiles', 'id=eq.' + encodeURIComponent(id), 1)
-  if (!rows || !rows[0]) return
+  if (!rows || !Array.isArray(rows) || !rows[0]) return
   var row = rows[0]
   TP.territory   = row.territory
   TP._rawIntel   = row.raw_intel || null
@@ -2669,7 +2680,7 @@ async function tpLoadTerritoryList() {
     rows.forEach(function(r) {
       var opt = document.createElement('option')
       opt.value = r.territory
-      opt.textContent = r.territory + (r.session && r.session.s2 ? ' ✓' : '')
+      opt.textContent = (r.territory||'') + (r.session && r.session.s2 ? ' ✓' : '')
       sel.appendChild(opt)
     })
   }
