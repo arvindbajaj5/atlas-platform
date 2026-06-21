@@ -446,13 +446,21 @@ async function sbInsert(table, data) {
   var sb = getSB()
   if (!sb.url) return null
   try {
-    var r = await fetch(sb.url + '/rest/v1/' + table, {
+    // Use PATCH (upsert) with ?on_conflict=id for territory_profiles
+    // POST with merge-duplicates needs on_conflict param for Supabase v2
+    var url = sb.url + '/rest/v1/' + table
+    if (data.id) url += '?on_conflict=id'
+    var r = await fetch(url, {
       method: 'POST',
       headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
         'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal' },
+        Prefer: 'resolution=merge-duplicates,return=representation' },
       body: JSON.stringify(data)
     })
+    if (!r.ok) {
+      var errText = await r.text()
+      console.warn('[sbInsert] ' + table + ' failed ' + r.status + ':', errText.substring(0,200))
+    }
     return r.ok
   } catch(e) { console.warn('[sbInsert]', table, e.message); return null }
 }
@@ -1958,6 +1966,46 @@ var TP = {
 var TP_TOKENS = { s1_raw:0, s1_extract:0, s2_prompt:0, s2_response:0 }
 
 
+async function callS2(territory, s1data, objectives, freeText) {
+  var prompt = buildS2Prompt(territory, s1data, objectives, freeText)
+  console.log('[callS2] prompt length:', prompt ? prompt.length : 0, '| objectives:', objectives.length, '| territory:', territory)
+  if (!prompt || prompt.length < 10) {
+    console.error('[callS2] buildS2Prompt returned empty prompt!')
+    return { ok: false, error: 'Prompt generation failed — empty prompt' }
+  }
+  tpTimerStart(Math.round(prompt.length / 4))
+
+  var _s2MaxTok = atlasAI.sectionMaxTokens ? atlasAI.sectionMaxTokens('s2') : 4096
+  console.log('[callS2] calling AI with maxTokens:', _s2MaxTok, '| callAndParse:', !!atlasAI.callAndParse)
+
+  var result
+  try {
+    // Race against a 90-second timeout
+    var _s2Call = atlasAI.callAndParse
+      ? atlasAI.callAndParse(prompt, { maxTokens: _s2MaxTok, tool: 'tsap-territory-profiler', callType: 's2_profile' })
+      : atlasAI.call(prompt, { maxTokens: _s2MaxTok }).then(function(raw) {
+          var txt = typeof raw === 'string' ? raw : (raw.text || raw.raw || '')
+          var parsed = tp_parseJSON(txt)
+          return parsed.ok ? { ok: true, data: parsed.data, tokens: (raw.tokens||0) } : { ok: false, error: parsed.error }
+        })
+    var _timeout = new Promise(function(_, rej) { setTimeout(function(){ rej(new Error('S2 timeout after 90s')) }, 90000) })
+    result = await Promise.race([_s2Call, _timeout])
+  } catch(callErr) {
+    tpTimerStop()
+    console.error('[callS2] API call error:', callErr.message)
+    return { ok: false, error: callErr.message }
+  }
+
+  tpTimerStop()
+  console.log('[callS2] result ok:', result.ok, '| tokens:', result.tokens, '| error:', result.error)
+  if (!result.ok) return { ok: false, error: result.error || 'AI call failed' }
+  if (!result.data) return { ok: false, error: 'AI returned empty data. Raw: ' + JSON.stringify(result).substring(0,100) }
+
+  TP_TOKENS.s2_prompt   = Math.round((result.tokens || 0) * 0.6)
+  TP_TOKENS.s2_response = Math.round((result.tokens || 0) * 0.4)
+  return { ok: true, data: result.data }
+}
+
 // ── geminiCall — thin wrapper over atlasAI for S1 raw search + section extract ─
 async function geminiCall(prompt, useSearch, maxTokens) {
   var opts = {
@@ -2192,15 +2240,43 @@ async function tpSaveProfile() {
     sources:    TP._sources || [],
     saved_at:   new Date().toISOString()
   } : null
-  await sbInsert('territory_profiles', {
-    id:           slug,
-    territory:    TP.territory,
-    profile:      TP.s1,
-    raw_intel:    TP._rawIntel || null,
-    session:      session,
-    generated_at: new Date().toISOString(),
-    expires_at:   new Date(Date.now() + 90*24*60*60*1000).toISOString()
-  })
+  // Try PATCH first (update existing row), then POST if not found
+  var sb = getSB()
+  var _saved = false
+  if (sb.url) {
+    var _body = {
+      territory: TP.territory, profile: TP.s1, raw_intel: TP._rawIntel || null,
+      session: session, generated_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 90*24*60*60*1000).toISOString()
+    }
+    try {
+      // PATCH updates existing row
+      var _pr = await fetch(sb.url + '/rest/v1/territory_profiles?id=eq.' + encodeURIComponent(slug), {
+        method: 'PATCH',
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+          'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(_body)
+      })
+      if (_pr.status === 404 || _pr.status === 0) {
+        // Row doesn't exist — POST to create
+        _body.id = slug
+        var _cr = await fetch(sb.url + '/rest/v1/territory_profiles', {
+          method: 'POST',
+          headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+            'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify(_body)
+        })
+        _saved = _cr.ok
+        console.log('[tpSaveProfile] POST result:', _cr.status)
+      } else {
+        _saved = _pr.ok
+        console.log('[tpSaveProfile] PATCH result:', _pr.status, 'rowCount:', _pr.headers.get('content-range'))
+      }
+    } catch(saveErr) {
+      console.error('[tpSaveProfile] save error:', saveErr.message)
+    }
+  }
+  console.log('[tpSaveProfile] saved:', slug, 'stage:', TP.stage, 'ok:', _saved, 's2:', !!TP.s2)
 }
 
 
@@ -3081,6 +3157,7 @@ function tpToggleObj(name) {
 }
 
 async function tpRunS2() {
+  try {
   var ft = document.getElementById('tp-free-text')
   TP.freeText = ft ? ft.value : ''
 
@@ -3116,6 +3193,14 @@ async function tpRunS2() {
   tpRender()
   // Auto-save full session (objectives + S2 result + overrides)
   setTimeout(tpSaveProfile, 300)
+  } catch(runErr) {
+    console.error('[tpRunS2]', runErr)
+    TP.stage = 's2_form'
+    var _mb = document.getElementById('intel-modal-body')
+    if (_mb) _mb.innerHTML = '<div style="padding:24px;background:#FEE2E2;border-radius:8px">'
+      + '<div style="font-weight:700;color:#991B1B;margin-bottom:8px">S2 error: ' + esc(runErr.message||String(runErr)) + '</div>'
+      + '<button onclick="TP.stage=&apos;s2_form&apos;;tpRender()" style="padding:5px 12px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer">Retry</button></div>'
+  }
 }
 
 //                                                                               
