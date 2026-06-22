@@ -1139,7 +1139,7 @@ async function savePortfolioSelection() {
   } catch(e) {}
   var _portRow = {
     id: _portId, docket_id: CURRENT_DOCKET_ID,
-    section: 'output', item_type: 'portfolio_selection', item_subtype: 'portfolio_selection',
+    section: 'output', item_type: 'solution', item_subtype: 'portfolio_selection',
     title: 'Portfolio Selection',
     content: { items: PORTFOLIO_SELECTION },
     status: 'done', created_by: 'ATLAS'
@@ -1531,7 +1531,7 @@ async function saveMaasConfig() {
   var _maasRow = {
     id: CURRENT_DOCKET_ID + '-maas',
     docket_id: CURRENT_DOCKET_ID,
-    section: 'output', item_type: 'maas_config', item_subtype: 'maas_config',
+    section: 'output', item_type: 'solution', item_subtype: 'maas_config',
     title: 'MaaS Configuration',
     content: {
       archetypes: window.MAAS_ARCHS || [],
@@ -3941,11 +3941,11 @@ async function openEngagement(eng) {
   window.PROFILE_DATA = null
   // Load portfolio selection if saved as docket_item
   if (CURRENT_DOCKET_ID) {
-    var piItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'portfolio_selection' || i.item_type === 'portfolio_selection' })
+    var piItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'portfolio_selection' })
     if (piItems.length) {
       try { var d = piItems[0].content || JSON.parse(piItems[0].data||'{}'); PORTFOLIO_SELECTION = d.items || [] } catch(e) {}
     }
-    var maasItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'maas_config' || i.item_type === 'maas_config' })
+    var maasItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'maas_config' })
     if (maasItems.length) {
       try {
         var md = maasItems[0].content || JSON.parse(maasItems[0].data||'{}')
@@ -4226,7 +4226,7 @@ function getStrategyItems() {
   var strat = DOCKET_ITEMS.filter(function(i){ return i.section === 'strategy' })
   if (!strat.length) return null
   var obj = {}
-  strat.forEach(function(i){ obj[i.item_type] = i.notes || i.title || '' })
+  strat.forEach(function(i){ var k = i.item_subtype || i.item_type; obj[k] = i.notes || i.title || '' })
   return obj
 }
 
@@ -4274,7 +4274,7 @@ async function saveStrategy() {
     if (existing) {
       await sbPatch('docket_items', 'id=eq.' + existing.id, { notes: it.text, updated_at: new Date().toISOString() })
     } else if (it.text) {
-      var row = { id: genId('DI'), docket_id: docketId, section: 'strategy', item_type: it.type, title: 'Strategy   ' + it.type, notes: it.text, status: 'active', created_by: 'ATLAS' }
+      var row = { id: genId('DI'), docket_id: docketId, section: 'strategy', item_type: 'pitch', item_subtype: it.type, title: 'Strategy — ' + it.type, notes: it.text, status: 'active', created_by: 'ATLAS' }
       await sbPost('docket_items', row)
     }
   }
@@ -4378,7 +4378,7 @@ async function addUCToDocket(ucId) {
   var uc = UC_LIBRARY.find(function(u){ return u.id === ucId }) || {}
   var row = {
     id: genId('DI'), docket_id: CURRENT_DOCKET_ID,
-    section: 'uc', item_type: 'use_case',
+    section: 'uc', item_type: 'uc',
     title: uc.uc_name || ucId,
     ref_table: 'uc_library', ref_id: ucId,
     status: 'proposed', created_by: 'ATLAS'
