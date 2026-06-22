@@ -1784,473 +1784,249 @@ async function generateVisionDoc() {
   if (!req.objective) { showToast('Add requirements first'); return }
   if (typeof atlasExport === 'undefined') { showToast('atlasExport not loaded'); return }
   if (typeof atlasAI === 'undefined')     { showToast('atlasAI not loaded'); return }
-  console.log('[VD] starting — atlasAI ok, atlasExport ok')
-  try {  // ← outer try/catch wraps entire function
+  console.log('[VD] starting')
 
-  var b         = atlasExport.getBrand()
-  var custName  = (eng._cust && eng._cust.name) || 'Customer'
-  var engName   = eng.name || eng.opportunity_name || 'Engagement'
-  var territory = eng.territory || ''
-  var today     = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
-
-  // ── Portfolio labels ──────────────────────────────────────────────────────
-  var PL = {
-    'L1-TSAP':'L1 TSAP Territory Programme','L1.1':'L1.1 Programme Management',
-    'L1.2':'L1.2 Governance Framework','L1.3':'L1.3 Ecosystem Development',
-    'L2-AIC':'L2 AI Centre of Excellence (Flagship)','L2-MDC':'L2 Modular Datacenter',
-    'L2-HPC':'L2 HPC Cluster','L2-TRC':'L2 GPU Training Cluster',
-    'L2-AIF':'L2 AI Factory','L2-EDG':'L2 Edge AI Nodes','L2-DAC':'L2 Domain AI Centre',
-    'L2-MAAS':'MaaS — Model as a Service','L2-GPUAAS':'GPUaaS — GPU as a Service',
-    'L2-BMAAS':'BMaaS — Bare Metal as a Service','L3-DEP':'L3 Deployment & Integration',
-    'L3-GOV':'L3 AI Governance','L3-SKL':'L3 AI Skills Academy',
-    'L3-OPS':'L3 Managed Operations','L3-RAG':'L3 RAG Platform',
-    'L3-INT':'L3 System Integration','L3-AMC':'L3 AMC & Refresh'
-  }
-
-  // ── Quadrant definitions ──────────────────────────────────────────────────
-  var QUAD = {
-    1: { name:'Green AI Hub',              axis:'High Data Economy · High AI Capacity',   desc:'Positioned to lead on AI infrastructure, clean compute and digital services export' },
-    2: { name:'Knowledge Exporter',        axis:'Emerging Data Economy · High AI Capacity',desc:'Strong on skills and research; opportunity to build AI talent pipelines and IP' },
-    3: { name:'Governance Moderniser',     axis:'High Data Economy · Developing AI Capacity',desc:'Rich data assets with opportunity to modernise public services and regulation through AI' },
-    4: { name:'Heritage & Sector Renaissance', axis:'Emerging Data Economy · Developing AI Capacity', desc:'AI as a sector transformation tool — tourism, agriculture, crafts, regional identity' }
-  }
-
-  // ── Step 1: Load TP from Supabase if not in memory ────────────────────────
-  showToast('📄 Preparing Vision Document…')
-  if (territory && (!TP || !TP.s1) && typeof sbGet === 'function') {
-    try {
-      var _tpRows = await sbGet('territory_profiles','territory=eq.'+encodeURIComponent(territory)+'&order=generated_at.desc&limit=1')
-      if (_tpRows && _tpRows[0]) {
-        var _c = _tpRows[0]
-        if (_c.profile) try { TP.s1 = typeof _c.profile==='string'?JSON.parse(_c.profile):_c.profile } catch(e){}
-        if (_c.session) try {
-          var _s = typeof _c.session==='string'?JSON.parse(_c.session):_c.session
-          if (_s.s2) TP.s2=_s.s2; if (_s._2x2) TP._2x2=_s._2x2
-          if (_s.objectives) TP.objectives=_s.objectives
-          TP.territory = territory
-        } catch(e){}
-      }
-    } catch(e){ console.warn('[VD] TP load err',e) }
-  }
-
-  // ── Step 2: Curate inputs ─────────────────────────────────────────────────
-  var docUCs = DOCKET_ITEMS.filter(function(i){ return i.section==='uc' })
-  var docActs= DOCKET_ITEMS.filter(function(i){ return i.section==='action' })
-  // Infer services from portfolio selection (SASC_DATA not available in Docket)
-  var services = []
-  if (PORTFOLIO_SELECTION.includes('L2-MAAS'))   services.push('MaaS — Model as a Service')
-  if (PORTFOLIO_SELECTION.includes('L2-GPUAAS')) services.push('GPUaaS — GPU as a Service')
-  if (PORTFOLIO_SELECTION.includes('L2-BMAAS'))  services.push('BMaaS — Bare Metal as a Service')
-  // Also check MaaS config saved in docket_items
-  var _maasItem = DOCKET_ITEMS.find(function(i){ return i.item_subtype === 'maas_config' })
-  if (_maasItem && !services.includes('MaaS — Model as a Service')) services.push('MaaS — Model as a Service')
-
-  var ucNames = docUCs.map(function(it){
-    var uid=it.ref_id||it._ref_id||''
-    var uc=UC_LIBRARY.find(function(u){return u.id===uid})||{}
-    return (it.title||uc.uc_name||uid) + (uc.cluster?' ['+uc.cluster+']':'')
-  })
-
-  var s1 = (TP && TP.s1) || {}
-  var s2 = (TP && TP.s2) || {}
-  var _2x2 = (TP && TP._2x2) || {}
-  var domQ = _2x2.dom ? QUAD[_2x2.dom] : null
-  var secQ = _2x2.sec ? QUAD[_2x2.sec] : null
-
-  // ── Step 3: Compute inputs hash for cache invalidation ────────────────────
-  var _hashSrc = [
-    territory, req.objective||'', req.problem||'', req.success_criteria||'',
-    (TP&&TP.s1&&TP.s1.headline)||'', (TP&&TP.s2&&TP.s2.headline_recommendation)||'',
-    ucNames.join('|'), PORTFOLIO_SELECTION.join('|'), services.join('|')
-  ].join('__')
-  var _hash = 0
-  for (var _hi=0;_hi<_hashSrc.length;_hi++){_hash=((_hash<<5)-_hash)+_hashSrc.charCodeAt(_hi);_hash=_hash&_hash}
-  var inputsHash = String(Math.abs(_hash))
-
-  // ── Step 4: Check narrative cache ─────────────────────────────────────────
-  var narrativeCacheId = CURRENT_DOCKET_ID + '-vision-narrative'
-  var narrative = null
-
-  var _cacheRows = await sbGet('docket_items','id=eq.'+encodeURIComponent(narrativeCacheId))
-  if (_cacheRows && _cacheRows[0] && _cacheRows[0].content) {
-    var _cc = _cacheRows[0].content
-    if (_cc.inputs_hash === inputsHash && _cc.sections) {
-      narrative = _cc.sections
-      console.log('[VD] Cache HIT — using cached narrative')
-      showToast('📄 Building from cached narrative…')
-    } else {
-      console.log('[VD] Cache MISS — hash changed, regenerating')
-    }
-  }
-
-  // ── Step 5: Generate narrative via AI if no cache hit ─────────────────────
-  console.log('[VD] narrative from cache:', !!narrative, '| TP.s1:', !!(TP&&TP.s1), '| TP.s2:', !!(TP&&TP.s2))
-  if (!narrative) {
-    showToast('🤖 Generating narrative… (this takes ~30s)')
-
-    // Format S2 lists for prompt
-    function fmtList(arr, keyField) {
-      if (!arr || !arr.length) return 'None provided'
-      return arr.slice(0,6).map(function(p,i){
-        var txt = typeof p==='string'?p:(p[keyField||'point']||p.text||JSON.stringify(p))
-        var extra = p.metric?' ['+p.metric+']':p.mitigation?' Mitigation: '+p.mitigation:''
-        return (i+1)+'. '+txt+extra
-      }).join('\n')
-    }
-
-    function fmtS1(key){ var v=s1[key]; if(!v) return 'Not available'; return typeof v==='string'?v:(Array.isArray(v)?v.map(function(x){return typeof x==='string'?x:(x.text||x.name||'')}).filter(Boolean).join('; '):JSON.stringify(v)).substring(0,400) }
-
-    var dimScoreText = s2.dim_scores && typeof s2.dim_scores==='object'
-      ? Object.keys(s2.dim_scores).map(function(k){return k+': '+s2.dim_scores[k]}).join(', ')
-      : 'Not available'
-
-    var prompt = 'You are an expert sovereign AI strategy consultant preparing a Vision Document for a government AI centre.\n\n'
-      + 'ENGAGEMENT: ' + engName + ' | CUSTOMER: ' + custName + ' | TERRITORY: ' + territory + '\n\n'
-      + '=== REQUIREMENTS ===\n'
-      + 'Objective: ' + (req.objective||'—') + '\n'
-      + 'Problem to solve: ' + (req.problem||'—') + '\n'
-      + 'Success criteria: ' + (req.success_criteria||'—') + '\n'
-      + 'Budget range: ' + (req.budget_range||'—') + '\n'
-      + 'Timeline: ' + (req.timeline||'—') + '\n\n'
-      + '=== TERRITORY INTELLIGENCE (S1) ===\n'
-      + 'Headline: ' + (s1.headline||'Not available') + '\n'
-      + 'Key Statistics: ' + fmtS1('hard_stats') + '\n'
-      + 'Policy & Regulatory: ' + fmtS1('policy') + '\n'
-      + 'AI Programmes: ' + fmtS1('programmes') + '\n'
-      + 'Geography & Infrastructure: ' + fmtS1('geography') + '\n'
-      + 'AI Opportunity Areas: ' + fmtS1('ai_opportunities') + '\n\n'
-      + '=== STRATEGIC ANALYSIS (S2) ===\n'
-      + 'Headline: ' + (s2.headline_recommendation||'Not available') + '\n'
-      + 'Objective Viability: ' + (s2.objective_viability||'—') + '\n'
-      + 'Working in Favour:\n' + fmtList(s2.working_in_favour,'point') + '\n\n'
-      + 'Needs Attention:\n' + fmtList(s2.needs_attention,'point') + '\n\n'
-      + '=== STRATEGIC POSITIONING (S3) ===\n'
-      + 'Primary position: ' + (domQ?domQ.name+' ('+(_2x2.domPct||'')+'%)':'Not available') + '\n'
-      + 'Secondary position: ' + (secQ?secQ.name+' ('+(_2x2.secPct||'')+'%)':'Not available') + '\n'
-      + 'Dimension scores: ' + dimScoreText + '\n\n'
-      + '=== SELECTED USE CASES ===\n'
-      + (ucNames.length ? ucNames.join('\n') : 'None selected yet') + '\n\n'
-      + '=== SERVICES MODEL ===\n'
-      + (services.length ? services.join(', ') : 'No managed services') + '\n\n'
-      + '=== PORTFOLIO SCOPE ===\n'
-      + PORTFOLIO_SELECTION.map(function(p){return PL[p]||p}).join(', ') + '\n\n'
-      + 'Generate a Vision Document narrative. Respond ONLY with valid JSON, no markdown, no preamble:\n'
-      + '{\n'
-      + '  "territory_narrative": "3-4 sentences on why '+territory+' is suited for this AI centre. Ground every claim in the S1 intelligence above — reference specific assets (energy, geography, programmes, stats). No generic AI platitudes.",\n'
-      + '  "needs_narrative": "3-4 sentences mapping '+territory+'\'s stated objective and problem to the real structural opportunity. Connect the requirements to what the territory is trying to achieve economically and socially.",\n'
-      + '  "strengths_risks_narrative": "3-4 sentences synthesising the working_in_favour and needs_attention into a balanced honest assessment. Frame risks as things the solution must address, not blockers.",\n'
-      + '  "strategic_position_narrative": "4-5 sentences explaining the '+( domQ?domQ.name:'primary quadrant')+' positioning. What does this quadrant mean for how the AI Centre should be structured? What should it prioritise? How does the secondary quadrant influence the approach?",\n'
-      + '  "vision_statement": "3-4 sentences of the core vision — what the '+territory+' AI Centre IS, what it does at full operation, the scale of ambition and the transformation it drives. Write this as a compelling, specific vision statement for a government audience.",\n'
-      + '  "uc_services_narrative": "3-4 sentences explaining how the selected use cases and services ('+services.join(', ')||'none'+') collectively serve '+territory+'\'s specific opportunity areas and contribute to the vision. Reference specific UC domains if available.",\n'
-      + '  "territory_benefits_narrative": "5-6 sentences on concrete, specific benefits for '+territory+': jobs and skills created, revenue potential, digital sovereignty, sector transformation, ecosystem development, quality of life. Be specific to this territory\'s context — reference actual sectors, population, geography. This is what makes the document land with a government audience."\n'
-      + '}'
-
-    // ── 3 focused calls, each under 2000 tokens ──────────────────────────────
-    function fmtL(arr,k){
-      if(!arr||!arr.length) return 'None'
-      return arr.slice(0,5).map(function(p,i){
-        var t=typeof p==='string'?p:(p[k||'point']||p.text||'')
-        var x=p&&p.metric?' ['+p.metric+']':p&&p.mitigation?' → '+p.mitigation:''
-        return t?(i+1)+'. '+t+x:null
-      }).filter(Boolean).join(' | ')
-    }
-    function fmtS1k(k){ var v=s1[k]; if(!v) return '—'; return typeof v==='string'?v.substring(0,200):(Array.isArray(v)?v.slice(0,3).map(function(x){return typeof x==='string'?x:(x.text||x.name||'')}).join('; '):JSON.stringify(v).substring(0,200)) }
-    var ctx = 'Territory: '+territory+' | Engagement: '+engName+' | Customer: '+custName
-
-    // Call 1: Territory context, needs, assessment
-    showToast('🤖 Writing territory analysis (1/3)…')
-    var _p1lines = [
-      ctx,
-      'REQUIREMENTS: Obj: '+(req.objective||'na')+' | Problem: '+(req.problem||'na'),
-      'S1: '+(s1.headline||'na'),
-      'STATS: '+fmtS1k('hard_stats'),
-      'OPPS: '+fmtS1k('ai_opportunities'),
-      'FAVOUR: '+fmtL(s2.working_in_favour,'point'),
-      'RISKS: '+fmtL(s2.needs_attention,'point'),
-      'RESPOND ONLY JSON no markdown:',
-      '{"territory_narrative":"2-3 sentences why '+territory+' suits an AI centre - cite S1 specifics.",'+
-      '"needs_narrative":"2-3 sentences mapping requirements to '+territory+' structural challenge.",'+
-      '"strengths_risks_narrative":"2-3 sentences on S2 assessment - frame risks as things solution addresses."}'
-    ]
-    var p1 = _p1lines.join('\n')
-    var r1 = await atlasAI.callAndParse(p1, { maxTokens: 900 })
-    console.log('[VD] Call 1:', r1&&r1.ok, 'tokens:', r1&&r1.tokens)
-
-    // Call 2: Positioning and vision
-    showToast('🤖 Writing strategic vision (2/3)…')
-    var domQn = domQ?domQ.name:'Not assessed'
-    var secQn = secQ?secQ.name:'—'
-    var _p2lines = [
-      ctx,
-      'PRIMARY: '+domQn+(domQ?' '+domQ.desc:''),
-      'SECONDARY: '+secQn+(secQ?' '+secQ.desc:''),
-      'PORTFOLIO: '+PORTFOLIO_SELECTION.map(function(p){return PL[p]||p}).join(', '),
-      'SERVICES: '+(services.length?services.join(', '):'None'),
-      'RESPOND ONLY JSON no markdown:',
-      '{"strategic_position_narrative":"3-4 sentences on '+domQn+' positioning for structure/priorities. Ref '+secQn+'.",'+
-      '"vision_statement":"3-4 sentences on what '+territory+' AI Centre IS and what it achieves. Compelling govt vision."}'
-    ]
-    var p2 = _p2lines.join('\n')
-    var r2 = await atlasAI.callAndParse(p2, { maxTokens: 700 })
-    console.log('[VD] Call 2:', r2&&r2.ok, 'tokens:', r2&&r2.tokens)
-
-    // Call 3: UC/services and territory benefits
-    showToast('🤖 Writing benefits narrative (3/3)…')
-    var _p3lines = [
-      ctx,
-      'UCS: '+(ucNames.slice(0,6).join(' | ')||'None'),
-      'SERVICES: '+(services.length?services.join(', '):'None'),
-      'OPPS: '+fmtS1k('ai_opportunities'),
-      'RESPOND ONLY JSON no markdown:',
-      '{"uc_services_narrative":"2-3 sentences how UCs and services address '+territory+' opportunity areas.",'+
-      '"territory_benefits_narrative":"4-5 sentences on concrete benefits: jobs, skills, revenue, sovereignty, sector change. Specific to '+territory+'."}'
-    ]
-    var p3 = _p3lines.join('\n')
-    var r3 = await atlasAI.callAndParse(p3, { maxTokens: 800 })
-    console.log('[VD] Call 3:', r3&&r3.ok, 'tokens:', r3&&r3.tokens)
-
-    // Merge all 3 results
-    narrative = Object.assign({},
-      (r1&&r1.ok&&r1.data)||{},
-      (r2&&r2.ok&&r2.data)||{},
-      (r3&&r3.ok&&r3.data)||{}
-    )
-    var anyOk = (r1&&r1.ok)||(r2&&r2.ok)||(r3&&r3.ok)
-    if (!anyOk) {
-      showToast('AI calls all failed — building data-only doc', 'err')
-      narrative = {}
-    } else {
-      // Save to cache
-      try {
-        var sb = getSB()
-        await fetch(sb.url+'/rest/v1/docket_items?id=eq.'+encodeURIComponent(narrativeCacheId),{method:'DELETE',headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}})
-        await sbPost('docket_items', {
-          id:narrativeCacheId, docket_id:CURRENT_DOCKET_ID,
-          section:'output', item_type:'exec_doc', item_subtype:'vision_narrative',
-          title:'Vision Narrative Cache — '+engName, status:'done',
-          content:{ inputs_hash:inputsHash, sections:narrative, generated_at:new Date().toISOString() },
-          created_by:'ATLAS'
-        })
-        console.log('[VD] Narrative cached with', Object.keys(narrative).length, 'sections')
-      } catch(_ce){ console.warn('[VD] cache save err',_ce) }
-    }
-  }
-
-  var N = narrative || {}
-  showToast('📄 Assembling document…')
-
-  // ── Step 6: Build 2×2 matrix table ───────────────────────────────────────
-  function mark(q) {
-    if (_2x2.dom===q) return '★ PRIMARY: '
-    if (_2x2.sec===q) return '◆ Secondary: '
-    return ''
-  }
-  var q2x2Table = null
-  if (_2x2.dom) {
-    q2x2Table = {
-      headers: ['', 'DATA-RICH ECOSYSTEM', 'EMERGING DATA ECOSYSTEM'],
-      rows: [
-        ['HIGH AI CAPACITY',
-          mark(1) + 'Green AI Hub — ' + QUAD[1].desc,
-          mark(2) + 'Knowledge Exporter — ' + QUAD[2].desc],
-        ['DEVELOPING AI CAPACITY',
-          mark(3) + 'Governance Moderniser — ' + QUAD[3].desc,
-          mark(4) + 'Heritage & Sector Renaissance — ' + QUAD[4].desc]
-      ]
-    }
-  }
-
-  // Radar table
-  var radarTable = null
-  if (s2.dim_scores && typeof s2.dim_scores === 'object') {
-    var dsKeys = Object.keys(s2.dim_scores)
-    if (dsKeys.length) {
-      radarTable = {
-        headers: ['Dimension', 'Score', 'Implication'],
-        rows: dsKeys.map(function(k){
-          var sc = s2.dim_scores[k]
-          var impl = sc>=4?'Strong advantage':sc>=3?'Moderate — leverage':'Needs investment'
-          return [k, String(sc)+'/5', impl]
-        })
-      }
-    }
-  }
-
-  // ── Step 7: Build atlasExport sections ────────────────────────────────────
-  var sections = []
-
-  // 1. Territory — Why Here
-  sections.push({
-    heading: '1.  ' + territory + ' — Why Here',
-    color: '#002870',
-    body: N.territory_narrative || (s1.headline || '')
-  })
-
-  // 2. What the Territory Needs
-  sections.push({
-    heading: '2.  The Challenge — What ' + territory + ' Needs to Solve',
-    color: '#002870',
-    body: N.needs_narrative || req.objective || '',
-    metadata: {
-      'Objective':         req.objective || '—',
-      'Core Problem':      req.problem   || '—',
-      'Success Measure':   req.success_criteria || '—',
-      'Budget Range':      req.budget_range || '—',
-      'Target Timeline':   req.timeline || '—'
-    }
-  })
-
-  // 3. Honest Assessment — Strengths & Risks
-  var _srFallback = (s2.working_in_favour&&s2.working_in_favour.length?s2.working_in_favour.length:0)
-    + ' factors work strongly in favour of this initiative, while '
-    + (s2.needs_attention&&s2.needs_attention.length?s2.needs_attention.length:0)
-    + ' areas require targeted attention. The strengths — particularly in human capital, energy availability and policy alignment — provide a solid foundation. '
-    + 'The risks identified are addressable through programme design and are not fundamental blockers to the vision.'
-  sections.push({
-    heading: '3.  Assessment — Strengths & Risks',
-    color: '#1C38F5',
-    body: N.strengths_risks_narrative || _srFallback,
-    bullets: [].concat(
-      (s2.working_in_favour||[]).slice(0,5).map(function(p){ var t=typeof p==='string'?p:(p.point||p.text||''); var m=p.metric?' ['+p.metric+']':''; return t?'✓  '+t+m:null }).filter(Boolean),
-      (s2.needs_attention||[]).slice(0,4).map(function(p){ var t=typeof p==='string'?p:(p.point||p.text||''); var m=p.mitigation?' → '+p.mitigation:''; return t?'⚠  '+t+m:null }).filter(Boolean)
-    )
-  })
-
-  // 4. Strategic Position — 2×2 + Radar
-  var pos4 = {
-    heading: '4.  Strategic Positioning',
-    color: '#002870',
-    body: [
-      domQ ? 'Primary Position: ' + domQ.name + (secQ?' · Secondary: '+secQ.name:'') : '',
-      N.strategic_position_narrative || ''
-    ].filter(Boolean)
-  }
-  if (q2x2Table) pos4.table = q2x2Table
-  sections.push(pos4)
-
-  // Radar scores embedded in positioning narrative — separate table removed
-
-  // 5. The Vision
-  sections.push({
-    heading: '5.  The Vision — ' + territory + ' AI Centre',
-    color: '#FF5539',
-    body: N.vision_statement || ''
-  })
-
-  // 6. Scope of Work — Portfolio
-  if (PORTFOLIO_SELECTION.length) {
-    sections.push({
-      heading: '6.  Scope of Work',
-      color: '#002870',
-      bullets: PORTFOLIO_SELECTION.map(function(p){ return PL[p]||p })
-    })
-  }
-
-  // 7. Use Cases + Services — What the Centre Will Do
-  var sec7 = {
-    heading: '7.  What the Centre Will Do',
-    color: '#002870',
-    body: N.uc_services_narrative || ''
-  }
-  if (docUCs.length) {
-    sec7.table = {
-      headers: ['#', 'Use Case', 'Cluster', 'Status'],
-      rows: docUCs.map(function(it,ix){
-        var uid=it.ref_id||it._ref_id||''
-        var uc=UC_LIBRARY.find(function(u){return u.id===uid})||{}
-        return [String(ix+1), it.title||uc.uc_name||uid, uc.cluster||'—', (it.status||'proposed').toUpperCase()]
-      })
-    }
-  }
-  sections.push(sec7)
-
-  // Services model
-  if (services.length) {
-    var svcBody = 'The AI Centre will offer managed AI services to government agencies, enterprises, universities and research institutions across '
-      + territory + '. These services make sovereign AI capability accessible without requiring consumers to own or operate infrastructure — '
-      + 'lowering the barrier to AI adoption across the territory\'s ecosystem.'
-    sections.push({
-      heading: '7a.  Managed Services',
-      color: '#00B290',
-      body: svcBody,
-      bullets: services.map(function(s) {
-        var sDesc = {
-          'MaaS — Model as a Service': 'On-demand access to foundation and fine-tuned AI models via API — pay-per-use, fully sovereign.',
-          'GPUaaS — GPU as a Service': 'Reserved or burst GPU compute for research, training and inference workloads.',
-          'BMaaS — Bare Metal as a Service': 'Dedicated bare-metal AI server access for organisations requiring maximum isolation.'
-        }
-        return s + (sDesc[s] ? ':  ' + sDesc[s] : '')
-      })
-    })
-  }
-
-  // 8. What the Territory Gains
-  var _gainsFallback = territory + ' stands to gain across four dimensions from this AI Centre initiative. '
-    + 'Economically, the centre will create a new technology industry cluster and generate high-value employment for the state\'s educated workforce — directly addressing the brain drain challenge. '
-    + 'On skills and human capital, the AI Skills Academy will build a pipeline of AI-literate professionals serving both the centre and the broader regional digital economy. '
-    + 'For digital sovereignty, ' + territory + ' will own and operate its AI infrastructure, keeping sensitive government and citizen data within the state\'s jurisdiction while enabling evidence-based policy. '
-    + 'Most directly, the ' + docUCs.length + ' use cases — spanning agriculture, water resources, disaster preparedness and governance — will deliver measurable improvements in citizen welfare, agricultural productivity and public service efficiency.'
-  sections.push({
-    heading: '8.  What ' + territory + ' Gains',
-    color: '#00B290',
-    body: N.territory_benefits_narrative || _gainsFallback
-  })
-
-  // 9. Investment & Timeline
-  var _bm = {}
-  if (req.budget_range && req.budget_range !== 'Not defined') _bm['Budget Range'] = req.budget_range
-  if (req.timeline)     _bm['Timeline']    = req.timeline
-  if (req.constraints && req.constraints.length) _bm['Constraints'] = req.constraints.join(' · ')
-  if (Object.keys(_bm).length) {
-    sections.push({ heading: '9.  Investment & Timeline', color: '#FFB600', metadata: _bm })
-  }
-
-  // 10. Next Steps
-  if (docActs.length) {
-    sections.push({
-      heading: '10.  Next Steps',
-      color: '#FF5539',
-      table: {
-        headers: ['Action', 'Owner', 'Due Date', 'Status'],
-        rows: docActs.map(function(a){ return [a.title||'', a.assigned_to||'—', a.due_date||'—', (a.status||'open').toUpperCase()] })
-      }
-    })
-  }
-
-  // ── Step 8: Generate & save ────────────────────────────────────────────────
-  var fn = 'VisionDoc_'
-    + (custName+' '+engName).replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+$/,'')
-    + '_' + new Date().toISOString().slice(0,10)
-
-  console.log('[VD] calling atlasExport.word with', sections.length, 'sections')
   try {
-    await atlasExport.word({
-      title:    engName + ' — Vision Document',
-      subtitle: custName + (territory?'  ·  '+territory:''),
-      filename: fn,
-      sections: sections,
-      footer:   'Prepared by '+b.companyName+'  ·  Confidential  ·  '+today
-    })
-    showToast('✓ ' + fn + '.docx downloaded')
+    var b        = atlasExport.getBrand()
+    var custName = (eng._cust && eng._cust.name) || 'Customer'
+    var engName  = eng.name || eng.opportunity_name || 'Engagement'
+    var territory= eng.territory || ''
+    var today    = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
 
-    // Save output record
-    var vdRow = {
-      id: genId('DI'), docket_id: CURRENT_DOCKET_ID,
-      section: 'output', item_type: 'exec_doc', item_subtype: 'vision_doc',
-      title: 'Vision Document — ' + engName, status: 'done',
-      content: { filename: fn+'.docx', generated_at: new Date().toISOString(), cached: !!narrative },
-      created_by: 'ATLAS'
+    // Scope labels — plain English, no product codes
+    var SCOPE_LABELS = {
+      'L1-TSAP': 'Territory AI Strategy, Programme Governance & Ecosystem Development',
+      'L1.1':    'Programme Management & Delivery Oversight',
+      'L1.2':    'AI Governance & Policy Framework',
+      'L1.3':    'Ecosystem Development & Partnerships',
+      'L2-AIC':  'AI Centre of Excellence — Sovereign Flagship Infrastructure',
+      'L2-MDC':  'Modular AI Datacenter',
+      'L2-HPC':  'High-Performance Computing Cluster',
+      'L2-TRC':  'GPU Training Cluster',
+      'L2-AIF':  'AI Inference Factory',
+      'L2-EDG':  'Edge AI Nodes for Field Deployment',
+      'L2-DAC':  'Domain AI Centre (Sector-Specific)',
+      'L2-MAAS': 'Model as a Service — On-Demand AI Model Access',
+      'L2-GPUAAS':'GPU as a Service — Reserved & Burst Compute',
+      'L2-BMAAS':'Bare-Metal AI Server Service',
+      'L3-DEP':  'End-to-End Deployment & Systems Integration',
+      'L3-GOV':  'AI Governance, Ethics & Compliance',
+      'L3-SKL':  'AI Skills Academy & Workforce Development',
+      'L3-OPS':  'Managed AI Platform Operations',
+      'L3-RAG':  'RAG Knowledge & Enterprise Search Platform',
+      'L3-INT':  'Application Integration & API Layer',
+      'L3-AMC':  'Annual Maintenance, Refresh & Support'
     }
-    await sbPost('docket_items', vdRow)
-    DOCKET_ITEMS.push(Object.assign({}, vdRow, { status: 'done' }))
-    if (ACTIVE_TAB === 'outputs') renderDocket()
-  } catch(e) {
-    showToast('Doc failed: '+e.message, 'err')
-    console.error('[generateVisionDoc]', e)
-  }
-  } catch(outerErr) {  // ← outer catch
-    showToast('Vision Doc error: ' + outerErr.message, 'err')
-    console.error('[VD] outer error:', outerErr)
+
+    var QUAD = {
+      1: { name:'Green AI Hub',              desc:'positioned to lead on AI infrastructure, clean compute and digital-services export' },
+      2: { name:'Knowledge Exporter',        desc:'strong on skills and research — build AI talent pipelines and IP' },
+      3: { name:'Governance Moderniser',     desc:'rich data assets — modernise public services and regulation through AI' },
+      4: { name:'Heritage & Sector Renaissance', desc:'AI as a sector transformation tool — tourism, agriculture, crafts, regional identity' }
+    }
+
+    // Load TP from Supabase if not in memory
+    showToast('📄 Preparing Vision Document…')
+    if (territory && (!TP || !TP.s1) && typeof sbGet === 'function') {
+      try {
+        var _tr = await sbGet('territory_profiles','territory=eq.'+encodeURIComponent(territory)+'&order=generated_at.desc&limit=1')
+        if (_tr && _tr[0]) {
+          if (_tr[0].profile) try { TP.s1 = typeof _tr[0].profile==='string'?JSON.parse(_tr[0].profile):_tr[0].profile } catch(ee){}
+          if (_tr[0].session) try {
+            var _ss=typeof _tr[0].session==='string'?JSON.parse(_tr[0].session):_tr[0].session
+            if (_ss.s2) TP.s2=_ss.s2; if (_ss._2x2) TP._2x2=_ss._2x2
+            TP.territory=territory
+          } catch(ee){}
+        }
+      } catch(ee){ console.warn('[VD] TP load',ee) }
+    }
+
+    var s1   = (TP && TP.s1) || {}
+    var s2   = (TP && TP.s2) || {}
+    var _2x2 = (TP && TP._2x2) || {}
+    var domQ = _2x2.dom ? QUAD[_2x2.dom] : null
+    var secQ = _2x2.sec ? QUAD[_2x2.sec] : null
+    var docUCs  = DOCKET_ITEMS.filter(function(i){ return i.section==='uc' })
+    var docActs = DOCKET_ITEMS.filter(function(i){ return i.section==='action' })
+
+    var services = []
+    if (PORTFOLIO_SELECTION.includes('L2-MAAS'))   services.push('Model as a Service')
+    if (PORTFOLIO_SELECTION.includes('L2-GPUAAS')) services.push('GPU as a Service')
+    if (PORTFOLIO_SELECTION.includes('L2-BMAAS'))  services.push('Bare-Metal AI Server Service')
+    var _maasItem = DOCKET_ITEMS.find(function(i){ return i.item_subtype==='maas_config' })
+    if (_maasItem && !services.includes('Model as a Service')) services.push('Model as a Service')
+
+    var ucNames = docUCs.map(function(it){
+      var uid=it.ref_id||it._ref_id||''
+      var uc=UC_LIBRARY.find(function(u){return u.id===uid})||{}
+      return (it.title||uc.uc_name||uid)+(uc.cluster?' ['+uc.cluster+']':'')
+    })
+
+    // Cache check
+    var _hashSrc=[territory,req.objective||'',req.problem||'',
+      (s1.headline||''),(s2.headline_recommendation||''),
+      ucNames.join('|'),PORTFOLIO_SELECTION.join('|'),services.join('|')].join('__')
+    var _hash=0
+    for(var _i=0;_i<_hashSrc.length;_i++){_hash=((_hash<<5)-_hash)+_hashSrc.charCodeAt(_i);_hash=_hash&_hash}
+    var cacheId=CURRENT_DOCKET_ID+'-vision-narrative', inputsHash=String(Math.abs(_hash))
+    var narrative=null
+
+    var _cr=await sbGet('docket_items','id=eq.'+encodeURIComponent(cacheId))
+    if(_cr&&_cr[0]&&_cr[0].content&&_cr[0].content.inputs_hash===inputsHash&&_cr[0].content.sections){
+      narrative=_cr[0].content.sections
+      console.log('[VD] cache hit')
+      showToast('📄 Building from cached narrative…')
+    }
+
+    // AI generation — 3 focused calls, each under 2000 tokens
+    if (!narrative) {
+      function fL(arr,k){ if(!arr||!arr.length) return 'None'; return arr.slice(0,5).map(function(p,i){ var t=typeof p==='string'?p:(p[k||'point']||p.text||''); var x=p&&p.metric?' ['+p.metric+']':p&&p.mitigation?' Mitig: '+p.mitigation:''; return t?(i+1)+'. '+t+x:null }).filter(Boolean).join(' | ') }
+      function fS(k){ var v=s1[k]; if(!v) return '-'; return typeof v==='string'?v.substring(0,200):(Array.isArray(v)?v.slice(0,3).map(function(x){return typeof x==='string'?x:(x.text||x.name||'')}).join('; '):JSON.stringify(v)).substring(0,200) }
+      var ctx='Territory: '+territory+' | Engagement: '+engName+' | Customer: '+custName
+
+      showToast('AI writing territory analysis (1/3)…')
+      var r1=await atlasAI.callAndParse([ctx,
+        'OBJ: '+(req.objective||'-')+' | PROBLEM: '+(req.problem||'-'),
+        'S1: '+(s1.headline||'-'),
+        'STATS: '+fS('hard_stats'),
+        'OPPS: '+fS('ai_opportunities'),
+        'FAVOUR: '+fL(s2.working_in_favour,'point'),
+        'RISKS: '+fL(s2.needs_attention,'point'),
+        'JSON only, no markdown: {"territory_narrative":"2-3 sentences why '+territory+' suits this AI centre, citing S1 specifics. No generic statements.","needs_narrative":"2-3 sentences mapping requirements to '+territory+' structural challenge.","strengths_risks_narrative":"2-3 sentences synthesising S2 into balanced assessment. Frame risks as what the solution must address."}'
+      ].join('\n'),{maxTokens:1800})
+      console.log('[VD] Call 1:',r1&&r1.ok,'tokens:',r1&&r1.tokens)
+
+      showToast('AI writing strategic vision (2/3)…')
+      var domQn=domQ?domQ.name:'Not yet assessed'
+      var secQn=secQ?secQ.name:'-'
+      var r2=await atlasAI.callAndParse([ctx,
+        'PRIMARY: '+domQn+(domQ?' - '+domQ.desc:''),
+        'SECONDARY: '+secQn+(secQ?' - '+secQ.desc:''),
+        'SCOPE: '+PORTFOLIO_SELECTION.map(function(p){return SCOPE_LABELS[p]||p}).join(', '),
+        'SERVICES: '+(services.length?services.join(', '):'None'),
+        'JSON only, no markdown: {"strategic_position_narrative":"3-4 sentences explaining '+domQn+' positioning and what it means for how the AI Centre is structured and prioritised. Reference '+secQn+' where relevant.","vision_statement":"3-4 sentences: what the '+territory+' AI Centre IS, what it achieves at full operation, the transformation it drives. Compelling government vision."}'
+      ].join('\n'),{maxTokens:1800})
+      console.log('[VD] Call 2:',r2&&r2.ok,'tokens:',r2&&r2.tokens)
+
+      showToast('AI writing benefits narrative (3/3)…')
+      var r3=await atlasAI.callAndParse([ctx,
+        'UCS ('+ucNames.length+'): '+(ucNames.slice(0,6).join(' | ')||'None'),
+        'SERVICES: '+(services.length?services.join(', '):'None'),
+        'OPPS: '+fS('ai_opportunities'),
+        'PROBLEM: '+(req.problem||'-'),
+        'JSON only, no markdown: {"uc_services_narrative":"2-3 sentences on how UCs and services address '+territory+' specific opportunity areas.","territory_benefits_narrative":"5-6 sentences on concrete benefits for '+territory+': jobs, skills, revenue, digital sovereignty, sector transformation, citizen welfare. Be specific to this territory context."}'
+      ].join('\n'),{maxTokens:1800})
+      console.log('[VD] Call 3:',r3&&r3.ok,'tokens:',r3&&r3.tokens)
+
+      narrative=Object.assign({},(r1&&r1.ok&&r1.data)||{},(r2&&r2.ok&&r2.data)||{},(r3&&r3.ok&&r3.data)||{})
+      var anyOk=(r1&&r1.ok)||(r2&&r2.ok)||(r3&&r3.ok)
+      if(anyOk){
+        try{
+          var sb=getSB()
+          await fetch(sb.url+'/rest/v1/docket_items?id=eq.'+encodeURIComponent(cacheId),{method:'DELETE',headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}})
+          await sbPost('docket_items',{id:cacheId,docket_id:CURRENT_DOCKET_ID,section:'output',item_type:'exec_doc',item_subtype:'vision_narrative',title:'Vision Narrative Cache',status:'done',content:{inputs_hash:inputsHash,sections:narrative,generated_at:new Date().toISOString()},created_by:'ATLAS'})
+          console.log('[VD] Narrative cached with',Object.keys(narrative).length,'sections')
+        }catch(_ce){console.warn('[VD] cache save err',_ce)}
+      }
+    }
+
+    var N=narrative||{}
+    showToast('📄 Assembling document…')
+
+    // 2x2 matrix table
+    var q2x2=null
+    if(_2x2.dom){
+      function mk(q){return _2x2.dom===q?'PRIMARY: ':_2x2.sec===q?'Also: ':''}
+      q2x2={
+        headers:['','DATA-RICH ECOSYSTEM','EMERGING DATA ECOSYSTEM'],
+        rows:[
+          ['HIGH AI CAPACITY', mk(1)+'Green AI Hub — '+QUAD[1].desc, mk(2)+'Knowledge Exporter — '+QUAD[2].desc],
+          ['DEVELOPING AI CAPACITY', mk(3)+'Governance Moderniser — '+QUAD[3].desc, mk(4)+'Heritage & Sector Renaissance — '+QUAD[4].desc]
+        ]
+      }
+    }
+
+    // Fallbacks when AI sections empty
+    var _srFb=(s2.working_in_favour?s2.working_in_favour.length:0)+' factors work in favour of this initiative and '+(s2.needs_attention?s2.needs_attention.length:0)+' areas require targeted attention. The strengths provide a solid foundation while the identified risks are addressable through programme design and are not fundamental blockers.'
+    var _gainsFb=territory+' stands to benefit across economic, skills, sovereignty and citizen welfare dimensions. The AI Centre will create high-value technology employment for the educated workforce, build a generation of AI-literate professionals through the Skills Academy, and establish '+territory+' as a pioneer in sovereign AI. The '+docUCs.length+' selected use cases will deliver measurable improvements in agricultural productivity, disaster preparedness and public service efficiency.'
+    var _svcFb=services.length?'The Centre will offer '+services.join(', ')+' to government agencies, enterprises, universities and research institutions across '+territory+', making sovereign AI capability accessible without requiring consumers to own or operate infrastructure.':''
+
+    // Build sections
+    var sections=[]
+
+    // 1. Territory — Why Here
+    sections.push({heading:'1.  '+territory+' — Why Here',color:'#002870',body:N.territory_narrative||(s1.headline||'')})
+
+    // 2. The Challenge
+    sections.push({heading:'2.  The Challenge — What '+territory+' Needs to Solve',color:'#002870',
+      body:N.needs_narrative||req.objective||'',
+      metadata:Object.assign({},
+        req.objective?{'Objective':req.objective}:{},
+        req.problem?{'Core Problem':req.problem}:{},
+        req.success_criteria?{'Success Measure':req.success_criteria}:{},
+        req.timeline?{'Target Timeline':req.timeline}:{}
+      )
+    })
+
+    // 3. Assessment
+    var _bullets=[]
+    ;(s2.working_in_favour||[]).slice(0,5).forEach(function(p){var t=typeof p==='string'?p:(p.point||p.text||'');var m=p.metric?' ['+p.metric+']':'';if(t)_bullets.push('✓  '+t+m)})
+    ;(s2.needs_attention||[]).slice(0,4).forEach(function(p){var t=typeof p==='string'?p:(p.point||p.text||'');var m=p.mitigation?' → '+p.mitigation:'';if(t)_bullets.push('⚠  '+t+m)})
+    sections.push({heading:'3.  Assessment — Strengths & Risks',color:'#1C38F5',body:N.strengths_risks_narrative||_srFb,bullets:_bullets.length?_bullets:undefined})
+
+    // 4. Strategic Positioning
+    var sec4={heading:'4.  Strategic Positioning',color:'#002870',body:[domQ?'Primary Position: '+domQ.name+(secQ?' · Secondary: '+secQ.name:''):'Position not yet assessed.',N.strategic_position_narrative||''].filter(Boolean)}
+    if(q2x2) sec4.table=q2x2
+    sections.push(sec4)
+
+    // 5. The Vision
+    sections.push({heading:'5.  The Vision — '+territory+' AI Centre',color:'#FF5539',body:N.vision_statement||''})
+
+    // 6. Scope of Work — plain English labels only
+    if(PORTFOLIO_SELECTION.length){
+      sections.push({heading:'6.  Scope of Work',color:'#002870',
+        body:'The following work streams define the scope of this engagement:',
+        bullets:PORTFOLIO_SELECTION.map(function(p){return SCOPE_LABELS[p]||p})
+      })
+    }
+
+    // 7. What the Centre Will Do
+    var sec7={heading:'7.  What the Centre Will Do',color:'#002870',body:N.uc_services_narrative||''}
+    if(docUCs.length){sec7.table={headers:['#','Use Case','Domain','Status'],rows:docUCs.map(function(it,ix){var uid=it.ref_id||it._ref_id||'';var uc=UC_LIBRARY.find(function(u){return u.id===uid})||{};return[String(ix+1),it.title||uc.uc_name||uid,uc.cluster||'—',(it.status||'proposed').toUpperCase()]})}}
+    sections.push(sec7)
+
+    // 7a. Services
+    if(services.length){
+      var svcDescs={'Model as a Service':'On-demand access to sovereign AI models via API — pay-per-use, no infrastructure required.','GPU as a Service':'Reserved or burst GPU compute for research, training and inference workloads.','Bare-Metal AI Server Service':'Dedicated bare-metal AI servers for organisations requiring maximum isolation and control.'}
+      sections.push({heading:'7a.  Managed Services',color:'#00B290',body:N.uc_services_narrative?'':_svcFb,bullets:services.map(function(s){return s+(svcDescs[s]?':  '+svcDescs[s]:'')})})
+    }
+
+    // 8. What the Territory Gains
+    sections.push({heading:'8.  What '+territory+' Gains',color:'#00B290',body:N.territory_benefits_narrative||_gainsFb})
+
+    // 9. Investment & Timeline
+    var _bm={}
+    if(req.budget_range&&req.budget_range!=='Not defined') _bm['Budget Range']=req.budget_range
+    if(req.timeline) _bm['Timeline']=req.timeline
+    if(req.constraints&&req.constraints.length) _bm['Constraints']=req.constraints.join(' · ')
+    if(Object.keys(_bm).length) sections.push({heading:'9.  Investment & Timeline',color:'#FFB600',metadata:_bm})
+
+    // 10. Next Steps
+    if(docActs.length){sections.push({heading:'10.  Next Steps',color:'#FF5539',table:{headers:['Action','Owner','Due Date','Status'],rows:docActs.map(function(a){return[a.title||'',a.assigned_to||'—',a.due_date||'—',(a.status||'open').toUpperCase()]})}})}
+
+    // Generate
+    var fn='VisionDoc_'+(custName+' '+engName).replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+$/,'')+'_'+new Date().toISOString().slice(0,10)
+    console.log('[VD] calling atlasExport.word with',sections.length,'sections')
+    await atlasExport.word({title:engName+' — Vision Document',subtitle:custName+(territory?'  ·  '+territory:''),filename:fn,sections:sections,footer:'Prepared by '+b.companyName+'  ·  Confidential  ·  '+today})
+    showToast('✓ '+fn+'.docx downloaded')
+    var vdRow={id:genId('DI'),docket_id:CURRENT_DOCKET_ID,section:'output',item_type:'exec_doc',item_subtype:'vision_doc',title:'Vision Document — '+engName,status:'done',content:{filename:fn+'.docx',generated_at:new Date().toISOString()},created_by:'ATLAS'}
+    await sbPost('docket_items',vdRow)
+    DOCKET_ITEMS.push(Object.assign({},vdRow,{status:'done'}))
+    if(ACTIVE_TAB==='outputs') renderDocket()
+
+  } catch(outerErr) {
+    showToast('Vision Doc error: '+outerErr.message,'err')
+    console.error('[VD] error:',outerErr)
   }
 }
 
@@ -5238,23 +5014,4 @@ init()
 </script>
 <div class="toast" id="toast"></div>
 </body>
-</html>    var p2 = [ctx,
-      'PRIMARY QUADRANT: '+domQn+(domQ?' - '+domQ.desc:''),
-      'SECONDARY QUADRANT: '+secQn+(secQ?' - '+secQ.desc:''),
-      'PORTFOLIO: '+PORTFOLIO_SELECTION.map(function(p){return PL[p]||p}).join(', '),
-      'SERVICES: '+(services.length?services.join(', '):'None'),
-      'OBJECTIVE: '+(req.objective||'-'),
-      'Respond ONLY with JSON (no markdown):',
-      '{"strategic_position_narrative":"3-4 sentences on what '+domQn+' positioning means for structure and priorities. Reference '+secQn+' where relevant.",'+
-      '"vision_statement":"3-4 sentences: what the '+territory+' AI Centre IS at full operation and what transformation it drives. Compelling, specific, for government audience."}'
-    ].join('
-')    var p3 = [ctx,
-      'USE CASES ('+ucNames.length+'): '+(ucNames.slice(0,6).join(' | ')||'None'),
-      'SERVICES: '+(services.length?services.join(', '):'None'),
-      'AI OPPORTUNITIES: '+fmtS1k('ai_opportunities'),
-      'PROBLEM: '+(req.problem||'-'),
-      'Respond ONLY with JSON (no markdown):',
-      '{"uc_services_narrative":"2-3 sentences on how UCs and services address '+territory+' opportunity areas.",'+
-      '"territory_benefits_narrative":"4-5 sentences on concrete benefits: jobs, skills, revenue, digital sovereignty, sector transformation. Specific to '+territory+' context and sectors."}'
-    ].join('
-')
+</html>
