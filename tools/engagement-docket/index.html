@@ -1836,17 +1836,14 @@ async function generateVisionDoc() {
   // ── Step 2: Curate inputs ─────────────────────────────────────────────────
   var docUCs = DOCKET_ITEMS.filter(function(i){ return i.section==='uc' })
   var docActs= DOCKET_ITEMS.filter(function(i){ return i.section==='action' })
-  var sm = SASC_DATA && SASC_DATA.serviceModel
+  // Infer services from portfolio selection (SASC_DATA not available in Docket)
   var services = []
-  if (sm) {
-    if (sm.maas && sm.maas.enabled)   services.push('MaaS — Model as a Service')
-    if (sm.gpuaas && sm.gpuaas.enabled) services.push('GPUaaS — GPU as a Service')
-    if (sm.bmaas && sm.bmaas.enabled)  services.push('BMaaS — Bare Metal as a Service')
-  }
-  // Also infer services from portfolio
-  if (PORTFOLIO_SELECTION.includes('L2-MAAS') && !services.includes('MaaS — Model as a Service'))   services.push('MaaS — Model as a Service')
-  if (PORTFOLIO_SELECTION.includes('L2-GPUAAS') && !services.includes('GPUaaS — GPU as a Service')) services.push('GPUaaS — GPU as a Service')
-  if (PORTFOLIO_SELECTION.includes('L2-BMAAS') && !services.includes('BMaaS — Bare Metal as a Service')) services.push('BMaaS — Bare Metal as a Service')
+  if (PORTFOLIO_SELECTION.includes('L2-MAAS'))   services.push('MaaS — Model as a Service')
+  if (PORTFOLIO_SELECTION.includes('L2-GPUAAS')) services.push('GPUaaS — GPU as a Service')
+  if (PORTFOLIO_SELECTION.includes('L2-BMAAS'))  services.push('BMaaS — Bare Metal as a Service')
+  // Also check MaaS config saved in docket_items
+  var _maasItem = DOCKET_ITEMS.find(function(i){ return i.item_subtype === 'maas_config' })
+  if (_maasItem && !services.includes('MaaS — Model as a Service')) services.push('MaaS — Model as a Service')
 
   var ucNames = docUCs.map(function(it){
     var uid=it.ref_id||it._ref_id||''
