@@ -268,7 +268,7 @@ textarea{resize:vertical;min-height:60px}
     <div class="atlas-tool-name">Engagement Docket</div>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
-    <span class="atlas-ver">v2.3</span>
+    <span class="atlas-ver" title="Build: schema-fix-1">v2.3.1</span>
     <button class="atlas-nav-btn" onclick="window.location.href='../../'">&#8592; Portal</button>
   </div>
 </div>
@@ -1150,8 +1150,16 @@ async function savePortfolioSelection() {
       'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify(_portRow)
   })
-  console.log('[savePortfolio]', _portRes.status, 'items:', PORTFOLIO_SELECTION.length)
-  if (!_portRes.ok) { var _e=await _portRes.text(); console.error('[savePortfolio]', _e) }
+  var _portBody = await _portRes.text()
+  if (!_portRes.ok) {
+    var _pp = {}; try { _pp = JSON.parse(_portBody) } catch(e2){}
+    var _pmsg = _pp.message || _pp.code || _portBody.substring(0,60)
+    console.error('[savePortfolio]', _portRes.status, _portBody)
+    showToast('Portfolio save ' + _portRes.status + ': ' + _pmsg, 'err')
+  } else {
+    console.log('[savePortfolio] OK', PORTFOLIO_SELECTION.length, 'items')
+    showToast('✓ Portfolio saved (' + PORTFOLIO_SELECTION.length + ' items)')
+  }
   showToast('✓ Portfolio selection saved')
 }
 
@@ -4384,8 +4392,10 @@ async function addUCToDocket(ucId) {
   })
   if (!_r.ok) {
     var _e = await _r.text()
+    var _parsed = {}; try { _parsed = JSON.parse(_e) } catch(e2){}
+    var _msg = _parsed.message || _parsed.code || _e.substring(0,60)
     console.error('[addUC]', _r.status, _e)
-    showToast('UC add failed (' + _r.status + ')', 'err'); return
+    showToast('UC add ' + _r.status + ': ' + _msg, 'err'); return
   }
   row._ref_id = ucId
   DOCKET_ITEMS.push(row)
