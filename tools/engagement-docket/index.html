@@ -422,47 +422,7 @@ textarea{resize:vertical;min-height:60px}
 
 <script>
 // -- Config                               
-// Smart docket_items insert — retries by stripping unknown columns (PGRST204)
-// Caches discovered valid columns in localStorage so subsequent inserts are fast
-async function docketInsert(row) {
-  var sb = getSB()
-  if (!sb.url) return { ok: false, error: 'No Supabase config' }
-  // Load known-bad columns from cache
-  var _badCols = {}
-  try { _badCols = JSON.parse(localStorage.getItem('atlas_docket_bad_cols')||'{}') } catch(e){}
-  var toSend = {}
-  Object.keys(row).forEach(function(k){ if (!k.startsWith('_') && !_badCols[k]) toSend[k] = row[k] })
-  // Try up to 6 times (strips one unknown column per attempt)
-  for (var attempt=0; attempt<6; attempt++) {
-    var r = await fetch(sb.url + '/rest/v1/docket_items', {
-      method: 'POST',
-      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
-        'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify(toSend)
-    })
-    if (r.ok) { console.log('[docketInsert] ok on attempt', attempt, '| cols:', Object.keys(toSend)); return { ok: true } }
-    var body = ''
-    try { body = await r.text() } catch(e){}
-    var parsed = {}
-    try { parsed = JSON.parse(body) } catch(e){}
-    if (parsed.code === 'PGRST204' && parsed.message) {
-      // Extract the unknown column name: "Could not find the 'X' column..."
-      var m = parsed.message.match(/find the '([^']+)' column/)
-      if (m) {
-        var badCol = m[1]
-        console.warn('[docketInsert] column not found:', badCol, '— removing and retrying')
-        _badCols[badCol] = 1
-        try { localStorage.setItem('atlas_docket_bad_cols', JSON.stringify(_badCols)) } catch(e){}
-        delete toSend[badCol]
-        continue
-      }
-    }
-    // Other error — give up
-    console.error('[docketInsert] error ' + r.status + ':', body.substring(0,200))
-    return { ok: false, error: body.substring(0,80), status: r.status }
-  }
-  return { ok: false, error: 'Max retries exceeded' }
-}
+
 
 function getSB() {
   try {
@@ -1170,23 +1130,28 @@ async function savePortfolioSelection() {
   // Save as docket_item with item_subtype = portfolio_selection
   // Only columns that exist in docket_items schema
   var _portId = CURRENT_DOCKET_ID + '-portfolio'
-  var _portNotes = JSON.stringify({ items: PORTFOLIO_SELECTION })
-  // DELETE then INSERT to ensure clean upsert without on_conflict header issues
   var sb = getSB()
+  // DELETE first to ensure clean upsert (on_conflict needs service key)
   try {
     await fetch(sb.url + '/rest/v1/docket_items?id=eq.' + encodeURIComponent(_portId), {
-      method: 'DELETE',
-      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, Prefer: 'return=minimal' }
+      method: 'DELETE', headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
     })
   } catch(e) {}
   var _portRow = {
     id: _portId, docket_id: CURRENT_DOCKET_ID,
-    section: 'output', item_type: 'portfolio_selection',
-    title: 'Portfolio Selection', notes: _portNotes,
+    section: 'output', item_type: 'portfolio_selection', item_subtype: 'portfolio_selection',
+    title: 'Portfolio Selection',
+    content: { items: PORTFOLIO_SELECTION },
     status: 'done', created_by: 'ATLAS'
   }
-  var _portResult = await docketInsert(_portRow)
-  console.log('[savePortfolio] result:', _portResult, 'items:', PORTFOLIO_SELECTION.length)
+  var _portRes = await fetch(sb.url + '/rest/v1/docket_items', {
+    method: 'POST',
+    headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+      'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify(_portRow)
+  })
+  console.log('[savePortfolio]', _portRes.status, 'items:', PORTFOLIO_SELECTION.length)
+  if (!_portRes.ok) { var _e=await _portRes.text(); console.error('[savePortfolio]', _e) }
   showToast('✓ Portfolio selection saved')
 }
 
@@ -1555,22 +1520,24 @@ async function saveMaasConfig() {
   if (!eng) return
   var sb = getSB()
   if (!sb.url) { showToast('Supabase not configured'); return }
-  var body = {
+  var _maasRow = {
+    id: CURRENT_DOCKET_ID + '-maas',
     docket_id: CURRENT_DOCKET_ID,
-    engagement_id: eng.id,
-    section: 'output',
-    item_subtype: 'maas_config',
-    item_type: 'maas_config',
+    section: 'output', item_type: 'maas_config', item_subtype: 'maas_config',
     title: 'MaaS Configuration',
-    data: JSON.stringify({
+    content: {
       archetypes: window.MAAS_ARCHS || [],
       models: MAAS_MODELS_SELECTED.map(function(m){ return { id:m.id, name:m.name, vendor:m.vendor } }),
       agent_enabled: AGENT_ON
-    }),
-    status: 'done'
+    },
+    status: 'done', created_by: 'ATLAS'
   }
-  await sbPost('docket_items', body)
-  showToast('✓ MaaS config saved')
+  var sb2 = getSB()
+  try { await fetch(sb2.url+'/rest/v1/docket_items?id=eq.'+encodeURIComponent(_maasRow.id),{method:'DELETE',headers:{apikey:sb2.key,Authorization:'Bearer '+sb2.key}}) } catch(e){}
+  var _mr = await fetch(sb2.url+'/rest/v1/docket_items', { method:'POST',
+    headers:{apikey:sb2.key,Authorization:'Bearer '+sb2.key,'Content-Type':'application/json',Prefer:'return=minimal'},
+    body:JSON.stringify(_maasRow) })
+  showToast(_mr.ok ? '✓ MaaS config saved' : 'MaaS save failed (' + _mr.status + ')')
 }
 
 // ── TERRITORY PROFILE TAB ────────────────────────────────────────────────────
@@ -1887,7 +1854,7 @@ async function generateVisionDoc() {
       item_subtype: 'vision_doc',
       title: 'Vision Document — ' + engName,
       status: 'done',
-      data: JSON.stringify({ filename: filename + '.docx', generated_at: new Date().toISOString() }),
+      content: { filename: filename + '.docx', generated_at: new Date().toISOString() },
       created_by: 'ATLAS'
     }
     await sbPost('docket_items', row)
@@ -3968,12 +3935,12 @@ async function openEngagement(eng) {
   if (CURRENT_DOCKET_ID) {
     var piItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'portfolio_selection' || i.item_type === 'portfolio_selection' })
     if (piItems.length) {
-      try { var d = JSON.parse(piItems[0].data||'{}'); PORTFOLIO_SELECTION = d.items || [] } catch(e) {}
+      try { var d = piItems[0].content || JSON.parse(piItems[0].data||'{}'); PORTFOLIO_SELECTION = d.items || [] } catch(e) {}
     }
     var maasItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'maas_config' || i.item_type === 'maas_config' })
     if (maasItems.length) {
       try {
-        var md = JSON.parse(maasItems[0].data||'{}')
+        var md = maasItems[0].content || JSON.parse(maasItems[0].data||'{}')
         window.MAAS_ARCHS = md.archetypes || []
         AGENT_ON = md.agent_enabled || false
         MAAS_MODELS_SELECTED = md.models || []
@@ -4325,7 +4292,7 @@ function renderUCTab() {
   html += '<div class="uc-grid">'
   ucItems.forEach(function(item) {
     // Find UC from library
-    var _uid = item._ref_id || item.ref_id || item.notes || ''
+    var _uid = item.ref_id || item._ref_id || ''
     var uc = UC_LIBRARY.find(function(u){ return u.id === _uid }) || {}
     var ucName = uc.uc_name || item.title || 'UC'
     var status = item.status || 'proposed'
@@ -4405,15 +4372,22 @@ async function addUCToDocket(ucId) {
     id: genId('DI'), docket_id: CURRENT_DOCKET_ID,
     section: 'uc', item_type: 'use_case',
     title: uc.uc_name || ucId,
-    notes: ucId,
-    status: 'proposed', created_by: 'ATLAS',
-    _ref_id: ucId  // in-memory only — stripped by docketInsert (starts with _)
+    ref_table: 'uc_library', ref_id: ucId,
+    status: 'proposed', created_by: 'ATLAS'
   }
-  var result = await docketInsert(row)
-  if (!result.ok) {
-    showToast('UC add failed: ' + (result.error||'unknown'), 'err')
-    return
+  var sb = getSB()
+  var _r = await fetch(sb.url + '/rest/v1/docket_items', {
+    method: 'POST',
+    headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+      'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify(row)
+  })
+  if (!_r.ok) {
+    var _e = await _r.text()
+    console.error('[addUC]', _r.status, _e)
+    showToast('UC add failed (' + _r.status + ')', 'err'); return
   }
+  row._ref_id = ucId
   DOCKET_ITEMS.push(row)
   showToast('UC added')
   renderUCModalContent(document.getElementById('uc-search').value)
@@ -4518,7 +4492,7 @@ async function cycleRAG(id) {
   if (!item) return
   var cycle = { amber:'green', green:'red', red:'amber' }
   item.rag = cycle[item.rag||'amber'] || 'amber'
-  await sbPatch('docket_items', 'id=eq.'+id, { rag: item.rag })
+  // rag stored in-memory only (not a DB column)
   switchTab('actions')
 }
 
@@ -4597,7 +4571,6 @@ async function saveAction() {
     title: title,
     assigned_to: document.getElementById('action-owner').value.trim() || null,
     due_date: document.getElementById('action-due').value || null,
-    rag: 'amber',
     notes: document.getElementById('action-notes').value.trim() || null
   }
   if (id) {
