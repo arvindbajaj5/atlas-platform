@@ -1781,166 +1781,312 @@ async function saveRequirements() {
 async function generateVisionDoc() {
   var eng = CURRENT_ENG || {}
   var req = eng.requirements || {}
-  if (!req.objective) {
-    showToast('Add requirements first — click Edit Requirements')
-    return
-  }
-  if (typeof atlasExport === 'undefined') {
-    showToast('Export library not loaded — check network'); return
-  }
-  showToast('📄 Generating Vision Document...')
-  var b = atlasExport.getBrand ? atlasExport.getBrand() : { companyName: 'OEM' }
+  if (!req.objective) { showToast('Add requirements first — click Edit Requirements'); return }
+  if (!window.docx)   { showToast('docx library not loaded — check network'); return }
+  showToast('📄 Generating Vision Document…')
+
+  // ── Brand ──────────────────────────────────────────────────────────────────
+  var gcfg = {}; try { gcfg = JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') } catch(e){}
+  var co     = gcfg.company || {}
+  var coName = co.brandName || co.brand_name || (typeof atlasExport!=='undefined'&&atlasExport.getBrand?atlasExport.getBrand().companyName:null) || 'OEM'
+  var logoDataUrl = co.brandLogoData || localStorage.getItem('atlas_logo') || null
+
+  // ── Data ───────────────────────────────────────────────────────────────────
   var custName  = (eng._cust && eng._cust.name) || 'Customer'
   var engName   = eng.name || eng.opportunity_name || 'Engagement'
   var territory = eng.territory || ''
-  var sections  = []
+  var today     = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
 
-  // 1. Cover metadata
-  sections.push({
-    heading: 'Engagement Overview',
-    color: '#002870',
-    metadata: {
-      'Customer':         custName,
-      'Engagement':       engName,
-      'Type':             eng.engagement_type || eng.type || '—',
-      'Territory':        territory || '—',
-      'Date':             new Date().toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' }),
-      'Prepared by':      b.companyName || 'OEM'
-    }
-  })
+  // Portfolio labels
+  var PL = {
+    'L1-TSAP':'L1 TSAP Territory Programme','L1.1':'L1.1 Programme Management',
+    'L1.2':'L1.2 Governance Framework','L1.3':'L1.3 Ecosystem Development',
+    'L2-AIC':'L2 AI Centre of Excellence','L2-MDC':'L2 Modular Datacenter',
+    'L2-HPC':'L2 HPC Cluster','L2-TRC':'L2 GPU Training Cluster',
+    'L2-AIF':'L2 AI Factory','L2-EDG':'L2 Edge AI Nodes',
+    'L2-DAC':'L2 Domain AI Centre',
+    'L2-MAAS':'MaaS — Model as a Service',
+    'L2-GPUAAS':'GPUaaS — GPU as a Service',
+    'L2-BMAAS':'BMaaS — Bare Metal as a Service',
+    'L3-DEP':'L3 Deployment & Integration','L3-GOV':'L3 AI Governance',
+    'L3-SKL':'L3 AI Skills Academy','L3-OPS':'L3 Managed Operations',
+    'L3-RAG':'L3 RAG Platform','L3-INT':'L3 System Integration','L3-AMC':'L3 AMC & Refresh'
+  }
 
-  // 2. Territory strategic recommendation (from S2/S3 if available)
-  if (TP && TP.s2 && TP.s2.headline_recommendation && TP.territory === territory) {
-    sections.push({
-      heading: 'Territory Strategic Assessment',
-      color: '#002870',
-      body: TP.s2.headline_recommendation
+  // ── docx helpers ───────────────────────────────────────────────────────────
+  var D = window.docx
+  var NAVY='002870', ORANGE='FF5539', TEAL='00B290', WHITE='FFFFFF', LIGHT='F0F2F5', MID='6B7280'
+
+  function sectionHeading(num, text) {
+    return new D.Paragraph({
+      children:[new D.TextRun({text: num+'. '+text, bold:true, color:WHITE, size:26, font:{name:'Calibri'}})],
+      shading:{fill:NAVY, type:D.ShadingType.SOLID},
+      spacing:{before:320,after:80},
+      indent:{left:80,right:80}
     })
-    // Add 2×2 positioning if available
-    if (TP._2x2 && TP._2x2.dom) {
-      var qNames = { 1:'Green AI Hub', 2:'Knowledge Exporter', 3:'Governance Moderniser', 4:'Heritage & Sector Renaissance' }
-      sections.push({
-        heading: 'Positioning',
-        color: '#00B290',
-        metadata: {
-          'Primary position': (qNames[TP._2x2.dom] || '') + ' (' + (TP._2x2.domPct || '') + '%)',
-          'Supporting':       (qNames[TP._2x2.sec] || '') + ' (' + (TP._2x2.secPct || '') + '%)'
+  }
+
+  function bodyPara(text, opts) {
+    opts = opts||{}
+    return new D.Paragraph({
+      children:[new D.TextRun({text:String(text||''), size:opts.size||22, bold:opts.bold||false, color:opts.color||'000000', italics:opts.italic||false})],
+      spacing:{after:opts.after||100}
+    })
+  }
+
+  function bulletPara(text) {
+    return new D.Paragraph({
+      children:[new D.TextRun({text:String(text||''), size:21})],
+      bullet:{level:0}, spacing:{after:60}
+    })
+  }
+
+  function spacer() { return new D.Paragraph({children:[new D.TextRun({text:'',size:12})],spacing:{after:60}}) }
+
+  function metaTable(rows) {
+    return new D.Table({
+      width:{size:100,type:D.WidthType.PERCENTAGE},
+      borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE},insideH:{style:D.BorderStyle.SINGLE,color:'E5E7EB',size:4},insideV:{style:D.BorderStyle.NONE}},
+      rows: rows.map(function(r,ri) {
+        return new D.TableRow({children:[
+          new D.TableCell({
+            width:{size:28,type:D.WidthType.PERCENTAGE},
+            shading:{fill:LIGHT,type:D.ShadingType.SOLID},
+            borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.SINGLE,color:'E5E7EB',size:4},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},
+            children:[new D.Paragraph({children:[new D.TextRun({text:r[0],bold:true,size:19,color:NAVY,font:{name:'Calibri'}})],spacing:{after:0}})]
+          }),
+          new D.TableCell({
+            width:{size:72,type:D.WidthType.PERCENTAGE},
+            borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.SINGLE,color:'E5E7EB',size:4},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},
+            children:[new D.Paragraph({children:[new D.TextRun({text:String(r[1]||'—'),size:19,font:{name:'Calibri'}})],spacing:{after:0}})]
+          })
+        ]})
+      })
+    })
+  }
+
+  function dataTable(headers, rows) {
+    var hRow = new D.TableRow({children:headers.map(function(h){
+      return new D.TableCell({
+        shading:{fill:NAVY,type:D.ShadingType.SOLID},
+        children:[new D.Paragraph({children:[new D.TextRun({text:h,bold:true,color:WHITE,size:18,font:{name:'Calibri'}})],spacing:{after:0}})]
+      })
+    })})
+    var dRows = rows.map(function(row,ri){
+      return new D.TableRow({children:row.map(function(cell){
+        return new D.TableCell({
+          shading: ri%2===1?{fill:LIGHT,type:D.ShadingType.SOLID}:undefined,
+          children:[new D.Paragraph({children:[new D.TextRun({text:String(cell||'—'),size:18,font:{name:'Calibri'}})],spacing:{after:0}})]
+        })
+      })})
+    })
+    return new D.Table({width:{size:100,type:D.WidthType.PERCENTAGE},rows:[hRow].concat(dRows)})
+  }
+
+  // ── Collect logo image if available ────────────────────────────────────────
+  var logoRun = null
+  if (logoDataUrl && logoDataUrl.startsWith('data:image')) {
+    try {
+      var b64 = logoDataUrl.split(',')[1]
+      var bin = atob(b64)
+      var buf = new Uint8Array(bin.length)
+      for(var i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i)
+      var isJpg = logoDataUrl.indexOf('jpeg')>=0||logoDataUrl.indexOf('jpg')>=0
+      logoRun = new D.ImageRun({
+        data: buf, transformation:{width:120,height:40},
+        type: isJpg?'jpg':'png'
+      })
+    } catch(e){ console.warn('[VD] logo err',e); logoRun=null }
+  }
+
+  // ── Build document children ────────────────────────────────────────────────
+  var children = []
+  var n = 1  // section counter
+
+  // Cover
+  if (logoRun) {
+    children.push(new D.Paragraph({children:[logoRun], alignment:D.AlignmentType.LEFT, spacing:{before:0,after:200}}))
+  }
+  children.push(new D.Paragraph({
+    children:[new D.TextRun({text:engName, bold:true, size:64, color:NAVY, font:{name:'Calibri'}})],
+    alignment:D.AlignmentType.LEFT, spacing:{before:200,after:120}
+  }))
+  children.push(new D.Paragraph({
+    children:[new D.TextRun({text:custName+(territory?' · '+territory:''), size:28, color:ORANGE, font:{name:'Calibri'}})],
+    spacing:{after:80}
+  }))
+  children.push(new D.Paragraph({
+    children:[new D.TextRun({text:'Vision Document  ·  '+today, size:20, color:MID, font:{name:'Calibri'}})],
+    spacing:{after:400}
+  }))
+  children.push(new D.Paragraph({
+    children:[new D.TextRun({text:'',size:4})],
+    border:{bottom:{color:ORANGE, size:12, style:D.BorderStyle.SINGLE}},
+    spacing:{after:400}
+  }))
+
+  // 1. Engagement Overview
+  children.push(sectionHeading(n++, 'Engagement Overview'))
+  children.push(metaTable([
+    ['Customer',    custName],
+    ['Engagement',  engName],
+    ['Type',        eng.engagement_type||eng.type||'—'],
+    ['Territory',   territory||'—'],
+    ['Stage',       eng.stage||'—'],
+    ['Date',        today],
+    ['Prepared by', coName]
+  ]))
+  children.push(spacer())
+
+  // 2. Territory Strategic Assessment (S1 + S2 if available)
+  if (TP && (TP.s1 || TP.s2)) {
+    children.push(sectionHeading(n++, 'Territory Strategic Assessment'))
+    // S1 headline
+    if (TP.s1 && TP.s1.headline) {
+      children.push(bodyPara(TP.s1.headline, {bold:true}))
+      children.push(spacer())
+    }
+    // S1 key stats
+    if (TP.s1) {
+      var statRows = []
+      var s1Map = {hard_stats:'Key Statistics',policy:'Policy & Regulatory',programmes:'AI Programmes',geography:'Geography & Infrastructure',ai_opportunities:'AI Opportunity Areas'}
+      Object.keys(s1Map).forEach(function(k){
+        var v = TP.s1[k]
+        if (v) {
+          var txt = typeof v==='string' ? v : (Array.isArray(v) ? v.map(function(x){return typeof x==='string'?x:(x.text||x.name||JSON.stringify(x))}).join('; ') : JSON.stringify(v))
+          if (txt.length>2) statRows.push([s1Map[k], txt.substring(0,400)])
         }
       })
+      if (statRows.length) { children.push(metaTable(statRows)); children.push(spacer()) }
+    }
+    // S2 headline
+    if (TP.s2 && TP.s2.headline_recommendation) {
+      children.push(bodyPara(TP.s2.headline_recommendation, {bold:true, color:NAVY}))
+      children.push(spacer())
+    }
+    // S2 working in favour
+    if (TP.s2 && TP.s2.working_in_favour && TP.s2.working_in_favour.length) {
+      children.push(bodyPara('Working in Favour:', {bold:true, color:'166534'}))
+      TP.s2.working_in_favour.forEach(function(p){
+        var txt = (p && (p.point||p.text||p)) || ''
+        var met = p && p.metric ? ' ['+p.metric+']' : ''
+        if (txt) children.push(bulletPara('✓ '+txt+met))
+      })
+      children.push(spacer())
+    }
+    // S2 needs attention
+    if (TP.s2 && TP.s2.needs_attention && TP.s2.needs_attention.length) {
+      children.push(bodyPara('Needs Attention:', {bold:true, color:'991B1B'}))
+      TP.s2.needs_attention.forEach(function(p){
+        var txt = (p && (p.point||p.text||p)) || ''
+        var mit = p && p.mitigation ? ' → '+p.mitigation : ''
+        if (txt) children.push(bulletPara('⚠ '+txt+mit))
+      })
+      children.push(spacer())
+    }
+    // S2 objective viability
+    if (TP.s2 && TP.s2.objective_viability) {
+      children.push(bodyPara('Objective Viability: '+TP.s2.objective_viability, {color:MID}))
+      children.push(spacer())
     }
   }
 
   // 3. Objective
-  sections.push({ heading: 'Objective', color: '#00B290', body: req.objective })
+  if (req.objective) {
+    children.push(sectionHeading(n++, 'Objective'))
+    children.push(bodyPara(req.objective))
+    children.push(spacer())
+  }
 
   // 4. Problem Statement
   if (req.problem) {
-    sections.push({ heading: 'Problem Statement', color: '#1C38F5', body: req.problem })
+    children.push(sectionHeading(n++, 'Problem Statement'))
+    children.push(bodyPara(req.problem))
+    children.push(spacer())
   }
 
   // 5. Success Criteria
   if (req.success_criteria) {
-    sections.push({ heading: 'Success Criteria', color: '#00B290', body: req.success_criteria })
+    children.push(sectionHeading(n++, 'Success Criteria'))
+    children.push(bodyPara(req.success_criteria))
+    children.push(spacer())
   }
 
-  // 6. Portfolio scope with readable labels
+  // 6. Scope of Work
   if (PORTFOLIO_SELECTION.length) {
-    var portLabels = {
-      'L1-TSAP':'L1 TSAP Territory Programme','L1.1':'L1.1 Programme Management',
-      'L1.2':'L1.2 Governance Framework','L1.3':'L1.3 Ecosystem Development',
-      'L2-AIC':'L2 AI Centre of Excellence (Flagship)','L2-MDC':'L2 Modular Datacenter',
-      'L2-HPC':'L2 HPC Cluster','L2-TRC':'L2 GPU Training Cluster','L2-AIF':'L2 AI Factory',
-      'L2-EDG':'L2 Edge AI Nodes','L2-DAC':'L2 Domain AI Centre',
-      'L2-MAAS':'MaaS — Model as a Service','L2-GPUAAS':'GPUaaS — GPU as a Service','L2-BMAAS':'BMaaS — Bare Metal as a Service',
-      'L3-DEP':'L3 Deployment & Integration','L3-GOV':'L3 AI Governance',
-      'L3-SKL':'L3 AI Skills Academy','L3-OPS':'L3 Managed Operations',
-      'L3-RAG':'L3 RAG Platform','L3-INT':'L3 System Integration','L3-AMC':'L3 AMC & Refresh'
-    }
-    sections.push({
-      heading: 'Scope of Work',
-      color: '#002870',
-      body: 'The following portfolio items define the scope of this engagement:',
-      bullets: PORTFOLIO_SELECTION.map(function(p){ return portLabels[p] || p })
-    })
+    children.push(sectionHeading(n++, 'Scope of Work'))
+    children.push(bodyPara('The following portfolio items define the scope of this engagement:'))
+    PORTFOLIO_SELECTION.forEach(function(p){ children.push(bulletPara(PL[p]||p)) })
+    children.push(spacer())
   }
 
-  // 7. Agreed use cases
-  var agreedUCs = DOCKET_ITEMS.filter(function(i){
-    return i.section === 'uc' && (i.status === 'agreed' || i.status === 'done')
-  })
+  // 7. Agreed Use Cases
+  var agreedUCs = DOCKET_ITEMS.filter(function(i){ return i.section==='uc'&&(i.status==='agreed'||i.status==='done') })
   if (agreedUCs.length) {
-    sections.push({
-      heading: 'Agreed Use Cases',
-      color: '#00B290',
-      table: {
-        headers: ['#', 'Use Case', 'Cluster', 'Complexity'],
-        rows: agreedUCs.map(function(item, idx) {
-          var _uid = item.ref_id || item._ref_id || item.notes || ''
-          var uc = UC_LIBRARY.find(function(u){ return u.id === _uid }) || {}
-          return [String(idx+1), item.title || uc.uc_name || _uid, uc.cluster || '—', uc.complexity || '—']
-        })
-      }
-    })
+    children.push(sectionHeading(n++, 'Agreed Use Cases'))
+    children.push(dataTable(
+      ['#','Use Case','Cluster','Complexity'],
+      agreedUCs.map(function(item,idx){
+        var _uid=item.ref_id||item._ref_id||''
+        var uc=UC_LIBRARY.find(function(u){return u.id===_uid})||{}
+        return [String(idx+1),item.title||uc.uc_name||_uid,uc.cluster||'—',uc.complexity||'—']
+      })
+    ))
+    children.push(spacer())
   }
 
-  // 8. Investment & timeline
-  if (req.budget_range || req.timeline || (req.constraints && req.constraints.length)) {
-    var meta = {}
-    if (req.budget_range && req.budget_range !== 'Not defined') meta['Budget Range'] = req.budget_range
-    if (req.timeline)     meta['Timeline']     = req.timeline
-    if (req.constraints && req.constraints.length) meta['Compliance / Constraints'] = req.constraints.join(' · ')
-    sections.push({ heading: 'Investment & Timeline', color: '#FFB600', metadata: meta })
+  // 8. Investment & Timeline
+  var hasBudget = req.budget_range||req.timeline||(req.constraints&&req.constraints.length)
+  if (hasBudget) {
+    children.push(sectionHeading(n++, 'Investment & Timeline'))
+    var budgetRows=[]
+    if (req.budget_range&&req.budget_range!=='Not defined') budgetRows.push(['Budget Range',req.budget_range])
+    if (req.timeline) budgetRows.push(['Timeline',req.timeline])
+    if (req.constraints&&req.constraints.length) budgetRows.push(['Constraints',req.constraints.join(' · ')])
+    if (budgetRows.length) { children.push(metaTable(budgetRows)); children.push(spacer()) }
   }
 
-  // 9. Open actions as next steps
-  var openActions = DOCKET_ITEMS.filter(function(i){
-    return i.section === 'action' && i.status !== 'done' && i.status !== 'closed'
-  })
-  if (openActions.length) {
-    sections.push({
-      heading: 'Next Steps',
-      color: '#FF5539',
-      table: {
-        headers: ['Action', 'Owner', 'Due Date', 'Status'],
-        rows: openActions.map(function(a) {
-          return [a.title || '', a.assigned_to || '—', a.due_date || '—', (a.status || 'open').toUpperCase()]
-        })
-      }
-    })
+  // 9. Next Steps
+  var openActs=DOCKET_ITEMS.filter(function(i){return i.section==='action'&&i.status!=='done'&&i.status!=='closed'})
+  if (openActs.length) {
+    children.push(sectionHeading(n++, 'Next Steps'))
+    children.push(dataTable(
+      ['Action','Owner','Due Date','Status'],
+      openActs.map(function(a){return [a.title||'',a.assigned_to||'—',a.due_date||'—',(a.status||'open').toUpperCase()]})
+    ))
+    children.push(spacer())
   }
 
-  var filename = 'VisionDoc_'
-    + (custName + ' ' + engName).replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+$/,'')
-    + '_' + new Date().toISOString().slice(0,10)
-
+  // ── Build and save ──────────────────────────────────────────────────────────
   try {
-    await atlasExport.word({
-      title:    engName,
-      subtitle: custName + (territory ? ' · ' + territory : ''),
-      filename: filename,
-      sections: sections,
-      footer:   'Prepared by ' + (b.companyName || 'OEM') + ' · Confidential · '
-                + new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
+    var doc = new D.Document({
+      styles:{default:{document:{run:{font:{name:'Calibri'},size:22}}}},
+      sections:[{
+        properties:{page:{margin:{top:720,right:720,bottom:720,left:720}}},
+        footers:{default:new D.Footer({children:[
+          new D.Paragraph({
+            children:[
+              new D.TextRun({text:coName+' · Confidential · '+today+'  ', size:16, color:MID}),
+              new D.TextRun({children:[new D.PageNumber(D.NumberOfPages)], size:16, color:MID})
+            ],
+            alignment:D.AlignmentType.RIGHT, border:{top:{color:'E5E7EB',size:4,style:D.BorderStyle.SINGLE}}
+          })
+        ]})},
+        children:children
+      }]
     })
-    showToast('✓ Vision Document downloaded — ' + filename + '.docx')
-    // Save record to docket_items (correct columns only)
-    var vdRow = {
-      id:           genId('DI'),
-      docket_id:    CURRENT_DOCKET_ID,
-      section:      'output',
-      item_type:    'exec_doc',
-      item_subtype: 'vision_doc',
-      title:        'Vision Document — ' + engName,
-      status:       'done',
-      content:      { filename: filename + '.docx', generated_at: new Date().toISOString() },
-      created_by:   'ATLAS'
-    }
+    var blob = await D.Packer.toBlob(doc)
+    var fn = 'VisionDoc_'+(custName+' '+engName).replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+$/,'')+'_'+new Date().toISOString().slice(0,10)
+    saveAs(blob, fn+'.docx')
+    showToast('✓ Vision Document downloaded — '+fn+'.docx')
+    // Save record
+    var vdRow={id:genId('DI'),docket_id:CURRENT_DOCKET_ID,section:'output',item_type:'exec_doc',item_subtype:'vision_doc',title:'Vision Document — '+engName,status:'done',content:{filename:fn+'.docx',generated_at:new Date().toISOString()},created_by:'ATLAS'}
     await sbPost('docket_items', vdRow)
-    DOCKET_ITEMS.push(Object.assign({}, vdRow, { status: 'done' }))
-    if (ACTIVE_TAB === 'outputs') renderDocket()
+    DOCKET_ITEMS.push(Object.assign({},vdRow,{status:'done'}))
+    if (ACTIVE_TAB==='outputs') renderDocket()
   } catch(e) {
-    showToast('Generation failed: ' + e.message, 'err')
-    console.error('[generateVisionDoc]', e)
+    showToast('Generation failed: '+e.message,'err')
+    console.error('[generateVisionDoc]',e)
   }
 }
 
@@ -4109,7 +4255,8 @@ function renderDocket() {
     if (btn) {
       btn.onclick = function(e) { e.preventDefault(); e.stopPropagation(); editRequirements(); return false; }
     }
-  }, 100)
+    wireTabEvents()
+  }, 120)
 }
 
 function switchTab(tab) {
