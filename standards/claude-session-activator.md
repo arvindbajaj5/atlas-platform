@@ -163,3 +163,47 @@ atlasAI.callAndParse(prompt, opts)   // {ok, data, tokens}
 ---
 
 *Last updated: 2026-06-22 | Build: Docket v2.3.1 + SASC + TSAP FM updated*
+
+---
+
+## Vision Document — Architecture (updated 2026-06-22)
+
+**Function:** `generateVisionDoc()` in Engagement Docket  
+**Trigger:** Overview tab "Generate Vision Doc" button OR S3 modal "Generate Vision Doc" button  
+**Library:** `atlasExport.word()` for formatting + font/brand rules  
+**Logo:** Read from `atlas_global_cfg.company.brandLogoData` or `atlas_logo` in localStorage (data URL)
+
+### AI generation — 3 focused calls (each under 2000 token Supabase cap)
+```
+Call 1 (~1400 tokens): territory_narrative + needs_narrative + strengths_risks_narrative
+Call 2 (~1300 tokens): strategic_position_narrative + vision_statement
+Call 3 (~1200 tokens): uc_services_narrative + territory_benefits_narrative
+```
+AtlasAI Supabase config: `{"model":"gemini-2.5-flash","maxTok":2000,"timeout":30000}`  
+Per-call maxTokens: 1800 (safely under cap)
+
+### Caching
+- Cache stored in `docket_items`: `id='{docketId}-vision-narrative'`, `item_type='exec_doc'`, `item_subtype='vision_narrative'`
+- `content.inputs_hash` = hash of territory + objectives + UCs + portfolio + S1/S2 headlines
+- Cache hit = instant doc, no AI call. Cache miss or hash changed = regenerate.
+- TP loaded from `territory_profiles` Supabase table if not in memory (after page refresh)
+
+### 10 document sections
+1. Territory — Why Here (S1-grounded narrative)
+2. The Challenge (requirements + metadata table)
+3. Assessment — Strengths & Risks (S2 synthesis + bullets)
+4. Strategic Positioning (2×2 matrix table + narrative)
+5. The Vision (AI-written vision statement)
+6. Scope of Work (plain English, NO L1/L2/L3 product codes)
+7. What the Centre Will Do (UC table + narrative)
+7a. Managed Services (with plain-English descriptions)
+8. What [Territory] Gains (benefits narrative — critical section)
+9. Investment & Timeline (only renders if data present, skips "Not defined")
+10. Next Steps (all actions)
+
+### Key rules
+- Scope labels: NEVER use L1/L2/L3 codes — use `SCOPE_LABELS` map for plain English
+- Services: "Model as a Service" not "MaaS", "GPU as a Service" not "GPUaaS"
+- Section 9 only renders if budget_range ≠ 'Not defined' AND timeline present
+- All sections have fallback content when AI fails — doc never renders empty sections
+- 2×2 table: uses "PRIMARY:" and "Also:" markers, no `\n` in cells
