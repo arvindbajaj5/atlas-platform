@@ -1946,7 +1946,7 @@ async function generateVisionDoc() {
       + '}'
 
     console.log('[VD] calling AI, prompt length:', prompt.length)
-    var aiResult = await atlasAI.callAndParse(prompt, { maxTokens: 2000 })
+    var aiResult = await atlasAI.callAndParse(prompt, { maxTokens: 5000 })
     console.log('[VD] AI result ok=', aiResult && aiResult.ok, 'data=', !!(aiResult && aiResult.data))
     if (!aiResult || !aiResult.ok || !aiResult.data) {
       showToast('AI call failed: ' + ((aiResult&&aiResult.error)||'unknown') + ' — building data-only doc', 'err')
@@ -1973,18 +1973,22 @@ async function generateVisionDoc() {
   showToast('📄 Assembling document…')
 
   // ── Step 6: Build 2×2 matrix table ───────────────────────────────────────
-  function mark(q) { return (_2x2.dom===q?'★ PRIMARY  ':(_2x2.sec===q?'◆ secondary  ':'')) }
+  function mark(q) {
+    if (_2x2.dom===q) return '★ PRIMARY: '
+    if (_2x2.sec===q) return '◆ Secondary: '
+    return ''
+  }
   var q2x2Table = null
   if (_2x2.dom) {
     q2x2Table = {
       headers: ['', 'DATA-RICH ECOSYSTEM', 'EMERGING DATA ECOSYSTEM'],
       rows: [
         ['HIGH AI CAPACITY',
-          mark(1) + 'Green AI Hub\n' + QUAD[1].desc,
-          mark(2) + 'Knowledge Exporter\n' + QUAD[2].desc],
+          mark(1) + 'Green AI Hub — ' + QUAD[1].desc,
+          mark(2) + 'Knowledge Exporter — ' + QUAD[2].desc],
         ['DEVELOPING AI CAPACITY',
-          mark(3) + 'Governance Moderniser\n' + QUAD[3].desc,
-          mark(4) + 'Heritage & Sector Renaissance\n' + QUAD[4].desc]
+          mark(3) + 'Governance Moderniser — ' + QUAD[3].desc,
+          mark(4) + 'Heritage & Sector Renaissance — ' + QUAD[4].desc]
       ]
     }
   }
@@ -2030,10 +2034,15 @@ async function generateVisionDoc() {
   })
 
   // 3. Honest Assessment — Strengths & Risks
+  var _srFallback = (s2.working_in_favour&&s2.working_in_favour.length?s2.working_in_favour.length:0)
+    + ' factors work strongly in favour of this initiative, while '
+    + (s2.needs_attention&&s2.needs_attention.length?s2.needs_attention.length:0)
+    + ' areas require targeted attention. The strengths — particularly in human capital, energy availability and policy alignment — provide a solid foundation. '
+    + 'The risks identified are addressable through programme design and are not fundamental blockers to the vision.'
   sections.push({
     heading: '3.  Assessment — Strengths & Risks',
     color: '#1C38F5',
-    body: N.strengths_risks_narrative || '',
+    body: N.strengths_risks_narrative || _srFallback,
     bullets: [].concat(
       (s2.working_in_favour||[]).slice(0,5).map(function(p){ var t=typeof p==='string'?p:(p.point||p.text||''); var m=p.metric?' ['+p.metric+']':''; return t?'✓  '+t+m:null }).filter(Boolean),
       (s2.needs_attention||[]).slice(0,4).map(function(p){ var t=typeof p==='string'?p:(p.point||p.text||''); var m=p.mitigation?' → '+p.mitigation:''; return t?'⚠  '+t+m:null }).filter(Boolean)
@@ -2052,13 +2061,7 @@ async function generateVisionDoc() {
   if (q2x2Table) pos4.table = q2x2Table
   sections.push(pos4)
 
-  if (radarTable) {
-    sections.push({
-      heading: '4a.  Capability Dimension Scores',
-      color: '#1C38F5',
-      table: radarTable
-    })
-  }
+  // Radar scores embedded in positioning narrative — separate table removed
 
   // 5. The Vision
   sections.push({
@@ -2096,28 +2099,43 @@ async function generateVisionDoc() {
 
   // Services model
   if (services.length) {
+    var svcBody = 'The AI Centre will offer managed AI services to government agencies, enterprises, universities and research institutions across '
+      + territory + '. These services make sovereign AI capability accessible without requiring consumers to own or operate infrastructure — '
+      + 'lowering the barrier to AI adoption across the territory\'s ecosystem.'
     sections.push({
       heading: '7a.  Managed Services',
       color: '#00B290',
-      bullets: services
+      body: svcBody,
+      bullets: services.map(function(s) {
+        var sDesc = {
+          'MaaS — Model as a Service': 'On-demand access to foundation and fine-tuned AI models via API — pay-per-use, fully sovereign.',
+          'GPUaaS — GPU as a Service': 'Reserved or burst GPU compute for research, training and inference workloads.',
+          'BMaaS — Bare Metal as a Service': 'Dedicated bare-metal AI server access for organisations requiring maximum isolation.'
+        }
+        return s + (sDesc[s] ? ':  ' + sDesc[s] : '')
+      })
     })
   }
 
   // 8. What the Territory Gains
+  var _gainsFallback = territory + ' stands to gain across four dimensions from this AI Centre initiative. '
+    + 'Economically, the centre will create a new technology industry cluster and generate high-value employment for the state\'s educated workforce — directly addressing the brain drain challenge. '
+    + 'On skills and human capital, the AI Skills Academy will build a pipeline of AI-literate professionals serving both the centre and the broader regional digital economy. '
+    + 'For digital sovereignty, ' + territory + ' will own and operate its AI infrastructure, keeping sensitive government and citizen data within the state\'s jurisdiction while enabling evidence-based policy. '
+    + 'Most directly, the ' + docUCs.length + ' use cases — spanning agriculture, water resources, disaster preparedness and governance — will deliver measurable improvements in citizen welfare, agricultural productivity and public service efficiency.'
   sections.push({
     heading: '8.  What ' + territory + ' Gains',
     color: '#00B290',
-    body: N.territory_benefits_narrative || ''
+    body: N.territory_benefits_narrative || _gainsFallback
   })
 
   // 9. Investment & Timeline
-  var hasBudget = req.budget_range || req.timeline || (req.constraints && req.constraints.length)
-  if (hasBudget) {
-    var bm = {}
-    if (req.budget_range) bm['Budget Range']   = req.budget_range
-    if (req.timeline)     bm['Timeline']        = req.timeline
-    if (req.constraints && req.constraints.length) bm['Constraints'] = req.constraints.join(' · ')
-    sections.push({ heading: '9.  Investment & Timeline', color: '#FFB600', metadata: bm })
+  var _bm = {}
+  if (req.budget_range && req.budget_range !== 'Not defined') _bm['Budget Range'] = req.budget_range
+  if (req.timeline)     _bm['Timeline']    = req.timeline
+  if (req.constraints && req.constraints.length) _bm['Constraints'] = req.constraints.join(' · ')
+  if (Object.keys(_bm).length) {
+    sections.push({ heading: '9.  Investment & Timeline', color: '#FFB600', metadata: _bm })
   }
 
   // 10. Next Steps
