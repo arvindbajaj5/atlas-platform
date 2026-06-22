@@ -468,6 +468,27 @@ async function sbInsert(table, data) {
 }
 
 
+// Status translation: UI labels ↔ DB allowed values
+// DB allows: pending | in_progress | done | closed
+var _UI_TO_DB = {
+  proposed:'pending', agreed:'done', scratched:'closed', active:'pending',
+  open:'pending', wip:'in_progress', blocked:'closed',
+  pending:'pending', in_progress:'in_progress', done:'done', closed:'closed'
+}
+var _DB_TO_UI = {
+  uc:     { pending:'proposed', in_progress:'proposed', done:'agreed', closed:'scratched' },
+  action: { pending:'open', in_progress:'wip', done:'done', closed:'blocked' },
+  strategy:{ pending:'active', done:'active', closed:'active', in_progress:'active' }
+}
+function toDbStatus(s) { return _UI_TO_DB[s] || s }
+function fromDbStatus(section, s) { return (_DB_TO_UI[section] && _DB_TO_UI[section][s]) || s }
+function normalizeItems(items) {
+  return (items||[]).map(function(i) {
+    i.status = fromDbStatus(i.section, i.status)
+    return i
+  })
+}
+
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
 function genId(pfx) { return (pfx||'ID') + '-' + Date.now() + '-' + Math.floor(Math.random()*9999) }
 function fmtDate(d) {
@@ -1865,7 +1886,7 @@ async function generateVisionDoc() {
       content: { filename: filename + '.docx', generated_at: new Date().toISOString() },
       created_by: 'ATLAS'
     }
-    await sbPost('docket_items', row)
+    await sbPost('docket_items', _dbRow)
     DOCKET_ITEMS.push(row)
   } catch(e) {
     showToast('Generation failed: ' + e.message)
@@ -3911,9 +3932,9 @@ async function openEngagement(eng) {
   CURRENT_DOCKET_ID = docketId
 
   // Load docket items
-  DOCKET_ITEMS = docketId
+  DOCKET_ITEMS = normalizeItems(docketId
     ? (await sbGet('docket_items', 'docket_id=eq.' + docketId + '&order=sort_order.asc,created_at.asc')) || []
-    : []
+    : [])
 
   // Derive territory preset key from stored states
   if (eng.territory_states && eng.territory_states.length) {
@@ -4274,7 +4295,7 @@ async function saveStrategy() {
     if (existing) {
       await sbPatch('docket_items', 'id=eq.' + existing.id, { notes: it.text, updated_at: new Date().toISOString() })
     } else if (it.text) {
-      var row = { id: genId('DI'), docket_id: docketId, section: 'strategy', item_type: 'pitch', item_subtype: it.type, title: 'Strategy — ' + it.type, notes: it.text, status: 'active', created_by: 'ATLAS' }
+      var row = { id: genId('DI'), docket_id: docketId, section: 'strategy', item_type: 'pitch', item_subtype: it.type, title: 'Strategy — ' + it.type, notes: it.text, status: 'done', created_by: 'ATLAS' }
       await sbPost('docket_items', row)
     }
   }
@@ -4381,7 +4402,7 @@ async function addUCToDocket(ucId) {
     section: 'uc', item_type: 'uc',
     title: uc.uc_name || ucId,
     ref_table: 'uc_library', ref_id: ucId,
-    status: 'proposed', created_by: 'ATLAS'
+    status: 'pending', created_by: 'ATLAS'
   }
   var sb = getSB()
   var _r = await fetch(sb.url + '/rest/v1/docket_items', {
@@ -4405,9 +4426,9 @@ async function addUCToDocket(ucId) {
 }
 
 async function setUCStatus(itemId, status) {
-  await sbPatch('docket_items', 'id=eq.' + itemId, { status: status })
+  await sbPatch('docket_items', 'id=eq.' + itemId, { status: toDbStatus(status) })
   var item = DOCKET_ITEMS.find(function(i){ return i.id === itemId })
-  if (item) item.status = status
+  if (item) item.status = status  // keep UI value in memory
   renderDocket()
 }
 
@@ -4492,8 +4513,8 @@ function renderActionRows() {
 async function setActionStatus(id, status) {
   var item = DOCKET_ITEMS.find(function(i){ return i.id === id })
   if (!item) return
-  item.status = status
-  await sbPatch('docket_items', 'id=eq.'+id, { status: status })
+  item.status = status  // UI value in memory
+  await sbPatch('docket_items', 'id=eq.'+id, { status: toDbStatus(status) })
   switchTab('actions')
 }
 
@@ -4590,9 +4611,11 @@ async function saveAction() {
     showToast('Action updated')
   } else {
     if (!CURRENT_DOCKET_ID) { showToast('No docket', 'err'); return }
-    var row = Object.assign({ id: genId('DI'), docket_id: CURRENT_DOCKET_ID, section: 'action', item_type: 'action', status: 'open', created_by: 'ATLAS' }, data)
-    await sbPost('docket_items', row)
-    DOCKET_ITEMS.push(row)
+    var row = Object.assign({ id: genId('DI'), docket_id: CURRENT_DOCKET_ID,
+      section: 'action', item_type: 'action', status: 'open', created_by: 'ATLAS' }, data)
+    var dbRow = Object.assign({}, row, { status: 'pending' })  // DB requires 'pending' not 'open'
+    await sbPost('docket_items', dbRow)
+    DOCKET_ITEMS.push(row)  // memory keeps 'open' for UI display
     showToast('Action added')
   }
   closeModal('modal-action')
@@ -4602,7 +4625,7 @@ async function saveAction() {
 async function completeAction(id) {
   await sbPatch('docket_items', 'id=eq.' + id, { status: 'done' })
   var item = DOCKET_ITEMS.find(function(i){ return i.id === id })
-  if (item) item.status = 'done'
+  if (item) item.status = 'done'  // 'done' valid in DB
   renderDocket()
 }
 
@@ -4681,7 +4704,7 @@ function renderHistoryTab() {
 //    Refresh                                                                    
 async function refreshItems() {
   if (!CURRENT_DOCKET_ID) return
-  DOCKET_ITEMS = (await sbGet('docket_items', 'docket_id=eq.' + CURRENT_DOCKET_ID + '&order=sort_order.asc,created_at.asc')) || []
+  DOCKET_ITEMS = normalizeItems((await sbGet('docket_items', 'docket_id=eq.' + CURRENT_DOCKET_ID + '&order=sort_order.asc,created_at.asc')) || [])
 }
 
 //    Create customer                                                            
