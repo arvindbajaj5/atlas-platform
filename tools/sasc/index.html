@@ -775,7 +775,7 @@ async function init() {
         var portItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_type=eq.portfolio_selection', 1)
         if (portItems && portItems[0]) {
           try {
-            var portData = JSON.parse(portItems[0].notes || portItems[0].data || '{}')
+            var portData = portItems[0].content || JSON.parse(portItems[0].notes||'{}')
             var portSel = portData.items || []
             SASC_DATA._portfolioItems = portSel
             if (portSel.includes('L2-MAAS'))   SASC_DATA.serviceModel.maas.enabled   = true
