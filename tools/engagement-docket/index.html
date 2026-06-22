@@ -1779,314 +1779,248 @@ async function saveRequirements() {
 
 
 async function generateVisionDoc() {
+  console.log('[VD] generateVisionDoc called, window.docx=', typeof window.docx)
   var eng = CURRENT_ENG || {}
   var req = eng.requirements || {}
-  if (!req.objective) { showToast('Add requirements first — click Edit Requirements'); return }
-  if (!window.docx)   { showToast('docx library not loaded — check network'); return }
-  showToast('📄 Generating Vision Document…')
+  if (!req.objective) { showToast('Add requirements first'); return }
+  if (!window.docx)   { showToast('docx library not loaded'); return }
 
-  // ── Brand ──────────────────────────────────────────────────────────────────
+  showToast('📄 Building Vision Document…')
+
+  // ── Brand from localStorage ───────────────────────────────────────────────
   var gcfg = {}; try { gcfg = JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') } catch(e){}
   var co     = gcfg.company || {}
-  var coName = co.brandName || co.brand_name || (typeof atlasExport!=='undefined'&&atlasExport.getBrand?atlasExport.getBrand().companyName:null) || 'OEM'
-  var logoDataUrl = co.brandLogoData || localStorage.getItem('atlas_logo') || null
+  var coName = co.brandName || co.brand_name || 'OEM'
+  var logoUrl = co.brandLogoData || localStorage.getItem('atlas_logo') || null
 
-  // ── Data ───────────────────────────────────────────────────────────────────
+  // ── Context ───────────────────────────────────────────────────────────────
   var custName  = (eng._cust && eng._cust.name) || 'Customer'
   var engName   = eng.name || eng.opportunity_name || 'Engagement'
   var territory = eng.territory || ''
   var today     = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
-
-  // Portfolio labels
-  var PL = {
-    'L1-TSAP':'L1 TSAP Territory Programme','L1.1':'L1.1 Programme Management',
-    'L1.2':'L1.2 Governance Framework','L1.3':'L1.3 Ecosystem Development',
-    'L2-AIC':'L2 AI Centre of Excellence','L2-MDC':'L2 Modular Datacenter',
-    'L2-HPC':'L2 HPC Cluster','L2-TRC':'L2 GPU Training Cluster',
-    'L2-AIF':'L2 AI Factory','L2-EDG':'L2 Edge AI Nodes',
-    'L2-DAC':'L2 Domain AI Centre',
-    'L2-MAAS':'MaaS — Model as a Service',
-    'L2-GPUAAS':'GPUaaS — GPU as a Service',
-    'L2-BMAAS':'BMaaS — Bare Metal as a Service',
-    'L3-DEP':'L3 Deployment & Integration','L3-GOV':'L3 AI Governance',
-    'L3-SKL':'L3 AI Skills Academy','L3-OPS':'L3 Managed Operations',
-    'L3-RAG':'L3 RAG Platform','L3-INT':'L3 System Integration','L3-AMC':'L3 AMC & Refresh'
-  }
-
-  // ── docx helpers ───────────────────────────────────────────────────────────
   var D = window.docx
-  var NAVY='002870', ORANGE='FF5539', TEAL='00B290', WHITE='FFFFFF', LIGHT='F0F2F5', MID='6B7280'
 
-  function sectionHeading(num, text) {
+  console.log('[VD] D.Document=',typeof D.Document,'D.Paragraph=',typeof D.Paragraph,'D.Table=',typeof D.Table)
+
+  // ── Constants ─────────────────────────────────────────────────────────────
+  var NAVY='002870', ORANGE='FF5539', WHITE='FFFFFF', LIGHT='F0F2F5', MID='6B7280'
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function P(children, opts) {
+    opts = opts || {}
+    return new D.Paragraph(Object.assign({ children: Array.isArray(children)?children:[children] }, opts))
+  }
+  function T(text, opts) {
+    return new D.TextRun(Object.assign({ text: String(text||''), font:{name:'Calibri'} }, opts||{}))
+  }
+  function secHdr(num, label) {
     return new D.Paragraph({
-      children:[new D.TextRun({text: num+'. '+text, bold:true, color:WHITE, size:26, font:{name:'Calibri'}})],
-      shading:{fill:NAVY, type:D.ShadingType.SOLID},
-      spacing:{before:320,after:80},
-      indent:{left:80,right:80}
+      children:[T(num+'.  '+label,{bold:true,color:WHITE,size:26})],
+      shading:{fill:NAVY,val:'clear'},
+      spacing:{before:300,after:80}, indent:{left:80,right:80}
     })
   }
-
-  function bodyPara(text, opts) {
-    opts = opts||{}
+  function spacer() { return new D.Paragraph({children:[T('')],spacing:{after:80}}) }
+  function bullet(text) {
     return new D.Paragraph({
-      children:[new D.TextRun({text:String(text||''), size:opts.size||22, bold:opts.bold||false, color:opts.color||'000000', italics:opts.italic||false})],
-      spacing:{after:opts.after||100}
-    })
-  }
-
-  function bulletPara(text) {
-    return new D.Paragraph({
-      children:[new D.TextRun({text:String(text||''), size:21})],
+      children:[T(text,{size:21})],
       bullet:{level:0}, spacing:{after:60}
     })
   }
-
-  function spacer() { return new D.Paragraph({children:[new D.TextRun({text:'',size:12})],spacing:{after:60}}) }
-
-  function metaTable(rows) {
+  function metaTable(pairs) {
     return new D.Table({
-      width:{size:100,type:D.WidthType.PERCENTAGE},
-      borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE},insideH:{style:D.BorderStyle.SINGLE,color:'E5E7EB',size:4},insideV:{style:D.BorderStyle.NONE}},
-      rows: rows.map(function(r,ri) {
+      width:{size:9000,type:D.WidthType.DXA},
+      rows: pairs.map(function(r){
         return new D.TableRow({children:[
           new D.TableCell({
-            width:{size:28,type:D.WidthType.PERCENTAGE},
-            shading:{fill:LIGHT,type:D.ShadingType.SOLID},
-            borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.SINGLE,color:'E5E7EB',size:4},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},
-            children:[new D.Paragraph({children:[new D.TextRun({text:r[0],bold:true,size:19,color:NAVY,font:{name:'Calibri'}})],spacing:{after:0}})]
+            width:{size:2500,type:D.WidthType.DXA},
+            shading:{fill:LIGHT,val:'clear'},
+            children:[P(T(r[0],{bold:true,size:19,color:NAVY}),{spacing:{after:0}})]
           }),
           new D.TableCell({
-            width:{size:72,type:D.WidthType.PERCENTAGE},
-            borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.SINGLE,color:'E5E7EB',size:4},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},
-            children:[new D.Paragraph({children:[new D.TextRun({text:String(r[1]||'—'),size:19,font:{name:'Calibri'}})],spacing:{after:0}})]
+            width:{size:6500,type:D.WidthType.DXA},
+            children:[P(T(String(r[1]||'—'),{size:19}),{spacing:{after:0}})]
           })
         ]})
       })
     })
   }
-
   function dataTable(headers, rows) {
     var hRow = new D.TableRow({children:headers.map(function(h){
-      return new D.TableCell({
-        shading:{fill:NAVY,type:D.ShadingType.SOLID},
-        children:[new D.Paragraph({children:[new D.TextRun({text:h,bold:true,color:WHITE,size:18,font:{name:'Calibri'}})],spacing:{after:0}})]
-      })
+      return new D.TableCell({shading:{fill:NAVY,val:'clear'},children:[P(T(h,{bold:true,color:WHITE,size:18}),{spacing:{after:0}})]})
     })})
     var dRows = rows.map(function(row,ri){
       return new D.TableRow({children:row.map(function(cell){
         return new D.TableCell({
-          shading: ri%2===1?{fill:LIGHT,type:D.ShadingType.SOLID}:undefined,
-          children:[new D.Paragraph({children:[new D.TextRun({text:String(cell||'—'),size:18,font:{name:'Calibri'}})],spacing:{after:0}})]
+          shading: ri%2===1?{fill:LIGHT,val:'clear'}:undefined,
+          children:[P(T(String(cell||'—'),{size:18}),{spacing:{after:0}})]
         })
       })})
     })
-    return new D.Table({width:{size:100,type:D.WidthType.PERCENTAGE},rows:[hRow].concat(dRows)})
+    return new D.Table({width:{size:9000,type:D.WidthType.DXA},rows:[hRow].concat(dRows)})
   }
 
-  // ── Collect logo image if available ────────────────────────────────────────
+  // ── Logo ──────────────────────────────────────────────────────────────────
   var logoRun = null
-  if (logoDataUrl && logoDataUrl.startsWith('data:image')) {
+  if (logoUrl && logoUrl.startsWith('data:image')) {
     try {
-      var b64 = logoDataUrl.split(',')[1]
-      var bin = atob(b64)
-      var buf = new Uint8Array(bin.length)
-      for(var i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i)
-      var isJpg = logoDataUrl.indexOf('jpeg')>=0||logoDataUrl.indexOf('jpg')>=0
-      logoRun = new D.ImageRun({
-        data: buf, transformation:{width:120,height:40},
-        type: isJpg?'jpg':'png'
-      })
-    } catch(e){ console.warn('[VD] logo err',e); logoRun=null }
+      var b64=logoUrl.split(',')[1], bin=atob(b64)
+      var buf=new Uint8Array(bin.length)
+      for(var li=0;li<bin.length;li++) buf[li]=bin.charCodeAt(li)
+      logoRun = new D.ImageRun({data:buf.buffer, transformation:{width:120,height:40}})
+      console.log('[VD] logo loaded OK')
+    } catch(le){ console.warn('[VD] logo err',le); logoRun=null }
   }
 
-  // ── Build document children ────────────────────────────────────────────────
-  var children = []
-  var n = 1  // section counter
+  // ── Portfolio labels ──────────────────────────────────────────────────────
+  var PL={'L1-TSAP':'L1 TSAP Territory Programme','L2-AIC':'L2 AI Centre of Excellence',
+    'L2-MDC':'L2 Modular Datacenter','L2-HPC':'L2 HPC Cluster','L2-TRC':'L2 GPU Training Cluster',
+    'L2-AIF':'L2 AI Factory','L2-EDG':'L2 Edge AI Nodes','L2-DAC':'L2 Domain AI Centre',
+    'L2-MAAS':'MaaS — Model as a Service','L2-GPUAAS':'GPUaaS — GPU as a Service',
+    'L2-BMAAS':'BMaaS — Bare Metal as a Service','L3-DEP':'L3 Deployment & Integration',
+    'L3-GOV':'L3 AI Governance','L3-SKL':'L3 AI Skills Academy','L3-OPS':'L3 Managed Operations',
+    'L3-RAG':'L3 RAG Platform','L3-AMC':'L3 AMC & Refresh'}
+
+  // ── Build children ────────────────────────────────────────────────────────
+  var ch = []
+  var n  = 1
 
   // Cover
-  if (logoRun) {
-    children.push(new D.Paragraph({children:[logoRun], alignment:D.AlignmentType.LEFT, spacing:{before:0,after:200}}))
-  }
-  children.push(new D.Paragraph({
-    children:[new D.TextRun({text:engName, bold:true, size:64, color:NAVY, font:{name:'Calibri'}})],
-    alignment:D.AlignmentType.LEFT, spacing:{before:200,after:120}
-  }))
-  children.push(new D.Paragraph({
-    children:[new D.TextRun({text:custName+(territory?' · '+territory:''), size:28, color:ORANGE, font:{name:'Calibri'}})],
-    spacing:{after:80}
-  }))
-  children.push(new D.Paragraph({
-    children:[new D.TextRun({text:'Vision Document  ·  '+today, size:20, color:MID, font:{name:'Calibri'}})],
-    spacing:{after:400}
-  }))
-  children.push(new D.Paragraph({
-    children:[new D.TextRun({text:'',size:4})],
-    border:{bottom:{color:ORANGE, size:12, style:D.BorderStyle.SINGLE}},
-    spacing:{after:400}
-  }))
+  if (logoRun) ch.push(P(logoRun,{spacing:{before:0,after:160}}))
+  ch.push(P(T(engName,{bold:true,size:60,color:NAVY}),{spacing:{before:240,after:100}}))
+  ch.push(P(T(custName+(territory?' · '+territory:''),{size:28,color:ORANGE}),{spacing:{after:80}}))
+  ch.push(P(T('Vision Document  ·  '+today,{size:20,color:MID}),{spacing:{after:320}}))
+  ch.push(P(T(''),{border:{bottom:{color:ORANGE,size:12,style:'single'}},spacing:{after:320}}))
 
-  // 1. Engagement Overview
-  children.push(sectionHeading(n++, 'Engagement Overview'))
-  children.push(metaTable([
-    ['Customer',    custName],
-    ['Engagement',  engName],
-    ['Type',        eng.engagement_type||eng.type||'—'],
-    ['Territory',   territory||'—'],
-    ['Stage',       eng.stage||'—'],
-    ['Date',        today],
-    ['Prepared by', coName]
+  // 1. Overview
+  ch.push(secHdr(n++,'Engagement Overview'))
+  ch.push(metaTable([
+    ['Customer',custName],['Engagement',engName],
+    ['Type',eng.engagement_type||eng.type||'—'],
+    ['Territory',territory||'—'],['Stage',eng.stage||'—'],
+    ['Date',today],['Prepared by',coName]
   ]))
-  children.push(spacer())
+  ch.push(spacer())
 
-  // 2. Territory Strategic Assessment (S1 + S2 if available)
+  // 2. Territory Intelligence (S1 + S2)
   if (TP && (TP.s1 || TP.s2)) {
-    children.push(sectionHeading(n++, 'Territory Strategic Assessment'))
-    // S1 headline
+    ch.push(secHdr(n++,'Territory Strategic Assessment'))
     if (TP.s1 && TP.s1.headline) {
-      children.push(bodyPara(TP.s1.headline, {bold:true}))
-      children.push(spacer())
+      ch.push(P(T(TP.s1.headline,{bold:true,size:22,color:NAVY}),{spacing:{after:120}}))
     }
-    // S1 key stats
+    // S1 stats
+    var s1Rows=[]
     if (TP.s1) {
-      var statRows = []
-      var s1Map = {hard_stats:'Key Statistics',policy:'Policy & Regulatory',programmes:'AI Programmes',geography:'Geography & Infrastructure',ai_opportunities:'AI Opportunity Areas'}
-      Object.keys(s1Map).forEach(function(k){
-        var v = TP.s1[k]
-        if (v) {
-          var txt = typeof v==='string' ? v : (Array.isArray(v) ? v.map(function(x){return typeof x==='string'?x:(x.text||x.name||JSON.stringify(x))}).join('; ') : JSON.stringify(v))
-          if (txt.length>2) statRows.push([s1Map[k], txt.substring(0,400)])
-        }
+      var s1K={hard_stats:'Key Statistics',policy:'Policy & Regulatory',programmes:'AI Programmes',
+               geography:'Geography & Infrastructure',ai_opportunities:'AI Opportunity Areas'}
+      Object.keys(s1K).forEach(function(k){
+        var v=TP.s1[k]
+        if(!v) return
+        var txt=typeof v==='string'?v:(Array.isArray(v)?v.map(function(x){return typeof x==='string'?x:(x.text||x.name||'')}).filter(Boolean).join('; '):JSON.stringify(v))
+        if(txt.length>2) s1Rows.push([s1K[k],txt.substring(0,350)])
       })
-      if (statRows.length) { children.push(metaTable(statRows)); children.push(spacer()) }
+      if(s1Rows.length){ch.push(metaTable(s1Rows));ch.push(spacer())}
     }
-    // S2 headline
-    if (TP.s2 && TP.s2.headline_recommendation) {
-      children.push(bodyPara(TP.s2.headline_recommendation, {bold:true, color:NAVY}))
-      children.push(spacer())
-    }
-    // S2 working in favour
-    if (TP.s2 && TP.s2.working_in_favour && TP.s2.working_in_favour.length) {
-      children.push(bodyPara('Working in Favour:', {bold:true, color:'166534'}))
-      TP.s2.working_in_favour.forEach(function(p){
-        var txt = (p && (p.point||p.text||p)) || ''
-        var met = p && p.metric ? ' ['+p.metric+']' : ''
-        if (txt) children.push(bulletPara('✓ '+txt+met))
-      })
-      children.push(spacer())
-    }
-    // S2 needs attention
-    if (TP.s2 && TP.s2.needs_attention && TP.s2.needs_attention.length) {
-      children.push(bodyPara('Needs Attention:', {bold:true, color:'991B1B'}))
-      TP.s2.needs_attention.forEach(function(p){
-        var txt = (p && (p.point||p.text||p)) || ''
-        var mit = p && p.mitigation ? ' → '+p.mitigation : ''
-        if (txt) children.push(bulletPara('⚠ '+txt+mit))
-      })
-      children.push(spacer())
-    }
-    // S2 objective viability
-    if (TP.s2 && TP.s2.objective_viability) {
-      children.push(bodyPara('Objective Viability: '+TP.s2.objective_viability, {color:MID}))
-      children.push(spacer())
+    // S2
+    if (TP.s2) {
+      if (TP.s2.headline_recommendation) {
+        ch.push(P(T(TP.s2.headline_recommendation,{bold:true,size:22,color:'002870'}),{spacing:{after:100}}))
+      }
+      if (TP.s2.working_in_favour && TP.s2.working_in_favour.length) {
+        ch.push(P(T('Working in Favour:',{bold:true,size:21,color:'166534'}),{spacing:{after:40}}))
+        TP.s2.working_in_favour.forEach(function(p){
+          var txt=(p&&(p.point||p.text||p))||''; var met=p&&p.metric?' ['+p.metric+']':''
+          if(txt) ch.push(bullet('✓ '+txt+met))
+        })
+        ch.push(spacer())
+      }
+      if (TP.s2.needs_attention && TP.s2.needs_attention.length) {
+        ch.push(P(T('Needs Attention:',{bold:true,size:21,color:'991B1B'}),{spacing:{after:40}}))
+        TP.s2.needs_attention.forEach(function(p){
+          var txt=(p&&(p.point||p.text||p))||''; var mit=p&&p.mitigation?' → '+p.mitigation:''
+          if(txt) ch.push(bullet('⚠ '+txt+mit))
+        })
+        ch.push(spacer())
+      }
     }
   }
 
   // 3. Objective
   if (req.objective) {
-    children.push(sectionHeading(n++, 'Objective'))
-    children.push(bodyPara(req.objective))
-    children.push(spacer())
+    ch.push(secHdr(n++,'Objective'))
+    ch.push(P(T(req.objective,{size:22}),{spacing:{after:100}})); ch.push(spacer())
   }
-
   // 4. Problem Statement
   if (req.problem) {
-    children.push(sectionHeading(n++, 'Problem Statement'))
-    children.push(bodyPara(req.problem))
-    children.push(spacer())
+    ch.push(secHdr(n++,'Problem Statement'))
+    ch.push(P(T(req.problem,{size:22}),{spacing:{after:100}})); ch.push(spacer())
   }
-
   // 5. Success Criteria
   if (req.success_criteria) {
-    children.push(sectionHeading(n++, 'Success Criteria'))
-    children.push(bodyPara(req.success_criteria))
-    children.push(spacer())
+    ch.push(secHdr(n++,'Success Criteria'))
+    ch.push(P(T(req.success_criteria,{size:22}),{spacing:{after:100}})); ch.push(spacer())
   }
-
-  // 6. Scope of Work
+  // 6. Scope
   if (PORTFOLIO_SELECTION.length) {
-    children.push(sectionHeading(n++, 'Scope of Work'))
-    children.push(bodyPara('The following portfolio items define the scope of this engagement:'))
-    PORTFOLIO_SELECTION.forEach(function(p){ children.push(bulletPara(PL[p]||p)) })
-    children.push(spacer())
+    ch.push(secHdr(n++,'Scope of Work'))
+    ch.push(P(T('The following portfolio items define the scope:',{size:21}),{spacing:{after:80}}))
+    PORTFOLIO_SELECTION.forEach(function(p){ch.push(bullet(PL[p]||p))})
+    ch.push(spacer())
   }
-
-  // 7. Agreed Use Cases
-  var agreedUCs = DOCKET_ITEMS.filter(function(i){ return i.section==='uc'&&(i.status==='agreed'||i.status==='done') })
-  if (agreedUCs.length) {
-    children.push(sectionHeading(n++, 'Agreed Use Cases'))
-    children.push(dataTable(
-      ['#','Use Case','Cluster','Complexity'],
-      agreedUCs.map(function(item,idx){
-        var _uid=item.ref_id||item._ref_id||''
-        var uc=UC_LIBRARY.find(function(u){return u.id===_uid})||{}
-        return [String(idx+1),item.title||uc.uc_name||_uid,uc.cluster||'—',uc.complexity||'—']
+  // 7. Agreed UCs
+  var agUCs=DOCKET_ITEMS.filter(function(i){return i.section==='uc'&&(i.status==='agreed'||i.status==='done')})
+  if (agUCs.length) {
+    ch.push(secHdr(n++,'Agreed Use Cases'))
+    ch.push(dataTable(['#','Use Case','Cluster','Complexity'],
+      agUCs.map(function(it,ix){
+        var uid=it.ref_id||it._ref_id||''
+        var uc=UC_LIBRARY.find(function(u){return u.id===uid})||{}
+        return [String(ix+1),it.title||uc.uc_name||uid,uc.cluster||'—',uc.complexity||'—']
       })
     ))
-    children.push(spacer())
+    ch.push(spacer())
   }
-
-  // 8. Investment & Timeline
-  var hasBudget = req.budget_range||req.timeline||(req.constraints&&req.constraints.length)
-  if (hasBudget) {
-    children.push(sectionHeading(n++, 'Investment & Timeline'))
-    var budgetRows=[]
-    if (req.budget_range&&req.budget_range!=='Not defined') budgetRows.push(['Budget Range',req.budget_range])
-    if (req.timeline) budgetRows.push(['Timeline',req.timeline])
-    if (req.constraints&&req.constraints.length) budgetRows.push(['Constraints',req.constraints.join(' · ')])
-    if (budgetRows.length) { children.push(metaTable(budgetRows)); children.push(spacer()) }
+  // 8. Investment
+  if (req.budget_range||req.timeline) {
+    ch.push(secHdr(n++,'Investment & Timeline'))
+    var br=[]; if(req.budget_range) br.push(['Budget Range',req.budget_range])
+    if(req.timeline) br.push(['Timeline',req.timeline])
+    if(req.constraints&&req.constraints.length) br.push(['Constraints',req.constraints.join(' · ')])
+    if(br.length){ch.push(metaTable(br));ch.push(spacer())}
   }
-
   // 9. Next Steps
-  var openActs=DOCKET_ITEMS.filter(function(i){return i.section==='action'&&i.status!=='done'&&i.status!=='closed'})
-  if (openActs.length) {
-    children.push(sectionHeading(n++, 'Next Steps'))
-    children.push(dataTable(
-      ['Action','Owner','Due Date','Status'],
-      openActs.map(function(a){return [a.title||'',a.assigned_to||'—',a.due_date||'—',(a.status||'open').toUpperCase()]})
+  var acts=DOCKET_ITEMS.filter(function(i){return i.section==='action'&&i.status!=='done'&&i.status!=='closed'})
+  if (acts.length) {
+    ch.push(secHdr(n++,'Next Steps'))
+    ch.push(dataTable(['Action','Owner','Due Date','Status'],
+      acts.map(function(a){return [a.title||'',a.assigned_to||'—',a.due_date||'—',(a.status||'open').toUpperCase()]})
     ))
-    children.push(spacer())
   }
 
-  // ── Build and save ──────────────────────────────────────────────────────────
+  // ── Assemble & save ───────────────────────────────────────────────────────
   try {
+    console.log('[VD] building document with',ch.length,'elements')
     var doc = new D.Document({
       styles:{default:{document:{run:{font:{name:'Calibri'},size:22}}}},
       sections:[{
-        properties:{page:{margin:{top:720,right:720,bottom:720,left:720}}},
-        footers:{default:new D.Footer({children:[
-          new D.Paragraph({
-            children:[
-              new D.TextRun({text:coName+' · Confidential · '+today+'  ', size:16, color:MID}),
-              new D.TextRun({children:[new D.PageNumber(D.NumberOfPages)], size:16, color:MID})
-            ],
-            alignment:D.AlignmentType.RIGHT, border:{top:{color:'E5E7EB',size:4,style:D.BorderStyle.SINGLE}}
-          })
-        ]})},
-        children:children
+        properties:{page:{margin:{top:720,right:720,bottom:900,left:720}}},
+        footers:{default:new D.Footer({children:[P(T(coName+' · Confidential · '+today,{size:16,color:MID}),{alignment:D.AlignmentType.RIGHT})]})},
+        children:ch
       }]
     })
+    console.log('[VD] doc built, packing blob…')
     var blob = await D.Packer.toBlob(doc)
-    var fn = 'VisionDoc_'+(custName+' '+engName).replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+$/,'')+'_'+new Date().toISOString().slice(0,10)
+    var fn='VisionDoc_'+(custName+' '+engName).replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+$/,'')+'_'+new Date().toISOString().slice(0,10)
     saveAs(blob, fn+'.docx')
-    showToast('✓ Vision Document downloaded — '+fn+'.docx')
-    // Save record
+    console.log('[VD] saved as',fn+'.docx')
+    showToast('✓ '+fn+'.docx downloaded')
     var vdRow={id:genId('DI'),docket_id:CURRENT_DOCKET_ID,section:'output',item_type:'exec_doc',item_subtype:'vision_doc',title:'Vision Document — '+engName,status:'done',content:{filename:fn+'.docx',generated_at:new Date().toISOString()},created_by:'ATLAS'}
-    await sbPost('docket_items', vdRow)
+    await sbPost('docket_items',vdRow)
     DOCKET_ITEMS.push(Object.assign({},vdRow,{status:'done'}))
-    if (ACTIVE_TAB==='outputs') renderDocket()
+    if(ACTIVE_TAB==='outputs') renderDocket()
   } catch(e) {
-    showToast('Generation failed: '+e.message,'err')
-    console.error('[generateVisionDoc]',e)
+    console.error('[VD] build error:',e)
+    showToast('Doc build failed: '+e.message+' (check console)','err')
   }
 }
 
