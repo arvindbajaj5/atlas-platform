@@ -1783,6 +1783,9 @@ async function generateVisionDoc() {
   var req = eng.requirements || {}
   if (!req.objective) { showToast('Add requirements first'); return }
   if (typeof atlasExport === 'undefined') { showToast('atlasExport not loaded'); return }
+  if (typeof atlasAI === 'undefined')     { showToast('atlasAI not loaded'); return }
+  console.log('[VD] starting — atlasAI ok, atlasExport ok')
+  try {  // ← outer try/catch wraps entire function
 
   var b         = atlasExport.getBrand()
   var custName  = (eng._cust && eng._cust.name) || 'Customer'
@@ -1884,6 +1887,7 @@ async function generateVisionDoc() {
   }
 
   // ── Step 5: Generate narrative via AI if no cache hit ─────────────────────
+  console.log('[VD] narrative from cache:', !!narrative, '| TP.s1:', !!(TP&&TP.s1), '| TP.s2:', !!(TP&&TP.s2))
   if (!narrative) {
     showToast('🤖 Generating narrative… (this takes ~30s)')
 
@@ -1944,9 +1948,11 @@ async function generateVisionDoc() {
       + '  "territory_benefits_narrative": "5-6 sentences on concrete, specific benefits for '+territory+': jobs and skills created, revenue potential, digital sovereignty, sector transformation, ecosystem development, quality of life. Be specific to this territory\'s context — reference actual sectors, population, geography. This is what makes the document land with a government audience."\n'
       + '}'
 
-    var aiResult = await atlasAI.callAndParse(prompt, { task: 'documents', maxTokens: 1800 })
-    if (!aiResult.ok || !aiResult.data) {
-      showToast('AI narrative failed: ' + (aiResult.error||'unknown') + ' — using data-only doc', 'err')
+    console.log('[VD] calling AI, prompt length:', prompt.length)
+    var aiResult = await atlasAI.callAndParse(prompt, { maxTokens: 2000 })
+    console.log('[VD] AI result ok=', aiResult && aiResult.ok, 'data=', !!(aiResult && aiResult.data))
+    if (!aiResult || !aiResult.ok || !aiResult.data) {
+      showToast('AI call failed: ' + ((aiResult&&aiResult.error)||'unknown') + ' — building data-only doc', 'err')
       narrative = {}
     } else {
       narrative = aiResult.data
@@ -2134,6 +2140,7 @@ async function generateVisionDoc() {
     + (custName+' '+engName).replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+$/,'')
     + '_' + new Date().toISOString().slice(0,10)
 
+  console.log('[VD] calling atlasExport.word with', sections.length, 'sections')
   try {
     await atlasExport.word({
       title:    engName + ' — Vision Document',
@@ -2158,6 +2165,10 @@ async function generateVisionDoc() {
   } catch(e) {
     showToast('Doc failed: '+e.message, 'err')
     console.error('[generateVisionDoc]', e)
+  }
+  } catch(outerErr) {  // ← outer catch
+    showToast('Vision Doc error: ' + outerErr.message, 'err')
+    console.error('[VD] outer error:', outerErr)
   }
 }
 
