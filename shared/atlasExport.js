@@ -29,6 +29,7 @@ var atlasExport = (function() {
       companyName:  g.companyName  || g.company_name  || g.brand_name || 'ATLAS Platform',
       tagline:      g.companyTagline || '',
       logoUrl:      g.docLogoUrl   || g.logoUrl        || g.logo_url  || null,
+      logoDataUrl:  g.brandLogoData || g.company && g.company.brandLogoData || localStorage.getItem('atlas_logo') || null,
       parentName:   g.parentCompanyName || '',
       navy:         (g.brandNavy    || '#002870').replace('#',''),
       orange:       (g.brandOrange  || '#FF5539').replace('#',''),
@@ -192,7 +193,27 @@ var atlasExport = (function() {
 
     // ── Cover section ────────────────────────────────────────────────────────
     var coverColor = (config.coverColor || b.navy).replace('#','')
+
+    // Build logo image run if data URL available
+    var logoElement = null
+    if (b.logoDataUrl && b.logoDataUrl.startsWith('data:image')) {
+      try {
+        var _b64 = b.logoDataUrl.split(',')[1]
+        var _bin = atob(_b64)
+        var _buf = new Uint8Array(_bin.length)
+        for (var _li = 0; _li < _bin.length; _li++) _buf[_li] = _bin.charCodeAt(_li)
+        var _isJpg = b.logoDataUrl.indexOf('jpeg') >= 0 || b.logoDataUrl.indexOf('jpg') >= 0
+        logoElement = new ImageRun({ data: _buf.buffer, transformation: { width: 140, height: 44 } })
+      } catch(_le) { console.warn('[atlasExport] logo err', _le) }
+    }
+
     var coverBlock = [
+      // Logo row (white background, above navy block)
+      logoElement ? new Paragraph({
+        spacing: { before: 0, after: 160 },
+        children: [logoElement]
+      }) : null,
+    ].filter(Boolean).concat([
       new Paragraph({
         spacing: { before: 0, after: 0 },
         shading: { type: ShadingType.SOLID, color: coverColor },
@@ -214,7 +235,7 @@ var atlasExport = (function() {
         children: [txt(today(), { size: 18, color: 'D1D5DB' })]
       }),
       spacer(400)
-    ]
+    ])
 
     // ── Build document sections ──────────────────────────────────────────────
     var docChildren = [].concat(coverBlock)
