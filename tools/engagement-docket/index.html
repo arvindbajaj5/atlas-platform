@@ -1832,6 +1832,30 @@ async function generateVisionDoc() {
     sections.push({ heading: 'Problem Statement', color: '#1C38F5', body: req.problem })
   }
 
+  // ── Load TP from Supabase if not in memory (e.g. after page refresh) ──────
+  if (territory && (!TP || !TP.s1) && typeof sbGet === 'function') {
+    try {
+      var _tpRows = await sbGet('territory_profiles', 'territory=eq.' + encodeURIComponent(territory) + '&order=generated_at.desc&limit=1')
+      if (_tpRows && _tpRows[0]) {
+        var _cached = _tpRows[0]
+        if (_cached.profile) {
+          try { TP.s1 = typeof _cached.profile === 'string' ? JSON.parse(_cached.profile) : _cached.profile } catch(e){}
+        }
+        if (_cached.session) {
+          try {
+            var _sess = typeof _cached.session === 'string' ? JSON.parse(_cached.session) : _cached.session
+            if (_sess.s2)         TP.s2        = _sess.s2
+            if (_sess._2x2)       TP._2x2      = _sess._2x2
+            if (_sess.objectives) TP.objectives = _sess.objectives
+            if (_sess.overrides)  TP.overrides  = _sess.overrides
+          } catch(e){}
+        }
+        TP.territory = territory
+        console.log('[VD] TP loaded from Supabase: s1=', !!TP.s1, 's2=', !!TP.s2)
+      }
+    } catch(_te) { console.warn('[VD] TP load err', _te) }
+  }
+
   // ── 4. Territory Overview (S1) ─────────────────────────────────────────────
   if (TP && TP.s1 && !TP.s1._failed) {
     var s1Meta = {}
@@ -1923,20 +1947,19 @@ async function generateVisionDoc() {
     })
   }
 
-  // ── 7. Agreed Use Cases ────────────────────────────────────────────────────
-  var agUCs = DOCKET_ITEMS.filter(function(i){
-    return i.section === 'uc' && (i.status === 'agreed' || i.status === 'done')
-  })
-  if (agUCs.length) {
+  // ── 7. Use Cases (all — agreed highlighted) ───────────────────────────────
+  var allDocUCs = DOCKET_ITEMS.filter(function(i){ return i.section === 'uc' })
+  if (allDocUCs.length) {
     sections.push({
-      heading: 'Agreed Use Cases',
+      heading: 'Use Cases',
       color: '#00B290',
       table: {
-        headers: ['#', 'Use Case', 'Cluster', 'Complexity'],
-        rows: agUCs.map(function(it, ix) {
+        headers: ['#', 'Use Case', 'Cluster', 'Complexity', 'Status'],
+        rows: allDocUCs.map(function(it, ix) {
           var uid = it.ref_id || it._ref_id || ''
           var uc  = UC_LIBRARY.find(function(u){ return u.id === uid }) || {}
-          return [String(ix+1), it.title || uc.uc_name || uid, uc.cluster||'—', uc.complexity||'—']
+          var st  = it.status || 'proposed'
+          return [String(ix+1), it.title || uc.uc_name || uid, uc.cluster||'—', uc.complexity||'—', st.toUpperCase()]
         })
       }
     })
@@ -1958,9 +1981,7 @@ async function generateVisionDoc() {
   }
 
   // ── 10. Next Steps ─────────────────────────────────────────────────────────
-  var openActs = DOCKET_ITEMS.filter(function(i){
-    return i.section === 'action' && i.status !== 'done' && i.status !== 'closed' && i.status !== 'blocked'
-  })
+  var openActs = DOCKET_ITEMS.filter(function(i){ return i.section === 'action' })
   if (openActs.length) {
     sections.push({
       heading: 'Next Steps',
