@@ -3532,7 +3532,7 @@ function tpS3Result() {
     + '<button onclick="TP.stage=\'s1_done\';tpRender()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#8592; Intelligence</button>'
     + '<button onclick="TP.stage=\'s2_form\';tpRender()" style="padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:5px;font-size:12px;cursor:pointer">&#9997; Objectives</button>'
     + '<div style="font-size:14px;font-weight:700;color:var(--navy);flex:1">' + esc(TP.territory) + '   Territory Profile</div>'
-    + '<button onclick="closeIntelModal();switchTab(\'outputs\')" style="padding:5px 12px;border:1px solid var(--teal);background:var(--teal);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#128196; Outputs &amp; Vision Doc &rarr;</button>'
+    + '<button onclick="tpGenerateS4()" style="padding:5px 12px;border:1px solid var(--teal);background:var(--teal);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#128196; Generate Vision Doc</button>'
     + '<button onclick="tpExportPPT()" style="padding:5px 12px;border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#128190; PPT</button>'
     + '<button onclick="applyS2ToRequirements()" style="padding:5px 12px;border:1px solid var(--teal);background:var(--teal);color:#fff;border-radius:5px;font-size:12px;cursor:pointer">&#8595; Apply to Requirements</button>'
     + '</div>'
@@ -3798,27 +3798,25 @@ async function tpSaveResult() {
 
 
 //    Export stubs (will be built separately)                                    
-function tpExportWord() { closeIntelModal(); switchTab('outputs') }
 
 // ── S4: Vision Document ───────────────────────────────────────────────────────
 
-function buildS4Prompt() { closeIntelModal(); switchTab('outputs') }
-
-function tpGenerateS4() { closeIntelModal(); switchTab('outputs') }
-
-function tpParseS4() { closeIntelModal(); switchTab('outputs') }
-
-function tpS4ConfidenceFlags() { closeIntelModal(); switchTab('outputs') }
-
-function saveCompanyName() { closeIntelModal(); switchTab('outputs') }
-
-function tpS4View() { closeIntelModal(); switchTab('outputs') }
-
-function tpS4Verify() { closeIntelModal(); switchTab('outputs') }
-
-function tpS4Edit() { closeIntelModal(); switchTab('outputs') }
-
-function tpExportS4Word() { closeIntelModal(); switchTab('outputs') }
+// S4 Vision Document — generated from territory intelligence + requirements
+async function tpGenerateS4() {
+  closeIntelModal()
+  setTimeout(async function() {
+    await generateVisionDoc()
+  }, 300)  // allow modal close animation
+}
+function tpExportWord()       { closeIntelModal(); switchTab('outputs') }
+function tpExportS4Word()     { closeIntelModal(); switchTab('outputs') }
+function buildS4Prompt()      { closeIntelModal(); switchTab('outputs') }
+function tpParseS4()          { closeIntelModal(); switchTab('outputs') }
+function tpS4ConfidenceFlags(){ closeIntelModal(); switchTab('outputs') }
+function saveCompanyName()    { closeIntelModal(); switchTab('outputs') }
+function tpS4View()           { closeIntelModal(); switchTab('outputs') }
+function tpS4Verify()         { closeIntelModal(); switchTab('outputs') }
+function tpS4Edit()           { closeIntelModal(); switchTab('outputs') }
 
 
 function tpExportPPT() { closeIntelModal(); switchTab('outputs') }
@@ -4291,9 +4289,9 @@ async function saveStrategy() {
   ]
   for (var i = 0; i < items.length; i++) {
     var it = items[i]
-    var existing = DOCKET_ITEMS.find(function(d){ return d.section === 'strategy' && d.item_type === it.type })
+    var existing = DOCKET_ITEMS.find(function(d){ return d.section === 'strategy' && (d.item_subtype === it.type || d.item_type === it.type) })
     if (existing) {
-      await sbPatch('docket_items', 'id=eq.' + existing.id, { notes: it.text, updated_at: new Date().toISOString() })
+      await sbPatch('docket_items', 'id=eq.' + existing.id, { notes: it.text })
     } else if (it.text) {
       var row = { id: genId('DI'), docket_id: docketId, section: 'strategy', item_type: 'pitch', item_subtype: it.type, title: 'Strategy — ' + it.type, notes: it.text, status: 'done', created_by: 'ATLAS' }
       await sbPost('docket_items', row)
@@ -4652,13 +4650,21 @@ function renderOutputsTab() {
       + '<div class="empty-sub">Outputs from SASC, FM, PEI, and documents appear here automatically</div></div>'
   }
 
-  var iconMap = { solution:'&#9881;', pei:'&#129488;', tsap_fm:'&#128184;', exec_doc:'&#128196;', intel:'&#128270;', use_case:'&#128161;', default:'&#128196;' }
-  var labelMap = { solution:'SASC Stack Config', pei:'Pre-Engagement Intelligence', tsap_fm:'TSAP Financial Model', exec_doc:'Document', intel:'Intelligence Signal', use_case:'Use Case' }
+  var _subtypeLabel = {
+    portfolio_selection:'Portfolio Scope', maas_config:'MaaS Configuration',
+    sasc_bom:'SASC BOM & Sizing', vision_doc:'Vision Document'
+  }
+  var _subtypeIcon = {
+    portfolio_selection:'&#128203;', maas_config:'&#129302;',
+    sasc_bom:'&#9881;', vision_doc:'&#128196;'
+  }
+  var iconMap = { solution:'&#9881;', pei:'&#129488;', tsap_fm:'&#128184;', exec_doc:'&#128196;', intel:'&#128270;', uc:'&#128161;', default:'&#128196;' }
+  var labelMap = { solution:'Solution', pei:'Pre-Engagement Intelligence', tsap_fm:'TSAP Financial Model', exec_doc:'Document', intel:'Intelligence Signal', uc:'Use Case' }
 
   html += '<div class="output-list">'
   outputs.forEach(function(item) {
-    var icon = iconMap[item.item_type] || iconMap.default
-    var typeLabel = labelMap[item.item_type] || item.item_type || 'Output'
+    var icon = _subtypeIcon[item.item_subtype] || iconMap[item.item_type] || iconMap.default
+    var typeLabel = _subtypeLabel[item.item_subtype] || labelMap[item.item_type] || item.item_type || 'Output'
     var done = item.status === 'done'
     var tool_url = getToolUrl(item)
     html += '<div class="output-item">'
@@ -4677,9 +4683,13 @@ function renderOutputsTab() {
 function getToolUrl(item) {
   var eng = CURRENT_ENG
   var engParam = eng ? '?eng=' + eng.id : ''
-  if (item.item_type === 'solution') return '../../tools/sasc/index.html' + engParam
-  if (item.item_type === 'tsap_fm')  return '../../tools/tsap-financial-model/index.html' + engParam
-  if (item.ref_table === 'pei_cache') return '../../tools/pei-tool/index.html'
+  var docketParam = CURRENT_DOCKET_ID ? '&docket=' + CURRENT_DOCKET_ID : ''
+  // Route by item_subtype first, then item_type
+  if (item.item_subtype === 'sasc_bom')  return '../../tools/sasc/index.html' + engParam + docketParam
+  if (item.item_subtype === 'portfolio_selection' || item.item_subtype === 'maas_config') return ''
+  if (item.item_type === 'solution')     return '../../tools/sasc/index.html' + engParam + docketParam
+  if (item.item_type === 'tsap_fm')      return '../../tools/tsap-financial-model/index.html' + engParam
+  if (item.ref_table === 'pei_cache')    return '../../tools/pei-tool/index.html'
   return ''
 }
 
@@ -4804,6 +4814,7 @@ function openFM() {
 //    Modal helpers                                                              
 function openModal(id) { document.getElementById(id).classList.add('open') }
 function closeModal(id) { document.getElementById(id).classList.remove('open') }
+function addSelectedUC() { closeModal('modal-uc') }  // UCs added individually via + Add buttons
 function buildTypeDropdown(eng) {
   var engT = eng.engagement_type || eng.type || ''
   var types = ['TSAP','Domain','Generic']
