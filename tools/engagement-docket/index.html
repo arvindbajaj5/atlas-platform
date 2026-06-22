@@ -422,6 +422,48 @@ textarea{resize:vertical;min-height:60px}
 
 <script>
 // -- Config                               
+// Smart docket_items insert — retries by stripping unknown columns (PGRST204)
+// Caches discovered valid columns in localStorage so subsequent inserts are fast
+async function docketInsert(row) {
+  var sb = getSB()
+  if (!sb.url) return { ok: false, error: 'No Supabase config' }
+  // Load known-bad columns from cache
+  var _badCols = {}
+  try { _badCols = JSON.parse(localStorage.getItem('atlas_docket_bad_cols')||'{}') } catch(e){}
+  var toSend = {}
+  Object.keys(row).forEach(function(k){ if (!k.startsWith('_') && !_badCols[k]) toSend[k] = row[k] })
+  // Try up to 6 times (strips one unknown column per attempt)
+  for (var attempt=0; attempt<6; attempt++) {
+    var r = await fetch(sb.url + '/rest/v1/docket_items', {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+        'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(toSend)
+    })
+    if (r.ok) { console.log('[docketInsert] ok on attempt', attempt, '| cols:', Object.keys(toSend)); return { ok: true } }
+    var body = ''
+    try { body = await r.text() } catch(e){}
+    var parsed = {}
+    try { parsed = JSON.parse(body) } catch(e){}
+    if (parsed.code === 'PGRST204' && parsed.message) {
+      // Extract the unknown column name: "Could not find the 'X' column..."
+      var m = parsed.message.match(/find the '([^']+)' column/)
+      if (m) {
+        var badCol = m[1]
+        console.warn('[docketInsert] column not found:', badCol, '— removing and retrying')
+        _badCols[badCol] = 1
+        try { localStorage.setItem('atlas_docket_bad_cols', JSON.stringify(_badCols)) } catch(e){}
+        delete toSend[badCol]
+        continue
+      }
+    }
+    // Other error — give up
+    console.error('[docketInsert] error ' + r.status + ':', body.substring(0,200))
+    return { ok: false, error: body.substring(0,80), status: r.status }
+  }
+  return { ok: false, error: 'Max retries exceeded' }
+}
+
 function getSB() {
   try {
     var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}')
@@ -1129,25 +1171,22 @@ async function savePortfolioSelection() {
   // Only columns that exist in docket_items schema
   var _portId = CURRENT_DOCKET_ID + '-portfolio'
   var _portNotes = JSON.stringify({ items: PORTFOLIO_SELECTION })
-  // PATCH existing row first, then POST to create
+  // DELETE then INSERT to ensure clean upsert without on_conflict header issues
   var sb = getSB()
-  var _pr = await fetch(sb.url + '/rest/v1/docket_items?id=eq.' + encodeURIComponent(_portId), {
-    method: 'PATCH',
-    headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
-      'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ notes: _portNotes, status: 'done' })
-  })
-  if (!_pr.ok) {
-    // Row doesn't exist — POST to create
-    await fetch(sb.url + '/rest/v1/docket_items', {
-      method: 'POST',
-      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
-        'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ id: _portId, docket_id: CURRENT_DOCKET_ID, section: 'output',
-        item_type: 'portfolio_selection', title: 'Portfolio Selection',
-        notes: _portNotes, status: 'done', created_by: 'ATLAS' })
+  try {
+    await fetch(sb.url + '/rest/v1/docket_items?id=eq.' + encodeURIComponent(_portId), {
+      method: 'DELETE',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, Prefer: 'return=minimal' }
     })
+  } catch(e) {}
+  var _portRow = {
+    id: _portId, docket_id: CURRENT_DOCKET_ID,
+    section: 'output', item_type: 'portfolio_selection',
+    title: 'Portfolio Selection', notes: _portNotes,
+    status: 'done', created_by: 'ATLAS'
   }
+  var _portResult = await docketInsert(_portRow)
+  console.log('[savePortfolio] result:', _portResult, 'items:', PORTFOLIO_SELECTION.length)
   showToast('✓ Portfolio selection saved')
 }
 
@@ -4367,33 +4406,16 @@ async function addUCToDocket(ucId) {
     section: 'uc', item_type: 'use_case',
     title: uc.uc_name || ucId,
     notes: ucId,
-    status: 'proposed', created_by: 'ATLAS'
+    status: 'proposed', created_by: 'ATLAS',
+    _ref_id: ucId  // in-memory only — stripped by docketInsert (starts with _)
   }
-  row._ref_id = ucId  // in-memory only for immediate render
-  // sbPost with error details
-  var sb = getSB()
-  var ok = false
-  try {
-    var _r = await fetch(sb.url + '/rest/v1/docket_items', {
-      method: 'POST',
-      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
-        'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify(row)
-    })
-    ok = _r.ok
-    if (!ok) {
-      var errBody = await _r.text()
-      console.error('[addUCToDocket] ' + _r.status + ':', errBody.substring(0,200))
-      showToast('UC add failed (' + _r.status + '): ' + errBody.substring(0,60), 'err')
-      return
-    }
-  } catch(e) {
-    console.error('[addUCToDocket]', e)
-    showToast('UC add error: ' + e.message, 'err')
+  var result = await docketInsert(row)
+  if (!result.ok) {
+    showToast('UC add failed: ' + (result.error||'unknown'), 'err')
     return
   }
   DOCKET_ITEMS.push(row)
-  showToast('UC added to docket')
+  showToast('UC added')
   renderUCModalContent(document.getElementById('uc-search').value)
   refreshItems()
 }
