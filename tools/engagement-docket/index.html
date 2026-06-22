@@ -1785,69 +1785,117 @@ async function generateVisionDoc() {
     showToast('Add requirements first — click Edit Requirements')
     return
   }
-  showToast('📄 Generating Vision Document...')
-  // Build doc using atlasExport.js
   if (typeof atlasExport === 'undefined') {
-    showToast('Export library not loaded — check network')
-    return
+    showToast('Export library not loaded — check network'); return
   }
-  var b = atlasExport.getBrand()
-  var custName = (eng._cust && eng._cust.name) || 'Customer'
-  var engName  = eng.name || eng.opportunity_name || 'Engagement'
+  showToast('📄 Generating Vision Document...')
+  var b = atlasExport.getBrand ? atlasExport.getBrand() : { companyName: 'OEM' }
+  var custName  = (eng._cust && eng._cust.name) || 'Customer'
+  var engName   = eng.name || eng.opportunity_name || 'Engagement'
   var territory = eng.territory || ''
+  var sections  = []
 
-  var sections = []
-
-  // Overview section
+  // 1. Cover metadata
   sections.push({
     heading: 'Engagement Overview',
     color: '#002870',
     metadata: {
-      'Customer':    custName,
-      'Engagement':  engName,
-      'Type':        eng.engagement_type || eng.type || '—',
-      'Stage':       eng.stage || '—',
-      'Territory':   territory || '—',
-      'Date':        new Date().toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' })
+      'Customer':         custName,
+      'Engagement':       engName,
+      'Type':             eng.engagement_type || eng.type || '—',
+      'Territory':        territory || '—',
+      'Date':             new Date().toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' }),
+      'Prepared by':      b.companyName || 'OEM'
     }
   })
 
-  // Objective
-  if (req.objective) {
-    sections.push({ heading: 'Objective', color: '#00B290', body: req.objective })
+  // 2. Territory strategic recommendation (from S2/S3 if available)
+  if (TP && TP.s2 && TP.s2.headline_recommendation && TP.territory === territory) {
+    sections.push({
+      heading: 'Territory Strategic Assessment',
+      color: '#002870',
+      body: TP.s2.headline_recommendation
+    })
+    // Add 2×2 positioning if available
+    if (TP._2x2 && TP._2x2.dom) {
+      var qNames = { 1:'Green AI Hub', 2:'Knowledge Exporter', 3:'Governance Moderniser', 4:'Heritage & Sector Renaissance' }
+      sections.push({
+        heading: 'Positioning',
+        color: '#00B290',
+        metadata: {
+          'Primary position': (qNames[TP._2x2.dom] || '') + ' (' + (TP._2x2.domPct || '') + '%)',
+          'Supporting':       (qNames[TP._2x2.sec] || '') + ' (' + (TP._2x2.secPct || '') + '%)'
+        }
+      })
+    }
   }
 
-  // Problem Statement
+  // 3. Objective
+  sections.push({ heading: 'Objective', color: '#00B290', body: req.objective })
+
+  // 4. Problem Statement
   if (req.problem) {
     sections.push({ heading: 'Problem Statement', color: '#1C38F5', body: req.problem })
   }
 
-  // Scope — Portfolio selection
-  if (PORTFOLIO_SELECTION.length) {
-    sections.push({
-      heading: 'Scope of Work',
-      color: '#002870',
-      bullets: PORTFOLIO_SELECTION,
-      body: 'The following portfolio items have been agreed upon as the scope of this engagement:'
-    })
-  }
-
-  // Budget & Timeline
-  if (req.budget_range || req.timeline || (req.constraints && req.constraints.length)) {
-    var meta = {}
-    if (req.budget_range) meta['Budget Range'] = req.budget_range
-    if (req.timeline)     meta['Timeline']     = req.timeline
-    if (req.constraints && req.constraints.length) meta['Constraints'] = req.constraints.join(' · ')
-    sections.push({ heading: 'Investment & Timeline', color: '#FFB600', metadata: meta })
-  }
-
-  // Success Criteria
+  // 5. Success Criteria
   if (req.success_criteria) {
     sections.push({ heading: 'Success Criteria', color: '#00B290', body: req.success_criteria })
   }
 
-  // Next Steps
-  var openActions = DOCKET_ITEMS.filter(function(i){ return i.section==='action' && i.status!=='done' })
+  // 6. Portfolio scope with readable labels
+  if (PORTFOLIO_SELECTION.length) {
+    var portLabels = {
+      'L1-TSAP':'L1 TSAP Territory Programme','L1.1':'L1.1 Programme Management',
+      'L1.2':'L1.2 Governance Framework','L1.3':'L1.3 Ecosystem Development',
+      'L2-AIC':'L2 AI Centre of Excellence (Flagship)','L2-MDC':'L2 Modular Datacenter',
+      'L2-HPC':'L2 HPC Cluster','L2-TRC':'L2 GPU Training Cluster','L2-AIF':'L2 AI Factory',
+      'L2-EDG':'L2 Edge AI Nodes','L2-DAC':'L2 Domain AI Centre',
+      'L2-MAAS':'MaaS — Model as a Service','L2-GPUAAS':'GPUaaS — GPU as a Service','L2-BMAAS':'BMaaS — Bare Metal as a Service',
+      'L3-DEP':'L3 Deployment & Integration','L3-GOV':'L3 AI Governance',
+      'L3-SKL':'L3 AI Skills Academy','L3-OPS':'L3 Managed Operations',
+      'L3-RAG':'L3 RAG Platform','L3-INT':'L3 System Integration','L3-AMC':'L3 AMC & Refresh'
+    }
+    sections.push({
+      heading: 'Scope of Work',
+      color: '#002870',
+      body: 'The following portfolio items define the scope of this engagement:',
+      bullets: PORTFOLIO_SELECTION.map(function(p){ return portLabels[p] || p })
+    })
+  }
+
+  // 7. Agreed use cases
+  var agreedUCs = DOCKET_ITEMS.filter(function(i){
+    return i.section === 'uc' && (i.status === 'agreed' || i.status === 'done')
+  })
+  if (agreedUCs.length) {
+    sections.push({
+      heading: 'Agreed Use Cases',
+      color: '#00B290',
+      table: {
+        headers: ['#', 'Use Case', 'Cluster', 'Complexity'],
+        rows: agreedUCs.map(function(item, idx) {
+          var _uid = item.ref_id || item._ref_id || item.notes || ''
+          var uc = UC_LIBRARY.find(function(u){ return u.id === _uid }) || {}
+          return [String(idx+1), item.title || uc.uc_name || _uid, uc.cluster || '—', uc.complexity || '—']
+        })
+      }
+    })
+  }
+
+  // 8. Investment & timeline
+  if (req.budget_range || req.timeline || (req.constraints && req.constraints.length)) {
+    var meta = {}
+    if (req.budget_range && req.budget_range !== 'Not defined') meta['Budget Range'] = req.budget_range
+    if (req.timeline)     meta['Timeline']     = req.timeline
+    if (req.constraints && req.constraints.length) meta['Compliance / Constraints'] = req.constraints.join(' · ')
+    sections.push({ heading: 'Investment & Timeline', color: '#FFB600', metadata: meta })
+  }
+
+  // 9. Open actions as next steps
+  var openActions = DOCKET_ITEMS.filter(function(i){
+    return i.section === 'action' && i.status !== 'done' && i.status !== 'closed'
+  })
   if (openActions.length) {
     sections.push({
       heading: 'Next Steps',
@@ -1855,41 +1903,43 @@ async function generateVisionDoc() {
       table: {
         headers: ['Action', 'Owner', 'Due Date', 'Status'],
         rows: openActions.map(function(a) {
-          return [a.title||a.text||'', a.assigned_to||'—', a.due_date||'—', (a.status||'open').toUpperCase()]
+          return [a.title || '', a.assigned_to || '—', a.due_date || '—', (a.status || 'open').toUpperCase()]
         })
       }
     })
   }
 
-  var filename = 'VisionDoc_' + (custName+' '+engName).replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+$/,'')
+  var filename = 'VisionDoc_'
+    + (custName + ' ' + engName).replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+$/,'')
     + '_' + new Date().toISOString().slice(0,10)
 
   try {
     await atlasExport.word({
-      title: engName,
+      title:    engName,
       subtitle: custName + (territory ? ' · ' + territory : ''),
       filename: filename,
       sections: sections,
-      footer: 'Prepared by ' + b.companyName + ' · Confidential · ' + new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
+      footer:   'Prepared by ' + (b.companyName || 'OEM') + ' · Confidential · '
+                + new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})
     })
-    showToast('✓ Vision Document available — ' + filename + '.docx')
-    // Save to docket_items as output
-    var row = {
-      id: genId('DI'),
-      docket_id: CURRENT_DOCKET_ID,
-      engagement_id: eng.id,
-      section: 'output',
-      item_type: 'exec_doc',
+    showToast('✓ Vision Document downloaded — ' + filename + '.docx')
+    // Save record to docket_items (correct columns only)
+    var vdRow = {
+      id:           genId('DI'),
+      docket_id:    CURRENT_DOCKET_ID,
+      section:      'output',
+      item_type:    'exec_doc',
       item_subtype: 'vision_doc',
-      title: 'Vision Document — ' + engName,
-      status: 'done',
-      content: { filename: filename + '.docx', generated_at: new Date().toISOString() },
-      created_by: 'ATLAS'
+      title:        'Vision Document — ' + engName,
+      status:       'done',
+      content:      { filename: filename + '.docx', generated_at: new Date().toISOString() },
+      created_by:   'ATLAS'
     }
-    await sbPost('docket_items', _dbRow)
-    DOCKET_ITEMS.push(row)
+    await sbPost('docket_items', vdRow)
+    DOCKET_ITEMS.push(Object.assign({}, vdRow, { status: 'done' }))
+    if (ACTIVE_TAB === 'outputs') renderDocket()
   } catch(e) {
-    showToast('Generation failed: ' + e.message)
+    showToast('Generation failed: ' + e.message, 'err')
     console.error('[generateVisionDoc]', e)
   }
 }
