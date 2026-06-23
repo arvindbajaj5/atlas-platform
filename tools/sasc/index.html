@@ -83,7 +83,11 @@ input:focus,select:focus{border-color:var(--blue);}
 .layer-list{display:flex;flex-direction:column;gap:0;}
 .layer-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f4;cursor:pointer;}
 .layer-row:last-child{border-bottom:none;}
-.layer-chk{width:18px;height:18px;border-radius:4px;border:2px solid #ccc;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s;}
+.layer-chk{width:18px;height:18px;border-radius:4px;border:2px solid #ccc;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s;cursor:pointer;}
+.toggle-sw{width:36px;height:20px;background:#ccc;border-radius:10px;position:relative;transition:background .2s;flex-shrink:0;cursor:pointer;}
+.toggle-sw::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:8px;top:2px;left:2px;transition:left .2s;}
+.toggle-sw.on{background:var(--teal);}
+.toggle-sw.on::after{left:18px;}
 .layer-chk.on{background:var(--navy);border-color:var(--navy);}
 .layer-chk.on::after{content:'\2713';color:var(--white);font-size:11px;font-weight:700;}
 .layer-info{flex:1;}
@@ -831,10 +835,14 @@ async function init() {
         // ref_id may be direct column or stored in notes (if data column didn't exist)
         return d.ref_id || d.notes || null
       }).filter(Boolean)
+      console.log('[SASC] docketRefs:', docketRefs)
       if (docketRefs.length) SASC_DATA.outputStack.ucdev = true
       // Always sync from docket   docket is the source of truth
       if (docketRefs.length) {
         SASC_DATA.selectedUCs = docketRefs
+        console.log('[SASC] selectedUCs set to', docketRefs.length, 'items:', docketRefs.slice(0,3))
+      } else {
+        console.warn('[SASC] No docketRefs found - check docket_items ref_id column')
       }
     }
   } else {
@@ -1750,10 +1758,26 @@ function renderScreen2() {
     return '<div class="card"><div style="padding:20px;color:var(--mid)">Loading use cases...</div></div>'
   }
   var selectedUCs = ALL_UCS.filter(function(u) { return s.selectedUCs.indexOf(u.id) >= 0 })
+  console.log('[SASC] renderScreen2: ALL_UCS', ALL_UCS.length, 'selectedUCs', s.selectedUCs.length, 'matched', selectedUCs.length)
   var gpuCfg = ALL_GPU_CONFIGS.find(function(g) { return g.id === s.gpuConfigId }) || ALL_GPU_CONFIGS[0]
 
-  //    Global settings card                                                    
-  var html = '<div class="card">'
+  // Requirements card (from Docket)
+  var req = (ENGAGEMENT && ENGAGEMENT.requirements) || {}
+  var html = ''
+  if (req.objective || req.problem || s.selectedUCs.length) {
+    html += '<div class="card" style="border-left:3px solid var(--teal)">'
+    html += '<div class="card-title">Requirements (from Docket)</div>'
+    if (req.objective) html += '<div style="margin-bottom:6px"><span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Objective</span><div style="font-size:12px;color:var(--dark);margin-top:3px">' + esc(req.objective) + '</div></div>'
+    if (req.problem)   html += '<div style="margin-bottom:6px"><span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Problem</span><div style="font-size:12px;color:var(--dark);margin-top:3px">' + esc(req.problem) + '</div></div>'
+    if (s.selectedUCs.length) {
+      html += '<div style="font-size:11px;color:var(--mid)">' + s.selectedUCs.length + ' UC' + (s.selectedUCs.length>1?'s':'') + ' linked from Docket'
+      + (selectedUCs.length < s.selectedUCs.length ? ' (' + (s.selectedUCs.length-selectedUCs.length) + ' not found in library)' : '') + '</div>'
+    } else {
+      html += '<div style="font-size:11px;color:var(--orange)">No UCs linked from Docket — add UCs in Docket Use Cases tab first</div>'
+    }
+    html += '</div>'
+  }
+  html += '<div class="card">'
     + '<div class="card-title">UC workload profiler</div>'
     + '<div class="card-sub">Size compute for each use case. Defaults loaded from UC library &mdash; override as needed.</div>'
 
@@ -3141,8 +3165,8 @@ function toggleLayerCfgPanel(key) {
 
 function toggleLayer(key) {
   SASC_DATA.layers[key].on = !SASC_DATA.layers[key].on
-  var chk = document.getElementById('chk-' + key)
-  if (chk) { chk.className = 'layer-chk ' + (SASC_DATA.layers[key].on ? 'on' : '') }
+  // Re-render Screen 1 to update MDC section and step nav
+  if (SASC_STEP === 1) renderStep(1)
 }
 
 function goToStack() {
