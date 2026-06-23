@@ -850,6 +850,14 @@ async function init() {
   // Load MaaS config from docket for simulation tab
   await loadMaasCfgFromDocket()
 
+  // Derive outputStack from layers and serviceModel state
+  var _os = SASC_DATA.outputStack, _la = SASC_DATA.layers, _sm2 = SASC_DATA.serviceModel
+  if (_la.ucdev   && _la.ucdev.on)   _os.ucdev  = true
+  if (_la.skills  && _la.skills.on)  _os.skills = true
+  if (_sm2.maas.enabled)   _os.maas   = true
+  if (_sm2.gpuaas.enabled) _os.gpuaas = true
+  if (_sm2.bmaas.enabled)  _os.bmaas  = true
+
   renderStep(1)
 }
 
@@ -890,7 +898,8 @@ function getActiveSteps() {
   var os = SASC_DATA.outputStack
   var steps = [{ key:'scope', label:'Scope & Stack' }]
   if (os.ucdev)  steps.push({ key:'workloads_a', label:'Workloads A — AI UCs' })
-  if (os.maas || os.gpuaas || os.bmaas) steps.push({ key:'workloads_b', label:'Workloads B — AI Services' })
+  var _sm = SASC_DATA.serviceModel
+  if (os.maas || os.gpuaas || os.bmaas || _sm.maas.enabled || _sm.gpuaas.enabled || _sm.bmaas.enabled) steps.push({ key:'workloads_b', label:'Workloads B — AI Services' })
   if (os.skills || os.coe) steps.push({ key:'workloads_c', label:'Workloads C — Capability' })
   steps.push({ key:'bom', label:'BOM / ROM' })
   return steps
@@ -1132,6 +1141,12 @@ async function loadWorkloadProfiles() {
   if (!SASC_DATA.gpuConfigId && ALL_GPU_CONFIGS.length) {
     var h100 = ALL_GPU_CONFIGS.find(function(g) { return g.name === 'H100 SXM5 8x' })
     SASC_DATA.gpuConfigId = h100 ? h100.id : ALL_GPU_CONFIGS[0].id
+  }
+
+  // Reload ALL_UCS from uc_library if not already loaded
+  if (!ALL_UCS.length) {
+    var _ucs = await sbFetch('uc_library','status=eq.active&order=cluster.asc,uc_name.asc',200)
+    ALL_UCS = _ucs || []
   }
 
   // Pre-fill workload inputs for selected UCs
@@ -1941,8 +1956,7 @@ function renderScreen2() {
     + (headroom < 0 ? '<div style="font-size:11px;color:#9a6800;margin-top:8px;padding:8px;background:rgba(255,182,0,0.08);border-radius:var(--r-sm)">&#9888; UC requirements exceed selected MDC. Consider upgrading T-shirt size or adding more sites in Step 1.</div>' : '')
     + '</div>'
 
-  // Service model section
-  html += renderServiceModelSection()
+  // Service model section moved to Workloads B (Screen 3)
 
   var _s2prev = getPrevStep(SASC_STEP), _s2next = getNextStep(SASC_STEP)
   var _s2steps = getActiveSteps()
@@ -3044,9 +3058,19 @@ async function selectEngagement(engId) {
   var dockets = await sbFetch('engagement_dockets', 'engagement_id=eq.' + engId + '&order=created_at.desc', 1)
   if (dockets && dockets[0]) {
     SASC_DATA.docketId = dockets[0].id
-    var docketItems = await sbFetch('docket_items', 'docket_id=eq.' + dockets[0].id + '&item_type=eq.uc', 50)
-    ALL_UCS = docketItems || []
-    SASC_DATA.selectedUCs = ALL_UCS.map(function(u) { return u.id })
+    var docketItems = await sbFetch('docket_items', 'docket_id=eq.' + dockets[0].id + '&section=eq.uc', 50)
+    var _refs = (docketItems||[]).map(function(d){ return d.ref_id||d.notes||null }).filter(Boolean)
+    SASC_DATA.selectedUCs = _refs
+    if (_refs.length) SASC_DATA.outputStack.ucdev = true
+    var _libUCs = await sbFetch('uc_library', 'status=eq.active&order=cluster.asc,uc_name.asc', 200)
+    ALL_UCS = _libUCs || []
+    // Also load portfolio
+    var _portItems = await sbFetch('docket_items', 'docket_id=eq.' + dockets[0].id + '&item_subtype=eq.portfolio_selection', 1)
+    if (_portItems && _portItems[0] && _portItems[0].content) {
+      var _portSel = (_portItems[0].content.items || [])
+      var _PORT_OS = { 'L2-MAAS':'maas','L2-GPUAAS':'gpuaas','L2-BMAAS':'bmaas','L3-SKL':'skills','L1.3':'coe','L1-TSAP':'coe' }
+      _portSel.forEach(function(code){ var k=_PORT_OS[code]; if(k) SASC_DATA.outputStack[k]=true })
+    }
   }
   document.getElementById('app-content').innerHTML = renderScreen1()
 }
