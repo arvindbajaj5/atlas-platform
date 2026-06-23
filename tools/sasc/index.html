@@ -831,16 +831,31 @@ async function init() {
     ALL_UCS = libraryUCs || []
     if (SASC_DATA.docketId) {
       var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&section=eq.uc', 100)
+      // UUID regex — ref_id must be a real uc_library UUID, not a DI-xxx docket item ID
+      var _uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       var docketRefs = (docketUCItems || []).map(function(d) {
-        // ref_id may be direct column or stored in notes (if data column didn't exist)
-        return d.ref_id || d.notes || null
+        // ref_id is the uc_library UUID saved by addUCToDocket — prefer it
+        var rid = d.ref_id || null
+        // Validate it's actually a UUID (guards against old rows that stored DI-xxx or null)
+        if (rid && _uuidRe.test(rid)) return rid
+        // Fallback: check content jsonb for a uc_id field
+        var cjson = d.content || {}
+        if (cjson.uc_id && _uuidRe.test(cjson.uc_id)) return cjson.uc_id
+        return null
       }).filter(Boolean)
-      console.log('[SASC] docketRefs:', docketRefs)
-      if (docketRefs.length) SASC_DATA.outputStack.ucdev = true
-      // Always sync from docket   docket is the source of truth
-      if (docketRefs.length) {
-        SASC_DATA.selectedUCs = docketRefs
-        console.log('[SASC] selectedUCs set to', docketRefs.length, 'items:', docketRefs.slice(0,3))
+      // Cross-validate: only keep refs that actually exist in ALL_UCS
+      var _validIds = ALL_UCS.map(function(u){ return u.id })
+      var validRefs = docketRefs.filter(function(r){ return _validIds.indexOf(r) >= 0 })
+      var invalidCount = docketRefs.length - validRefs.length
+      if (invalidCount > 0) console.warn('[SASC] ' + invalidCount + ' docket UC ref(s) not found in uc_library — may be inactive or deleted')
+      console.log('[SASC] docketRefs raw:', docketRefs.length, 'valid:', validRefs.length)
+      if (validRefs.length) SASC_DATA.outputStack.ucdev = true
+      // Always sync from docket — docket is the source of truth
+      if (validRefs.length) {
+        SASC_DATA.selectedUCs = validRefs
+        console.log('[SASC] selectedUCs set to', validRefs.length, 'items:', validRefs.slice(0,3))
+      } else if (docketRefs.length > 0) {
+        console.warn('[SASC] docketRefs found but none matched uc_library — check uc_library status=active')
       } else {
         console.warn('[SASC] No docketRefs found - check docket_items ref_id column')
       }
@@ -859,8 +874,9 @@ async function init() {
   await loadMaasCfgFromDocket()
 
   // Derive outputStack from layers and serviceModel state
+  // NOTE: do NOT overwrite ucdev if already set true from docket UCs above
   var _os = SASC_DATA.outputStack, _la = SASC_DATA.layers, _sm2 = SASC_DATA.serviceModel
-  if (_la.ucdev   && _la.ucdev.on)   _os.ucdev  = true
+  if (!_os.ucdev && _la.ucdev   && _la.ucdev.on)   _os.ucdev  = true
   if (_la.skills  && _la.skills.on)  _os.skills = true
   if (_sm2.maas.enabled)   _os.maas   = true
   if (_sm2.gpuaas.enabled) _os.gpuaas = true
@@ -1993,8 +2009,11 @@ function renderScreen2() {
 
   // Service model section moved to Workloads B (Screen 3)
 
-  var _s2prev = getPrevStep(SASC_STEP), _s2next = getNextStep(SASC_STEP)
   var _s2steps = getActiveSteps()
+  var _s2prev = getPrevStep(SASC_STEP), _s2next = getNextStep(SASC_STEP)
+  // Guard: clamp to valid step range -- prevents undefined label crash / renderStep(undefined) hang
+  if (_s2prev && _s2prev > _s2steps.length) _s2prev = null
+  if (_s2next && _s2next > _s2steps.length) _s2next = null
   html += '<div class="actions-bar">'
     + (_s2prev ? '<button class="btn btn-ghost" onclick="renderStep(' + _s2prev + ')">&larr; ' + esc((_s2steps[_s2prev-1]||{}).label||'Back') + '</button>' : '<div></div>')
     + (_s2next ? '<button class="btn btn-primary" onclick="renderStep(' + _s2next + ')">Next: ' + esc((_s2steps[_s2next-1]||{}).label||'Next') + ' &rarr;</button>' : '')
