@@ -159,7 +159,7 @@ input:focus,select:focus{border-color:var(--blue);}
 
 /* Service Model section */
 .svc-card{border:2px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;background:#fff;transition:border-color .15s}
-.svc-card.on{border-color:var(--teal)}
+.svc-card.on{border-color:var(--teal)}.svc-card.on .svc-body{color:var(--dark)}.svc-card.on .svc-body *{color:inherit}
 .svc-hdr{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:0}
 .svc-hdr.on{margin-bottom:12px}
 .svc-toggle{width:32px;height:18px;background:var(--border);border-radius:9px;position:relative;transition:background .2s;flex-shrink:0}
@@ -871,17 +871,17 @@ function renderStep(n) {
   var el = document.getElementById('app-content')
   renderStepNav()
   if (n === 1) el.innerHTML = renderScreen1()
-  if (n === 2) { el.innerHTML = renderScreen3() }
-  if (n === 3) { el.innerHTML = renderScreen2Loading(); loadWorkloadProfiles() }
+  if (n === 2) { el.innerHTML = renderScreen2Loading(); loadWorkloadProfiles() }
+  if (n === 3) { el.innerHTML = renderWorkloadB(); loadSvcModelCatalogue().then(function(){ renderStep(3) }) }
   if (n === 4) { el.innerHTML = renderScreen4Loading(); loadAndRenderBOM() }
 }
 
 function renderStepNav() {
   var steps = [
-    { n:1, label:'Scope & DC' },
-    { n:2, label:'Stack layers' },
-    { n:3, label:'Workloads' },
-    { n:4, label:'BOM + ROM' }
+    { n:1, label:'Scope & Stack' },
+    { n:2, label:'Workloads A — UCs' },
+    { n:3, label:'Workloads B — Services' },
+    { n:4, label:'BOM / ROM' }
   ]
   var html = '<div class="step-nav">'
   steps.forEach(function(s, i) {
@@ -1119,8 +1119,9 @@ function renderScreen1() {
 
     + '</div></div>'
 
+    + renderStackLayers()
     + '<div class="actions-bar"><div></div>'
-    + '<button class="btn btn-primary" onclick="goToStack()">Next: Configure stack &rarr;</button>'
+    + '<button class="btn btn-primary" onclick="renderStep(2)">Next: Workloads A &rarr;</button>'
     + '</div>'
 }
 
@@ -1594,6 +1595,94 @@ function calcMaxDau(gpuCfg, totalGpus, sla, usageTypes) {
   }, 0))
 }
 
+// ── Workloads B — AI Infrastructure Services (new Screen 3) ─────────────────
+function renderWorkloadB() {
+  if (SVC_MC_STATE === '') { loadSvcModelCatalogue() }
+  var html = ''
+  var cfg = MAAS_CFG
+  var uts = cfg && cfg.usage_types ? cfg.usage_types.filter(function(u){ return u.enabled }) : []
+
+  // MaaS Docket config summary
+  html += '<div class="card">'
+  html += '<div class="card-title">MaaS Configuration (from Docket)</div>'
+  if (cfg && uts.length) {
+    html += '<div class="card-sub">' + uts.length + ' of 6 usage types enabled'
+    html += ' &middot; ' + (cfg.total_concurrent_users||0) + ' total DAU'
+    html += ' &middot; SLA: ' + (cfg.sla_tier||'standard').toUpperCase()
+    html += (cfg.trial_enabled ? ' &middot; 15-day trial' : '')
+    html += '</div>'
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">'
+    uts.forEach(function(ut) {
+      html += '<div style="padding:5px 10px;background:rgba(0,178,144,.08);border:1.5px solid var(--teal);border-radius:5px;font-size:11px;color:var(--teal);font-weight:600">'
+      html += esc(ut.label||ut.type) + ' &middot; ' + (ut.dau||ut.concurrent_users||0) + ' DAU'
+      if (ut.model_name) html += ' &middot; ' + esc(ut.model_name)
+      html += '</div>'
+    })
+    html += '</div>'
+  } else if (cfg && !uts.length) {
+    html += '<div style="padding:10px;background:#FEF9C3;border-radius:6px;font-size:12px;color:#854D0E">No usage types enabled yet. Configure in Docket → Service Model.</div>'
+  } else {
+    html += '<div style="padding:10px;background:#FEF9C3;border-radius:6px;font-size:12px;color:#854D0E">No MaaS config found. Set up in Docket → Service Model tab, then reopen SASC.</div>'
+  }
+  html += '</div>'
+
+  // MaaS simulation (3-layer engine)
+  html += renderMaasSimTab()
+
+  // GPUaaS + BMaaS
+  html += renderGpuBmaasSection()
+
+  html += '<div class="actions-bar">'
+  html += '<button class="btn btn-ghost" onclick="renderStep(2)">&larr; Workloads A</button>'
+  html += '<button class="btn btn-primary" onclick="renderStep(4)">Next: BOM / ROM &rarr;</button>'
+  html += '</div>'
+  return html
+}
+
+// GPUaaS + BMaaS config section
+function renderGpuBmaasSection() {
+  var sm = SASC_DATA.serviceModel
+  var ga = sm.gpuaas
+  var bm2 = sm.bmaas
+  var html = '<div class="card"><div class="card-title">GPU as a Service &amp; Bare Metal as a Service</div>'
+
+  // GPUaaS
+  html += '<div style="margin-bottom:16px">'
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+  html += '<div class="toggle-sw' + (ga.enabled?' on':'') + '" onclick="SASC_DATA.serviceModel.gpuaas.enabled=!SASC_DATA.serviceModel.gpuaas.enabled;renderStep(3)"></div>'
+  html += '<span style="font-weight:600;font-size:13px;color:var(--navy)">GPU as a Service</span>'
+  html += '<span style="font-size:11px;color:var(--mid)">Reserved + burst GPU compute for external consumers</span>'
+  html += '</div>'
+  if (ga.enabled) {
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 12px;background:var(--light);border-radius:6px">'
+    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">GPUs reserved</div>'
+    html += '<input type="number" value="' + ga.gpus + '" min="0" step="8" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.gpuaas.gpus=+this.value"></div>'
+    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Price USD/GPU-hr</div>'
+    html += '<input type="number" value="' + ga.gpu_hour_price_usd + '" min="0" step="0.5" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.gpuaas.gpu_hour_price_usd=+this.value"></div>'
+    html += '</div>'
+  }
+  html += '</div>'
+
+  // BMaaS
+  html += '<div>'
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+  html += '<div class="toggle-sw' + (bm2.enabled?' on':'') + '" onclick="SASC_DATA.serviceModel.bmaas.enabled=!SASC_DATA.serviceModel.bmaas.enabled;renderStep(3)"></div>'
+  html += '<span style="font-weight:600;font-size:13px;color:var(--navy)">Bare Metal as a Service</span>'
+  html += '<span style="font-size:11px;color:var(--mid)">Dedicated AI servers for maximum isolation</span>'
+  html += '</div>'
+  if (bm2.enabled) {
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 12px;background:var(--light);border-radius:6px">'
+    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Servers</div>'
+    html += '<input type="number" value="' + bm2.servers + '" min="0" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.bmaas.servers=+this.value"></div>'
+    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Price USD/server/hr</div>'
+    html += '<input type="number" value="' + bm2.server_hour_price_usd + '" min="0" step="0.1" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.bmaas.server_hour_price_usd=+this.value"></div>'
+    html += '</div>'
+  }
+  html += '</div>'
+  html += '</div>'
+  return html
+}
+
 function renderServiceModelSection() {
   var sm = SASC_DATA.serviceModel
 
@@ -1897,8 +1986,8 @@ function renderScreen2() {
   html += renderServiceModelSection()
 
   html += '<div class="actions-bar">'
-    + '<button class="btn btn-ghost" onclick="renderStep(2)">&larr; Back</button>'
-    + '<button class="btn btn-primary" onclick="renderStep(4)">Next: BOM + ROM &rarr;</button>'
+    + '<button class="btn btn-ghost" onclick="renderStep(1)">&larr; Scope & Stack</button>'
+    + '<button class="btn btn-primary" onclick="renderStep(3)">Next: Workloads B &rarr;</button>'
     + '</div>'
 
   return html
@@ -2167,11 +2256,12 @@ function renderUCComplexityTier(ucId) {
     + '</div></div>'
 }
 
-function renderScreen3() {
+// renderStackLayers: inline stack section for Screen 1
+function renderStackLayers() {
   initLayerCfg()
   var layers = SASC_DATA.layers
-  var html = '<div class="card"><div class="card-title">Stack configuration</div>'
-    + '<div class="card-sub" style="margin-bottom:14px">Toggle layers on or off. Pre-selected based on your scope of supply. Click a layer to toggle.</div>'
+  var html = '<div class="card" style="margin-top:14px"><div class="card-title">Stack Configuration</div>'
+    + '<div class="card-sub" style="margin-bottom:14px">Toggle layers on or off. Pre-selected from your portfolio scope. Click a layer to configure.</div>'
     + '<div class="layer-list">'
 
   Object.keys(layers).forEach(function(key) {
@@ -2191,10 +2281,6 @@ function renderScreen3() {
   })
 
   html += '</div></div>'
-    + '<div class="actions-bar">'
-    + '<button class="btn btn-ghost" onclick="renderStep(1)">&larr; Back</button>'
-    + '<button class="btn btn-primary" onclick="renderStep(3)">Next: Workloads &rarr;</button>'
-    + '</div>'
   return html
 }
 
@@ -2419,7 +2505,7 @@ function calculateBOM(pricing, ucProfiles) {
 function renderScreen4(bom) {
   var tab = window._sascBomTab || 'bom'
   var tabBar = '<div style="display:flex;gap:0;border-bottom:2px solid #e0e0e8;margin-bottom:16px">'
-    + [{id:'bom',l:'Bill of Materials'},{id:'people',l:'People Model'},{id:'rom',l:'ROM Summary'},{id:'maas',l:'MaaS Simulation'}].map(function(t){
+    + [{id:'bom',l:'Bill of Materials'},{id:'people',l:'People Model'},{id:'rom',l:'ROM Summary'}].map(function(t){
         var on = tab === t.id
         return '<button style="padding:8px 16px;font-size:12px;font-weight:' + (on?'700':'500') + ';border:none;background:transparent;cursor:pointer;border-bottom:' + (on?'2px solid var(--orange)':'2px solid transparent') + ';color:' + (on?'var(--orange)':'var(--mid)') + ';font-family:inherit;margin-bottom:-2px" data-tab="' + t.id + '" onclick="switchBOMTab(this.dataset.tab)">' + t.l + '</button>'
       }).join('') + '</div>'
@@ -2466,6 +2552,15 @@ function renderMaasSimTab() {
     html += '<button style="padding:8px 14px;font-size:12px;font-weight:'+(on?'700':'500')+';border:none;background:transparent;cursor:pointer;border-bottom:'+(on?'2px solid var(--teal)':'2px solid transparent')+';color:'+(on?'var(--teal)':'var(--mid)')+';font-family:inherit;margin-bottom:-2px" onclick="MAAS_SIM_LAYER='+(i+1)+';renderStep(4)">'+(i+1)+'. '+l+'</button>'
   })
   html += '</div>'
+
+  // Trigger catalogue load if not yet loaded
+  if (SVC_MC_STATE === '') {
+    SVC_MC_STATE = 'loading'
+    loadSvcModelCatalogue().then(function(){
+      var el = document.getElementById('bom-tab-content') || document.getElementById('app-content')
+      if (el) el.innerHTML = renderWorkloadB()
+    })
+  }
 
   if (!MAAS_CFG) {
     return html + '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">No MaaS configuration found.<br><br>Configure MaaS in the Engagement Docket → Service Model tab, then reopen SASC.</div></div>'
