@@ -555,6 +555,22 @@ var UC_LIBRARY = []          // all active UCs
 var ACTIVE_TAB = 'overview'
 var UC_MODAL_FILTER = 'all'
 
+// ── MaaS Service Model globals ────────────────────────────────────────────────
+var MAAS_USAGE_TYPES = [
+  { type:'text',     archetype:'general',  icon:'🎯', label:'Text / Chat',      enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:50,  sla:'standard' },
+  { type:'coding',   archetype:'coding',   icon:'💻', label:'Coding',           enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:50,  sla:'standard' },
+  { type:'document', archetype:'document', icon:'📄', label:'Document',         enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:100, sla:'standard' },
+  { type:'audio',    archetype:'audio',    icon:'🎙️',  label:'Audio / Speech',  enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:20,  sla:'standard' },
+  { type:'indic',    archetype:'indic',    icon:'🌐', label:'Indic / Regional', enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:50,  sla:'standard' },
+  { type:'generic',  archetype:'general',  icon:'🔮', label:'Generic / Other',  enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:30,  sla:'standard' }
+]
+var MAAS_SLA    = 'standard'   // standard | enterprise
+var MAAS_TRIAL  = false        // 15-day free trial
+var MC_ROWS_D   = []           // model_catalogue rows
+var MC_LOAD_D   = ''           // idle|loading|loaded|error|no-creds
+var MAAS_MODELS_SELECTED = []  // legacy compat
+var AGENT_ON    = false        // legacy compat
+
 //    Load                                                                       
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1223,110 +1239,111 @@ async function renderSvcModelTab() {
 
   // ── MaaS section ──────────────────────────────────────────────────────────
   if (hasMaas) {
-    var capTypes = [
-      { id:'general',    icon:'🎯', label:'Text Generation' },
-      { id:'coding',     icon:'💻', label:'Coding' },
-      { id:'vision',     icon:'👁️', label:'Vision / Multimodal' },
-      { id:'audio',      icon:'🎙️', label:'Audio / Speech' },
-      { id:'embedding',  icon:'🔗', label:'Embedding & RAG' },
-      { id:'video',      icon:'🎬', label:'Video Generation' },
-      { id:'indic',      icon:'🌐', label:'Indic Languages' },
-      { id:'multimodal', icon:'🔮', label:'Multimodal' }
-    ]
-    window.MAAS_ARCHS = window.MAAS_ARCHS || []
-    window.MAAS_VENDOR_FILTER = window.MAAS_VENDOR_FILTER || ''
+    // Load model catalogue if not already loaded
+    if (!MC_ROWS_D.length && MC_LOAD_D !== 'loading' && MC_LOAD_D !== 'loaded') {
+      MC_LOAD_D = 'loading'
+      var _sb2 = getSB()
+      if (_sb2.url) {
+        fetch(_sb2.url + '/rest/v1/model_catalogue?enabled=eq.true&order=vendor.asc,family.asc,params_b.asc&limit=300', {
+          headers: { apikey: _sb2.key, Authorization: 'Bearer ' + _sb2.key }
+        }).then(function(r){ return r.ok ? r.json() : [] })
+          .then(function(rows){ MC_ROWS_D = rows; MC_LOAD_D = 'loaded'; switchTab('svcmodel') })
+          .catch(function(){ MC_LOAD_D = 'error' })
+      } else { MC_LOAD_D = 'no-creds' }
+    }
 
-    html += '<div class="card"><div class="card-title">🤖 MaaS — Model as a Service</div>'
-      + '<div class="card-sub">Select the AI capability types your customer wants to offer, then choose specific models from the catalogue. GPU sizing is auto-calculated.</div>'
-      + '<div class="arch-grid">'
-      + capTypes.map(function(c) {
-          var cnt = MC_ROWS_D.filter(function(m){ return (m.archetype||[]).includes(c.id) }).length
-          var on = window.MAAS_ARCHS.includes(c.id)
-          return '<div class="arch-card' + (on?' on':'') + '" onclick="toggleArch(\'' + c.id + '\',this)" title="Filter models by ' + c.label + '">'
-            + '<div class="arch-icon">' + c.icon + '</div>'
-            + '<div class="arch-name">' + c.label + '</div>'
-            + '<div class="arch-cnt">' + (MC_LOAD_D==='loaded'?cnt+' models':'...') + '</div>'
-            + '</div>'
-        }).join('')
-      + '</div>'
+    html += '<div class="card">'      + '<div class="card-title">🤖 Model as a Service</div>'      + '<div class="card-sub">Define AI API services by usage type. Select model family and tier for each. Full sizing in SASC · Pricing in FM.</div>'
 
-    // Model table
-    var selArchs = window.MAAS_ARCHS
-    var vendors = Array.from(new Set(MC_ROWS_D.map(function(m){ return m.vendor }))).sort()
-    var filtered = MC_ROWS_D.filter(function(m) {
-      if (selArchs.length && !selArchs.some(function(a){ return (m.archetype||[]).includes(a) })) return false
-      if (window.MAAS_VENDOR_FILTER && m.vendor !== window.MAAS_VENDOR_FILTER) return false
-      return true
-    })
+    // SLA + Trial controls
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding:10px 12px;background:var(--light);border-radius:8px">'      + '<div style="display:flex;align-items:center;gap:10px">'      + '<span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);letter-spacing:.3px">SLA Tier</span>'      + '<div style="display:flex;gap:4px">'      + ['standard','enterprise'].map(function(tier) {
+          return '<button style="padding:4px 12px;font-size:11px;font-weight:600;border:1.5px solid '+(MAAS_SLA===tier?'var(--navy)':'var(--border)')
+            +';background:'+(MAAS_SLA===tier?'var(--navy)':'#fff')
+            +';color:'+(MAAS_SLA===tier?'#fff':'var(--mid)')
+            +';border-radius:5px;cursor:pointer;font-family:inherit" '
+            +'onclick="MAAS_SLA=\''+tier+'\';switchTab(\'svcmodel\')">'
+            +(tier==='enterprise'?'★ ':'')
+            +tier.charAt(0).toUpperCase()+tier.slice(1)+'</button>'
+        }).join('')      + '</div></div>'      + '<div style="display:flex;align-items:center;gap:8px">'      + '<span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);letter-spacing:.3px">Free Trial (15 days)</span>'      + '<div class="toggle-sw'+(MAAS_TRIAL?' on':'')+'" onclick="MAAS_TRIAL=!MAAS_TRIAL;switchTab(\'svcmodel\')"></div>'      + '</div></div>'
 
-    html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'
-      + '<select class="mc-filter" onchange="window.MAAS_VENDOR_FILTER=this.value;switchTab(\'svcmodel\')">'
-      + '<option value="">All vendors</option>'
-      + vendors.map(function(v){ return '<option value="'+esc(v)+'"'+(window.MAAS_VENDOR_FILTER===v?' selected':'')+'>'+esc(v)+'</option>' }).join('')
-      + '</select>'
-      + '<span style="font-size:11px;color:var(--mid)">' + filtered.length + ' models shown · ' + MAAS_MODELS_SELECTED.length + ' selected</span>'
-      + '</div>'
-
-    if (MC_LOAD_D === 'loading') {
-      html += '<div style="padding:16px;text-align:center;color:var(--mid);font-size:12px">⏳ Loading model catalogue...</div>'
+    // Usage type rows
+    if (MC_LOAD_D === 'loading' || MC_LOAD_D === '') {
+      html += '<div style="padding:20px;text-align:center;color:var(--mid);font-size:12px">⏳ Loading model catalogue…</div>'
     } else if (MC_LOAD_D === 'no-creds' || MC_LOAD_D === 'error') {
       html += '<div style="padding:12px;background:#FEE2E2;border-radius:6px;font-size:12px;color:#991B1B">⚠ Model catalogue unavailable — check Settings → API Keys</div>'
     } else {
-      html += '<div style="overflow-x:auto;max-height:320px;overflow-y:auto">'
-        + '<table class="mc-table"><tr>'
-        + '<th></th><th>Model</th><th>Vendor</th><th>Capability</th>'
-        + '<th>Params</th><th>Context</th><th>MMLU</th><th>License</th></tr>'
-        + filtered.map(function(m) {
-            var sel = MAAS_MODELS_SELECTED.some(function(x){ return x.id === m.id })
-            function bcc(v){ return !v?'lo':v>=80?'hi':v>=65?'md':'lo' }
-            function lcc(l){ return ['Apache2','MIT','CC-BY','Gemma','Llama-Community'].includes(l||'')?'open':'comm' }
-            return '<tr class="' + (sel?'on':'') + '" onclick="toggleMaasModel(\'' + m.id + '\')" style="cursor:pointer">'
-              + '<td><div class="mc-toggle ' + (sel?'on':'') + '" style="pointer-events:none"></div></td>'
-              + '<td style="min-width:130px"><div class="mc-name">' + esc(m.name||'') + '</div><div class="mc-vendor">' + esc(m.vendor||'') + '</div></td>'
-              + '<td style="font-size:11px">' + esc(m.vendor||'') + '</td>'
-              + '<td>' + (m.archetype||[]).slice(0,2).map(function(a){ return '<span class="mc-arch">'+esc(a)+'</span>' }).join('') + '</td>'
-              + '<td style="font-size:11px;white-space:nowrap">' + (m.params_b?m.params_b+'B':'—') + '</td>'
-              + '<td style="font-size:11px">' + (m.context_length_k?m.context_length_k+'K':'—') + '</td>'
-              + '<td><span class="mc-bench ' + bcc(m.bench_mmlu) + '">' + (m.bench_mmlu||'—') + '</span></td>'
-              + '<td><span class="mc-lic ' + lcc(m.license) + '">' + esc(m.license||'—') + '</span></td>'
-              + '</tr>'
-          }).join('')
-        + '</table></div>'
+      html += '<div style="display:flex;flex-direction:column;gap:6px">'
+
+      MAAS_USAGE_TYPES.forEach(function(ut) {
+        // Families available for this archetype
+        var _fams = [], _famSeen = {}
+        MC_ROWS_D.forEach(function(m) {
+          if ((m.archetype||[]).includes(ut.archetype) && m.family && !_famSeen[m.family]) {
+            _fams.push(m.family); _famSeen[m.family] = 1
+          }
+        })
+        _fams.sort()
+
+        // Models in selected family (sorted basic→advanced by params_b)
+        var _tiers = ut.model_family ? MC_ROWS_D.filter(function(m){
+          return m.family===ut.model_family && (m.archetype||[]).includes(ut.archetype)
+        }).sort(function(a,b){ return (a.params_b||0)-(b.params_b||0) }) : []
+
+        function _tierLabel(m, arr) {
+          var i = arr.indexOf(m)
+          var sfx = arr.length===1 ? '' : i===0 ? ' · Basic' : i===arr.length-1 ? ' · Advanced' : ' · Mid'
+          var gpi = m.gpus_per_instance&&(m.gpus_per_instance.INT4||m.gpus_per_instance.FP16||m.gpus_per_instance.FP4)
+          return esc(m.name||'') + sfx + (gpi?' ('+gpi+'GPU)':'')
+        }
+
+        var _on = ut.enabled
+        html += '<div style="border:1.5px solid '+(_on?'var(--teal)':'var(--border)')
+          +';border-radius:8px;padding:10px 12px;transition:border-color .15s">'          + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'          + '<div class="toggle-sw'+(_on?' on':'')+'" onclick="toggleUsageType(\''+ut.type+'\')"></div>'          + '<span style="font-size:15px;line-height:1">'+ut.icon+'</span>'          + '<span style="font-weight:600;font-size:12px;color:var(--navy);min-width:110px">'+esc(ut.label)+'</span>'
+
+        if (_on) {
+          // Family selector
+          html += '<select style="flex:1;min-width:130px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;background:#fff" '
+            + 'onchange="selectMaasFamily(\''+ut.type+'\',this.value)">'            + '<option value="">— Family —</option>'            + _fams.map(function(f){ return '<option value="'+esc(f)+'"'+(ut.model_family===f?' selected':'')+'>'+esc(f)+'</option>' }).join('')            + '</select>'
+
+          if (ut.model_family && _tiers.length) {
+            // Tier selector
+            html += '<select style="flex:1;min-width:150px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;background:#fff" '
+              + 'onchange="selectMaasModel(\''+ut.type+'\',this.value)">'              + '<option value="">— Model / Tier —</option>'              + _tiers.map(function(m){ return '<option value="'+m.id+'"'+(ut.model_id===m.id?' selected':'')+'>'+_tierLabel(m,_tiers)+'</option>' }).join('')              + '</select>'
+          } else if (ut.model_family) {
+            html += '<span style="font-size:11px;color:var(--mid);flex:1">No models for this family</span>'
+          }
+
+          // Users input
+          html += '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">'            + '<span style="font-size:11px;color:var(--mid)">Users</span>'            + '<input type="number" min="1" step="10" value="'+(ut.concurrent_users||50)+'" '            + 'style="width:65px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;text-align:right" '            + 'onchange="setMaasUsers(\''+ut.type+'\',this.value)">'            + '</div>'
+        } else {
+          // Collapsed: show summary
+          var _summary = ut.model_name ? esc(ut.model_name)+' · '+ut.concurrent_users+' users'
+            : '<span style="color:var(--mid);font-size:11px">Not configured</span>'
+          html += '<span style="font-size:11px;color:var(--mid);flex:1">'+_summary+'</span>'
+        }
+
+        html += '</div></div>'  // close flex + row
+      })
+
+      html += '</div>'  // close usage types container
     }
 
-    // Agent harness
-    html += '<div style="margin-top:14px;padding:12px 14px;background:var(--light);border-radius:8px">'
-      + '<div class="agent-toggle" onclick="toggleAgent()" style="background:transparent;padding:0;margin:0">'
-      + '<div class="toggle-sw' + (AGENT_ON?' on':'') + '" id="agent-sw"></div>'
-      + '<div><div style="font-size:13px;font-weight:600;color:var(--navy)">Agent Harness</div>'
-      + '<div style="font-size:11px;color:var(--mid);font-weight:400;text-transform:none;letter-spacing:0">Optional add-on — adds ~1 GPU per 8 inference GPUs for agentic workflows</div></div>'
-      + '</div>'
-      + '<div class="agent-cfg' + (AGENT_ON?' on':'') + '" id="agent-cfg" style="margin-top:10px">'
-      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
-      + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:5px">Harness Type</div>'
-      + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--dark);margin-bottom:4px"><input type="radio" name="harness" checked> Our Harness (LangGraph / AutoGen)</label>'
-      + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--dark)"><input type="radio" name="harness"> BYO Harness (~15% compute buffer)</label>'
-      + '</div>'
-      + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:5px">Orchestration Model</div>'
-      + '<select style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none">'
-      + '<option>Llama 3.1 8B INT4 (recommended)</option><option>Phi-4 Mini INT4</option><option>Qwen 2.5 7B INT4</option>'
-      + '</select></div></div></div>'
+    // GPU estimate summary
+    var _maasGpus = 0
+    MAAS_USAGE_TYPES.filter(function(u){ return u.enabled && u.model_id }).forEach(function(u) {
+      var m = MC_ROWS_D.find(function(r){ return r.id===u.model_id })
+      if (m) {
+        var gpi = m.gpus_per_instance
+        _maasGpus += gpi ? (gpi.INT4||gpi.FP16||gpi.FP4||1) : 1
+      }
+    })
+    var _activeTypes = MAAS_USAGE_TYPES.filter(function(u){ return u.enabled }).length
+    var _totalUsers2 = MAAS_USAGE_TYPES.filter(function(u){ return u.enabled })
+      .reduce(function(s,u){ return s+(u.concurrent_users||0) },0)
 
-    // GPU estimate
-    var infGPUs = Math.max(MAAS_MODELS_SELECTED.length * 2, 0)
-    var agentGPUs = AGENT_ON ? Math.max(Math.ceil(infGPUs/8),1) : 0
-    var platGPUs  = Math.ceil((infGPUs+agentGPUs)*0.15) || 0
-    var totalGPUs = infGPUs + agentGPUs + platGPUs
-    html += '<div class="gpu-est" style="margin-top:12px">'
-      + '<div style="font-size:10px;color:rgba(255,255,255,.55);margin-bottom:8px">MaaS GPU estimate (auto-calculated from model selection)</div>'
-      + '<div class="gpu-est-grid">'
-      + '<div class="gpu-est-item"><div class="gpu-est-val">' + infGPUs + '</div><div class="gpu-est-lbl">Inference GPUs</div></div>'
-      + '<div class="gpu-est-item"><div class="gpu-est-val">' + agentGPUs + '</div><div class="gpu-est-lbl">Agent GPUs</div></div>'
-      + '<div class="gpu-est-item"><div class="gpu-est-val">' + platGPUs + '</div><div class="gpu-est-lbl">Platform Overhead</div></div>'
-      + '<div class="gpu-est-item"><div class="gpu-est-val" style="color:var(--amber)">' + totalGPUs + '</div><div class="gpu-est-lbl">Total MaaS GPUs</div></div>'
-      + '</div></div>'
-    html += '</div>' // close MaaS card
-  }
+    html += '<div class="gpu-est" style="margin-top:12px">'      + '<div style="display:flex;justify-content:space-between;margin-bottom:8px">'      + '<span style="font-size:10px;color:rgba(255,255,255,.55)">MaaS GPU estimate (from model tier selection)</span>'      + '<span style="font-size:10px;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:8px;color:rgba(255,255,255,.7)">±20% · full sim in SASC</span>'      + '</div>'      + '<div class="gpu-est-grid">'      + '<div class="gpu-est-item"><div class="gpu-est-val">'+_activeTypes+'</div><div class="gpu-est-lbl">Usage Types</div></div>'      + '<div class="gpu-est-item"><div class="gpu-est-val">'+_totalUsers2+'</div><div class="gpu-est-lbl">Total Users</div></div>'      + '<div class="gpu-est-item"><div class="gpu-est-val" style="color:var(--amber)">'+_maasGpus+'</div><div class="gpu-est-lbl">GPUs Est.</div></div>'      + '<div class="gpu-est-item"><div class="gpu-est-val">'+esc(MAAS_SLA==='enterprise'?'ENT':'STD')+'</div><div class="gpu-est-lbl">SLA</div></div>'      + '</div></div>'
+
+    html += '</div>'  // close MaaS card
+  } // end if(hasMaas)
 
   // ── GPUaaS section ─────────────────────────────────────────────────────────
   if (hasGpuaas) {
@@ -1544,29 +1561,57 @@ function toggleAgent() {
   if (gpu[3]) gpu[3].textContent = infG+agG+plG
 }
 
+// ── MaaS helper functions ─────────────────────────────────────────────────────
+function toggleUsageType(type) {
+  var ut = MAAS_USAGE_TYPES.find(function(u){ return u.type===type })
+  if (ut) { ut.enabled = !ut.enabled; switchTab('svcmodel') }
+}
+function selectMaasFamily(type, family) {
+  var ut = MAAS_USAGE_TYPES.find(function(u){ return u.type===type })
+  if (!ut) return
+  ut.model_family = family; ut.model_id = ''; ut.model_name = ''
+  switchTab('svcmodel')
+}
+function selectMaasModel(type, modelId) {
+  var ut = MAAS_USAGE_TYPES.find(function(u){ return u.type===type })
+  if (!ut) return
+  var m = MC_ROWS_D.find(function(r){ return r.id===modelId })
+  if (m) { ut.model_id = modelId; ut.model_name = m.name }
+}
+function setMaasUsers(type, val) {
+  var ut = MAAS_USAGE_TYPES.find(function(u){ return u.type===type })
+  if (ut) ut.concurrent_users = Math.max(1, +val||1)
+}
+
 async function saveMaasConfig() {
-  var eng = CURRENT_ENG
-  if (!eng) return
-  var sb = getSB()
-  if (!sb.url) { showToast('Supabase not configured'); return }
+  var eng = CURRENT_ENG; if (!eng) return
+  var sb = getSB(); if (!sb.url) { showToast('Supabase not configured'); return }
+  var _totalUsers = MAAS_USAGE_TYPES.filter(function(u){return u.enabled})
+    .reduce(function(s,u){return s+(u.concurrent_users||0)},0)
   var _maasRow = {
     id: CURRENT_DOCKET_ID + '-maas',
     docket_id: CURRENT_DOCKET_ID,
     section: 'output', item_type: 'solution', item_subtype: 'maas_config',
     title: 'MaaS Configuration',
     content: {
-      archetypes: window.MAAS_ARCHS || [],
-      models: MAAS_MODELS_SELECTED.map(function(m){ return { id:m.id, name:m.name, vendor:m.vendor } }),
-      agent_enabled: AGENT_ON
+      usage_types: MAAS_USAGE_TYPES.map(function(u){
+        return { type:u.type, archetype:u.archetype, label:u.label,
+          enabled:u.enabled, model_family:u.model_family,
+          model_id:u.model_id, model_name:u.model_name,
+          concurrent_users:u.concurrent_users }
+      }),
+      sla_tier: MAAS_SLA,
+      trial_enabled: MAAS_TRIAL,
+      total_concurrent_users: _totalUsers
     },
     status: 'done', created_by: 'ATLAS'
   }
-  var sb2 = getSB()
-  try { await fetch(sb2.url+'/rest/v1/docket_items?id=eq.'+encodeURIComponent(_maasRow.id),{method:'DELETE',headers:{apikey:sb2.key,Authorization:'Bearer '+sb2.key}}) } catch(e){}
-  var _mr = await fetch(sb2.url+'/rest/v1/docket_items', { method:'POST',
-    headers:{apikey:sb2.key,Authorization:'Bearer '+sb2.key,'Content-Type':'application/json',Prefer:'return=minimal'},
+  try { await fetch(sb.url+'/rest/v1/docket_items?id=eq.'+encodeURIComponent(_maasRow.id),
+    {method:'DELETE',headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}}) } catch(e){}
+  var _mr = await fetch(sb.url+'/rest/v1/docket_items', { method:'POST',
+    headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},
     body:JSON.stringify(_maasRow) })
-  showToast(_mr.ok ? '✓ MaaS config saved' : 'MaaS save failed (' + _mr.status + ')')
+  showToast(_mr.ok ? '✓ MaaS config saved' : 'MaaS save failed ('+_mr.status+')')
 }
 
 // ── TERRITORY PROFILE TAB ────────────────────────────────────────────────────
@@ -4104,7 +4149,22 @@ async function openEngagement(eng) {
     if (maasItems.length) {
       try {
         var md = maasItems[0].content || JSON.parse(maasItems[0].data||'{}')
-        window.MAAS_ARCHS = md.archetypes || []
+        // New format: usage_types array
+        if (md.usage_types && md.usage_types.length) {
+          md.usage_types.forEach(function(saved) {
+            var ut = MAAS_USAGE_TYPES.find(function(u){ return u.type===saved.type })
+            if (ut) {
+              ut.enabled = saved.enabled||false
+              ut.model_family = saved.model_family||''
+              ut.model_id = saved.model_id||''
+              ut.model_name = saved.model_name||''
+              ut.concurrent_users = saved.concurrent_users||50
+            }
+          })
+          MAAS_SLA   = md.sla_tier || 'standard'
+          MAAS_TRIAL = md.trial_enabled || false
+        }
+        // Legacy compat: old format
         AGENT_ON = md.agent_enabled || false
         MAAS_MODELS_SELECTED = md.models || []
       } catch(e) {}
