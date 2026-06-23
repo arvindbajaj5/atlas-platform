@@ -1132,12 +1132,13 @@ var ALL_GPU_CONFIGS = []
 var ALL_UC_TYPES = []
 
 async function loadWorkloadProfiles() {
+  try {
   // Load all four reference tables in parallel
   var results = await Promise.all([
     sbFetch('ai_models',             'active=eq.true&order=model_size_b.asc',  50),
     sbFetch('gpu_configs',           'active=eq.true&order=name.asc',          50),
     sbFetch('uc_interaction_types',  'active=eq.true&order=sort_order.asc',    50),
-    sbFetch('benchmark_results',     'order=gpu_config_id.asc',                100)
+    sbFetch('benchmark_results', 'order=gpu_config_id.asc', 100).catch(function(){ return [] })
   ])
 
   ALL_MODELS      = results[0] || []
@@ -1189,7 +1190,17 @@ async function loadWorkloadProfiles() {
     }
   })
 
-  document.getElementById('app-content').innerHTML = renderScreen2()
+  } catch(lwpErr) {
+    console.error('[SASC] loadWorkloadProfiles error:', lwpErr)
+    document.getElementById('app-content').innerHTML = '<div class="card"><div style="padding:20px;color:red">Load error: ' + lwpErr.message + '</div></div>'
+    return
+  }
+  try {
+    document.getElementById('app-content').innerHTML = renderScreen2()
+  } catch(e) {
+    console.error('[SASC] renderScreen2 error:', e)
+    document.getElementById('app-content').innerHTML = '<div class="card"><div style="padding:20px;color:red">Screen 2 error: ' + e.message + '</div></div>'
+  }
 }
 
 //    Sizing calculation (RPS-based, not tokens)                                 
