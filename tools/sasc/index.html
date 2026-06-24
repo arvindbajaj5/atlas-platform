@@ -1010,9 +1010,19 @@ function renderStep(n) {
     if (step.key === 'workloads_a') { el.innerHTML = renderScreen2Loading(); loadWorkloadProfiles() }
     if (step.key === 'workloads_b') {
       console.log('[renderStep] rendering workloads_b')
-      el.innerHTML = renderWorkloadB()
-      console.log('[renderStep] workloads_b rendered, innerHTML length='+el.innerHTML.length)
-      if (SVC_MC_STATE === '' || SVC_MC_STATE === 'loading') loadSvcModelCatalogue().then(function(){ if (SVC_MC_STATE === 'loaded') renderStep(n) })
+      if (SVC_MC_STATE === '' || SVC_MC_STATE === 'loading') {
+        // Load catalogue first, then render once — capture step n so re-render targets correct screen
+        var _wbGen = SASC_LOAD_GEN, _wbN = n
+        loadSvcModelCatalogue().then(function(){
+          if (SASC_LOAD_GEN !== _wbGen) return  // user navigated away
+          el.innerHTML = renderWorkloadB()
+          console.log('[renderStep] workloads_b rendered after catalogue load, length='+el.innerHTML.length)
+        })
+        el.innerHTML = '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue…</div></div>'
+      } else {
+        el.innerHTML = renderWorkloadB()
+        console.log('[renderStep] workloads_b rendered, innerHTML length='+el.innerHTML.length)
+      }
     }
     if (step.key === 'workloads_c') el.innerHTML = renderWorkloadC()
     if (step.key === 'bom')         { el.innerHTML = renderScreen4Loading(); loadAndRenderBOM() }
@@ -1650,7 +1660,7 @@ function calcMaxDau(gpuCfg, totalGpus, sla, usageTypes) {
 
 // ── Workloads B — AI Infrastructure Services (new Screen 3) ─────────────────
 function renderWorkloadB() {
-  if (SVC_MC_STATE === '') { loadSvcModelCatalogue() }
+  // Catalogue loaded by renderStep before this function is called
   var html = ''
   var cfg = MAAS_CFG
   var uts = cfg && cfg.usage_types ? cfg.usage_types.filter(function(u){ return u.enabled }) : []
@@ -2598,7 +2608,7 @@ function renderScreen4(bom) {
 
 function switchBOMTab(tab) {
   window._sascBomTab = tab
-  if (tab === 'maas' && SVC_MC_STATE === '') loadSvcModelCatalogue().then(function(){ renderStep(4) })
+  // catalogue load handled by renderStep(workloads_b)
   if (tab === 'people' && !PEOPLE_MODEL.loaded) {
     document.getElementById('bom-tab-content').innerHTML = '<div style="padding:20px;display:flex;align-items:center;gap:10px"><div class="spinner"></div><div class="status-msg">Loading people data...</div></div>'
     loadPeopleModel().then(function() {
@@ -2637,15 +2647,7 @@ function renderMaasSimTab() {
   })
   html += '</div>'
 
-  // Trigger catalogue load if not yet loaded
-  if (SVC_MC_STATE === '') {
-    SVC_MC_STATE = 'loading'
-    loadSvcModelCatalogue().then(function(){
-      if (SVC_MC_STATE !== 'loaded') return
-      var el = document.getElementById('bom-tab-content') || document.getElementById('app-content')
-      if (el) el.innerHTML = renderWorkloadB()
-    })
-  }
+  // Catalogue loading is handled by renderStep — never trigger async re-renders from inside a render function
 
   if (!MAAS_CFG) {
     return html + '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">No MaaS configuration found.<br><br>Configure MaaS in the Engagement Docket → Service Model tab, then reopen SASC.</div></div>'
