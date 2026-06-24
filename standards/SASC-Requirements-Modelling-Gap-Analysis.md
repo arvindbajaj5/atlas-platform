@@ -370,7 +370,7 @@ create table pricing_params (
 | **M8** | Token pricing not passed to FM Revenue tab | 🟠 High |
 | **M9** | Model family → tier mapping in Docket MaaS screen uses old spec. Needs updating to confirmed model catalogue (Section 2.3) | 🟡 Medium |
 | **M10** | Free trial (15 days, 1M tokens) — modelled as flag in config but not costed as CAC in FM | 🟡 Medium |
-| **M11** | GPU specs in benchmark_results / gpu_configs (agreed source) — need verification that all 12 architectures have complete specs (TFlops, HBM, bandwidth, TDP, cost/GPU) | 🟡 Medium |
+| **M11** | ~~GPU specs in benchmark_results / gpu_configs~~ | ✅ Done — gpu_configs confirmed complete with tdp_kw, bf16_tflops, int4_tflops, hbm_bw_tbps, gpus_in_unit, rack_scale |
 
 ### 5.3 Fleet Management Gaps
 
@@ -386,7 +386,7 @@ create table pricing_params (
 | Gap | Description | Priority |
 |---|---|---|
 | **B1** | ~~pricing_params Supabase table does not exist. All prices hardcoded.~~ | ✅ Done 2026-06-24 — 47 rows seeded across 10 categories |
-| **B2** | BOM is compute-only. Missing: networking, platform software, security uplift, resilience uplift, UC dev effort. Currently ~40–50% of actual cost. | 🔴 Critical |
+| **B2** | BOM is compute-only. Missing: networking, platform software, security uplift, resilience uplift, UC dev effort. Currently ~40–50% of actual cost. | 🟡 Partial — networking, software, security, services all now in BOM. MaaS/GPUaaS GPU lines added. UC dev effort added. Confidence range now weighted from pricing_params. |
 | **B3** | Networking not sized from workload (switch count, IB requirements, NKC units) | 🟠 High |
 | **B4** | Platform software has no cost model (enabling AI Platform layer adds nothing to BOM) | 🟠 High |
 | **B5** | Security uplift % not applied | 🟠 High |
