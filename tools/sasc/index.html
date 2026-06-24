@@ -995,21 +995,30 @@ function renderWorkloadC() {
 }
 
 function renderStep(n) {
-  SASC_STEP = n
-  SASC_LOAD_GEN++  // invalidate any in-flight loadWorkloadProfiles
-  var el = document.getElementById('app-content')
-  renderStepNav()
-  var steps = getActiveSteps()
-  var step = steps[n-1]
-  if (!step) { SASC_STEP = 1; renderStep(1); return }
-  if (step.key === 'scope')       el.innerHTML = renderScreen1()
-  if (step.key === 'workloads_a') { el.innerHTML = renderScreen2Loading(); loadWorkloadProfiles() }
-  if (step.key === 'workloads_b') {
-    el.innerHTML = renderWorkloadB()
-    if (SVC_MC_STATE !== 'loaded') loadSvcModelCatalogue().then(function(){ renderStep(n) })
+  try {
+    console.log('[renderStep] called with n='+n+' SASC_STEP='+SASC_STEP)
+    SASC_STEP = n
+    SASC_LOAD_GEN++
+    var el = document.getElementById('app-content')
+    if (!el) { console.error('[renderStep] app-content not found!'); return }
+    renderStepNav()
+    var steps = getActiveSteps()
+    console.log('[renderStep] steps='+steps.map(function(s){return s.key}).join(',')+' target='+( steps[n-1]||{}).key)
+    var step = steps[n-1]
+    if (!step) { SASC_STEP = 1; renderStep(1); return }
+    if (step.key === 'scope')       el.innerHTML = renderScreen1()
+    if (step.key === 'workloads_a') { el.innerHTML = renderScreen2Loading(); loadWorkloadProfiles() }
+    if (step.key === 'workloads_b') {
+      console.log('[renderStep] rendering workloads_b')
+      el.innerHTML = renderWorkloadB()
+      console.log('[renderStep] workloads_b rendered, innerHTML length='+el.innerHTML.length)
+      if (SVC_MC_STATE !== 'loaded') loadSvcModelCatalogue().then(function(){ renderStep(n) })
+    }
+    if (step.key === 'workloads_c') el.innerHTML = renderWorkloadC()
+    if (step.key === 'bom')         { el.innerHTML = renderScreen4Loading(); loadAndRenderBOM() }
+  } catch(e) {
+    console.error('[renderStep] EXCEPTION n='+n+':', e.message, e.stack)
   }
-  if (step.key === 'workloads_c') el.innerHTML = renderWorkloadC()
-  if (step.key === 'bom')         { el.innerHTML = renderScreen4Loading(); loadAndRenderBOM() }
 }
 
 function renderStepNav() {
