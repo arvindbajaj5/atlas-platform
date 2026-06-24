@@ -1915,7 +1915,6 @@ function renderScreen2() {
     + '<div class="form-grid" style="margin-bottom:10px">'
     + '<div><label>GPU configuration</label>'
     + '<select onchange="SASC_DATA.gpuConfigId=this.value;document.getElementById(\'app-content\').innerHTML=renderScreen2()">'
-    + ALL_GPU_CONFIGS.map(function(g) {
     + ALL_GPU_CONFIGS.filter(function(g) { return !g.rack_scale }).map(function(g) {
         return '<option value="' + g.id + '"' + (s.gpuConfigId===g.id?' selected':'') + '>'
           + g.name + ' (' + (g.vram_per_gpu_gb||Math.round(g.total_vram_gb/(g.gpus_in_unit||8))) + 'GB/GPU × ' + (g.gpus_in_unit||8) + ' GPUs)'
