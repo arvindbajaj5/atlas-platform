@@ -243,6 +243,7 @@ function genId(prefix) {
   return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 9999)
 }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function fmtNum(n) { return Number(n||0).toLocaleString() }
 function showToast(msg, duration) {
   var t = document.getElementById('toast')
   t.textContent = msg
@@ -874,19 +875,18 @@ async function init() {
         console.warn('[SASC] UC row unmatched - id:', d.id, 'title:', d.title, 'ref_id:', d.ref_id)
         return null
       }).filter(Boolean)
-      // Cross-validate: only keep refs that actually exist in ALL_UCS
+      // Cross-validate against active uc_library — warn on misses but keep ALL refs (docket is source of truth)
       var _validIds = ALL_UCS.map(function(u){ return u.id })
-      var validRefs = docketRefs.filter(function(r){ return _validIds.indexOf(r) >= 0 })
-      var invalidCount = docketRefs.length - validRefs.length
-      if (invalidCount > 0) console.warn('[SASC] ' + invalidCount + ' docket UC ref(s) not found in uc_library — may be inactive or deleted')
-      console.log('[SASC] docketRefs raw:', docketRefs.length, 'valid:', validRefs.length)
-      if (validRefs.length) SASC_DATA.outputStack.ucdev = true
-      // Always sync from docket — docket is the source of truth
-      if (validRefs.length) {
-        SASC_DATA.selectedUCs = validRefs
-        console.log('[SASC] selectedUCs set to', validRefs.length, 'items:', validRefs.slice(0,3))
-      } else if (docketRefs.length > 0) {
-        console.warn('[SASC] docketRefs found but none matched uc_library — check uc_library status=active')
+      var validRefs   = docketRefs.filter(function(r){ return _validIds.indexOf(r) >= 0 })
+      var invalidRefs = docketRefs.filter(function(r){ return _validIds.indexOf(r) < 0 })
+      if (invalidRefs.length) console.warn('[SASC] ' + invalidRefs.length + ' UC ref(s) not in active uc_library (may be inactive/different cluster):', invalidRefs)
+      console.log('[SASC] docketRefs raw:', docketRefs.length, 'in library:', validRefs.length, 'not in library:', invalidRefs.length)
+      // Use ALL docket refs — UCs not in active library still show with title from docket row
+      var allRefs = docketRefs  // don't filter — docket is source of truth
+      if (allRefs.length) SASC_DATA.outputStack.ucdev = true
+      if (allRefs.length) {
+        SASC_DATA.selectedUCs = allRefs
+        console.log('[SASC] selectedUCs set to', allRefs.length, 'items:', allRefs)
       } else {
         console.warn('[SASC] No docketRefs found - check docket_items ref_id column')
       }
@@ -2643,7 +2643,7 @@ function renderMaasSimTab() {
   var html = '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #e0e0e8">'
   ;['Architecture Comparison','Usage Heatmap','Mix Optimiser'].forEach(function(l,i) {
     var on = MAAS_SIM_LAYER === i+1
-    html += '<button style="padding:8px 14px;font-size:12px;font-weight:'+(on?'700':'500')+';border:none;background:transparent;cursor:pointer;border-bottom:'+(on?'2px solid var(--teal)':'2px solid transparent')+';color:'+(on?'var(--teal)':'var(--mid)')+';font-family:inherit;margin-bottom:-2px" onclick="MAAS_SIM_LAYER='+(i+1)+';renderStep(4)">'+(i+1)+'. '+l+'</button>'
+    html += '<button style="padding:8px 14px;font-size:12px;font-weight:'+(on?'700':'500')+';border:none;background:transparent;cursor:pointer;border-bottom:'+(on?'2px solid var(--teal)':'2px solid transparent')+';color:'+(on?'var(--teal)':'var(--mid)')+';font-family:inherit;margin-bottom:-2px" onclick="MAAS_SIM_LAYER='+(i+1)+';renderStep(SASC_STEP)">'+(i+1)+'. '+l+'</button>'
   })
   html += '</div>'
 
@@ -2693,7 +2693,7 @@ function renderMaasSimTab() {
       + '<div style="font-size:10px;color:var(--mid);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">'+p.label+'</div>'
       + '<div style="display:flex;align-items:center;gap:4px">'
       + '<input type="number" value="'+p.val+'" min="1" style="width:80px;padding:4px 6px;border:1.5px solid var(--border);border-radius:4px;font-size:13px;font-weight:600;font-family:inherit;outline:none" '
-      + 'onchange="'+p.id.replace('sim_','MAAS_SIM_'+(p.id==='sim_peak'?'PEAK':p.id==='sim_amort'?'AMORT':'DAU'))+'=+this.value;renderStep(4)">'
+      + 'onchange="'+p.id.replace('sim_','MAAS_SIM_'+(p.id==='sim_peak'?'PEAK':p.id==='sim_amort'?'AMORT':'DAU'))+'=+this.value;renderStep(SASC_STEP)">'
       + (p.unit?'<span style="font-size:11px;color:var(--mid)">'+p.unit+'</span>':'')
       + '</div>'
       + '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.tip+'</div>'
@@ -2725,7 +2725,7 @@ function toggleMaasGpu(id) {
   var idx = MAAS_SIM_SEL.indexOf(id)
   if (idx >= 0) { MAAS_SIM_SEL.splice(idx,1) }
   else if (MAAS_SIM_SEL.length < 5) { MAAS_SIM_SEL.push(id) }
-  renderStep(4)
+  renderStep(SASC_STEP)
 }
 
 // ── Layer 1: Architecture Comparison Curves ───────────────────────────────────
@@ -2923,7 +2923,7 @@ function renderMaasLayer3(selGpus, enabledUts, sla) {
       + '</div>'
       + '<input type="range" min="0" max="100" value="'+MAAS_SIM_MIX[t]+'" style="width:100%" '
       + 'oninput="MAAS_SIM_MIX[\''+t+'\']=+this.value;var el=document.getElementById(\'mix-lbl-'+t+'\');if(el)el.textContent=this.value+\'%\'" '
-      + 'onchange="renderStep(4)">'
+      + 'onchange="renderStep(SASC_STEP)">'
       + '</div>'
   })
   html += '</div>'
@@ -2934,12 +2934,12 @@ function renderMaasLayer3(selGpus, enabledUts, sla) {
     + '<div style="display:flex;align-items:center;gap:6px">'
     + '<span style="font-size:11px;color:var(--mid)">₹ / M tokens</span>'
     + '<input type="number" value="'+(window._maasTokenPriceInr||500)+'" min="1" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-family:inherit" '
-    + 'onchange="window._maasTokenPriceInr=+this.value;renderStep(4)">'
+    + 'onchange="window._maasTokenPriceInr=+this.value;renderStep(SASC_STEP)">'
     + '</div>'
     + '<div style="display:flex;align-items:center;gap:6px">'
     + '<span style="font-size:11px;color:var(--mid)">Gross Margin target</span>'
     + '<input type="number" value="'+(window._maasGmTarget||40)+'" min="1" max="90" style="width:60px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-family:inherit" '
-    + 'onchange="window._maasGmTarget=+this.value;renderStep(4)">%'
+    + 'onchange="window._maasGmTarget=+this.value;renderStep(SASC_STEP)">%'
     + '</div>'
     + '</div>'
 
@@ -3051,7 +3051,7 @@ function chooseMaasArch(gpuId, gpuName, gpus, capexUsd, costPerMtoken) {
     chosen_at: new Date().toISOString()
   }
   showToast('Architecture chosen: '+gpuName+' — save to Docket when ready')
-  renderStep(4)
+  renderStep(SASC_STEP)
 }
 
 async function saveMaasBomToDocket() {
