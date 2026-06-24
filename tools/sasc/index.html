@@ -843,16 +843,24 @@ async function init() {
       console.log('[SASC] Fetching UCs for docketId:', SASC_DATA.docketId)
       var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&section=eq.uc', 100)
       console.log('[SASC] docketUCItems raw count:', (docketUCItems||[]).length, docketUCItems && docketUCItems[0] ? JSON.stringify(docketUCItems[0]).substring(0,120) : 'empty')
-      // UUID regex — ref_id must be a real uc_library UUID, not a DI-xxx docket item ID
+      // Build a title->id lookup from ALL_UCS for name-based fallback
+      var _ucByName = {}
+      ALL_UCS.forEach(function(u) { _ucByName[(u.uc_name||'').trim().toLowerCase()] = u.id })
       var _uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       var docketRefs = (docketUCItems || []).map(function(d) {
-        // ref_id is the uc_library UUID saved by addUCToDocket — prefer it
+        // 1. ref_id column (UUID) — preferred
         var rid = d.ref_id || null
-        // Validate it's actually a UUID (guards against old rows that stored DI-xxx or null)
         if (rid && _uuidRe.test(rid)) return rid
-        // Fallback: check content jsonb for a uc_id field
+        // 2. content.uc_id jsonb field
         var cjson = d.content || {}
         if (cjson.uc_id && _uuidRe.test(cjson.uc_id)) return cjson.uc_id
+        // 3. Title match against uc_library.uc_name — handles rows where ref_id column is absent/null
+        var titleKey = (d.title || '').trim().toLowerCase()
+        if (titleKey && _ucByName[titleKey]) {
+          console.log('[SASC] UC matched by title:', d.title, '->', _ucByName[titleKey])
+          return _ucByName[titleKey]
+        }
+        console.warn('[SASC] UC row unmatched - id:', d.id, 'title:', d.title, 'ref_id:', d.ref_id)
         return null
       }).filter(Boolean)
       // Cross-validate: only keep refs that actually exist in ALL_UCS
@@ -1792,13 +1800,22 @@ function renderServiceModelSection() {
 
 function renderScreen2() {
   var s = SASC_DATA
-  // Guard: if ALL_UCS not yet loaded, show loading state
-  if (!ALL_UCS || !ALL_UCS.length) {
-    return '<div class="card"><div style="padding:20px;color:var(--mid)">Loading use cases...</div></div>'
+  // Guard: if reference data not yet loaded, show loading state with nav
+  if (!ALL_UCS || !ALL_UCS.length || !ALL_GPU_CONFIGS || !ALL_GPU_CONFIGS.length) {
+    var _s2steps0 = getActiveSteps()
+    var _s2prev0 = getPrevStep(SASC_STEP), _s2next0 = getNextStep(SASC_STEP)
+    if (_s2prev0 && _s2prev0 > _s2steps0.length) _s2prev0 = null
+    if (_s2next0 && _s2next0 > _s2steps0.length) _s2next0 = null
+    return '<div class="card"><div style="padding:20px;color:var(--mid)">Loading use cases...</div>'
+      + '<div class="actions-bar">'
+      + (_s2prev0 ? '<button class="btn btn-ghost" onclick="renderStep('+_s2prev0+')">← '+( _s2steps0[_s2prev0-1]||{}).label+'</button>' : '<div></div>')
+      + (_s2next0 ? '<button class="btn btn-primary" onclick="renderStep('+_s2next0+')">Next: '+(_s2steps0[_s2next0-1]||{}).label+' →</button>' : '')
+      + '</div></div>'
   }
   var selectedUCs = ALL_UCS.filter(function(u) { return s.selectedUCs.indexOf(u.id) >= 0 })
   console.log('[SASC] renderScreen2: ALL_UCS', ALL_UCS.length, 'selectedUCs', s.selectedUCs.length, 'matched', selectedUCs.length)
   var gpuCfg = ALL_GPU_CONFIGS.find(function(g) { return g.id === s.gpuConfigId }) || ALL_GPU_CONFIGS[0]
+  if (!gpuCfg) gpuCfg = { id:'', name:'No GPU configs loaded', vram_per_gpu_gb:80, hbm_bw_tbps:3.0, power_watts_tdp:5600, gpus_in_unit:8, tdp_kw:10 }
 
   // Requirements card (from Docket)
   var req = (ENGAGEMENT && ENGAGEMENT.requirements) || {}
