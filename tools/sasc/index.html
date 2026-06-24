@@ -328,6 +328,7 @@ function setCurrency(c) {
 
 // -- State ---------------------------------------------------------------------
 var SASC_STEP = 1
+var SASC_LOAD_GEN = 0  // increments on every renderStep call; loadWorkloadProfiles checks before writing to DOM
 var SASC_DATA = {
   engId: null, engName: '', customerName: '', archetype: '',
   docketId: null, docketItemId: null,
@@ -995,6 +996,7 @@ function renderWorkloadC() {
 
 function renderStep(n) {
   SASC_STEP = n
+  SASC_LOAD_GEN++  // invalidate any in-flight loadWorkloadProfiles
   var el = document.getElementById('app-content')
   renderStepNav()
   var steps = getActiveSteps()
@@ -1178,6 +1180,7 @@ var ALL_GPU_CONFIGS = []
 var ALL_UC_TYPES = []
 
 async function loadWorkloadProfiles() {
+  var _myGen = ++SASC_LOAD_GEN  // capture generation; if SASC_LOAD_GEN changes before we finish, abort
   try {
   // Load all four reference tables in parallel
   var results = await Promise.all([
@@ -1243,6 +1246,8 @@ async function loadWorkloadProfiles() {
     document.getElementById('app-content').innerHTML = '<div class="card"><div style="padding:20px;color:red">Load error: ' + lwpErr.message + '</div></div>'
     return
   }
+  // Abort if user navigated away while we were loading
+  if (_myGen !== SASC_LOAD_GEN) { console.log('[SASC] loadWorkloadProfiles: stale generation, aborting render'); return }
   try {
     document.getElementById('app-content').innerHTML = renderScreen2()
   } catch(e) {
