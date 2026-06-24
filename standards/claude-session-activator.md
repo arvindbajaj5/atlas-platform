@@ -251,7 +251,7 @@ Token (`$GITHUB_TOKEN`) not available in Claude sessions — always output to `/
 **Gap register summary — current Phase:**
 
 Phase 1 — Fleet View (in progress):
-- [ ] **[Supabase]** Create `pricing_params` table — seed with GPU server, MDC, NKC prices (Gap B1)
+- [x] **[Supabase]** `pricing_params` table seeded — 47 rows, 10 categories (Gap B1 ✅ 2026-06-24)
 - [ ] **[SASC S3]** MaaS buffer model — peak headroom + failover + multi-tenancy (Gaps M1, M2)
 - [ ] **[SASC S3]** Fleet allocation table — aggregate UC + MaaS + GPUaaS GPUs, MW check (Gaps F1, F2, F3)
 - [ ] **[SASC S3]** Demand curves / temporal heatmap — archetype shapes, aggregate curve (Gap M4)
