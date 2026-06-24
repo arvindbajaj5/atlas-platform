@@ -148,18 +148,59 @@
 
   /**
    * VRAM required for KV cache (GB)
-   * Uses model gpu_memory_gb jsonb if available, else field rule
-   * Field rule: MB_per_token × context_len × concurrent_requests / 1024
+   *
+   * Exact formula when model architecture params available (num_layers, num_kv_heads, head_dim):
+   *   M_KV = 2 × L × H_kv × D_head × C_max × N × B_cache
+   *   where:
+   *     L       = num_layers (transformer layers)
+   *     H_kv    = num_kv_heads (GQA KV heads — typically 8 for GQA, not full attention head count)
+   *     D_head  = head_dim (hidden dimension per head, typically 128)
+   *     C_max   = context_len in tokens (input + output)
+   *     N       = concurrent_requests
+   *     B_cache = bytes per KV element — always FP16 (2 bytes) by default
+   *               (frameworks like vLLM keep KV cache in FP16 even when weights are INT4)
+   *
+   * Field rule fallback when architecture params absent:
+   *   Small models 7B-14B:  0.15 MB/token (FP16)
+   *   Medium 14B-35B:       0.25 MB/token
+   *   Large 70B-80B:        0.35 MB/token
+   *   XLarge 100B+:         0.50 MB/token
    */
   function calcKVCache (model, contextLenTokens, concurrentRequests, precision) {
-    // Use field rule — accurate for GQA models (most modern LLMs)
-    var sizeClass = kvCacheSizeClass(model ? model.params_b : null)
+    // KV cache is always kept at FP16 regardless of weight precision
+    // (this is standard practice in vLLM, TGI, TensorRT-LLM)
+    var B_cache = 2  // FP16 = 2 bytes
+
+    // Optional: FP8 KV cache if model explicitly configured for it
+    if (model && model.kv_cache_dtype === 'FP8') B_cache = 1
+
+    // Use exact formula if model architecture params are in model_catalogue
+    if (model && model.num_layers && model.num_kv_heads && model.head_dim) {
+      var L      = model.num_layers
+      var H_kv   = model.num_kv_heads
+      var D_head = model.head_dim
+      // M_KV = 2 × L × H_kv × D_head × C_max × N × B_cache (bytes → GB)
+      var bytes  = 2 * L * H_kv * D_head * contextLenTokens * concurrentRequests * B_cache
+      var gb     = bytes / (1024 * 1024 * 1024)
+      return Math.max(gb, 0.1)
+    }
+
+    // Field rule fallback — calibrated for FP16 KV cache, directionally accurate
+    var sizeClass  = kvCacheSizeClass(model ? model.params_b : null)
     var mbPerToken = KV_CACHE_MB_PER_TOKEN[sizeClass]
-    // Scale for FP8 KV cache (half of FP16)
-    if (precision === 'FP8' || precision === 'INT8') mbPerToken *= 0.5
-    if (precision === 'INT4' || precision === 'FP4') mbPerToken *= 0.25
-    var totalGB = (mbPerToken * contextLenTokens * concurrentRequests) / 1024
-    return Math.max(totalGB, 0.5)  // minimum 0.5GB
+    var totalGB    = (mbPerToken * contextLenTokens * concurrentRequests) / 1024
+    return Math.max(totalGB, 0.1)
+  }
+
+  /**
+   * Return which KV cache calculation method was used — for audit trail in UI
+   */
+  function kvCacheMethod (model) {
+    if (model && model.num_layers && model.num_kv_heads && model.head_dim) {
+      return 'exact (2×L×H_kv×D_head×C×N | L=' + model.num_layers + ' H_kv=' + model.num_kv_heads + ' D=' + model.head_dim + ')'
+    }
+    var sc = kvCacheSizeClass(model ? model.params_b : null)
+    return 'field rule (' + (KV_CACHE_MB_PER_TOKEN[sc] || 0.25) + ' MB/token)'
   }
 
   /**
@@ -406,10 +447,15 @@
       var derating    = config.derating_pct        || 80
       var params_b    = model ? model.params_b : 7
 
-      // For UCs: concurrency is low (internal use) — size for peak concurrent sessions
-      // Assume ~1% of peak RPS translates to active concurrent sessions
-      var peakRPS         = calcPeakRPS(dau, reqPerDay, peakMult)
-      var concurrentSessions = Math.max(1, Math.ceil(peakRPS * 2))  // 2s avg response time
+      // Peak RPS from demand inputs
+      var peakRPS = calcPeakRPS(dau, reqPerDay, peakMult)
+      // Concurrent sessions via Little's Law: N = λ × W
+      // W = average service time derived from latency SLA
+      // Tighter SLA = shorter service time = fewer concurrent sessions for same RPS
+      var responseTimeSec = config.ttft_sla_ms
+        ? Math.max(0.5, config.ttft_sla_ms / 1000)
+        : (ucType && ucType.typical_sla_ms ? ucType.typical_sla_ms / 1000 : 2.0)
+      var concurrentSessions = Math.max(1, Math.ceil(peakRPS * responseTimeSec))
 
       // GPU fit (VRAM)
       var gpusForFit        = calcGPUsForFit(params_b, precision, gpu, model, contextLen, concurrentSessions)
@@ -480,8 +526,23 @@
           'Profile B (UC internal): memory-bandwidth bound at low concurrency',
           'Base: max(' + gpusForFit + ' fit, ' + gpusForThroughput + ' throughput) = ' + baseGPUs + ' GPUs (' + bindingConstraint + ')',
           'Buffers: +' + peakBuffer + ' peak, +' + failoverReserve + ' failover, +' + haGPUs + ' HA, +' + drGPUs + ' DR, +' + growthGPUs + ' growth',
-          'Total: ' + totalGPUs + ' GPUs → ' + unitCalc.units + ' ' + unitCalc.unit_type + '(s) × ' + unitCalc.gpus_per_unit + ' GPUs'
-        ].join(' | ')
+          'Total: ' + totalGPUs + ' GPUs → ' + unitCalc.units + ' ' + unitCalc.unit_type + '(s) × ' + unitCalc.gpus_per_unit + ' GPUs',
+        'KV: ' + kvCacheMethod(model)
+      ].join(' | '),
+
+      // Audit trail — full sizing inputs/outputs for customer transparency
+      audit: {
+        formula:             'M_total = (M_weights + M_KV) × 1.20',
+        m_weights_gb:        Math.round(calcModelVRAM(params_b, precision) * 100) / 100,
+        m_kv_gb:             Math.round(calcKVCache(model, contextLen, concurrentSessions, precision) * 100) / 100,
+        m_total_gb:          Math.round(calcTotalVRAM(params_b, precision, contextLen, concurrentSessions, model) * 100) / 100,
+        vram_per_gpu_gb:     gpu.vram_per_gpu_gb || 80,
+        gpus_for_fit:        gpusForFit,
+        gpus_for_throughput: gpusForThroughput,
+        binding_constraint:  bindingConstraint,
+        kv_cache_method:     kvCacheMethod(model),
+        concurrent_sessions: concurrentSessions,
+        littles_law:         'λ=' + Math.round(peakRPS*100)/100 + ' RPS × W=' + responseTimeSec + 's = N=' + concurrentSessions
       }
     },
 
@@ -759,6 +820,7 @@
     // ── Utility: expose core math for UI use ────────────────────────────────
     calcPeakRPS:        calcPeakRPS,
     calcModelVRAM:      calcModelVRAM,
+    kvCacheMethod:      kvCacheMethod,
     calcKVCache:        calcKVCache,
     calcTotalVRAM:      calcTotalVRAM,
     calcGPUThroughput:  calcGPUThroughput,
