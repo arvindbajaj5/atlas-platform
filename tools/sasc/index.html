@@ -843,23 +843,33 @@ async function init() {
       console.log('[SASC] Fetching UCs for docketId:', SASC_DATA.docketId)
       var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&section=eq.uc', 100)
       console.log('[SASC] docketUCItems raw count:', (docketUCItems||[]).length, docketUCItems && docketUCItems[0] ? JSON.stringify(docketUCItems[0]).substring(0,120) : 'empty')
-      // Build a title->id lookup from ALL_UCS for name-based fallback
-      var _ucByName = {}
-      ALL_UCS.forEach(function(u) { _ucByName[(u.uc_name||'').trim().toLowerCase()] = u.id })
-      var _uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      // Build lookups for fallback matching
+      var _ucById   = {}; ALL_UCS.forEach(function(u) { _ucById[u.id] = true })
+      var _ucByName = {}; ALL_UCS.forEach(function(u) { _ucByName[(u.uc_name||'').trim().toLowerCase()] = u.id })
+
       var docketRefs = (docketUCItems || []).map(function(d) {
-        // 1. ref_id column (UUID) — preferred
-        var rid = d.ref_id || null
-        if (rid && _uuidRe.test(rid)) return rid
+        // 1. ref_id — uc_library id (may be slug like geo-uc-010 or UUID, accept any non-empty string)
+        var rid = (d.ref_id || '').trim()
+        if (rid && _ucById[rid]) return rid
+
         // 2. content.uc_id jsonb field
         var cjson = d.content || {}
-        if (cjson.uc_id && _uuidRe.test(cjson.uc_id)) return cjson.uc_id
-        // 3. Title match against uc_library.uc_name — handles rows where ref_id column is absent/null
+        var cid = (cjson.uc_id || '').trim()
+        if (cid && _ucById[cid]) return cid
+
+        // 3. ref_id present but not in library — still return it (library may load later or UC may be inactive)
+        if (rid) {
+          console.warn('[SASC] ref_id not in active uc_library:', rid, '(title:', d.title + ')')
+          return rid
+        }
+
+        // 4. Title match — last resort when ref_id absent
         var titleKey = (d.title || '').trim().toLowerCase()
         if (titleKey && _ucByName[titleKey]) {
           console.log('[SASC] UC matched by title:', d.title, '->', _ucByName[titleKey])
           return _ucByName[titleKey]
         }
+
         console.warn('[SASC] UC row unmatched - id:', d.id, 'title:', d.title, 'ref_id:', d.ref_id)
         return null
       }).filter(Boolean)
@@ -1199,11 +1209,13 @@ async function loadWorkloadProfiles() {
     if (SASC_DATA.selectedUCs.indexOf(uc.id) < 0) return
     if (SASC_DATA.ucWorkloads[uc.id]) return  // already have saved values
 
-    // Match UC title to a UC type
-    var title = (uc.title || '').toLowerCase()
+    // Match UC name to a UC type (use uc_name as primary, title as fallback)
+    var title = (uc.uc_name || uc.title || '').toLowerCase()
     var ucType = ALL_UC_TYPES.find(function(t) {
       return title.indexOf(t.name.toLowerCase().split(' ')[0]) >= 0
-    }) || ALL_UC_TYPES[0]
+    }) || ALL_UC_TYPES.find(function(t) { return t.name.toLowerCase().indexOf('vision') >= 0 })
+      || ALL_UC_TYPES.find(function(t) { return t.name.toLowerCase().indexOf('image') >= 0 })
+      || ALL_UC_TYPES[0]
 
     // Find recommended model for this UC type
     var recModelSize = (ucType && ucType.recommended_model_size) || '7B'
@@ -1894,9 +1906,9 @@ function renderScreen2() {
     //    UC header row                                                         
     html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--light);cursor:pointer" data-uid="' + uc.id + '" onclick="toggleUCExpand(this.dataset.uid)">'
       + '<div style="width:28px;height:28px;border-radius:6px;background:var(--navy);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
-      + '<span style="color:#fff;font-size:10px;font-weight:700">' + (uc.title||'UC').slice(0,2).toUpperCase() + '</span></div>'
+      + '<span style="color:#fff;font-size:10px;font-weight:700">' + (uc.uc_name||uc.title||'UC').slice(0,2).toUpperCase() + '</span></div>'
       + '<div style="flex:1">'
-      + '<div style="font-size:13px;font-weight:600;color:var(--dark)">' + esc(uc.title||'UC') + '</div>'
+      + '<div style="font-size:13px;font-weight:600;color:var(--dark)">' + esc(uc.uc_name||uc.title||'UC') + '</div>'
       + '<div style="font-size:10px;color:var(--mid)">'
       + (ucType ? esc(ucType.name) : 'Unclassified') + ' &bull; '
       + (model ? esc(model.name) : 'No model') + ' &bull; '
@@ -2066,7 +2078,7 @@ function showHowCalc(ucId) {
   var rpud = ucType ? ucType.requests_per_user_per_day : 5
   alert(
     'HOW WE CALCULATED THIS\n'
-    + 'UC: ' + (uc ? uc.title : ucId) + '\n\n'
+    + 'UC: ' + (uc ? (uc.uc_name||uc.title) : ucId) + '\n\n'
     + 'INPUTS\n'
     + '  DAU: ' + wl.dau.toLocaleString() + '\n'
     + '  Peak multiplier: ' + wl.peak_mult + 'x\n'
