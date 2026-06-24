@@ -169,6 +169,32 @@ Functions in Docket: `toDbStatus()`, `fromDbStatus(section, s)`, `normalizeItems
 - BMaaS: toggle + server count + USD/server/hr
 - `renderGpuBmaasSection()` toggle buttons still have hardcoded `renderStep(3)` — fix when next touching S3
 
+### SizingEngine (shared/sasc-sizing.js — inlined in sasc/index.html)
+- **Inlined** directly in sasc/index.html — external script tag caused GitHub Pages 403
+- Loads on `SizingEngine.init(sbUrl, sbKey)` — called in SASC `init()` before `renderStep(1)`
+- After init, syncs to globals: `ALL_GPU_CONFIGS`, `ALL_MODELS`, `ALL_UC_TYPES`
+- Reads from: `gpu_configs`, `model_catalogue`, `uc_interaction_types`, `requirement_archetypes`, `benchmark_results`
+- `sizeUC(config, gpuConfigId)` → raw GPU count (no packaging), Profile B math
+- `sizeMaaS(config, gpuConfigId)` → raw GPU count with 3-layer buffers, Profile A math
+- `fleetTotal(ucResults, maasResults, gpuaas, bmaas, mdcSpec)` → fleet allocation + MW check
+- KV cache: exact formula `2×L×H_kv×D_head×C×N` when `num_layers`/`num_kv_heads`/`head_dim` in model_catalogue; field rule fallback
+- Little's Law for concurrent sessions: `N = λ × W` (W from latency SLA)
+- `model_catalogue_extend.sql` — adds architecture columns, needs running in Supabase
+
+### S1 Fleet Configuration (rebuilt 2026-06-24)
+- GPU Architecture selector — all 12 architectures, centre-level, drives everything
+- Power mode toggle: Total DC (apply PUE + overheads) vs GPU-ready
+- Overhead inputs: PUE, Network%, Storage%, Mgmt% — all editable
+- Fleet inventory panel: GPUs available / units / MW for GPU — live on selection
+- `calcFleetInventory()` — pure function, MDC kW ÷ PUE ÷ overheads ÷ GPU TDP → GPU count
+- Fleet context banner on S2 shows selected arch + GPU count, "Change" → back to S1
+
+### Single GPU Architecture (decided 2026-06-24)
+- One GPU arch for the entire centre (UC + MaaS + GPUaaS on same fleet)
+- Multi-arch deferred — revisit after single-arch fleet view validated
+- GPU count = raw number (packaging to servers/racks happens at BOM only)
+- Fleet inventory = MDC capacity ÷ GPU TDP after PUE and infra overheads
+
 ### Workloads C (S4)
 - Pure placeholder 🚧 — "Skills Academy & CoE sizing coming in next release"
 - Only shown when `outputStack.skills || outputStack.coe`
