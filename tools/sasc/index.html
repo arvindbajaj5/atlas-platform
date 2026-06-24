@@ -186,6 +186,7 @@ input:focus,select:focus{border-color:var(--blue);}
 .svc-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
 </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="../../shared/sasc-sizing.js"></script>
 </head>
 <body>
 
@@ -780,6 +781,15 @@ function renderROMSummary() {
 
 async function init() {
   await loadFxRates()
+  // Initialise SizingEngine — loads gpu_configs, model_catalogue, uc_interaction_types,
+  // requirement_archetypes, benchmark_results from Supabase
+  var _sb = getSB()
+  if (_sb.url && window.SizingEngine) {
+    await SizingEngine.init(_sb.url, _sb.key)
+    console.log('[SASC] SizingEngine ready:', SizingEngine.ready)
+  } else {
+    console.warn('[SASC] SizingEngine not available — check shared/sasc-sizing.js is loaded')
+  }
   var params = new URLSearchParams(window.location.search)
   SASC_DATA.engId      = params.get('eng') || null
   SASC_DATA.docketId   = params.get('docket') || null
@@ -1289,73 +1299,76 @@ async function loadWorkloadProfiles() {
 
 //    Sizing calculation (RPS-based, not tokens)                                 
 function calcSizing(wl) {
-  var ucType = ALL_UC_TYPES.find(function(t) { return t.id === wl.uc_type_id })
-  var model  = ALL_MODELS.find(function(m)   { return m.id === wl.model_id })
+  // Wrapper around SizingEngine.sizeUC() — single source of truth for GPU sizing math
+  // Falls back to legacy inline math if SizingEngine not loaded
+  var model  = ALL_MODELS.find(function(m) { return m.id === wl.model_id })
   var gpuCfg = ALL_GPU_CONFIGS.find(function(g) { return g.id === SASC_DATA.gpuConfigId })
+  var ucType = ALL_UC_TYPES.find(function(t) { return t.id === wl.uc_type_id })
 
-  // Requests per second at peak
-  var rpud = ucType ? ucType.requests_per_user_per_day : 5  // requests per user per day
-  var peak_rps = Math.ceil(wl.dau * wl.peak_mult * rpud / 86400)
-  peak_rps = Math.max(1, peak_rps)
+  if (window.SizingEngine && SizingEngine.ready && gpuCfg) {
+    var seResult = SizingEngine.sizeUC({
+      uc_type_id:          wl.uc_type_id,
+      model_id:            wl.model_id,
+      dau:                 wl.dau,
+      peak_multiplier:     wl.peak_mult,
+      avg_input_tokens:    wl.avg_input_tokens,
+      avg_output_tokens:   wl.avg_output_tokens,
+      context_window:      wl.context_window,
+      precision:           wl.precision || 'INT4',
+      sla_tier:            wl.sla_tier || 'standard',
+      ha_required:         wl.ha_required !== undefined ? wl.ha_required : true,
+      dr_type:             wl.dr_type || 'none',
+      growth_headroom_pct: 20,
+      derating_pct:        wl.derating_pct || 80
+    }, SASC_DATA.gpuConfigId)
 
-  // Find best benchmark for this GPU + model combination
-  var bm = null
-  if (model && gpuCfg && SASC_DATA.benchmarks.length) {
-    bm = SASC_DATA.benchmarks.find(function(b) {
-      return b.gpu_config_id === gpuCfg.id && b.ai_model_id === model.id
-    })
-    // Fallback: same GPU, any model of similar size
-    if (!bm) {
-      bm = SASC_DATA.benchmarks.find(function(b) {
-        return b.gpu_config_id === gpuCfg.id
-      })
+    if (!seResult.error) {
+      // Map SizingEngine output to shape renderScreen2 already consumes
+      // servers = units_required (racks or servers depending on GPU type)
+      var servers = seResult.units_required || 1
+      var headroom_pct = seResult.actual_gpus > 0
+        ? Math.round((1 - seResult.total_gpus / seResult.actual_gpus) * 100)
+        : 0
+      return {
+        // Legacy fields (renderScreen2 reads these)
+        peak_rps:       seResult.peak_rps,
+        derated_rps:    0,  // not applicable in SizingEngine model
+        rps_capacity:   seResult.throughput_tokens_per_sec,
+        servers:        servers,
+        headroom_pct:   Math.max(0, headroom_pct),
+        power_kw:       seResult.power_kw,
+        p99_bm:         seResult.ttft_estimate_ms || 0,
+        latency_ok:     seResult.sla_met !== false,
+        model_name:     model ? model.name : 'Unknown model',
+        gpu_name:       gpuCfg ? gpuCfg.name : 'Unknown GPU',
+        bm_source:      'SizingEngine',
+        // Extended SizingEngine fields (for expanded UC card detail)
+        _se:            seResult
+      }
     }
+    console.warn('[calcSizing] SizingEngine error:', seResult.error, '— falling back to legacy')
   }
 
-  // Get RPS capacity from benchmark at customer's SLA bucket
-  var rps_capacity = 0
-  if (bm) {
-    var sla = wl.latency_sla_ms || 2000
-    if      (sla <= 1000)  rps_capacity = bm.rps_at_1s  || bm.rps_at_2s  || 50
-    else if (sla <= 2000)  rps_capacity = bm.rps_at_2s  || bm.rps_at_5s  || 30
-    else if (sla <= 5000)  rps_capacity = bm.rps_at_5s  || bm.rps_at_10s || 15
-    else                   rps_capacity = bm.rps_at_10s || 8
-  } else {
-    // Fallback defaults by GPU type when no benchmark found
-    var gpuName = gpuCfg ? gpuCfg.name : ''
-    var sla2 = wl.latency_sla_ms || 2000
-    if      (gpuName.indexOf('GB200')  >= 0) rps_capacity = sla2 <= 2000 ? 980  : 2100
-    else if (gpuName.indexOf('MI325X') >= 0) rps_capacity = sla2 <= 2000 ? 76   : 160
-    else                                      rps_capacity = sla2 <= 2000 ? 85   : 180
-  }
-
-  // Apply derating
-  var derated_rps = Math.max(1, Math.round(rps_capacity * (wl.derating_pct / 100)))
-
-  // Servers needed
+  // ── Legacy fallback (used when SizingEngine not loaded or GPU not found) ──
+  var rpud = ucType ? ucType.requests_per_user_per_day : 5
+  var peak_rps = Math.max(1, Math.ceil(wl.dau * wl.peak_mult * rpud / 86400))
+  var gpuName = gpuCfg ? gpuCfg.name : ''
+  var sla = wl.latency_sla_ms || 2000
+  var rps_capacity = gpuName.indexOf('GB200') >= 0 ? (sla <= 2000 ? 980 : 2100)
+                   : gpuName.indexOf('NVL72') >= 0 ? (sla <= 2000 ? 750 : 1600)
+                   : (sla <= 2000 ? 85 : 180)
+  var derated_rps = Math.max(1, Math.round(rps_capacity * (wl.derating_pct || 80) / 100))
   var servers = Math.max(1, Math.ceil(peak_rps / derated_rps))
   var headroom_pct = Math.max(0, Math.round((1 - peak_rps / (derated_rps * servers)) * 100))
-
-  // Power
-  var power_w = (bm && bm.power_watts_load) || (gpuCfg ? gpuCfg.power_watts_tdp : 5600) || 5600
+  var power_w = gpuCfg ? gpuCfg.power_watts_tdp : 5600
   var power_kw = Math.round(servers * power_w / 1000 * 10) / 10
-
-  // Latency check
-  var p99_bm = bm ? (bm.p99_latency_ms || 0) : 0
-  var latency_ok = p99_bm === 0 || p99_bm <= (wl.latency_sla_ms || 2000)
-
   return {
-    peak_rps:       peak_rps,
-    derated_rps:    derated_rps,
-    rps_capacity:   rps_capacity,
-    servers:        servers,
-    headroom_pct:   headroom_pct,
-    power_kw:       power_kw,
-    p99_bm:         p99_bm,
-    latency_ok:     latency_ok,
-    model_name:     model ? model.name : 'Unknown model',
-    gpu_name:       gpuCfg ? gpuCfg.name : 'Unknown GPU',
-    bm_source:      bm ? (bm.source || 'internal') : 'estimate'
+    peak_rps: peak_rps, derated_rps: derated_rps, rps_capacity: rps_capacity,
+    servers: servers, headroom_pct: headroom_pct, power_kw: power_kw,
+    p99_bm: 0, latency_ok: true,
+    model_name: model ? model.name : 'Unknown model',
+    gpu_name: gpuCfg ? gpuCfg.name : 'Unknown GPU',
+    bm_source: 'estimate (legacy)', _se: null
   }
 }
 
@@ -2037,13 +2050,24 @@ function renderScreen2() {
         + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--white);border:0.5px solid #e0e0e8;color:var(--mid)">' + sizing.power_kw + ' kW</span>'
         + '</div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
-        + '<div style="flex:1;min-width:120px"><div style="font-size:22px;font-weight:700;color:var(--navy)">' + sizing.servers + '</div>'
-        + '<div style="font-size:10px;color:var(--mid)">server' + (sizing.servers>1?'s':'') + ' (' + (sizing.servers*8) + ' GPUs)</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+        + '<div style="flex:1;min-width:120px">'
+        + '<div style="font-size:22px;font-weight:700;color:var(--navy)">' + sizing.servers + '</div>'
+        + (function(){ var se=sizing._se; var gc=ALL_GPU_CONFIGS.find(function(g){return g.id===SASC_DATA.gpuConfigId}); var ul=gc&&gc.rack_scale?'rack':'server'; var gpu=(se?se.actual_gpus:(sizing.servers*(gc?gc.gpus_in_unit||8:8))); return '<div style="font-size:10px;color:var(--mid)">'+ul+(sizing.servers>1?'s':'')+' ('+gpu+' GPUs)</div>' })()
+        + '</div>'
         + '<div style="flex:2;padding-left:10px;border-left:0.5px solid #e0e0e8">'
-        + '<div style="font-size:11px;font-weight:600;color:' + (sizing.headroom_pct>50?'var(--teal)':'var(--amber)') + '">'
-        + sizing.headroom_pct + '% headroom at peak load</div>'
-        + '<div style="font-size:10px;color:var(--mid)">Benchmark p99: ' + (sizing.p99_bm||'N/A') + 'ms vs your SLA: ' + wl.latency_sla_ms + 'ms</div>'
-        + '<div style="font-size:10px;color:var(--mid)">Source: ' + sizing.bm_source + ' | Derating: ' + wl.derating_pct + '%</div>'
+        + (function(){ var se=sizing._se; if(se){ return '<div style="font-size:10px;font-weight:700;color:var(--navy);margin-bottom:3px">GPU Allocation</div>'
+          + '<div style="display:grid;grid-template-columns:1fr auto;gap:1px 8px;font-size:10px">'
+          + '<span style="color:var(--mid)">Base ('+se.binding_constraint+')</span><span style="font-weight:600">'+se.base_gpus+'</span>'
+          + '<span style="color:var(--mid)">Peak buffer</span><span style="font-weight:600;color:var(--amber)">+'+se.peak_buffer_gpus+'</span>'
+          + '<span style="color:var(--mid)">Failover</span><span style="font-weight:600;color:var(--amber)">+'+se.failover_gpus+'</span>'
+          + (se.ha_gpus?'<span style="color:var(--mid)">HA</span><span style="font-weight:600;color:var(--amber)">+'+se.ha_gpus+'</span>':'')
+          + (se.growth_gpus?'<span style="color:var(--mid)">Growth</span><span style="font-weight:600;color:var(--mid)">+'+se.growth_gpus+'</span>':'')
+          + '<span style="font-weight:700;border-top:1px solid #e0e0e8;padding-top:2px">Total</span><span style="font-weight:700;color:var(--navy);border-top:1px solid #e0e0e8;padding-top:2px">'+se.total_gpus+'</span>'
+          + '</div>'
+          + '<div style="font-size:9px;color:var(--mid);margin-top:3px">'+(se.sla_met?'&#10003; SLA met':'&#9888; SLA risk')+' &bull; SizingEngine &bull; '+wl.derating_pct+'% derating</div>'
+          } else { return '<div style="font-size:11px;font-weight:600;color:'+(sizing.headroom_pct>50?'var(--teal)':'var(--amber)')+'">'+sizing.headroom_pct+'% headroom</div>'
+          + '<div style="font-size:10px;color:var(--mid)">'+sizing.bm_source+' | '+wl.derating_pct+'% derating</div>' } })()
         + '</div>'
         + '<button class="btn btn-ghost btn-xs" style="align-self:flex-start" data-uid="' + uc.id + '" onclick="showHowCalc(this.dataset.uid)">&#9432; How?</button>'
         + '</div></div>'
@@ -2474,24 +2498,41 @@ function calculateBOM(pricing, ucProfiles) {
 
   // -- COMPUTE ---------------------------------------------------------------
   if (layers.compute.on) {
-    // Estimate GPU servers needed from UC profiles
-    var selectedProfiles = ucProfiles.filter(function(p) {
-      return s.selectedUCs.length === 0 || true // include all profiles as estimate
-    })
+    // Use SizingEngine fleet total if available — single source of truth
     var maxGPUs = 0
-    if (selectedProfiles.length) {
-      maxGPUs = selectedProfiles.reduce(function(sum, p) { return sum + (p.gpu_count_rec || 2) }, 0)
+    var gpuNotes = ''
+
+    if (window.SizingEngine && SizingEngine.ready && s.selectedUCs.length) {
+      // Size each UC and aggregate
+      var ucSizingResults = s.selectedUCs.map(function(ucId) {
+        var wl = s.ucWorkloads[ucId] || { dau:100, peak_mult:3, derating_pct:80 }
+        wl.derating_pct = s.deratingPct || 80
+        return SizingEngine.sizeUC({
+          uc_type_id: wl.uc_type_id, model_id: wl.model_id,
+          dau: wl.dau, peak_multiplier: wl.peak_mult,
+          precision: wl.precision || 'INT4',
+          sla_tier: wl.sla_tier || 'standard',
+          ha_required: wl.ha_required !== undefined ? wl.ha_required : true,
+          dr_type: wl.dr_type || 'none',
+          growth_headroom_pct: 20, derating_pct: wl.derating_pct
+        }, SASC_DATA.gpuConfigId)
+      }).filter(function(r) { return !r.error })
+
+      maxGPUs = ucSizingResults.reduce(function(sum, r) { return sum + (r.actual_gpus || 0) }, 0)
+      gpuNotes = maxGPUs + ' GPUs across ' + s.selectedUCs.length + ' UCs (SizingEngine — incl. buffers)'
     } else {
-      // Default based on T-shirt or B&M size
-      var defaultGPUs = { xs:16, s:32, m:64, l:96, xl:128 }
-      maxGPUs = s.dcType === 'mdc' ? (defaultGPUs[s.mdc.tshirt] || 64) : 32
+      // Fallback: default by T-shirt size
+      var defaultGPUs = { xs:64, s:256, m:512, l:768, xl:1024 }
+      maxGPUs = s.dcType === 'mdc' ? (defaultGPUs[s.mdc.tshirt] || 512) : 128
+      gpuNotes = maxGPUs + ' GPUs (T-shirt default — no UC workloads profiled)'
     }
+
     var _gpuUnit = gpusPerUnit()
     var gpuUnits = Math.max(1, Math.ceil(maxGPUs / _gpuUnit))
     var gpuParam = findParam(gpuComponent())
     var _gpuLabel = gpuComponent()
     var _gpuUnitLabel = _gpuLabel.indexOf('NVL72') >= 0 ? 'per_rack' : 'per_server'
-    if (gpuParam) totalCapex += addLine('Compute', _gpuLabel, gpuUnits, _gpuUnitLabel, gpuParam.base_price_usd, maxGPUs + ' GPUs across ' + s.selectedUCs.length + ' UCs (' + _gpuUnit + ' GPUs/' + (_gpuLabel.indexOf('NVL72')>=0?'rack':'server') + ')')
+    if (gpuParam) totalCapex += addLine('Compute', _gpuLabel, gpuUnits, _gpuUnitLabel, gpuParam.base_price_usd, gpuNotes)
     // CPU servers (1 per 4 GPU servers)
     var cpuServers = Math.max(2, Math.ceil(gpuServers / 4))
     var cpuParam = findParam('CPU Server AMD EPYC 9654')
