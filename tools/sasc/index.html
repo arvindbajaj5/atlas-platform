@@ -696,7 +696,14 @@ function renderROMSummary() {
   var peopleCost = calcPeopleCost(pm.team, duration)
   var _tc = SASC_DATA.territory_costs
   var salaryRatio = (_tc && _tc.salary_ratio) || 1.0
-  var adjustedPeopleCost = { total: Math.round(peopleCost.total * salaryRatio), yearCosts: peopleCost.yearCosts, peakHeadcount: peopleCost.peakHeadcount, monthlyBurn: peopleCost.monthlyBurn, managedCost: Math.round((adjustedPeopleCost.managedCost||0)*salaryRatio), internalCost: Math.round((adjustedPeopleCost.internalCost||0)*salaryRatio) }
+  var adjustedPeopleCost = {
+    total:         Math.round((peopleCost.total        || 0) * salaryRatio),
+    yearCosts:     peopleCost.yearCosts  || [],
+    peakHeadcount: peopleCost.peakHeadcount || 0,
+    monthlyBurn:   Math.round((peopleCost.monthlyBurn  || 0) * salaryRatio),
+    managedCost:   Math.round((peopleCost.managedCost  || 0) * salaryRatio),
+    internalCost:  Math.round((peopleCost.internalCost || 0) * salaryRatio)
+  }
   // Compute confidence as weighted average of pricing_params confidence_range values
   var confidence = 35
   if (SASC_DATA.pricingParams && SASC_DATA.pricingParams.length && SASC_DATA.bom && SASC_DATA.bom.length) {
@@ -1225,7 +1232,7 @@ async function loadWorkloadProfiles() {
   try {
   // Load all four reference tables in parallel
   var results = await Promise.all([
-    sbFetch('ai_models',             'active=eq.true&order=model_size_b.asc',  50),
+    sbFetch('model_catalogue',        'enabled=eq.true&order=params_b.asc',     100),
     sbFetch('gpu_configs',           'active=eq.true&order=name.asc',          50),
     sbFetch('uc_interaction_types',  'active=eq.true&order=sort_order.asc',    50),
     sbFetch('benchmark_results', 'order=gpu_config_id.asc', 100).catch(function(){ return [] })
@@ -1263,9 +1270,12 @@ async function loadWorkloadProfiles() {
 
     // Find recommended model for this UC type
     var recModelSize = (ucType && ucType.recommended_model_size) || '7B'
+    // Pick default model: prefer Sarvam (indic/sovereign) else first available
     var defModel = ALL_MODELS.find(function(m) {
-      return m.sovereign && m.active
-    }) || ALL_MODELS[0]
+      var arch = m.archetype
+      if (typeof arch === 'string') { try { arch = JSON.parse(arch) } catch(e) { arch = [] } }
+      return Array.isArray(arch) && arch.indexOf('indic') >= 0
+    }) || ALL_MODELS.find(function(m) { return m.enabled !== false }) || ALL_MODELS[0]
 
     SASC_DATA.ucWorkloads[uc.id] = {
       uc_type_id:     ucType ? ucType.id : '',
@@ -1985,9 +1995,14 @@ function renderScreen2() {
         + '<div><label>AI model</label>'
         + '<select data-field="model_id" onchange="wlChange(this)">'
         + '<option value="">-- Select model --</option>'
+        + '<option value="">-- Select model --</option>'
         + ALL_MODELS.map(function(m) {
+            var arch = m.archetype
+            if (typeof arch === 'string') { try { arch = JSON.parse(arch) } catch(e) { arch = [] } }
+            var isIndic = Array.isArray(arch) && arch.indexOf('indic') >= 0
+            var sizeLabel = m.params_b ? m.params_b + 'B' : (m.model_size_b ? m.model_size_b + 'B' : '?')
             return '<option value="' + m.id + '"' + (wl.model_id===m.id?' selected':'') + '>'
-              + (m.sovereign?'&#127464;&#127475; ':'') + esc(m.name) + ' (' + m.model_size_b + 'B)'
+              + (isIndic ? '&#127464;&#127475; ' : '') + esc(m.name) + ' (' + sizeLabel + ')'
               + '</option>'
           }).join('')
         + '</select></div>'
@@ -2423,23 +2438,25 @@ function renderScreen4Loading() {
 }
 
 async function loadAndRenderBOM() {
-  // Load pricing params
-  var pricing = await sbFetch('pricing_params', 'active=eq.true&order=category.asc', 200)
-  var ucProfiles = await sbFetch('uc_workload_profiles', 'order=domain.asc', 50)
-  var benchmarks = await sbFetch('benchmark_results', 'order=gpu_type.asc', 50)
-
-  SASC_DATA.pricingParams  = pricing  || []
-  SASC_DATA.ucProfiles     = ucProfiles || []
-  SASC_DATA.benchmarks     = benchmarks || []
-
-  // Calculate BOM
-  var bom = calculateBOM(pricing, ucProfiles)
-  SASC_DATA.bom = bom
-
-  document.getElementById('app-content').innerHTML = renderScreen4(bom)
+  var _bomGen = ++SASC_LOAD_GEN  // abort if user navigates away
+  var pricing   = await sbFetch('pricing_params', 'active=eq.true&order=category.asc', 200)
+  if (_bomGen !== SASC_LOAD_GEN) return
+  SASC_DATA.pricingParams = pricing || []
+  try {
+    var bom = calculateBOM(pricing)
+    SASC_DATA.bom = bom
+    if (_bomGen !== SASC_LOAD_GEN) return
+    var el = document.getElementById('app-content')
+    if (el) el.innerHTML = renderScreen4(bom)
+  } catch(e) {
+    console.error('[SASC] BOM error:', e.message, e.stack)
+    var el = document.getElementById('app-content')
+    if (el) el.innerHTML = '<div class="card"><div style="padding:20px;color:red">BOM error: ' + e.message + '<br><small>' + (e.stack||'').split('\n')[1] + '</small></div></div>'
+  }
 }
 
-function calculateBOM(pricing, ucProfiles) {
+function calculateBOM(pricing) {
+  var ucProfiles = []  // retired — sizing from SizingEngine
   var s = SASC_DATA
   var layers = s.layers
   var bom = []
