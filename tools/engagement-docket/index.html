@@ -4597,6 +4597,7 @@ async function addUCToDocket(ucId) {
     section: 'uc', item_type: 'uc',
     title: uc.uc_name || ucId,
     ref_table: 'uc_library', ref_id: ucId,
+    content: { uc_id: ucId, uc_name: uc.uc_name || '', cluster: uc.cluster || '' },
     status: 'pending', created_by: 'ATLAS'
   }
   var sb = getSB()
