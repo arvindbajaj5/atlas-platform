@@ -385,7 +385,7 @@ create table pricing_params (
 
 | Gap | Description | Priority |
 |---|---|---|
-| **B1** | pricing_params Supabase table does not exist. All prices hardcoded. | 🔴 Critical — Supabase action needed |
+| **B1** | ~~pricing_params Supabase table does not exist. All prices hardcoded.~~ | ✅ Done 2026-06-24 — 47 rows seeded across 10 categories |
 | **B2** | BOM is compute-only. Missing: networking, platform software, security uplift, resilience uplift, UC dev effort. Currently ~40–50% of actual cost. | 🔴 Critical |
 | **B3** | Networking not sized from workload (switch count, IB requirements, NKC units) | 🟠 High |
 | **B4** | Platform software has no cost model (enabling AI Platform layer adds nothing to BOM) | 🟠 High |
