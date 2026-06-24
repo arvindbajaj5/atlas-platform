@@ -1012,7 +1012,7 @@ function renderStep(n) {
       console.log('[renderStep] rendering workloads_b')
       el.innerHTML = renderWorkloadB()
       console.log('[renderStep] workloads_b rendered, innerHTML length='+el.innerHTML.length)
-      if (SVC_MC_STATE !== 'loaded') loadSvcModelCatalogue().then(function(){ renderStep(n) })
+      if (SVC_MC_STATE === '' || SVC_MC_STATE === 'loading') loadSvcModelCatalogue().then(function(){ if (SVC_MC_STATE === 'loaded') renderStep(n) })
     }
     if (step.key === 'workloads_c') el.innerHTML = renderWorkloadC()
     if (step.key === 'bom')         { el.innerHTML = renderScreen4Loading(); loadAndRenderBOM() }
@@ -1400,7 +1400,7 @@ var MAAS_GPU_COST_DEFAULTS = {
 }
 
 async function loadSvcModelCatalogue() {
-  if (SVC_MC_STATE === 'loading' || SVC_MC_STATE === 'loaded') return
+  if (SVC_MC_STATE === 'loading' || SVC_MC_STATE === 'loaded' || SVC_MC_STATE === 'error') return
   SVC_MC_STATE = 'loading'
   var sb = getSB()
   if (!sb.url) { SVC_MC_STATE = 'error'; return }
@@ -1408,9 +1408,9 @@ async function loadSvcModelCatalogue() {
     var r = await fetch(sb.url + '/rest/v1/model_catalogue?enabled=eq.true&order=vendor.asc,name.asc&limit=200', {
       headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
     })
-    if (r.ok) { SVC_MC_ROWS = await r.json(); SVC_MC_STATE = 'loaded' }
-    else SVC_MC_STATE = 'error'
-  } catch(e) { SVC_MC_STATE = 'error' }
+    if (r.ok) { SVC_MC_ROWS = await r.json(); SVC_MC_STATE = 'loaded'; console.log('[SASC] model_catalogue loaded:', SVC_MC_ROWS.length, 'rows') }
+    else { var _et = await r.text(); SVC_MC_STATE = 'error'; console.error('[SASC] model_catalogue fetch failed:', r.status, _et.substring(0,120)) }
+  } catch(e) { SVC_MC_STATE = 'error'; console.error('[SASC] model_catalogue exception:', e.message) }
 }
 
 function toggleSvcModel(id) {
@@ -2641,6 +2641,7 @@ function renderMaasSimTab() {
   if (SVC_MC_STATE === '') {
     SVC_MC_STATE = 'loading'
     loadSvcModelCatalogue().then(function(){
+      if (SVC_MC_STATE !== 'loaded') return
       var el = document.getElementById('bom-tab-content') || document.getElementById('app-content')
       if (el) el.innerHTML = renderWorkloadB()
     })
