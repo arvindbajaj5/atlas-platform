@@ -2665,6 +2665,84 @@ function calcMaxDau(gpuCfg, totalGpus, sla, usageTypes) {
 }
 
 // ── Workloads B — AI Infrastructure Services (new Screen 3) ─────────────────
+function renderFleetAllocation() {
+  var inv = calcFleetInventory()
+  if (!inv || !inv.fleet_gpus) return ''
+
+  // Get UC total from S2 sizing results
+  var ucGPUs = 0
+  if (SASC_DATA.selectedUCs && SASC_DATA.selectedUCs.length && SizingEngine && SizingEngine.ready) {
+    SASC_DATA.selectedUCs.forEach(function(ucId) {
+      var wl = SASC_DATA.ucWorkloads[ucId] || { dau:1000, peak_mult:3, derating_pct:80 }
+      var r  = SizingEngine.sizeUC({
+        uc_type_id: wl.uc_type_id, model_id: wl.model_id,
+        dau: wl.dau, peak_multiplier: wl.peak_mult,
+        precision: wl.precision||'INT4', sla_tier: wl.sla_tier||'standard',
+        ha_required: true, dr_type: 'none',
+        growth_headroom_pct: 20, derating_pct: wl.derating_pct||80
+      }, SASC_DATA.gpuConfigId)
+      if (!r.error) ucGPUs += r.total_gpus
+    })
+  }
+
+  var maasGPUs  = SASC_DATA.totalMaasGPU || 0
+  var sm        = SASC_DATA.serviceModel || {}
+  var gaasGPUs  = sm.gpuaas && sm.gpuaas.enabled
+    ? (sm.gpuaas.gpus||0) + Math.ceil((sm.gpuaas.gpus||0)*0.10)   // +10% HA
+    : 0
+  var totalUsed = ucGPUs + maasGPUs + gaasGPUs
+  var headroom  = inv.fleet_gpus - totalUsed
+
+  // MW used: sum of power from each block
+  var gpu       = ALL_GPU_CONFIGS.find(function(g){ return g.id===SASC_DATA.gpuConfigId })
+  var gpuTdpKw  = gpu ? gpu.tdp_kw : 10
+  var gpusPerUnit = gpu ? (gpu.gpus_in_unit||8) : 8
+  var kwPerGPU  = gpuTdpKw / gpusPerUnit
+  var totalKW   = totalUsed * kwPerGPU
+  var mwStatus  = totalKW > inv.gpu_available_kw ? 'over'
+                : totalKW > inv.gpu_available_kw * 0.9 ? 'warning' : 'ok'
+  var gpuStatus = totalUsed > inv.fleet_gpus ? 'over'
+                : totalUsed > inv.fleet_gpus * 0.9 ? 'warning' : 'ok'
+
+  var rows = [
+    { label:'UC Inference',   gpus:ucGPUs,   pct:ucGPUs/inv.fleet_gpus,   type:'cost',    color:'#1C38F5' },
+    { label:'MaaS',           gpus:maasGPUs, pct:maasGPUs/inv.fleet_gpus, type:'revenue', color:'#00B290' },
+    { label:'GPUaaS',         gpus:gaasGPUs, pct:gaasGPUs/inv.fleet_gpus, type:'revenue', color:'#FFB600' },
+    { label:'Unallocated',    gpus:Math.max(0,headroom), pct:Math.max(0,headroom)/inv.fleet_gpus, type:'reserve', color:'#9CA3AF' }
+  ]
+
+  var html = '<div class="card" style="border-left:3px solid var(--navy)">'    + '<div class="card-title">Fleet Allocation'    + '<span style="float:right;font-size:11px;font-weight:400;color:var(--mid)">'    + inv.fleet_gpus.toLocaleString() + ' GPUs · '    + inv.max_gpu_units + ' ' + (inv.unit_type==='rack'?'racks':'servers')    + '</span></div>'
+
+  // Stacked bar
+  html += '<div style="height:28px;border-radius:6px;overflow:hidden;display:flex;margin-bottom:12px">'
+  rows.forEach(function(r) {
+    if (r.gpus <= 0) return
+    html += '<div style="flex:'+(r.pct)+';background:'+r.color+';position:relative" title="'+r.label+': '+r.gpus+' GPUs ('+Math.round(r.pct*100)+'%)"></div>'
+  })
+  html += '</div>'
+
+  // Table
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+  html += '<tr style="font-size:10px;color:var(--mid);text-transform:uppercase;letter-spacing:.3px">'    + '<th style="text-align:left;padding:4px 6px;font-weight:600">Block</th>'    + '<th style="text-align:right;padding:4px 6px;font-weight:600">GPUs</th>'    + '<th style="text-align:right;padding:4px 6px;font-weight:600">%</th>'    + '<th style="text-align:right;padding:4px 6px;font-weight:600">kW</th>'    + '<th style="text-align:left;padding:4px 6px;font-weight:600">Type</th>'    + '</tr>'
+
+  rows.forEach(function(r) {
+    var kw = Math.round(r.gpus * kwPerGPU * 10) / 10
+    html += '<tr style="border-top:1px solid #f0f0f4">'      + '<td style="padding:6px;display:flex;align-items:center;gap:6px">'        + '<div style="width:10px;height:10px;border-radius:2px;background:'+r.color+';flex-shrink:0"></div>'        + '<span style="font-weight:600">'+r.label+'</span></td>'      + '<td style="padding:6px;text-align:right;font-weight:700">'+r.gpus.toLocaleString()+'</td>'      + '<td style="padding:6px;text-align:right;color:var(--mid)">'+Math.round(r.pct*100)+'%</td>'      + '<td style="padding:6px;text-align:right;color:var(--mid)">'+kw+'</td>'      + '<td style="padding:6px">'        + '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:'        + (r.type==='revenue'?'rgba(0,178,144,.1)':r.type==='cost'?'rgba(28,56,245,.08)':'rgba(156,163,175,.15)')        + ';color:'+(r.type==='revenue'?'var(--teal)':r.type==='cost'?'var(--blue)':'var(--mid)')+'">'
+        + r.type + '</span></td>'      + '</tr>'
+  })
+
+  html += '<tr style="border-top:2px solid var(--border);font-weight:700">'    + '<td style="padding:8px 6px">Total allocated</td>'    + '<td style="padding:8px 6px;text-align:right;color:'+(gpuStatus==='over'?'var(--orange)':'var(--navy)')+'">'      + totalUsed.toLocaleString() + ' / ' + inv.fleet_gpus.toLocaleString() + '</td>'    + '<td style="padding:8px 6px;text-align:right">' + Math.round(totalUsed/inv.fleet_gpus*100) + '%</td>'    + '<td style="padding:8px 6px;text-align:right;color:'+(mwStatus==='over'?'var(--orange)':'inherit')+'">'      + Math.round(totalKW/100)/10 + 'MW</td>'    + '<td style="padding:8px 6px">'      + (gpuStatus==='over' ? '<span style="color:var(--orange);font-weight:700">⚠ Over fleet capacity</span>'
+        : gpuStatus==='warning' ? '<span style="color:var(--amber)">⚡ High utilisation</span>'
+        : '<span style="color:var(--teal)">✓ Within capacity</span>')    + '</td></tr>'    + '</table>'
+
+  // MW check summary
+  html += '<div style="margin-top:10px;padding:8px 12px;border-radius:6px;font-size:11px;'    + 'background:'+(mwStatus==='over'?'#FEF2F2':mwStatus==='warning'?'#FFFBEB':'rgba(0,178,144,.08)')    + ';color:'+(mwStatus==='over'?'#991B1B':mwStatus==='warning'?'#92400E':'#065F46')+'">'    + '⚡ Power: ' + Math.round(totalKW/100)/10 + 'MW used of '    + Math.round(inv.gpu_available_kw/100)/10 + 'MW GPU-available'    + (mwStatus==='over' ? ' — <b>exceeds envelope. Reduce scope or upsize MDC.</b>'
+      : mwStatus==='warning' ? ' — approaching limit.'
+      : ' — headroom ' + Math.round((inv.gpu_available_kw-totalKW)/100)/10 + 'MW.')    + '</div>'    + '</div>'
+
+  return html
+}
+
 function renderWorkloadB() {
   // Catalogue loaded by renderStep before this function is called
   var html = ''
@@ -2695,11 +2773,14 @@ function renderWorkloadB() {
   }
   html += '</div>'
 
-  // MaaS simulation (3-layer engine)
+  // MaaS sizing per usage type
   html += renderMaasSimTab()
 
   // GPUaaS + BMaaS
   html += renderGpuBmaasSection()
+
+  // Fleet allocation table — the "so what" view
+  html += renderFleetAllocation()
 
   var _wbprev = getPrevStep(SASC_STEP), _wbnext = getNextStep(SASC_STEP)
   var _wbsteps = getActiveSteps()
@@ -3719,89 +3800,78 @@ function renderActiveTab() { return renderBOMTabContent(window._sascBomTab || 'b
 
 // ── MaaS Simulation Tab ───────────────────────────────────────────────────────
 function renderMaasSimTab() {
-  var sla = (MAAS_CFG && MAAS_CFG.sla_tier) || 'standard'
-  var uts = (MAAS_CFG && MAAS_CFG.usage_types) || []
-  var enabledUts = uts.filter(function(u){ return u.enabled && u.model_id })
+  // ── New: Fleet Capacity Model per usage type ─────────────────────────────
+  var sla      = (MAAS_CFG && MAAS_CFG.sla_tier)   || 'standard'
+  var uts      = (MAAS_CFG && MAAS_CFG.usage_types) || []
+  var enabled  = uts.filter(function(u) { return u.enabled && u.model_id })
+  var gpu      = ALL_GPU_CONFIGS.find(function(g) { return g.id === SASC_DATA.gpuConfigId })
+  var html     = ''
 
-  // Layer nav
-  var html = '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #e0e0e8">'
-  ;['Architecture Comparison','Usage Heatmap','Mix Optimiser'].forEach(function(l,i) {
-    var on = MAAS_SIM_LAYER === i+1
-    html += '<button style="padding:8px 14px;font-size:12px;font-weight:'+(on?'700':'500')+';border:none;background:transparent;cursor:pointer;border-bottom:'+(on?'2px solid var(--teal)':'2px solid transparent')+';color:'+(on?'var(--teal)':'var(--mid)')+';font-family:inherit;margin-bottom:-2px" onclick="MAAS_SIM_LAYER='+(i+1)+';renderStep(SASC_STEP)">'+(i+1)+'. '+l+'</button>'
+  if (!MAAS_CFG || !enabled.length) {
+    return '<div class="card"><div style="padding:20px;text-align:center;color:var(--mid)">'      + 'No MaaS usage types configured.<br>Set up in Docket → Service Model tab.</div></div>'
+  }
+  if (!gpu) {
+    return '<div class="card" style="border-left:3px solid var(--amber)"><div style="padding:16px;font-size:13px;color:#854D0E">'      + '⚠ No GPU architecture selected. Go to S1 to configure the centre GPU.</div></div>'
+  }
+  if (!SizingEngine || !SizingEngine.ready) {
+    return '<div class="card"><div style="padding:20px;text-align:center;color:var(--mid)">⏳ Loading SizingEngine…</div></div>'
+  }
+
+  // ── Size each enabled usage type ─────────────────────────────────────────
+  var maasResults  = []
+  var totalMaasGPU = 0
+
+  enabled.forEach(function(ut) {
+    var archId   = 'maas-' + (ut.type || 'generic')
+    var arch     = SizingEngine.getArchetypes().find(function(a){ return a.id === archId })
+    if (!arch) arch = SizingEngine.getArchetypes().find(function(a){ return a.archetype_type === 'maas' })
+    if (!arch) return
+
+    var result = SizingEngine.sizeMaaS({
+      archetype_id: arch.id,
+      model_id:     ut.model_id,
+      dau:          ut.concurrent_users || 1000,   // Docket stores as concurrent_users label
+      sla_tier:     sla,
+      precision:    'INT4',
+      derating_pct: SASC_DATA.deratingPct || 80
+    }, SASC_DATA.gpuConfigId)
+
+    maasResults.push({ ut: ut, arch: arch, result: result })
+    if (!result.error) totalMaasGPU += result.total_gpus
   })
-  html += '</div>'
 
-  // Catalogue loading is handled by renderStep — never trigger async re-renders from inside a render function
+  // Store for fleet total and BOM
+  SASC_DATA.maasSizingResults = maasResults
+  SASC_DATA.totalMaasGPU      = totalMaasGPU
 
-  if (!MAAS_CFG) {
-    return html + '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">No MaaS configuration found.<br><br>Configure MaaS in the Engagement Docket → Service Model tab, then reopen SASC.</div></div>'
-  }
-  if (!enabledUts.length) {
-    return html + '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">No usage types enabled in MaaS config.<br><br>Enable at least one usage type in the Docket MaaS tab.</div></div>'
-  }
-  if (!SVC_MC_ROWS.length) {
-    return html + '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue…</div></div>'
-  }
+  // ── Render each usage type card ──────────────────────────────────────────
+  var TYPE_ICONS = { coding:'⌨', text:'💬', document:'📄', audio:'🎙', indic:'🇮🇳', generic:'⚙' }
 
-  // GPU selector (top of all layers)
-  var availGpus = ALL_GPU_CONFIGS.filter(function(g){ return g.active !== false })
-  html += '<div class="card"><div class="card-title" style="margin-bottom:10px">GPU Architecture Selection <span style="font-size:11px;font-weight:400;color:var(--mid)">(select 1-5 to compare)</span></div>'
-  html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">'
-  availGpus.forEach(function(g) {
-    var sel = MAAS_SIM_SEL.indexOf(g.id) >= 0
-    var isPlaceholder = g.placeholder
-    html += '<button onclick="toggleMaasGpu(\''+g.id+'\')" style="padding:5px 10px;font-size:11px;border:1.5px solid '+(sel?'var(--teal)':'var(--border)')+';background:'+(sel?'rgba(0,178,144,.08)':'#fff')+';color:'+(sel?'var(--teal)':'var(--mid)')+';border-radius:5px;cursor:pointer;font-family:inherit;font-weight:'+(sel?'700':'400')+(isPlaceholder?';opacity:.6':'')+'">'
-      + (sel?'✓ ':'')+g.name+(isPlaceholder?' ⚠':'')+'</button>'
+  html += '<div class="card"><div class="card-title">MaaS — GPU Allocation by Usage Type'    + '<span style="float:right;font-size:12px;font-weight:400;color:var(--mid)">'    + 'Architecture: ' + gpu.name + ' · ' + (gpu.vram_per_gpu_gb||'?') + 'GB/GPU</span></div>'    + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px">'    + 'SLA: <b>' + sla.toUpperCase() + '</b> · GPU demand includes peak buffer + failover + multi-tenancy overhead</div>'
+
+  maasResults.forEach(function(mr) {
+    var ut  = mr.ut
+    var r   = mr.result
+    var ico = TYPE_ICONS[ut.type] || '⚙'
+
+    if (r.error) {
+      html += '<div style="padding:8px 12px;background:#FEF2F2;border-radius:6px;margin-bottom:8px;font-size:11px;color:#991B1B">'        + ico + ' ' + esc(ut.label||ut.type) + ': ' + r.error + '</div>'
+      return
+    }
+
+    // Colour bar proportional to GPU count
+    var barPct = totalMaasGPU > 0 ? Math.round(r.total_gpus / totalMaasGPU * 100) : 0
+
+    html += '<div style="margin-bottom:12px;padding:12px 14px;background:var(--light);border-radius:8px;border-left:3px solid var(--teal)">'      // Header row
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'      + '<div>'      + '<span style="font-size:13px;font-weight:700;color:var(--navy)">' + ico + ' ' + esc(ut.label||ut.type) + '</span>'      + '<span style="font-size:11px;color:var(--mid);margin-left:8px">' + esc(ut.model_name||'') + '</span>'      + '</div>'      + '<div style="text-align:right">'      + '<span style="font-size:20px;font-weight:800;color:var(--navy)">' + r.total_gpus.toLocaleString() + '</span>'      + '<span style="font-size:11px;color:var(--mid);margin-left:4px">GPUs</span>'      + '</div>'      + '</div>'      // Buffer breakdown row
+      + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:8px;text-align:center">'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--navy)">' + r.base_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Base</div>'        + '<div style="font-size:9px;color:var(--mid)">' + r.binding_constraint.replace('_',' ') + '</div>'      + '</div>'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--amber)">+' + r.peak_buffer_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Peak</div>'        + '<div style="font-size:9px;color:var(--mid)">' + (sla==='enterprise'?30:25) + '%</div>'      + '</div>'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--amber)">+' + r.failover_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Failover</div>'        + '<div style="font-size:9px;color:var(--mid)">' + (sla==='enterprise'?30:15) + '%</div>'      + '</div>'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--amber)">+' + r.multi_tenancy_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Multi-T</div>'        + '<div style="font-size:9px;color:var(--mid)">12%</div>'      + '</div>'      + '<div style="background:var(--navy);border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:#fff">' + r.total_gpus + '</div>'        + '<div style="font-size:9px;color:rgba(255,255,255,.7);text-transform:uppercase">Total</div>'        + '<div style="font-size:9px;color:rgba(255,255,255,.5)">' + barPct + '% of MaaS</div>'      + '</div>'      + '</div>'      // Progress bar
+      + '<div style="height:4px;background:#e0e0e8;border-radius:2px">'      + '<div style="height:4px;background:var(--teal);border-radius:2px;width:' + barPct + '%"></div>'      + '</div>'      // Sizing detail row
+      + '<div style="margin-top:6px;font-size:10px;color:var(--mid)">'      + 'DAU: <b>' + (ut.concurrent_users||0).toLocaleString() + '</b>'      + ' · Peak concurrent: <b>' + r.peak_concurrent + '</b>'      + ' · Peak RPS: <b>' + r.peak_rps + '</b>'      + ' · Throughput needed: <b>' + (r.throughput_tokens_per_sec||0).toLocaleString() + ' tok/s</b>'      + ' · Binding: <b>' + r.binding_constraint.replace('_',' ') + '</b>'      + ' · Power: <b>' + r.power_kw + 'kW</b>'      + '</div>'      + '</div>'
   })
-  html += '</div>'
-  if (availGpus.some(function(g){ return g.placeholder && MAAS_SIM_SEL.indexOf(g.id)>=0 })) {
-    html += '<div style="font-size:11px;color:var(--amber)">⚠ Placeholder GPU specs are indicative estimates</div>'
-  }
-  html += '</div>'
 
-  if (!MAAS_SIM_SEL.length) {
-    return html + '<div class="card"><div style="padding:16px;text-align:center;color:var(--mid)">Select at least one GPU architecture above to run the simulation.</div></div>'
-  }
-  var selGpus = ALL_GPU_CONFIGS.filter(function(g){ return MAAS_SIM_SEL.indexOf(g.id) >= 0 })
+  // MaaS total row
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--navy);border-radius:6px;color:#fff">'    + '<span style="font-size:12px;font-weight:600">Total MaaS GPU Demand</span>'    + '<span style="font-size:22px;font-weight:800">' + totalMaasGPU.toLocaleString() + ' GPUs</span>'    + '</div>'    + '</div>'  // close card
 
-  // Simulation params card
-  html += '<div class="card"><div class="card-title" style="margin-bottom:10px">Simulation Parameters</div>'
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">'
-  var simParams = [
-    {id:'sim_peak',  label:'Peak % of DAU concurrent', val:MAAS_SIM_PEAK,  unit:'%',   tip:'% of DAU active simultaneously at peak hour'},
-    {id:'sim_amort', label:'CapEx amortisation',        val:MAAS_SIM_AMORT, unit:'mo',  tip:'Months to amortise hardware investment'},
-    {id:'sim_dau',   label:'Target DAU (Layer 3)',       val:MAAS_SIM_DAU,   unit:'',    tip:'Total daily active users for mix optimiser'}
-  ]
-  simParams.forEach(function(p) {
-    html += '<div style="background:var(--light);padding:8px 10px;border-radius:6px">'
-      + '<div style="font-size:10px;color:var(--mid);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">'+p.label+'</div>'
-      + '<div style="display:flex;align-items:center;gap:4px">'
-      + '<input type="number" value="'+p.val+'" min="1" style="width:80px;padding:4px 6px;border:1.5px solid var(--border);border-radius:4px;font-size:13px;font-weight:600;font-family:inherit;outline:none" '
-      + 'onchange="'+p.id.replace('sim_','MAAS_SIM_'+(p.id==='sim_peak'?'PEAK':p.id==='sim_amort'?'AMORT':'DAU'))+'=+this.value;renderStep(SASC_STEP)">'
-      + (p.unit?'<span style="font-size:11px;color:var(--mid)">'+p.unit+'</span>':'')
-      + '</div>'
-      + '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.tip+'</div>'
-      + '</div>'
-  })
-  html += '</div></div>'
-
-  // Dispatch to active layer
-  if      (MAAS_SIM_LAYER === 1) html += renderMaasLayer1(selGpus, enabledUts, sla)
-  else if (MAAS_SIM_LAYER === 2) html += renderMaasLayer2(selGpus, enabledUts, sla)
-  else if (MAAS_SIM_LAYER === 3) html += renderMaasLayer3(selGpus, enabledUts, sla)
-
-  // Save button
-  if (MAAS_SIM_RESULT) {
-    html += '<div class="card" style="border-left:3px solid var(--teal)">'
-      + '<div class="card-title" style="margin-bottom:6px">Simulation Result</div>'
-      + '<div style="font-size:12px;color:var(--mid)">Chosen: <b>'+esc(MAAS_SIM_RESULT.chosen_gpu_name)+'</b>'
-      + ' · '+MAAS_SIM_RESULT.total_gpus+' GPUs'
-      + ' · CapEx $'+fmtNum(Math.round(MAAS_SIM_RESULT.capex_usd/1000))+'K'
-      + ' · ₹'+fmtNum(Math.round(MAAS_SIM_RESULT.cost_per_mtoken))+'/ M tokens'
-      + '</div>'
-      + '<button class="btn btn-sm" style="margin-top:8px" onclick="saveMaasBomToDocket()">↑ Save MaaS BOM to Docket</button>'
-      + '</div>'
-  }
   return html
 }
 
