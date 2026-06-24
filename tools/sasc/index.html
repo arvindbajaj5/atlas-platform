@@ -215,12 +215,17 @@ async function sbFetch(table, params, limit) {
   const sb = getSB()
   if (!sb.url) return []
   try {
-    const r = await fetch(sb.url + '/rest/v1/' + table + '?' + params + (limit ? '&limit=' + limit : ''), {
+    const url = sb.url + '/rest/v1/' + table + '?' + params + (limit ? '&limit=' + limit : '')
+    const r = await fetch(url, {
       headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
     })
-    if (!r.ok) return []
+    if (!r.ok) {
+      var errText = await r.text()
+      console.error('[sbFetch] ' + r.status + ' on ' + table + '?' + params.substring(0,80) + ' -- ' + errText.substring(0,120))
+      return []
+    }
     return r.json()
-  } catch(e) { return [] }
+  } catch(e) { console.error('[sbFetch] exception:', e.message); return [] }
 }
 async function sbInsert(table, data) {
   const sb = getSB()
@@ -772,6 +777,11 @@ async function init() {
     if (items && items[0] && items[0].content && items[0].content.sasc) {
       var saved = items[0].content.sasc
       Object.assign(SASC_DATA, saved)
+      // Restore URL params -- they are ground truth; saved content must never overwrite them
+      SASC_DATA.engId        = params.get('eng')    || SASC_DATA.engId
+      SASC_DATA.docketId     = params.get('docket') || SASC_DATA.docketId
+      SASC_DATA.docketItemId = params.get('item')   || SASC_DATA.docketItemId
+      console.log('[SASC] Restored from URL: eng=' + SASC_DATA.engId + ' docket=' + SASC_DATA.docketId)
     }
   }
 
@@ -830,7 +840,9 @@ async function init() {
     var libraryUCs = await sbFetch('uc_library', 'status=eq.active&order=cluster.asc,uc_name.asc', 200)
     ALL_UCS = libraryUCs || []
     if (SASC_DATA.docketId) {
+      console.log('[SASC] Fetching UCs for docketId:', SASC_DATA.docketId)
       var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&section=eq.uc', 100)
+      console.log('[SASC] docketUCItems raw count:', (docketUCItems||[]).length, docketUCItems && docketUCItems[0] ? JSON.stringify(docketUCItems[0]).substring(0,120) : 'empty')
       // UUID regex — ref_id must be a real uc_library UUID, not a DI-xxx docket item ID
       var _uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       var docketRefs = (docketUCItems || []).map(function(d) {
