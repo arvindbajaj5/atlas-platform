@@ -401,9 +401,7 @@ var ENGAGEMENT = null
 
 function calcFleetInventory() {
   var s = SASC_DATA
-  var gpu = (window.SizingEngine && SizingEngine.ready)
-    ? SizingEngine.getGPUConfigs().find(function(g) { return g.id === s.gpuConfigId })
-    : null
+  var gpu = ALL_GPU_CONFIGS.find(function(g) { return g.id === s.gpuConfigId }) || null
 
   // MDC total DC power (kW)
   var mdc_kw_map = { xs: 2000, s: 5000, m: 10000, l: 15000, xl: 20000 }
@@ -864,7 +862,20 @@ async function init() {
   var _sb = getSB()
   if (_sb.url && window.SizingEngine) {
     await SizingEngine.init(_sb.url, _sb.key)
-    console.log('[SASC] SizingEngine ready:', SizingEngine.ready)
+    console.log('[SASC] SizingEngine ready:', SizingEngine.ready,
+      '— GPUs:', SizingEngine.getGPUConfigs().length,
+      'Models:', SizingEngine.getModels().length)
+    // Sync to module-level globals so any code using ALL_GPU_CONFIGS also gets the data
+    if (SizingEngine.getGPUConfigs().length) ALL_GPU_CONFIGS = SizingEngine.getGPUConfigs()
+    if (SizingEngine.getModels().length)     ALL_MODELS      = SizingEngine.getModels()
+    if (SizingEngine.getUCTypes().length)    ALL_UC_TYPES    = SizingEngine.getUCTypes()
+    // Set default GPU: prefer H200 SXM (server class), avoid rack-scale as default
+    if (!SASC_DATA.gpuConfigId && ALL_GPU_CONFIGS.length) {
+      var defGpu = ALL_GPU_CONFIGS.find(function(g) { return g.name === 'H200 SXM 8x' })
+        || ALL_GPU_CONFIGS.find(function(g) { return !g.rack_scale && !g.placeholder })
+        || ALL_GPU_CONFIGS[0]
+      if (defGpu) { SASC_DATA.gpuConfigId = defGpu.id; console.log('[SASC] Default GPU:', defGpu.name) }
+    }
   } else {
     console.warn('[SASC] SizingEngine not available — check shared/sasc-sizing.js is loaded')
   }
@@ -1239,7 +1250,7 @@ function renderScreen1() {
       var dc  = s.mdc
       var inv = calcFleetInventory()
       var sizes = [{id:'xs',mw:'2MW'},{id:'s',mw:'5MW'},{id:'m',mw:'10MW'},{id:'l',mw:'15MW'},{id:'xl',mw:'20MW'}]
-      var gpuList = (window.SizingEngine && SizingEngine.ready) ? SizingEngine.getGPUConfigs() : ALL_GPU_CONFIGS
+      var gpuList = ALL_GPU_CONFIGS  // populated from SizingEngine on init
 
       isHtml += '<div style="margin:0 0 8px 34px;padding:12px 14px;background:var(--light);border-radius:8px;border-left:3px solid #6B7280">'
         // T-shirt
@@ -1368,14 +1379,7 @@ async function loadWorkloadProfiles() {
   ALL_UC_TYPES    = results[2] || []
   SASC_DATA.benchmarks = results[3] || []
 
-  // Set default GPU config — prefer H200 SXM (server class), avoid rack-scale as default
-  if (!SASC_DATA.gpuConfigId && ALL_GPU_CONFIGS.length) {
-    var defGpu = ALL_GPU_CONFIGS.find(function(g) { return g.name === 'H200 SXM 8x' })
-      || ALL_GPU_CONFIGS.find(function(g) { return !g.rack_scale && !g.placeholder })
-      || ALL_GPU_CONFIGS[0]
-    SASC_DATA.gpuConfigId = defGpu.id
-    console.log('[SASC] Default GPU set to:', defGpu.name)
-  }
+  // Default GPU set in init() after SizingEngine loads
 
   // Reload ALL_UCS from uc_library if not already loaded
   if (!ALL_UCS.length) {
