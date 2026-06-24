@@ -696,7 +696,19 @@ function renderROMSummary() {
   var _tc = SASC_DATA.territory_costs
   var salaryRatio = (_tc && _tc.salary_ratio) || 1.0
   var adjustedPeopleCost = { total: Math.round(peopleCost.total * salaryRatio), yearCosts: peopleCost.yearCosts, peakHeadcount: peopleCost.peakHeadcount, monthlyBurn: peopleCost.monthlyBurn, managedCost: Math.round((adjustedPeopleCost.managedCost||0)*salaryRatio), internalCost: Math.round((adjustedPeopleCost.internalCost||0)*salaryRatio) }
+  // Compute confidence as weighted average of pricing_params confidence_range values
   var confidence = 35
+  if (SASC_DATA.pricingParams && SASC_DATA.pricingParams.length && SASC_DATA.bom && SASC_DATA.bom.length) {
+    var _totalVal = 0, _weightedConf = 0
+    SASC_DATA.bom.forEach(function(line) {
+      var param = (SASC_DATA.pricingParams || []).find(function(p){ return p.component === line.component })
+      var conf = param ? (param.confidence_range || 20) : 25
+      var val = line.usd_total || 0
+      _weightedConf += conf * val
+      _totalVal += val
+    })
+    if (_totalVal > 0) confidence = Math.round(_weightedConf / _totalVal)
+  }
 
   var totalROM = rom.capex_usd + (rom.opex_usd * 3) + rom.ucdev_usd + adjustedPeopleCost.total
   var lo = Math.round(totalROM * (1 - confidence/100))
@@ -2421,6 +2433,35 @@ function calculateBOM(pricing, ucProfiles) {
     return pricing.find(function(p) { return p.component === comp }) || null
   }
 
+  // Resolve the correct GPU server/rack component name from the selected GPU config
+  // Falls back to H200 if selected GPU not found in pricing_params
+  function gpuComponent() {
+    var gpuCfg = ALL_GPU_CONFIGS.find(function(g){ return g.id === s.gpuConfigId }) || ALL_GPU_CONFIGS[0]
+    if (!gpuCfg) return 'GPU Server H200 SXM 8x'
+    // NVL72 rack-level configs
+    if (gpuCfg.name && gpuCfg.name.indexOf('NVL72') >= 0) {
+      if (gpuCfg.name.indexOf('VR') >= 0 || gpuCfg.name.indexOf('Vera') >= 0) return 'GPU Rack Vera Rubin NVL72'
+      if (gpuCfg.name.indexOf('GB300') >= 0) return 'GPU Rack GB300 NVL72'
+      if (gpuCfg.name.indexOf('GB200') >= 0) return 'GPU Rack GB200 NVL72'
+      if (gpuCfg.name.indexOf('B300') >= 0) return 'GPU Rack B300 NVL72'
+      if (gpuCfg.name.indexOf('B200') >= 0) return 'GPU Rack B200 NVL72'
+    }
+    // Per-server configs
+    if (gpuCfg.name.indexOf('Vera') >= 0 || gpuCfg.name.indexOf('VR') >= 0) return 'GPU Server Vera Rubin SXM 8x'
+    if (gpuCfg.name.indexOf('B300') >= 0) return 'GPU Server B300 SXM 8x'
+    if (gpuCfg.name.indexOf('B200') >= 0) return 'GPU Server B200 SXM 8x'
+    if (gpuCfg.name.indexOf('H200') >= 0) return 'GPU Server H200 SXM 8x'
+    if (gpuCfg.name.indexOf('MI355') >= 0) return 'GPU Server AMD MI355X 8x'
+    if (gpuCfg.name.indexOf('MI400') >= 0) return 'GPU Server AMD MI400X 8x'
+    return 'GPU Server H200 SXM 8x'  // default fallback
+  }
+
+  // For NVL72 configs, unit is per_rack (72 GPUs); for servers it's per_server (8 GPUs)
+  function gpusPerUnit() {
+    var name = gpuComponent()
+    return name.indexOf('NVL72') >= 0 ? 72 : 8
+  }
+
   // -- INFRASTRUCTURE --------------------------------------------------------
   if (layers.infra.on) {
     if (s.dcType === 'mdc') {
@@ -2445,9 +2486,12 @@ function calculateBOM(pricing, ucProfiles) {
       var defaultGPUs = { xs:16, s:32, m:64, l:96, xl:128 }
       maxGPUs = s.dcType === 'mdc' ? (defaultGPUs[s.mdc.tshirt] || 64) : 32
     }
-    var gpuServers = Math.max(1, Math.ceil(maxGPUs / 8))
-    var gpuParam = findParam('GPU Server H100 SXM5 8x')
-    if (gpuParam) totalCapex += addLine('Compute', 'GPU Server H100 SXM5 8x', gpuServers, 'per_server', gpuParam.base_price_usd, maxGPUs + ' GPUs recommended across ' + s.selectedUCs.length + ' UCs')
+    var _gpuUnit = gpusPerUnit()
+    var gpuUnits = Math.max(1, Math.ceil(maxGPUs / _gpuUnit))
+    var gpuParam = findParam(gpuComponent())
+    var _gpuLabel = gpuComponent()
+    var _gpuUnitLabel = _gpuLabel.indexOf('NVL72') >= 0 ? 'per_rack' : 'per_server'
+    if (gpuParam) totalCapex += addLine('Compute', _gpuLabel, gpuUnits, _gpuUnitLabel, gpuParam.base_price_usd, maxGPUs + ' GPUs across ' + s.selectedUCs.length + ' UCs (' + _gpuUnit + ' GPUs/' + (_gpuLabel.indexOf('NVL72')>=0?'rack':'server') + ')')
     // CPU servers (1 per 4 GPU servers)
     var cpuServers = Math.max(2, Math.ceil(gpuServers / 4))
     var cpuParam = findParam('CPU Server AMD EPYC 9654')
@@ -2534,7 +2578,7 @@ function calculateBOM(pricing, ucProfiles) {
   if (layers.ucdev.on) {
     var ucCount = Math.max(1, s.selectedUCs.length || (ALL_UCS.length || 3))
     var globalComplexity = (s.layerCfg && s.layerCfg.ucdev && s.layerCfg.ucdev.complexity) || 'medium'
-    var complexityMap = { simple:'UC Development - Simple', medium:'UC Development - Medium', complex:'UC Development - Complex', research:'UC Development - Research Grade' }
+    var complexityMap = { simple:'UC Development - Low', medium:'UC Development - Medium', complex:'UC Development - High', research:'UC Development - High' }
     var complexityGroups = { simple:0, medium:0, complex:0, research:0 }
     if (s.selectedUCs.length) {
       s.selectedUCs.forEach(function(uid) {
@@ -2564,9 +2608,12 @@ function calculateBOM(pricing, ucProfiles) {
     }, 0)
     if (sm.maas.agentEnabled) maasGPUs += Math.max(1, Math.ceil(maasGPUs / 8))
     var maasServers = Math.ceil(maasGPUs / 8)
-    var gpuSvcParam = findParam('GPU Server H100 SXM5 8x')
-    if (gpuSvcParam && maasServers > 0) {
-      totalCapex += addLine('MaaS Infrastructure', 'GPU Servers for MaaS (' + sm.maas.models.length + ' models)', maasServers, 'per_server', gpuSvcParam.base_price_usd, maasGPUs + ' GPUs for model hosting' + (sm.maas.agentEnabled ? ' + agent harness' : ''))
+    var gpuSvcParam = findParam(gpuComponent())
+    var _maasUnit = gpusPerUnit()
+    var maasUnits = Math.ceil(maasGPUs / _maasUnit)
+    var _maasUnitLabel = gpuComponent().indexOf('NVL72') >= 0 ? 'per_rack' : 'per_server'
+    if (gpuSvcParam && maasUnits > 0) {
+      totalCapex += addLine('MaaS Infrastructure', gpuComponent() + ' (MaaS)', maasUnits, _maasUnitLabel, gpuSvcParam.base_price_usd, maasGPUs + ' GPUs for model hosting' + (sm.maas.agentEnabled ? ' + agent harness' : ''))
     }
     // Platform overhead for MaaS (API gateway, billing, routing)
     var platSvcParam = findParam('Data Fusion Platform')
@@ -2576,8 +2623,11 @@ function calculateBOM(pricing, ucProfiles) {
   // GPUaaS — add GPU servers for raw compute rental
   if (sm.gpuaas && sm.gpuaas.enabled && sm.gpuaas.gpus > 0) {
     var gpuaasServers = Math.ceil(sm.gpuaas.gpus / 8)
-    var gpuaasParam = findParam('GPU Server H100 SXM5 8x')
-    if (gpuaasParam) totalCapex += addLine('GPUaaS Infrastructure', 'GPU Servers for GPUaaS (' + sm.gpuaas.gpus + ' GPUs)', gpuaasServers, 'per_server', gpuaasParam.base_price_usd, 'Raw GPU rental capacity')
+    var gpuaasParam = findParam(gpuComponent())
+    var _gaasUnit = gpusPerUnit()
+    var gpuaasUnits = Math.ceil(sm.gpuaas.gpus / _gaasUnit)
+    var _gaasUnitLabel = gpuComponent().indexOf('NVL72') >= 0 ? 'per_rack' : 'per_server'
+    if (gpuaasParam) totalCapex += addLine('GPUaaS Infrastructure', gpuComponent() + ' (GPUaaS — ' + sm.gpuaas.gpus + ' GPUs)', gpuaasUnits, _gaasUnitLabel, gpuaasParam.base_price_usd, 'Raw GPU rental capacity')
   }
 
   // BMaaS — add CPU servers for bare metal rental
@@ -3087,7 +3137,17 @@ function renderBOMTabContent(tab, bom) {
 
 function renderBOMContent(bom) {
   var rom = SASC_DATA.rom
-  var confidence = 35  // parametric pre-UC
+  // Weighted confidence from pricing_params confidence_range per BOM line
+  var confidence = 35
+  if (SASC_DATA.pricingParams && SASC_DATA.pricingParams.length && bom && bom.length) {
+    var _tv = 0, _wc = 0
+    bom.forEach(function(line) {
+      var p = SASC_DATA.pricingParams.find(function(p){ return p.component === line.component })
+      var c = p ? (p.confidence_range || 20) : 25
+      _wc += c * (line.usd_total || 0); _tv += (line.usd_total || 0)
+    })
+    if (_tv > 0) confidence = Math.round(_wc / _tv)
+  }
 
   // Group BOM by category
   var categories = {}
