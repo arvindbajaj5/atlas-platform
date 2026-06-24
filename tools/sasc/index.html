@@ -360,6 +360,20 @@ var SASC_DATA = {
   ucWorkloads: {},
   layerCfg: {},
   gpuConfigId: null,
+  powerMode: 'total',        // 'total' = full DC power, 'gpu' = already net of overheads
+  pue: 1.2,                  // Power Usage Effectiveness (OEM DLC default)
+  overhead: {
+    networking_pct: 2.0,     // % of IT load for networking
+    storage_pct:    1.5,     // % of IT load for storage
+    mgmt_pct:       1.0,     // % of IT load for management/control nodes
+  },
+  fleetInventory: {          // computed from MDC + GPU arch + power mode
+    it_load_kw:       0,
+    gpu_available_kw: 0,
+    max_gpu_units:    0,
+    fleet_gpus:       0,
+    unit_type:        'server'
+  },
   serviceModel: {
     maas:   { enabled: false, models: [], agentEnabled: false, agentModel: 'Llama 3.1 8B INT4' },
     gpuaas: { enabled: false, gpus: 0, gpu_hour_price_usd: 3.50 },
@@ -380,6 +394,63 @@ var SASC_DATA = {
 var ALL_UCS = []
 var ALL_ENGAGEMENTS = []
 var ENGAGEMENT = null
+
+// -- Fleet Inventory Calculation -----------------------------------------------
+// Computes available GPU count from MDC power envelope + GPU architecture
+// Called whenever MDC T-shirt, GPU arch, or power mode changes
+
+function calcFleetInventory() {
+  var s = SASC_DATA
+  var gpu = (window.SizingEngine && SizingEngine.ready)
+    ? SizingEngine.getGPUConfigs().find(function(g) { return g.id === s.gpuConfigId })
+    : null
+
+  // MDC total DC power (kW)
+  var mdc_kw_map = { xs: 2000, s: 5000, m: 10000, l: 15000, xl: 20000 }
+  var total_dc_kw = mdc_kw_map[s.mdc.tshirt] || 10000
+
+  var inv = {
+    total_dc_kw:      total_dc_kw,
+    it_load_kw:       0,
+    networking_kw:    0,
+    storage_kw:       0,
+    mgmt_kw:          0,
+    bmaas_kw:         0,
+    gpu_available_kw: 0,
+    max_gpu_units:    0,
+    fleet_gpus:       0,
+    unit_type:        gpu ? (gpu.rack_scale ? 'rack' : 'server') : 'server',
+    gpu_name:         gpu ? gpu.name : 'No GPU selected',
+    tdp_kw:           gpu ? gpu.tdp_kw : 0,
+    gpus_per_unit:    gpu ? (gpu.gpus_in_unit || 8) : 8
+  }
+
+  if (!gpu) { s.fleetInventory = inv; return inv }
+
+  if (s.powerMode === 'gpu') {
+    // User confirms power figure is already net of all overheads — use directly
+    inv.it_load_kw       = total_dc_kw
+    inv.gpu_available_kw = total_dc_kw
+  } else {
+    // Total DC power — deduct PUE and infrastructure overheads
+    var pue  = s.pue || 1.2
+    inv.it_load_kw    = Math.round(total_dc_kw / pue)
+    var oh = s.overhead || {}
+    inv.networking_kw = Math.round(inv.it_load_kw * ((oh.networking_pct || 2.0) / 100))
+    inv.storage_kw    = Math.round(inv.it_load_kw * ((oh.storage_pct    || 1.5) / 100))
+    inv.mgmt_kw       = Math.round(inv.it_load_kw * ((oh.mgmt_pct       || 1.0) / 100))
+    // BMaaS servers consume power too — deduct if configured
+    var bmaas_servers = (s.serviceModel && s.serviceModel.bmaas && s.serviceModel.bmaas.servers) || 0
+    inv.bmaas_kw      = Math.round(bmaas_servers * 0.7)  // ~700W per EPYC server
+    inv.gpu_available_kw = inv.it_load_kw - inv.networking_kw - inv.storage_kw - inv.mgmt_kw - inv.bmaas_kw
+    inv.gpu_available_kw = Math.max(0, inv.gpu_available_kw)
+  }
+
+  inv.max_gpu_units = Math.floor(inv.gpu_available_kw / gpu.tdp_kw)
+  inv.fleet_gpus    = inv.max_gpu_units * inv.gpus_per_unit
+  s.fleetInventory  = inv
+  return inv
+}
 
 // -- Init ---------------------------------------------------------------------
 //    PEOPLE MODEL                                                               
@@ -1165,19 +1236,73 @@ function renderScreen1() {
 
     // MDC config — only show if infra layer is ON
     if (key === 'infra' && on) {
-      var dc = s.mdc
-      var sizes = [{id:'xs',l:'XS — 2MW'},{id:'s',l:'S — 5MW'},{id:'m',l:'M — 10MW'},{id:'l',l:'L — 15MW'},{id:'xl',l:'XL — 20MW'}]
-      isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid #6B7280">'
-        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:8px">MDC Configuration</div>'
-        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
-        + sizes.map(function(sz){ return '<button onclick="SASC_DATA.mdc.tshirt=\'' + sz.id + '\';renderStep(1)" style="padding:4px 12px;font-size:11px;border:1.5px solid ' + (dc.tshirt===sz.id?'var(--navy)':'var(--border)') + ';background:' + (dc.tshirt===sz.id?'var(--navy)':'#fff') + ';color:' + (dc.tshirt===sz.id?'#fff':'var(--mid)') + ';border-radius:5px;cursor:pointer;font-family:inherit">' + sz.l + '</button>' }).join('')
+      var dc  = s.mdc
+      var inv = calcFleetInventory()
+      var sizes = [{id:'xs',mw:'2MW'},{id:'s',mw:'5MW'},{id:'m',mw:'10MW'},{id:'l',mw:'15MW'},{id:'xl',mw:'20MW'}]
+      var gpuList = (window.SizingEngine && SizingEngine.ready) ? SizingEngine.getGPUConfigs() : ALL_GPU_CONFIGS
+
+      isHtml += '<div style="margin:0 0 8px 34px;padding:12px 14px;background:var(--light);border-radius:8px;border-left:3px solid #6B7280">'
+        // T-shirt
+        + '<div style="font-size:11px;color:var(--mid);margin-bottom:5px;font-weight:600">MDC T-shirt size</div>'
+        + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">'
+        + sizes.map(function(sz){
+            var sel=dc.tshirt===sz.id
+            return '<button onclick="SASC_DATA.mdc.tshirt=\''+sz.id+'\';renderStep(1)" style="padding:5px 10px;font-size:11px;font-weight:'+(sel?'700':'400')+';border:1.5px solid '+(sel?'var(--navy)':'var(--border)')+';background:'+(sel?'var(--navy)':'#fff')+';color:'+(sel?'#fff':'var(--mid)')+';border-radius:5px;cursor:pointer;font-family:inherit">'+sz.id.toUpperCase()+' <span style="font-size:9px;opacity:.8">'+sz.mw+'</span></button>'
+          }).join('')
         + '</div>'
-        + '<div style="display:flex;gap:12px;align-items:center">'
+
+        // GPU Architecture selector
+        + '<div style="font-size:11px;color:var(--mid);margin-bottom:5px;font-weight:600">GPU Architecture <span style="font-weight:400;opacity:.7">(entire centre — one architecture)</span></div>'
+        + '<select onchange="SASC_DATA.gpuConfigId=this.value;renderStep(1)" style="width:100%;padding:6px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;margin-bottom:10px">'
+        + '<option value="">-- Select GPU architecture --</option>'
+        + gpuList.map(function(g){
+            var sel=s.gpuConfigId===g.id
+            var tag=g.placeholder?' ⚑':''; var rk=g.rack_scale?' [NVL72 rack]':' [8x server]'
+            return '<option value="'+g.id+'"'+(sel?' selected':'')+'>'+g.name+' · '+(g.vram_per_gpu_gb||'?')+'GB/GPU · '+(g.tdp_kw||'?')+'kW/unit'+rk+tag+'</option>'
+          }).join('')
+        + '</select>'
+
+        // Power mode
+        + '<div style="padding:8px 10px;background:#fff;border-radius:6px;border:1px solid var(--border);margin-bottom:10px">'
+        + '<div style="font-size:11px;font-weight:600;color:var(--mid);margin-bottom:5px">Power envelope</div>'
+        + '<div style="display:flex;gap:14px;margin-bottom:'+(s.powerMode!=='gpu'?'6':'0')+'px">'
+        + '<label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;color:'+(s.powerMode!=='gpu'?'var(--navy)':'var(--mid)')+';font-weight:'+(s.powerMode!=='gpu'?'600':'400')+'"><input type="radio" name="pm" value="total"'+(s.powerMode!=='gpu'?' checked':'')+' onchange="SASC_DATA.powerMode=this.value;renderStep(1)"> Total DC power (apply overheads)</label>'
+        + '<label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;color:'+(s.powerMode==='gpu'?'var(--navy)':'var(--mid)')+';font-weight:'+(s.powerMode==='gpu'?'600':'400')+'"><input type="radio" name="pm" value="gpu"'+(s.powerMode==='gpu'?' checked':'')+' onchange="SASC_DATA.powerMode=this.value;renderStep(1)"> GPU-ready power (already net)</label>'
+        + '</div>'
+        + (s.powerMode!=='gpu' ? '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--mid)">'
+          + 'PUE <input type="number" value="'+(s.pue||1.2)+'" min="1.05" max="2.0" step="0.05" onchange="SASC_DATA.pue=+this.value;renderStep(1)" style="width:44px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:10px"> '
+          + 'Network <input type="number" value="'+((s.overhead&&s.overhead.networking_pct)||2.0)+'" min="0" max="10" step="0.5" onchange="SASC_DATA.overhead.networking_pct=+this.value;renderStep(1)" style="width:36px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:10px">% '
+          + 'Storage <input type="number" value="'+((s.overhead&&s.overhead.storage_pct)||1.5)+'" min="0" max="10" step="0.5" onchange="SASC_DATA.overhead.storage_pct=+this.value;renderStep(1)" style="width:36px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:10px">% '
+          + 'Mgmt <input type="number" value="'+((s.overhead&&s.overhead.mgmt_pct)||1.0)+'" min="0" max="10" step="0.5" onchange="SASC_DATA.overhead.mgmt_pct=+this.value;renderStep(1)" style="width:36px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:10px">%'
+          + '</div>' : '')
+        + '</div>'
+
+        // Fleet inventory panel
+        + (inv.fleet_gpus>0
+          ? '<div style="padding:10px 12px;background:var(--navy);border-radius:6px;color:#fff;margin-bottom:10px">'
+            + '<div style="font-size:9px;opacity:.6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Fleet Inventory — ' + inv.gpu_name + '</div>'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px">'
+            + '<div style="text-align:center"><div style="font-size:22px;font-weight:800">' + inv.fleet_gpus.toLocaleString() + '</div><div style="font-size:9px;opacity:.6">GPUs available</div></div>'
+            + '<div style="text-align:center"><div style="font-size:22px;font-weight:800">' + inv.max_gpu_units + '</div><div style="font-size:9px;opacity:.6">' + (inv.unit_type==='rack'?'NVL72 racks':'GPU servers') + '</div></div>'
+            + '<div style="text-align:center"><div style="font-size:22px;font-weight:800">' + Math.round(inv.gpu_available_kw/100)/10 + 'MW</div><div style="font-size:9px;opacity:.6">for GPU</div></div>'
+            + '</div>'
+            + (s.powerMode!=='gpu' ? '<div style="font-size:9px;opacity:.5;border-top:1px solid rgba(255,255,255,.15);padding-top:6px">'
+              + inv.total_dc_kw/1000+'MW total '
+              + '÷ PUE '+s.pue+' = '+Math.round(inv.it_load_kw/100)/10+'MW IT '
+              + '− '+Math.round((inv.networking_kw+inv.storage_kw+inv.mgmt_kw)/100)/10+'MW infra '
+              + '= '+Math.round(inv.gpu_available_kw/100)/10+'MW GPU'
+              + '</div>' : '')
+            + '</div>'
+          : '<div style="padding:8px 10px;background:#FEF9C3;border-radius:5px;font-size:11px;color:#854D0E;margin-bottom:10px">⚠ Select GPU architecture above to compute fleet inventory</div>')
+
+        // Sites
+        + '<div style="display:flex;gap:10px;align-items:center">'
         + '<span style="font-size:11px;color:var(--mid)">Sites:</span>'
-        + '<input type="number" min="1" max="20" value="' + (dc.sites||1) + '" style="width:60px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.mdc.sites=+this.value">'
+        + '<input type="number" min="1" max="20" value="'+(dc.sites||1)+'" style="width:55px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.mdc.sites=+this.value;renderStep(1)">'
         + '<span style="font-size:11px;color:var(--mid)">Name(s):</span>'
-        + '<input type="text" value="' + esc(dc.siteNames||'') + '" placeholder="e.g. Shimla, Dharamsala" style="flex:1;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit" onchange="SASC_DATA.mdc.siteNames=this.value">'
-        + '</div></div>'
+        + '<input type="text" value="'+esc(dc.siteNames||'')+'" placeholder="e.g. Shimla, Dharamsala" style="flex:1;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit" onchange="SASC_DATA.mdc.siteNames=this.value">'
+        + '</div>'
+        + '</div>'
     }
   })
   isHtml += '</div>'  // close card
@@ -1911,16 +2036,21 @@ function renderScreen2() {
     + '<div class="card-title">UC workload profiler</div>'
     + '<div class="card-sub">Size compute for each use case. Defaults loaded from UC library &mdash; override as needed.</div>'
 
-    // GPU config selector
-    + '<div class="form-grid" style="margin-bottom:10px">'
-    + '<div><label>GPU configuration</label>'
-    + '<select onchange="SASC_DATA.gpuConfigId=this.value;document.getElementById(\'app-content\').innerHTML=renderScreen2()">'
-    + ALL_GPU_CONFIGS.filter(function(g) { return !g.rack_scale }).map(function(g) {
-        return '<option value="' + g.id + '"' + (s.gpuConfigId===g.id?' selected':'') + '>'
-          + g.name + ' (' + (g.vram_per_gpu_gb||Math.round(g.total_vram_gb/(g.gpus_in_unit||8))) + 'GB/GPU × ' + (g.gpus_in_unit||8) + ' GPUs)'
-          + '</option>'
-      }).join('')
-    + '</select></div>'
+    // Fleet context banner (GPU arch set on S1 — show summary here)
+    + '<div style="padding:8px 12px;background:var(--navy);border-radius:6px;color:#fff;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">'
+    + (function(){
+        var inv=calcFleetInventory()
+        var gc=ALL_GPU_CONFIGS.find(function(g){return g.id===s.gpuConfigId})
+        if (!gc) return '<span style="font-size:11px;opacity:.8">⚠ No GPU architecture selected — go to S1 to configure</span><button class="btn" onclick="renderStep(1)" style="font-size:10px;padding:3px 8px;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:4px;cursor:pointer">← S1</button>'
+        return '<div>'
+          + '<span style="font-size:10px;opacity:.6">GPU Fleet · </span>'
+          + '<span style="font-size:13px;font-weight:700">'+gc.name+'</span>'
+          + '<span style="font-size:10px;opacity:.6"> · '+inv.fleet_gpus.toLocaleString()+' GPUs available</span>'
+          + '</div>'
+          + '<button onclick="renderStep(1)" style="font-size:10px;padding:3px 8px;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:4px;cursor:pointer">Change ↑</button>'
+      })()
+    + '</div>'
+
 
     // Derating slider
     + '<div><label>Derating factor &mdash; <strong id="derating-label">' + (s.deratingPct||80) + '%</strong> sustained utilisation</label>'
