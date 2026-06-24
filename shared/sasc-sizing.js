@@ -1,841 +1,3477 @@
-/**
- * ATLAS SizingEngine — shared/sasc-sizing.js
- * Single source of truth for all GPU sizing across SASC, TSAP FM, Inferencing Factory
- *
- * Reads from Supabase:
- *   gpu_configs          — GPU specs (vram_per_gpu_gb, bf16_tflops, hbm_bw_tbps, tdp_kw, etc.)
- *   model_catalogue      — Model specs (gpu_memory_gb jsonb, gpus_per_instance jsonb, params_b)
- *   uc_interaction_types — UC archetypes (requests_per_user_per_day, avg_input_tokens, etc.)
- *   requirement_archetypes — MaaS/GPUaaS/BMaaS archetypes
- *   benchmark_results    — Measured throughput (gpu_config_id × model_id → tokens/sec)
- *
- * Physics reference: Sizing GPUs for LLM Inferencing
- *   Memory capacity determines if the model can run.
- *   Memory bandwidth determines how fast at low batch (Profile B — UC internal).
- *   Compute (TFlops) determines throughput at high batch (Profile A — MaaS API).
- *
- * Usage:
- *   await SizingEngine.init(sbUrl, sbKey)
- *   const result = SizingEngine.sizeUC(ucConfig, gpuConfigId)
- *   const result = SizingEngine.sizeMaaS(maasConfig, gpuConfigId)
- *   const fleet  = SizingEngine.fleetTotal(ucResults, maasResults, gpuaasConfig, bmaasConfig, mdcSpec)
- *
- * All functions are pure (no DOM, no side effects) except init() which fetches from Supabase.
- */
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SASC -- Sovereign AI Stack Configurator</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#FF5539;--navy:#002870;--blue:#1C38F5;--teal:#00B290;--amber:#FFB600;--white:#FFF;--light:#F5F5F7;--mid:#B4B4BE;--dark:#282832;--r:8px;--r-sm:6px;--r-lg:12px;--shadow:0 2px 8px rgba(0,0,0,0.08);--shadow-md:0 4px 16px rgba(0,0,0,0.12);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
+.hdr-brand{font-size:16px;font-weight:900;color:var(--white);letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-actions{display:flex;align-items:center;gap:10px;}
+.hdr-eng{font-size:11px;color:rgba(255,255,255,0.6);padding:4px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:var(--r-sm);}
+.hdr-eng strong{color:var(--white);}
+.main{max-width:960px;margin:0 auto;padding:24px;}
+/* Step progress */
+.step-nav{display:flex;align-items:center;margin-bottom:24px;background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:16px 20px;gap:0;}
+.step-item{display:flex;align-items:center;flex:1;}
+.step-circle{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;transition:all 0.2s;}
+.step-circle.done{background:var(--teal);color:var(--white);}
+.step-circle.active{background:var(--orange);color:var(--white);}
+.step-circle.pending{background:var(--light);color:var(--mid);border:2px solid #e0e0e8;}
+.step-label{margin-left:8px;font-size:12px;font-weight:600;}
+.step-label.active{color:var(--navy);}
+.step-label.done{color:var(--teal);}
+.step-label.pending{color:var(--mid);}
+.step-connector{flex:1;height:2px;background:#e0e0e8;margin:0 8px;}
+.step-connector.done{background:var(--teal);}
+/* Cards */
+.card{background:var(--white);border:1px solid #e0e0e8;border-radius:var(--r-lg);padding:20px;margin-bottom:16px;}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:14px;}
+/* Forms */
+label{display:block;font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px;margin-top:14px;}
+label:first-child{margin-top:0;}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid #d0d0d8;border-radius:var(--r-sm);font-size:13px;font-family:inherit;color:var(--dark);background:var(--white);outline:none;}
+input:focus,select:focus{border-color:var(--blue);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--orange);color:var(--white);}
+.btn-primary:hover{background:#e6421f;}
+.btn-navy{background:var(--navy);color:var(--white);}
+.btn-teal{background:var(--teal);color:var(--white);}
+.btn-outline{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+.btn-ghost{background:var(--light);color:var(--dark);border:1px solid #e0e0e8;}
+.btn-ghost:hover{border-color:var(--navy);}
+.btn-sm{padding:5px 12px;font-size:11px;}
+.btn-xs{padding:3px 8px;font-size:10px;}
+/* UC pills */
+.uc-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;}
+.uc-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all 0.15s;}
+.uc-pill.selected{background:rgba(0,40,112,0.08);color:var(--navy);border-color:var(--navy);}
+.uc-pill.unselected{background:var(--light);color:var(--mid);border-color:#e0e0e8;}
+.uc-pill:hover{border-color:var(--navy);}
+/* Scope radio */
+.scope-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.scope-opt{padding:10px 12px;border:1.5px solid #e0e0e8;border-radius:var(--r);cursor:pointer;transition:all 0.15s;}
+.scope-opt.sel{border-color:var(--navy);background:rgba(0,40,112,0.04);}
+.scope-opt-title{font-size:12px;font-weight:700;color:var(--dark);}
+.scope-opt-sub{font-size:10px;color:var(--mid);margin-top:2px;}
+/* DC type */
+.dc-opts{display:flex;flex-direction:column;gap:8px;}
+.dc-opt{padding:12px 14px;border:1.5px solid #e0e0e8;border-radius:var(--r);cursor:pointer;transition:all 0.15s;}
+.dc-opt.sel{border-color:var(--orange);background:rgba(255,85,57,0.04);}
+.dc-opt-hdr{display:flex;align-items:center;gap:8px;}
+.dc-dot{width:14px;height:14px;border-radius:50%;border:2px solid #ccc;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.dc-opt.sel .dc-dot{border-color:var(--orange);}
+.dc-opt.sel .dc-dot::after{content:'';width:6px;height:6px;border-radius:50%;background:var(--orange);}
+.dc-opt-title{font-size:13px;font-weight:700;}
+.dc-opt-sub{font-size:11px;color:var(--mid);margin-left:22px;margin-top:2px;}
+.dc-detail{margin-top:10px;margin-left:22px;padding:10px 12px;background:var(--light);border-radius:var(--r-sm);display:none;}
+.dc-opt.sel .dc-detail{display:block;}
+/* T-shirt buttons */
+.tshirt-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.tshirt-btn{padding:5px 12px;border-radius:var(--r-sm);font-size:11px;font-weight:700;border:1.5px solid #e0e0e8;background:var(--white);cursor:pointer;transition:all 0.15s;}
+.tshirt-btn.sel{background:var(--navy);color:var(--white);border-color:var(--navy);}
+/* Layer rows */
+.layer-list{display:flex;flex-direction:column;gap:0;}
+.layer-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f4;cursor:pointer;}
+.layer-row:last-child{border-bottom:none;}
+.layer-chk{width:18px;height:18px;border-radius:4px;border:2px solid #ccc;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s;cursor:pointer;}
+.toggle-sw{width:36px;height:20px;background:#ccc;border-radius:10px;position:relative;transition:background .2s;flex-shrink:0;cursor:pointer;}
+.toggle-sw::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:8px;top:2px;left:2px;transition:left .2s;}
+.toggle-sw.on{background:var(--teal);}
+.toggle-sw.on::after{left:18px;}
+.layer-chk.on{background:var(--navy);border-color:var(--navy);}
+.layer-chk.on::after{content:'\2713';color:var(--white);font-size:11px;font-weight:700;}
+.layer-info{flex:1;}
+.layer-name{font-size:13px;font-weight:600;color:var(--dark);}
+.layer-desc{font-size:10px;color:var(--mid);margin-top:1px;}
+.layer-tag{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(0,40,112,0.08);color:var(--navy);}
+/* BOM table */
+.bom-table{width:100%;border-collapse:collapse;font-size:12px;}
+.bom-table th{text-align:left;padding:6px 10px;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.3px;border-bottom:2px solid #e0e0e8;}
+.bom-table td{padding:8px 10px;border-bottom:1px solid #f0f0f4;color:var(--dark);}
+.bom-table tr:last-child td{border-bottom:none;}
+.bom-table .cat-row td{background:rgba(0,40,112,0.03);font-weight:700;color:var(--navy);font-size:11px;}
+.bom-total{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:2px solid var(--navy);margin-top:4px;}
+.bom-total-label{font-size:14px;font-weight:700;color:var(--navy);}
+.bom-total-val{font-size:18px;font-weight:900;color:var(--orange);}
+.confidence-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(255,182,0,0.12);color:#9a6800;}
+/* Currency toggle */
+.currency-toggle{display:flex;gap:4px;align-items:center;}
+.curr-btn{padding:4px 10px;border-radius:var(--r-sm);font-size:11px;font-weight:600;border:1px solid #e0e0e8;background:var(--white);cursor:pointer;}
+.curr-btn.active{background:var(--navy);color:var(--white);border-color:var(--navy);}
+/* Actions bar */
+.actions-bar{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid #e0e0e8;}
+/* Loading */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #e0e0e8;border-top-color:var(--orange);border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.status-msg{font-size:12px;color:var(--mid);display:flex;align-items:center;gap:6px;}
 
-;(function (root) {
-  'use strict'
+/* Layer config panels (Inferencing Factory style) */
+.layer-row{cursor:pointer;}
+.layer-cfg{padding:10px 14px 14px;background:rgba(0,40,112,0.02);border-top:0.5px solid #e8e8f0;}
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:8px;}
+.cfg-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+.lb{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:3px;}
+.cfg-grid select,.cfg-grid input,.cfg-grid-2 select,.cfg-grid-2 input{width:100%;font-size:11px;padding:4px 6px;border:0.5px solid #d0d0d8;border-radius:4px;font-family:inherit;background:var(--white);}
+/* Complexity tier pills */
+.tier-opts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.tier-btn{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid #e0e0e8;background:var(--white);cursor:pointer;color:var(--mid);transition:all 0.15s;}
+.tier-btn.sel-simple{background:rgba(0,178,144,0.1);color:#085041;border-color:#00B290;}
+.tier-btn.sel-medium{background:rgba(28,56,245,0.08);color:#1C38F5;border-color:#1C38F5;}
+.tier-btn.sel-complex{background:rgba(255,182,0,0.12);color:#9a6800;border-color:#FFB600;}
+.tier-btn.sel-research{background:rgba(255,85,57,0.1);color:#c0341a;border-color:#FF5539;}
+/* Layer colour accents */
+.layer-infra{border-left:3px solid #6B7280;}
+.layer-compute{border-left:3px solid var(--navy);}
+.layer-network{border-left:3px solid var(--teal);}
+.layer-platform{border-left:3px solid var(--blue);}
+.layer-security{border-left:3px solid var(--orange);}
+.layer-resilience{border-left:3px solid #8B5CF6;}
+.layer-data{border-left:3px solid #059669;}
+.layer-ucdev{border-left:3px solid var(--amber);}
+.layer-skills{border-left:3px solid #6B7280;}
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--dark);color:var(--white);padding:10px 16px;border-radius:var(--r);font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
+.toast.show{opacity:1;}
 
-  // ─── Internal state ────────────────────────────────────────────────────────
-  var _sbUrl = ''
-  var _sbKey = ''
-  var _ready = false
+/*    ATLAS Standard Masthead                                                 */
+.atlas-hdr{background:var(--navy,#002870);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+.atlas-hdr-left{display:flex;align-items:center;gap:12px;}
+.atlas-brand{font-size:16px;font-weight:900;color:#fff;letter-spacing:3px;white-space:nowrap;}
+.atlas-brand span{color:#FF5539;}
+.atlas-tool-name{font-size:12px;font-weight:600;color:rgba(255,255,255,0.75);padding:3px 8px;background:rgba(255,255,255,0.1);border-radius:4px;letter-spacing:.3px;}
+.atlas-eng-badge{font-size:11px;color:rgba(255,255,255,0.6);padding:3px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.atlas-eng-badge strong{color:#fff;}
+.atlas-hdr-right{display:flex;align-items:center;gap:8px;}
+.atlas-ver{font-size:10px;font-weight:700;color:#FF5539;padding:2px 7px;background:rgba(255,85,57,0.15);border-radius:10px;white-space:nowrap;}
+.atlas-nav-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;font-family:inherit;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.atlas-nav-btn:hover{background:rgba(255,255,255,0.1);color:#fff;border-color:rgba(255,255,255,0.4);}
+.atlas-nav-btn:disabled{opacity:0.35;cursor:not-allowed;pointer-events:none;}
+.atlas-nav-btn.orange{background:#FF5539;border-color:#FF5539;color:#fff;}
+.atlas-nav-btn.orange:hover{background:#e04530;}
+.atlas-nav-btn.teal{background:rgba(0,178,144,0.15);border-color:#00B290;color:#00B290;}
+.atlas-nav-btn.teal:hover{background:rgba(0,178,144,0.25);}
 
-  // Reference data loaded from Supabase on init()
-  var _gpuConfigs       = []   // gpu_configs rows
-  var _models           = []   // model_catalogue rows
-  var _ucTypes          = []   // uc_interaction_types rows
-  var _archetypes       = []   // requirement_archetypes rows
-  var _benchmarks       = []   // benchmark_results rows
+/* Service Model section */
+.svc-card{border:2px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;background:#fff;transition:border-color .15s}
+.svc-card.on{border-color:var(--teal)}.svc-card.on .svc-body{color:var(--dark)}.svc-card.on .svc-body *{color:inherit}
+.svc-hdr{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:0}
+.svc-hdr.on{margin-bottom:12px}
+.svc-toggle{width:32px;height:18px;background:var(--border);border-radius:9px;position:relative;transition:background .2s;flex-shrink:0}
+.svc-toggle.on{background:var(--teal)}
+.svc-toggle::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.svc-toggle.on::after{left:16px}
+.svc-title{font-size:13px;font-weight:700;color:var(--navy)}
+.svc-desc{font-size:11px;color:var(--mid);margin-left:auto}
+.svc-body{display:none}
+.svc-card.on .svc-body{display:block}
+.svc-model-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.svc-model-item{border:1.5px solid var(--border);border-radius:6px;padding:6px 9px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;transition:all .15s}
+.svc-model-item:hover{border-color:var(--mid)}.svc-model-item.on{border-color:var(--teal);background:#E1F5EE;font-weight:600}
+.svc-model-ck{width:13px;height:13px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+.svc-model-item.on .svc-model-ck{background:var(--teal);border-color:var(--teal);color:#fff}
+.svc-arch-chip{display:inline-block;font-size:9px;padding:1px 5px;border-radius:8px;background:#EFF3FF;color:#1C38F5;margin-right:2px}
+.svc-gpu-est{background:var(--navy);color:#fff;border-radius:6px;padding:10px 14px;margin-top:10px;font-size:12px}
+.svc-input{padding:6px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;width:100%}
+.svc-input:focus{border-color:var(--navy)}
+.svc-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="../../shared/sasc-sizing.js"></script>
+</head>
+<body>
 
-  // ─── Constants ─────────────────────────────────────────────────────────────
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S <span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.5);letter-spacing:1px;margin-left:8px">SASC</span></div>
+  <div class="hdr-actions">
+    <div class="hdr-eng" id="hdr-eng-label">No engagement loaded</div>
+    <button class="atlas-nav-btn" onclick="backToDocket()">&#8592; Docket</button>
+  </div>
+</div>
 
-  // Bytes per parameter by precision
-  var BYTES_PER_PARAM = { FP16: 2, BF16: 2, FP8: 1, INT8: 1, INT4: 0.5, FP4: 0.5 }
+<div class="main" id="main">
+  <div id="app-content"></div>
+</div>
 
-  // KV cache field rules (MB per token at FP16) when exact layer specs unavailable
-  var KV_CACHE_MB_PER_TOKEN = {
-    small:  0.15,   // 7B–14B models
-    medium: 0.25,   // 14B–35B models
-    large:  0.35,   // 70B–80B models
-    xlarge: 0.50    // 100B+ models
-  }
+<div class="toast" id="toast"></div>
 
-  // Words to tokens ratio
-  var WORDS_TO_TOKENS = 1.3
+<script charset="utf-8">
+// -- Config -------------------------------------------------------------------
+const DOCKET_URL = '../engagement-docket/index.html'
 
-  // Runtime overhead factor (PyTorch/CUDA activations + framework)
-  var RUNTIME_OVERHEAD = 1.20
-
-  // SLA buffer presets — applied on top of base GPU count
-  var SLA_BUFFERS = {
-    standard: {
-      peak_headroom_pct:    25,   // above P95 traffic
-      failover_pct:         15,   // N+1 style reserve
-      multi_tenancy_pct:    12    // tenant isolation overhead
-    },
-    enterprise: {
-      peak_headroom_pct:    30,
-      failover_pct:         30,   // dedicated failover block
-      multi_tenancy_pct:    12
-    }
-  }
-
-  // HA / DR GPU overhead (added to base after SLA buffers)
-  var RESILIENCE_OVERHEAD = {
-    ha_none:           0,
-    ha_standard:       0.15,   // N+1 at cluster level ~15%
-    dr_warm:           0.50,   // warm standby — 50% of primary
-    dr_active_active:  1.00    // full duplicate
-  }
-
-  // Compute intensity → default headroom when no archetype headroom specified
-  var INTENSITY_HEADROOM = {
-    low:       15,
-    medium:    20,
-    high:      25,
-    very_high: 30
-  }
-
-  // ─── Supabase fetch helper ──────────────────────────────────────────────────
-  function _fetch (table, params, limit) {
-    var url = _sbUrl + '/rest/v1/' + table + '?' + params + (limit ? '&limit=' + limit : '')
-    return fetch(url, {
-      headers: { apikey: _sbKey, Authorization: 'Bearer ' + _sbKey }
-    }).then(function (r) {
-      if (!r.ok) {
-        console.error('[SizingEngine] fetch failed:', table, r.status)
-        return []
-      }
-      return r.json()
-    }).catch(function (e) {
-      console.error('[SizingEngine] fetch error:', table, e.message)
+function getSB() {
+  var g = typeof atlasGetGlobal === 'function' ? atlasGetGlobal() : (function(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } })()
+  return { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
+}
+async function sbFetch(table, params, limit) {
+  const sb = getSB()
+  if (!sb.url) return []
+  try {
+    const url = sb.url + '/rest/v1/' + table + '?' + params + (limit ? '&limit=' + limit : '')
+    const r = await fetch(url, {
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+    })
+    if (!r.ok) {
+      var errText = await r.text()
+      console.error('[sbFetch] ' + r.status + ' on ' + table + '?' + params.substring(0,80) + ' -- ' + errText.substring(0,120))
       return []
+    }
+    return r.json()
+  } catch(e) { console.error('[sbFetch] exception:', e.message); return [] }
+}
+async function sbInsert(table, data) {
+  const sb = getSB()
+  if (!sb.url) return false
+  try {
+    const r = await fetch(sb.url + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(data)
+    })
+    return r.ok
+  } catch(e) { return false }
+}
+function genId(prefix) {
+  return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 9999)
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function fmtNum(n) { return Number(n||0).toLocaleString() }
+function showToast(msg, duration) {
+  var t = document.getElementById('toast')
+  t.textContent = msg
+  t.className = 'toast show'
+  setTimeout(function() { t.className = 'toast' }, duration || 2500)
+}
+
+// -- Currency formatting -------------------------------------------------------
+var SASC_CURRENCY = localStorage.getItem('sasc_currency') || 'USD'
+var FX_RATES = { USD: 1, INR: 95.76, EUR: 0.865, EUR_INR: 110.7, _source: 'config', _date: '' }
+
+async function loadFxRates() {
+  try {
+    var ctrl = new AbortController()
+    var timeout = setTimeout(function(){ ctrl.abort() }, 4000)
+    var r = await fetch('https://api.frankfurter.app/latest?from=USD&to=INR,EUR', { signal: ctrl.signal })
+    clearTimeout(timeout)
+    if (r.ok) {
+      var data = await r.json()
+      if (data && data.rates) {
+        if (data.rates.INR) FX_RATES.INR = data.rates.INR
+        if (data.rates.EUR) FX_RATES.EUR = data.rates.EUR
+        if (FX_RATES.INR && FX_RATES.EUR) FX_RATES.EUR_INR = Math.round(FX_RATES.INR / FX_RATES.EUR * 100) / 100
+        FX_RATES._source = 'live'
+        FX_RATES._date = data.date || new Date().toISOString().slice(0,10)
+        saveFxRatesToConfig()
+        return
+      }
+    }
+  } catch(e) {}
+  var rows = await sbFetch('fx_rates', 'from_currency=eq.USD&order=effective_date.desc', 20)
+  if (rows && rows.length) {
+    rows.forEach(function(r) { FX_RATES[r.to_currency] = r.rate })
+    FX_RATES._source = 'supabase'
+  }
+}
+
+async function saveFxRatesToConfig() {
+  var sb = getSB(); if (!sb.url) return
+  var today = FX_RATES._date || new Date().toISOString().slice(0,10)
+  var patches = [
+    { key: 'fx_usd_inr', value: String(FX_RATES.INR) },
+    { key: 'fx_usd_eur', value: String(FX_RATES.EUR) },
+    { key: 'fx_eur_inr', value: String(FX_RATES.EUR_INR || '') },
+    { key: 'fx_updated_at', value: today }
+  ]
+  patches.forEach(function(p) {
+    fetch(sb.url + '/rest/v1/app_config?key=eq.' + p.key, {
+      method: 'PATCH',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ value: p.value, updated_at: new Date().toISOString() })
+    }).catch(function(){})
+  })
+  var histRows = [
+    { currency_pair: 'USD_INR', rate: FX_RATES.INR, effective_date: today, source: 'frankfurter_api', notes: 'Auto-fetched' },
+    { currency_pair: 'USD_EUR', rate: FX_RATES.EUR, effective_date: today, source: 'frankfurter_api', notes: 'Auto-fetched' },
+    { currency_pair: 'EUR_INR', rate: FX_RATES.EUR_INR, effective_date: today, source: 'frankfurter_api', notes: 'Derived' }
+  ]
+  fetch(sb.url + '/rest/v1/exchange_rate_history', {
+    method: 'POST',
+    headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+    body: JSON.stringify(histRows)
+  }).catch(function(){})
+}
+
+function fmtMoney(usdVal, currency) {
+  currency = currency || SASC_CURRENCY
+  var val = usdVal * (FX_RATES[currency] || 1)
+  if (currency === 'INR') {
+    if (val >= 1e7) return '\u20B9' + (val / 1e7).toFixed(2) + ' Cr'
+    if (val >= 1e5) return '\u20B9' + (val / 1e5).toFixed(1) + ' L'
+    return '\u20B9' + Math.round(val).toLocaleString('en-IN')
+  }
+  if (currency === 'EUR') return '\u20AC' + (val / 1e6).toFixed(2) + 'M'
+  return '$' + (val / 1e6).toFixed(2) + 'M'
+}
+
+function setCurrency(c) {
+  SASC_CURRENCY = c
+  localStorage.setItem('sasc_currency', c)
+  renderStep(SASC_STEP)
+}
+
+// -- State ---------------------------------------------------------------------
+var SASC_STEP = 1
+var SASC_LOAD_GEN = 0  // increments on every renderStep call; loadWorkloadProfiles checks before writing to DOM
+var SASC_DATA = {
+  engId: null, engName: '', customerName: '', archetype: '',
+  docketId: null, docketItemId: null,
+  selectedUCs: [],
+  ucExpandedCluster: null,
+  scope: 'full',
+  dcType: 'mdc',
+  mdc: { tshirt: 'm', sites: 1, siteNames: '' },
+  bm: { power_kw: '', racks: '', cooling: 'dlc', situation: 'existing' },
+  layers: {
+    infra:    { on: true,  name: 'Infrastructure', desc: 'DC / MDC, power, cooling, physical security', tag: 'Infra' },
+    compute:  { on: true,  name: 'Compute', desc: 'GPU clusters (training + inference), CPU servers, NVMe storage', tag: 'Compute' },
+    network:  { on: true,  name: 'Networking', desc: 'InfiniBand E-W, 100GbE N-S, NKC switches, OOB management', tag: 'NKC' },
+    platform: { on: true,  name: 'AI Platform software', desc: 'Data Fusion, RAG, model registry, APIs, gateways, guardrails', tag: 'Platform' },
+    security: { on: true,  name: 'Security & compliance', desc: 'DPDP, zero-trust, air-gap (if required), SIEM', tag: 'SecOps' },
+    resilience:{ on: true, name: 'Resilience', desc: 'HA, DR, failover, backup and recovery', tag: 'HA/DR' },
+    data:     { on: true,  name: 'Data & integration', desc: 'Ingestion pipelines, connectors, ETL, data lake', tag: 'Data' },
+    ucdev:    { on: true,  name: 'UC development', desc: 'Build, fine-tune, integrate and test use cases', tag: 'UC Dev' },
+    skills:   { on: false, name: 'Skills & operations', desc: 'AI workforce, MLOps team, managed services', tag: 'Ops' }
+  },
+  pricingParams: [],
+  ucProfiles: [],
+  bom: [],
+  rom: { capex_usd: 0, opex_usd: 0, ucdev_usd: 0, total_usd: 0 },
+  gpuType: 'H100_SXM5',
+  deratingPct: 80,
+  ucWorkloads: {},
+  layerCfg: {},
+  gpuConfigId: null,
+  serviceModel: {
+    maas:   { enabled: false, models: [], agentEnabled: false, agentModel: 'Llama 3.1 8B INT4' },
+    gpuaas: { enabled: false, gpus: 0, gpu_hour_price_usd: 3.50 },
+    bmaas:  { enabled: false, servers: 0, server_hour_price_usd: 1.20 }
+  },
+  _portfolioItems: [],
+  territory_costs: null,
+  outputStack: {
+    ucdev:  false,  // AI Use Cases
+    maas:   false,  // Model as a Service
+    gpuaas: false,  // GPU as a Service
+    bmaas:  false,  // Bare Metal as a Service
+    skills: false,  // AI Skills Academy
+    coe:    false   // Centre of Excellence
+  }
+}
+
+var ALL_UCS = []
+var ALL_ENGAGEMENTS = []
+var ENGAGEMENT = null
+
+// -- Init ---------------------------------------------------------------------
+//    PEOPLE MODEL                                                               
+// Tab 2 on Screen 4. Pulls from people_params table.
+// Auto-suggests team from scope + UC count + complexity.
+// Contract types: fixed_price | tm | hybrid
+
+var ALL_PEOPLE_PARAMS = []
+var PEOPLE_MODEL = {
+  contract_type:    'tm',       // fixed_price | tm | hybrid
+  duration_months:  0,          // 0 = auto-calculated
+  team:             [],         // [{role_id, role, grade, count, start_month, end_month, rate_usd, cola_pct}]
+  loaded:           false
+}
+
+// Duration auto-calculation
+function calcAutoDuration() {
+  var s = SASC_DATA
+  var totalMonths = 3  // base infrastructure setup
+  var ucs = s.selectedUCs || []
+  var globalComp = (s.layerCfg && s.layerCfg.ucdev && s.layerCfg.ucdev.complexity) || 'medium'
+  var compMonths = { simple:2, medium:4, complex:6, research:9 }
+  ucs.forEach(function(ucId) {
+    var wl = s.ucWorkloads[ucId] || {}
+    var comp = wl.complexity || globalComp
+    totalMonths += compMonths[comp] || 4
+  })
+  // Parallel execution discount for 2+ UCs
+  if (ucs.length > 1) totalMonths = Math.round(totalMonths * 0.8)
+  return Math.max(6, totalMonths)
+}
+
+// Auto-suggest team based on scope + UC count + complexity
+function suggestTeam(peopleParams, durationMonths) {
+  var s = SASC_DATA
+  var layers = s.layers || {}
+  var ucCount = Math.max(1, (s.selectedUCs || []).length || 1)
+  var globalComp = (s.layerCfg && s.layerCfg.ucdev && s.layerCfg.ucdev.complexity) || 'medium'
+  var team = []
+
+  function addRole(role, grade, count, startMonth, endMonth) {
+    var param = peopleParams.find(function(p) {
+      return p.role === role && p.grade === grade
+    }) || peopleParams.find(function(p) { return p.role === role })
+    if (!param) return
+    team.push({
+      role_id:     param.id,
+      role:        param.role,
+      grade:       param.grade,
+      count:       count,
+      start_month: startMonth,
+      end_month:   endMonth || durationMonths,
+      rate_usd:    param.monthly_rate_usd,
+      cola_pct:    param.cola_pct || 10,
+      managed:     param.managed_service || false
     })
   }
 
-  // ─── Lookup helpers ────────────────────────────────────────────────────────
-  function getGPU (id) {
-    return _gpuConfigs.find(function (g) { return g.id === id }) || null
-  }
+  // Programme Manager -- always present
+  addRole('Programme Manager', 'senior', 1, 1, durationMonths)
 
-  function getModel (id) {
-    return _models.find(function (m) { return m.id === id }) || null
-  }
+  // AI/ML Engineers -- scale with UC count + complexity
+  var aiCount = globalComp === 'complex' || globalComp === 'research' ? ucCount : Math.ceil(ucCount * 0.7)
+  aiCount = Math.max(1, Math.min(aiCount, 4))
+  var aiGrade = globalComp === 'research' ? 'lead' : 'senior'
+  if (layers.ucdev && layers.ucdev.on) addRole('AI/ML Engineer', aiGrade, aiCount, 2, durationMonths - 1)
 
-  function getUCType (id) {
-    return _ucTypes.find(function (t) { return t.id === id }) || null
-  }
+  // Data Engineers
+  if (layers.data && layers.data.on) addRole('Data Engineer', 'senior', Math.max(1, Math.ceil(ucCount/2)), 2, durationMonths - 1)
 
-  function getArchetype (id) {
-    return _archetypes.find(function (a) { return a.id === id }) || null
-  }
+  // MLOps
+  if (layers.platform && layers.platform.on) addRole('MLOps Engineer', 'senior', 1, 3, durationMonths)
 
-  function getBenchmark (gpuConfigId, modelId) {
-    return _benchmarks.find(function (b) {
-      return b.gpu_config_id === gpuConfigId && b.ai_model_id === modelId
-    }) || null
-  }
+  // Infrastructure
+  if (layers.compute && layers.compute.on) addRole('Infrastructure Engineer', 'senior', 1, 1, 4)
 
-  function kvCacheSizeClass (params_b) {
-    if (!params_b) return 'medium'
-    if (params_b <= 14)  return 'small'
-    if (params_b <= 35)  return 'medium'
-    if (params_b <= 80)  return 'large'
-    return 'xlarge'
-  }
+  // Security
+  if (layers.security && layers.security.on) addRole('Security Engineer', 'mid', 1, 2, 5)
 
-  // ─── Core Math (pure functions) ────────────────────────────────────────────
-
-  /**
-   * VRAM required for model weights at given precision (GB)
-   * Formula: params_b × bytes_per_param
-   */
-  function calcModelVRAM (params_b, precision) {
-    var bpp = BYTES_PER_PARAM[precision] || 2
-    return params_b * bpp  // GB (1B params × 2 bytes = 2 GB)
-  }
-
-  /**
-   * VRAM required for KV cache (GB)
-   *
-   * Exact formula when model architecture params available (num_layers, num_kv_heads, head_dim):
-   *   M_KV = 2 × L × H_kv × D_head × C_max × N × B_cache
-   *   where:
-   *     L       = num_layers (transformer layers)
-   *     H_kv    = num_kv_heads (GQA KV heads — typically 8 for GQA, not full attention head count)
-   *     D_head  = head_dim (hidden dimension per head, typically 128)
-   *     C_max   = context_len in tokens (input + output)
-   *     N       = concurrent_requests
-   *     B_cache = bytes per KV element — always FP16 (2 bytes) by default
-   *               (frameworks like vLLM keep KV cache in FP16 even when weights are INT4)
-   *
-   * Field rule fallback when architecture params absent:
-   *   Small models 7B-14B:  0.15 MB/token (FP16)
-   *   Medium 14B-35B:       0.25 MB/token
-   *   Large 70B-80B:        0.35 MB/token
-   *   XLarge 100B+:         0.50 MB/token
-   */
-  function calcKVCache (model, contextLenTokens, concurrentRequests, precision) {
-    // KV cache is always kept at FP16 regardless of weight precision
-    // (this is standard practice in vLLM, TGI, TensorRT-LLM)
-    var B_cache = 2  // FP16 = 2 bytes
-
-    // Optional: FP8 KV cache if model explicitly configured for it
-    if (model && model.kv_cache_dtype === 'FP8') B_cache = 1
-
-    // Use exact formula if model architecture params are in model_catalogue
-    if (model && model.num_layers && model.num_kv_heads && model.head_dim) {
-      var L      = model.num_layers
-      var H_kv   = model.num_kv_heads
-      var D_head = model.head_dim
-      // M_KV = 2 × L × H_kv × D_head × C_max × N × B_cache (bytes → GB)
-      var bytes  = 2 * L * H_kv * D_head * contextLenTokens * concurrentRequests * B_cache
-      var gb     = bytes / (1024 * 1024 * 1024)
-      return Math.max(gb, 0.1)
+  // Domain SME -- based on UC domain
+  var ucDomains = {}
+  ;(s.selectedUCs || []).forEach(function(ucId) {
+    var ucType = ALL_UC_TYPES.find(function(t) {
+      var wl = s.ucWorkloads[ucId] || {}
+      return t.id === wl.uc_type_id
+    })
+    if (ucType) {
+      var domain = ucType.name.toLowerCase().indexOf('satellite') >= 0 ? 'Geospatial' :
+                   ucType.name.toLowerCase().indexOf('drug') >= 0 ? 'Health' :
+                   ucType.name.toLowerCase().indexOf('citizen') >= 0 || ucType.name.toLowerCase().indexOf('governance') >= 0 ? 'Governance' : null
+      if (domain) ucDomains[domain] = true
     }
+  })
+  Object.keys(ucDomains).forEach(function(domain) {
+    addRole('Domain SME - ' + domain, 'senior', 1, 2, Math.round(durationMonths * 0.7))
+  })
 
-    // Field rule fallback — calibrated for FP16 KV cache, directionally accurate
-    var sizeClass  = kvCacheSizeClass(model ? model.params_b : null)
-    var mbPerToken = KV_CACHE_MB_PER_TOKEN[sizeClass]
-    var totalGB    = (mbPerToken * contextLenTokens * concurrentRequests) / 1024
-    return Math.max(totalGB, 0.1)
-  }
+  return team
+}
 
-  /**
-   * Return which KV cache calculation method was used — for audit trail in UI
-   */
-  function kvCacheMethod (model) {
-    if (model && model.num_layers && model.num_kv_heads && model.head_dim) {
-      return 'exact (2×L×H_kv×D_head×C×N | L=' + model.num_layers + ' H_kv=' + model.num_kv_heads + ' D=' + model.head_dim + ')'
-    }
-    var sc = kvCacheSizeClass(model ? model.params_b : null)
-    return 'field rule (' + (KV_CACHE_MB_PER_TOKEN[sc] || 0.25) + ' MB/token)'
-  }
+// Monthly cost for a team member at a given month
+function memberMonthlyCost(member, month) {
+  if (month < member.start_month || month > member.end_month) return 0
+  // Ramp up: 50% in first month, 100% after
+  var rampFactor = month === member.start_month ? 0.5 : 1.0
+  // Ramp down: 50% in last month
+  if (month === member.end_month) rampFactor = 0.5
+  // COLA: apply per year
+  var yearIdx = Math.floor((month - 1) / 12)
+  var colaMultiplier = Math.pow(1 + member.cola_pct / 100, yearIdx)
+  return member.count * member.rate_usd * rampFactor * colaMultiplier
+}
 
-  /**
-   * Total VRAM footprint for model at full load (GB)
-   * M_total = (M_weights + M_KV_cache) × 1.20 overhead
-   */
-  function calcTotalVRAM (params_b, precision, contextLenTokens, concurrentRequests, model) {
-    var weights = calcModelVRAM(params_b, precision)
-    var kv      = calcKVCache(model, contextLenTokens, concurrentRequests, precision)
-    return (weights + kv) * RUNTIME_OVERHEAD
-  }
+// Calculate total people cost
+function calcPeopleCost(team, durationMonths) {
+  var yearCosts = [0, 0, 0]
+  var peakHeadcount = 0
+  var monthlyBurn = []
 
-  /**
-   * GPUs needed to fit model in VRAM
-   * Considers model's gpu_memory_gb jsonb if available (more accurate)
-   */
-  function calcGPUsForFit (params_b, precision, gpu, model, contextLenTokens, concurrentRequests) {
-    var vramPerGPU = gpu.vram_per_gpu_gb || 80
-
-    // Use model's known VRAM requirement if available
-    var modelVRAMNeeded = null
-    if (model && model.gpu_memory_gb) {
-      var memMap = typeof model.gpu_memory_gb === 'string'
-        ? JSON.parse(model.gpu_memory_gb) : model.gpu_memory_gb
-      modelVRAMNeeded = memMap[precision] || memMap['INT4'] || null
-    }
-
-    if (modelVRAMNeeded) {
-      // Add KV cache on top of known model VRAM
-      var kv = calcKVCache(model, contextLenTokens, concurrentRequests, precision)
-      var total = (modelVRAMNeeded + kv) * RUNTIME_OVERHEAD
-      return Math.ceil(total / vramPerGPU)
-    }
-
-    // Fallback: estimate from params
-    var total = calcTotalVRAM(params_b, precision, contextLenTokens, concurrentRequests, model)
-    return Math.ceil(total / vramPerGPU)
-  }
-
-  /**
-   * Peak requests per second
-   */
-  function calcPeakRPS (dau, requestsPerUserPerDay, peakMultiplier) {
-    var avgRPS = (dau * requestsPerUserPerDay) / 86400
-    return avgRPS * peakMultiplier
-  }
-
-  /**
-   * Token throughput needed (tokens/sec) at peak
-   */
-  function calcPeakTokenThroughput (peakRPS, avgOutputTokens) {
-    return peakRPS * avgOutputTokens
-  }
-
-  /**
-   * GPU throughput (tokens/sec per GPU unit) from benchmark or formula
-   *
-   * Profile B (internal UC — low concurrency, latency-bound):
-   *   tokens/sec ≈ GPU_bandwidth_GBs / model_size_GB  (memory bandwidth bound)
-   *
-   * Profile A (MaaS API — high concurrency, compute-bound at batch 128+):
-   *   tokens/sec from benchmark_results (measured)
-   *   fallback: estimate from TFlops × efficiency factor
-   */
-  function calcGPUThroughput (gpu, model, params_b, precision, profile) {
-    // Try benchmark first (most accurate)
-    if (model) {
-      var bm = getBenchmark(gpu.id, model.id)
-      if (bm && bm.tokens_per_sec_p50) return bm.tokens_per_sec_p50
-    }
-
-    var modelSizeGB = calcModelVRAM(params_b, precision)
-    var bwGBs = (gpu.hbm_bw_tbps || 3.0) * 1000  // TB/s → GB/s
-
-    if (profile === 'B') {
-      // Memory bandwidth bound (small batch, latency-driven)
-      // tokens/sec per GPU ≈ bandwidth / model_size (rough but directionally correct)
-      return Math.round(bwGBs / Math.max(modelSizeGB / (gpu.gpus_in_unit || gpu.gpus_per_unit || 8), 1))
-    } else {
-      // Profile A — compute bound at large batch
-      // Effective tokens/sec: TFlops × 2 (multiply-add) / model_ops_per_token
-      // Model ops per token ≈ 2 × params_b × 1e9 (2 flops per param per token)
-      var tflops = precision === 'INT4' || precision === 'FP4'
-        ? (gpu.int4_tflops || gpu.bf16_tflops * 2)
-        : (gpu.bf16_tflops || 1000)
-      // tflops is per unit (rack or server)
-      var flopsPerToken = 2 * params_b * 1e9  // ~2 flops per param
-      var rawTokensPerSec = (tflops * 1e12) / flopsPerToken
-      // Apply 30% efficiency factor (realistic utilisation of peak TFlops)
-      return Math.round(rawTokensPerSec * 0.30)
-    }
-  }
-
-  /**
-   * GPUs needed to meet throughput demand
-   */
-  function calcGPUsForThroughput (peakRPS, avgOutputTokens, gpu, model, params_b, precision, profile, deratingPct) {
-    var throughputNeeded = calcPeakTokenThroughput(peakRPS, avgOutputTokens)
-    var throughputPerUnit = calcGPUThroughput(gpu, model, params_b, precision, profile)
-    var derate = (deratingPct || 80) / 100
-    var derated = throughputPerUnit * derate
-    if (derated <= 0) return 1
-    var units = Math.ceil(throughputNeeded / derated)
-    return Math.max(units, 1)
-  }
-
-  /**
-   * Apply SLA + resilience buffers to base GPU count
-   * Returns breakdown object for full transparency
-   */
-  function applyBuffers (baseGPUs, slaTier, haRequired, drType, growthHeadroomPct) {
-    var sla = SLA_BUFFERS[slaTier] || SLA_BUFFERS.standard
-
-    var peakBuffer       = Math.ceil(baseGPUs * sla.peak_headroom_pct / 100)
-    var failoverReserve  = Math.ceil(baseGPUs * sla.failover_pct / 100)
-    var multiTenancy     = Math.ceil(baseGPUs * sla.multi_tenancy_pct / 100)
-
-    var haGPUs = haRequired ? Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.ha_standard) : 0
-    var drGPUs = 0
-    if (drType === 'warm')          drGPUs = Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.dr_warm)
-    if (drType === 'active-active') drGPUs = Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.dr_active_active)
-
-    var growthGPUs = Math.ceil(baseGPUs * ((growthHeadroomPct || 0) / 100))
-
-    var totalGPUs = baseGPUs + peakBuffer + failoverReserve + multiTenancy + haGPUs + drGPUs + growthGPUs
-
-    return {
-      base_gpus:        baseGPUs,
-      peak_buffer:      peakBuffer,
-      failover_reserve: failoverReserve,
-      multi_tenancy:    multiTenancy,
-      ha_gpus:          haGPUs,
-      dr_gpus:          drGPUs,
-      growth_gpus:      growthGPUs,
-      total_gpus:       totalGPUs
-    }
-  }
-
-  /**
-   * Convert GPU count to rack/server units
-   */
-  function gpusToUnits (totalGPUs, gpu) {
-    var gpusPerUnit = gpu.gpus_in_unit || gpu.gpus_per_unit || 8
-    var unitType = gpu.rack_scale ? 'rack' : 'server'
-    var units = Math.ceil(totalGPUs / gpusPerUnit)
-    // Recalculate actual GPU count (round up to full units)
-    var actualGPUs = units * gpusPerUnit
-    return { units: units, unit_type: unitType, actual_gpus: actualGPUs, gpus_per_unit: gpusPerUnit }
-  }
-
-  /**
-   * Power draw estimate
-   */
-  function calcPowerKW (units, gpu) {
-    return units * (gpu.tdp_kw || (gpu.power_watts_tdp / 1000) || 10)
-  }
-
-  // ─── PUBLIC API ────────────────────────────────────────────────────────────
-
-  var SizingEngine = {
-
-    ready: false,
-
-    /**
-     * init(sbUrl, sbKey)
-     * Load all reference data from Supabase. Call once on app start.
-     * Returns Promise<void>
-     */
-    init: function (sbUrl, sbKey) {
-      _sbUrl = sbUrl
-      _sbKey = sbKey
-      var self = this
-
-      return Promise.all([
-        _fetch('gpu_configs',           'active=eq.true&order=name.asc', 50),
-        _fetch('model_catalogue',       'enabled=eq.true&order=name.asc', 100),
-        _fetch('uc_interaction_types',  'active=eq.true&order=sort_order.asc', 50),
-        _fetch('requirement_archetypes','active=eq.true&order=sort_order.asc', 20),
-        _fetch('benchmark_results',     'order=created_at.desc', 200)
-      ]).then(function (results) {
-        _gpuConfigs  = results[0] || []
-        _models      = results[1] || []
-        _ucTypes     = results[2] || []
-        _archetypes  = results[3] || []
-        _benchmarks  = results[4] || []
-        self.ready = true
-        _ready = true
-        console.log('[SizingEngine] ready — GPUs:', _gpuConfigs.length,
-          'Models:', _models.length, 'UC types:', _ucTypes.length,
-          'Archetypes:', _archetypes.length, 'Benchmarks:', _benchmarks.length)
-      })
-    },
-
-    // Expose reference data for UI use
-    getGPUConfigs:  function () { return _gpuConfigs },
-    getModels:      function () { return _models },
-    getUCTypes:     function () { return _ucTypes },
-    getArchetypes:  function () { return _archetypes },
-    getMaaSArchetypes: function () {
-      return _archetypes.filter(function (a) { return a.archetype_type === 'maas' })
-    },
-
-    /**
-     * sizeUC(config, gpuConfigId)
-     *
-     * Size a single Use Case workload. Profile B — latency-driven, low concurrency.
-     *
-     * config: {
-     *   uc_type_id:          string  (uc_interaction_types.id — provides defaults)
-     *   model_id:            string  (model_catalogue.id)
-     *   dau:                 number
-     *   requests_per_day:    number  (optional — uses uc_type default)
-     *   avg_input_tokens:    number  (optional — uses uc_type default)
-     *   avg_output_tokens:   number  (optional — uses uc_type default)
-     *   context_window:      number  in tokens (optional — uses model default)
-     *   precision:           string  FP16|INT8|INT4 (optional — uses uc_type min_precision)
-     *   peak_multiplier:     number  (optional — uses uc_type default)
-     *   sla_tier:            string  standard|enterprise
-     *   ha_required:         boolean (optional — uses uc_type default)
-     *   dr_type:             string  none|warm|active-active
-     *   growth_headroom_pct: number  (optional, default 20)
-     *   derating_pct:        number  (optional, default 80)
-     * }
-     */
-    sizeUC: function (config, gpuConfigId) {
-      var gpu   = getGPU(gpuConfigId)
-      var model = getModel(config.model_id)
-      var ucType = getUCType(config.uc_type_id)
-
-      if (!gpu) return { error: 'GPU config not found: ' + gpuConfigId }
-
-      // Resolve config with uc_type defaults
-      var dau         = config.dau || 100
-      var reqPerDay   = config.requests_per_day    || (ucType && ucType.requests_per_user_per_day) || 5
-      var inputTok    = config.avg_input_tokens    || (ucType && ucType.avg_input_tokens)  || 300
-      var outputTok   = config.avg_output_tokens   || (ucType && ucType.avg_output_tokens) || 500
-      var contextLen  = config.context_window      || ((model && model.context_length_k) ? model.context_length_k * 1000 : 8192)
-      var precision   = config.precision           || (ucType && ucType.min_precision) || 'INT4'
-      var peakMult    = config.peak_multiplier     || (ucType && ucType.peak_multiplier) || 3
-      var slaTier     = config.sla_tier            || 'standard'
-      var haRequired  = config.ha_required !== undefined ? config.ha_required : (ucType && ucType.ha_required !== undefined ? ucType.ha_required : true)
-      var drType      = config.dr_type             || 'none'
-      var growth      = config.growth_headroom_pct !== undefined ? config.growth_headroom_pct : 20
-      var derating    = config.derating_pct        || 80
-      var params_b    = model ? model.params_b : 7
-
-      // Peak RPS from demand inputs
-      var peakRPS = calcPeakRPS(dau, reqPerDay, peakMult)
-      // Concurrent sessions via Little's Law: N = λ × W
-      // W = average service time derived from latency SLA
-      // Tighter SLA = shorter service time = fewer concurrent sessions for same RPS
-      var responseTimeSec = config.ttft_sla_ms
-        ? Math.max(0.5, config.ttft_sla_ms / 1000)
-        : (ucType && ucType.typical_sla_ms ? ucType.typical_sla_ms / 1000 : 2.0)
-      var concurrentSessions = Math.max(1, Math.ceil(peakRPS * responseTimeSec))
-
-      // GPU fit (VRAM)
-      var gpusForFit        = calcGPUsForFit(params_b, precision, gpu, model, contextLen, concurrentSessions)
-
-      // GPU throughput (Profile B — memory bandwidth bound at low batch)
-      var gpusForThroughput = calcGPUsForThroughput(peakRPS, outputTok, gpu, model, params_b, precision, 'B', derating)
-
-      // Binding constraint
-      var baseGPUs = Math.max(gpusForFit, gpusForThroughput, 1)
-      var bindingConstraint = gpusForFit >= gpusForThroughput ? 'memory_fit' : 'throughput'
-
-      // Apply buffers — note: for UCs we DON'T apply MaaS multi-tenancy overhead
-      var sla = SLA_BUFFERS[slaTier] || SLA_BUFFERS.standard
-      var peakBuffer      = Math.ceil(baseGPUs * sla.peak_headroom_pct / 100)
-      var failoverReserve = Math.ceil(baseGPUs * sla.failover_pct / 100)
-      var haGPUs          = haRequired ? Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.ha_standard) : 0
-      var drGPUs          = drType === 'warm' ? Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.dr_warm)
-                          : drType === 'active-active' ? Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.dr_active_active)
-                          : 0
-      var growthGPUs      = Math.ceil(baseGPUs * (growth / 100))
-      var totalGPUs       = baseGPUs + peakBuffer + failoverReserve + haGPUs + drGPUs + growthGPUs
-
-      // Convert to units
-      var unitCalc    = gpusToUnits(totalGPUs, gpu)
-      var powerKW     = calcPowerKW(unitCalc.units, gpu)
-
-      // Throughput estimate (for SLA validation)
-      var throughputPerUnit = calcGPUThroughput(gpu, model, params_b, precision, 'B')
-      var totalThroughput   = throughputPerUnit * unitCalc.actual_gpus * (derating / 100)
-      var ttftEstimateMs    = model
-        ? Math.round((params_b * 2 * 1e9) / ((gpu.hbm_bw_tbps || 3) * 1e12) * 1000)
-        : null
-      var slaRequired = ucType ? ucType.typical_sla_ms : (config.ttft_sla_ms || 2000)
-      var slaMet = ttftEstimateMs ? ttftEstimateMs <= slaRequired : true
-
-      return {
-        // Inputs resolved
-        dau: dau, requests_per_day: reqPerDay, peak_rps: Math.round(peakRPS * 100) / 100,
-        precision: precision, params_b: params_b, context_window: contextLen,
-
-        // GPU sizing breakdown
-        gpus_for_fit:        gpusForFit,
-        gpus_for_throughput: gpusForThroughput,
-        binding_constraint:  bindingConstraint,
-        base_gpus:           baseGPUs,
-        peak_buffer_gpus:    peakBuffer,
-        failover_gpus:       failoverReserve,
-        ha_gpus:             haGPUs,
-        dr_gpus:             drGPUs,
-        growth_gpus:         growthGPUs,
-        total_gpus:          totalGPUs,
-
-        // Units
-        units_required: unitCalc.units,
-        unit_type:      unitCalc.unit_type,
-        actual_gpus:    unitCalc.actual_gpus,
-        gpus_per_unit:  unitCalc.gpus_per_unit,
-
-        // Performance
-        throughput_tokens_per_sec: Math.round(totalThroughput),
-        ttft_estimate_ms:          ttftEstimateMs,
-        sla_met:                   slaMet,
-        power_kw:                  Math.round(powerKW * 10) / 10,
-
-        // Explanation
-        sizing_profile: 'B',
-        notes: [
-          'Profile B (UC internal): memory-bandwidth bound at low concurrency',
-          'Base: max(' + gpusForFit + ' fit, ' + gpusForThroughput + ' throughput) = ' + baseGPUs + ' GPUs (' + bindingConstraint + ')',
-          'Buffers: +' + peakBuffer + ' peak, +' + failoverReserve + ' failover, +' + haGPUs + ' HA, +' + drGPUs + ' DR, +' + growthGPUs + ' growth',
-          'Total: ' + totalGPUs + ' GPUs → ' + unitCalc.units + ' ' + unitCalc.unit_type + '(s) × ' + unitCalc.gpus_per_unit + ' GPUs',
-        'KV: ' + kvCacheMethod(model)
-      ].join(' | '),
-
-      // Audit trail — full sizing inputs/outputs for customer transparency
-      audit: {
-        formula:             'M_total = (M_weights + M_KV) × 1.20',
-        m_weights_gb:        Math.round(calcModelVRAM(params_b, precision) * 100) / 100,
-        m_kv_gb:             Math.round(calcKVCache(model, contextLen, concurrentSessions, precision) * 100) / 100,
-        m_total_gb:          Math.round(calcTotalVRAM(params_b, precision, contextLen, concurrentSessions, model) * 100) / 100,
-        vram_per_gpu_gb:     gpu.vram_per_gpu_gb || 80,
-        gpus_for_fit:        gpusForFit,
-        gpus_for_throughput: gpusForThroughput,
-        binding_constraint:  bindingConstraint,
-        kv_cache_method:     kvCacheMethod(model),
-        concurrent_sessions: concurrentSessions,
-        littles_law:         'λ=' + Math.round(peakRPS*100)/100 + ' RPS × W=' + responseTimeSec + 's = N=' + concurrentSessions
+  for (var m = 1; m <= durationMonths; m++) {
+    var monthCost = 0
+    var monthHeadcount = 0
+    team.forEach(function(member) {
+      monthCost += memberMonthlyCost(member, m)
+      if (m >= member.start_month && m <= member.end_month) {
+        monthHeadcount += member.count
       }
-    },
+    })
+    monthlyBurn.push({ month: m, cost: Math.round(monthCost) })
+    peakHeadcount = Math.max(peakHeadcount, monthHeadcount)
+    var yearIdx = Math.min(2, Math.floor((m - 1) / 12))
+    yearCosts[yearIdx] += monthCost
+  }
 
-    /**
-     * sizeMaaS(config, gpuConfigId)
-     *
-     * Size a MaaS usage type. Profile A — throughput-driven, high concurrency.
-     *
-     * config: {
-     *   archetype_id:     string  (requirement_archetypes.id — provides all defaults)
-     *   model_id:         string  (model_catalogue.id — selected tier)
-     *   dau:              number  total DAU for this usage type
-     *   sla_tier:         string  standard|enterprise
-     *   precision:        string  (optional — inferred from model)
-     *   derating_pct:     number  (optional, default 80)
-     * }
-     */
-    sizeMaaS: function (config, gpuConfigId) {
-      var gpu       = getGPU(gpuConfigId)
-      var model     = getModel(config.model_id)
-      var archetype = getArchetype(config.archetype_id)
+  var managedCost = 0
+  var internalCost = 0
+  team.forEach(function(member) {
+    var totalMemberCost = 0
+    for (var m2 = member.start_month; m2 <= member.end_month; m2++) {
+      totalMemberCost += memberMonthlyCost(member, m2)
+    }
+    if (member.managed) managedCost += totalMemberCost
+    else internalCost += totalMemberCost
+  })
 
-      if (!gpu)       return { error: 'GPU config not found: ' + gpuConfigId }
-      if (!archetype) return { error: 'Archetype not found: ' + config.archetype_id }
+  return {
+    yearCosts:        yearCosts,
+    total:            yearCosts.reduce(function(a,b){ return a+b }, 0),
+    peakHeadcount:    peakHeadcount,
+    monthlyBurn:      monthlyBurn,
+    managedCost:      managedCost,
+    internalCost:     internalCost
+  }
+}
 
-      var cfg = archetype.config || {}
-      var dau        = config.dau || 1000
-      var slaTier    = config.sla_tier || 'standard'
-      var precision  = config.precision || 'INT4'
-      var derating   = config.derating_pct || 80
+async function loadPeopleModel() {
+  if (!ALL_PEOPLE_PARAMS.length) {
+    ALL_PEOPLE_PARAMS = await sbFetch('people_params', 'active=eq.true&order=role.asc', 50) || []
+  }
+  if (!PEOPLE_MODEL.loaded || !PEOPLE_MODEL.team.length) {
+    var duration = PEOPLE_MODEL.duration_months || calcAutoDuration()
+    PEOPLE_MODEL.duration_months = duration
+    PEOPLE_MODEL.team = suggestTeam(ALL_PEOPLE_PARAMS, duration)
+    PEOPLE_MODEL.loaded = true
+  }
+  return PEOPLE_MODEL
+}
 
-      // Resolve from archetype
-      var reqPerDay   = cfg.requests_per_user_per_day || 5
-      var inputTok    = cfg.avg_input_tokens  || 300
-      var outputTok   = cfg.avg_output_tokens || 500
-      var contextLen  = (cfg.avg_context_window_k || 8) * 1000
-      var peakConcPct = cfg.peak_concurrent_pct || 5
-      var params_b    = model ? model.params_b : 7
+function setPeopleContract(type) {
+  PEOPLE_MODEL.contract_type = type
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
 
-      // Peak concurrent users at any moment
-      var peakConcurrent = Math.ceil(dau * peakConcPct / 100)
+function setPeopleDuration(val) {
+  var n = parseInt(val) || calcAutoDuration()
+  PEOPLE_MODEL.duration_months = n
+  // Re-suggest team with new duration
+  PEOPLE_MODEL.team = suggestTeam(ALL_PEOPLE_PARAMS, n)
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
 
-      // Peak RPS from concurrent users × requests per session
-      // At peak, concurrent users are actively generating — assume 1 req/10s average
-      var peakRPS = Math.ceil(peakConcurrent / 10)
+function updateTeamMember(idx, field, value) {
+  if (!PEOPLE_MODEL.team[idx]) return
+  PEOPLE_MODEL.team[idx][field] = isNaN(Number(value)) ? value : Number(value)
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
 
-      // GPU fit (VRAM for model + KV cache for concurrent sessions)
-      var gpusForFit = calcGPUsForFit(params_b, precision, gpu, model, contextLen, peakConcurrent)
+function addTeamMember() {
+  var param = ALL_PEOPLE_PARAMS[0]
+  if (!param) return
+  PEOPLE_MODEL.team.push({
+    role_id: param.id, role: param.role, grade: param.grade,
+    count: 1, start_month: 1, end_month: PEOPLE_MODEL.duration_months,
+    rate_usd: param.monthly_rate_usd, cola_pct: param.cola_pct || 10, managed: false
+  })
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
 
-      // GPU throughput (Profile A — compute bound at large batch)
-      var gpusForThroughput = calcGPUsForThroughput(peakRPS, outputTok, gpu, model, params_b, precision, 'A', derating)
+function removeTeamMember(idx) {
+  PEOPLE_MODEL.team.splice(idx, 1)
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
 
-      var baseGPUs = Math.max(gpusForFit, gpusForThroughput, 1)
-      var bindingConstraint = gpusForFit >= gpusForThroughput ? 'memory_fit' : 'throughput'
+function changePeopleRole(idx, roleId) {
+  var param = ALL_PEOPLE_PARAMS.find(function(p){ return p.id === roleId })
+  if (!param || !PEOPLE_MODEL.team[idx]) return
+  PEOPLE_MODEL.team[idx].role_id   = param.id
+  PEOPLE_MODEL.team[idx].role      = param.role
+  PEOPLE_MODEL.team[idx].grade     = param.grade
+  PEOPLE_MODEL.team[idx].rate_usd  = param.monthly_rate_usd
+  PEOPLE_MODEL.team[idx].cola_pct  = param.cola_pct || 10
+  PEOPLE_MODEL.team[idx].managed   = param.managed_service || false
+  document.getElementById('bom-tab-content').innerHTML = renderActiveTab()
+}
 
-      // MaaS buffers — all three layers applied
-      var headroomPct    = slaTier === 'enterprise' ? (cfg.peak_headroom_pct_enterprise || 30) : (cfg.peak_headroom_pct_standard || 25)
-      var failoverPct    = slaTier === 'enterprise' ? (cfg.failover_pct_enterprise || 30)      : (cfg.failover_pct_standard || 15)
-      var multiTenPct    = cfg.multi_tenancy_overhead_pct || 12
+//    Render people model tab                                                    
+function renderPeopleTab() {
+  var pm = PEOPLE_MODEL
+  var duration = pm.duration_months || calcAutoDuration()
+  var autoDur  = calcAutoDuration()
+  var peopleCost = calcPeopleCost(pm.team, duration)
 
-      var peakBuffer      = Math.ceil(baseGPUs * headroomPct  / 100)
-      var failoverReserve = Math.ceil(baseGPUs * failoverPct  / 100)
-      var multiTenancy    = Math.ceil(baseGPUs * multiTenPct  / 100)
-      var totalGPUs       = baseGPUs + peakBuffer + failoverReserve + multiTenancy
+  // Contract type selector
+  var html = '<div class="card">'
+    + '<div class="card-title">Contract type</div>'
+    + '<div class="card-sub">Determines how people costs are presented in the ROM</div>'
+    + '<div class="scope-opts" style="margin-bottom:0">'
+    + [
+        {v:'tm',          t:'Time & Materials',  s:'Customer pays monthly actuals. We bill at agreed rates.'},
+        {v:'fixed_price', t:'Fixed Price',       s:'Lump sum. Our risk. Margin baked in.'},
+        {v:'hybrid',      t:'Hybrid',            s:'Fixed price for UC dev, T&M for managed services.'}
+      ].map(function(o) {
+        return '<div class="scope-opt ' + (pm.contract_type===o.v?'sel':'') + '" data-ct="' + o.v + '" onclick="setPeopleContract(this.dataset.ct)">'
+          + '<div class="scope-opt-title">' + o.t + '</div>'
+          + '<div class="scope-opt-sub">' + o.s + '</div></div>'
+      }).join('')
+    + '</div></div>'
 
-      // Units
-      var unitCalc = gpusToUnits(totalGPUs, gpu)
-      var powerKW  = calcPowerKW(unitCalc.units, gpu)
+  // Programme duration
+  html += '<div class="card">'
+    + '<div class="card-title">Programme duration</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+    + '<div><label>Duration (months)</label>'
+    + '<input type="number" min="3" max="60" value="' + duration + '" id="prog-duration" onchange="setPeopleDuration(this.value)">'
+    + '<div style="font-size:10px;color:var(--mid);margin-top:3px">Auto-calculated: ' + autoDur + ' months from UC count + complexity. Override above.</div>'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:4px;justify-content:flex-end">'
+    + '<div style="font-size:12px;font-weight:600;color:var(--navy)">Peak headcount: ' + peopleCost.peakHeadcount + '</div>'
+    + '<div style="font-size:11px;color:var(--mid)">Managed service: ' + fmtMoney(adjustedPeopleCost.managedCost) + '</div>'
+    + '<div style="font-size:11px;color:var(--mid)">Internal team: ' + fmtMoney(adjustedPeopleCost.internalCost) + '</div>'
+    + '</div></div></div>'
 
-      // Cost per million tokens (at 75% utilisation)
-      var throughputPerUnit  = calcGPUThroughput(gpu, model, params_b, precision, 'A')
-      var totalThroughput    = throughputPerUnit * unitCalc.actual_gpus * (derating / 100)
-      var tokensPerMonth     = totalThroughput * 60 * 60 * 24 * 30 * 0.75  // 75% utilisation
-      var capexPerUnit       = null  // populated externally from pricing_params
-      var powerCostPerMonth  = null  // populated externally from territory config
+  // Team table
+  html += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    + '<div><div class="card-title">Team composition</div>'
+    + '<div class="card-sub">Auto-suggested from scope + UC count. Override as needed.</div></div>'
+    + '<button class="btn btn-ghost btn-sm" onclick="addTeamMember()">+ Add role</button>'
+    + '</div>'
+    + '<div style="overflow-x:auto"><table class="bom-table"><thead><tr>'
+    + '<th>Role</th><th>Grade</th><th>Count</th><th>Start mo.</th><th>End mo.</th>'
+    + '<th>Rate/mo (USD)</th><th>COLA%</th><th>MS</th>'
+    + '<th>Yr 1</th><th>Yr 2</th><th>Yr 3</th><th></th>'
+    + '</tr></thead><tbody>'
 
-      return {
-        // Demand
-        usage_type:            cfg.usage_type,
-        dau:                   dau,
-        peak_concurrent:       peakConcurrent,
-        peak_rps:              peakRPS,
-        precision:             precision,
-        params_b:              params_b,
+  pm.team.forEach(function(member, idx) {
+    var yr1 = 0, yr2 = 0, yr3 = 0
+    for (var m = member.start_month; m <= member.end_month; m++) {
+      var cost = memberMonthlyCost(member, m)
+      var yi   = Math.min(2, Math.floor((m-1)/12))
+      if (yi===0) yr1+=cost; else if(yi===1) yr2+=cost; else yr3+=cost
+    }
+    html += '<tr>'
+      // Role selector
+      + '<td><select style="font-size:11px;padding:2px 4px;min-width:140px" data-idx="' + idx + '" onchange="changePeopleRole(this.dataset.idx,this.value)">'
+      + ALL_PEOPLE_PARAMS.map(function(p) {
+          return '<option value="' + p.id + '"' + (member.role_id===p.id?' selected':'') + '>' + p.role + ' (' + p.grade + ')</option>'
+        }).join('')
+      + '</select></td>'
+      + '<td style="font-size:11px;color:var(--mid)">' + esc(member.grade) + '</td>'
+      + '<td><input type="number" min="1" max="20" value="' + member.count + '" style="width:50px;font-size:11px;padding:2px 4px" data-idx="' + idx + '" data-field="count" onchange="updateTeamMember(this.dataset.idx,this.dataset.field,this.value)"></td>'
+      + '<td><input type="number" min="1" max="' + duration + '" value="' + member.start_month + '" style="width:50px;font-size:11px;padding:2px 4px" data-idx="' + idx + '" data-field="start_month" onchange="updateTeamMember(this.dataset.idx,this.dataset.field,this.value)"></td>'
+      + '<td><input type="number" min="1" max="' + duration + '" value="' + member.end_month + '" style="width:50px;font-size:11px;padding:2px 4px" data-idx="' + idx + '" data-field="end_month" onchange="updateTeamMember(this.dataset.idx,this.dataset.field,this.value)"></td>'
+      + '<td style="font-size:11px">' + fmtMoney(member.rate_usd) + '</td>'
+      + '<td style="font-size:11px">' + member.cola_pct + '%</td>'
+      + '<td style="font-size:11px">' + (member.managed?'Yes':'No') + '</td>'
+      + '<td style="font-size:11px;font-weight:600">' + fmtMoney(yr1) + '</td>'
+      + '<td style="font-size:11px">' + fmtMoney(yr2) + '</td>'
+      + '<td style="font-size:11px">' + fmtMoney(yr3) + '</td>'
+      + '<td><button class="btn btn-ghost btn-xs" data-idx="' + idx + '" onclick="removeTeamMember(this.dataset.idx)" style="color:var(--orange)">x</button></td>'
+      + '</tr>'
+  })
 
-        // GPU breakdown
-        gpus_for_fit:          gpusForFit,
-        gpus_for_throughput:   gpusForThroughput,
-        binding_constraint:    bindingConstraint,
-        base_gpus:             baseGPUs,
-        peak_buffer_gpus:      peakBuffer,
-        failover_gpus:         failoverReserve,
-        multi_tenancy_gpus:    multiTenancy,
-        total_gpus:            totalGPUs,
+  html += '</tbody></table></div>'
 
-        // Units
-        units_required:        unitCalc.units,
-        unit_type:             unitCalc.unit_type,
-        actual_gpus:           unitCalc.actual_gpus,
-        gpus_per_unit:         unitCalc.gpus_per_unit,
+  // People cost summary
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:2px solid var(--navy);margin-top:8px">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy)">Total people cost</div>'
+    + '<div style="display:flex;gap:16px">'
+    + '<div style="text-align:center"><div style="font-size:11px;color:var(--mid)">Year 1</div><div style="font-size:14px;font-weight:700;color:var(--navy)">' + fmtMoney(peopleCost.yearCosts[0]) + '</div></div>'
+    + '<div style="text-align:center"><div style="font-size:11px;color:var(--mid)">Year 2</div><div style="font-size:14px;font-weight:700;color:var(--navy)">' + fmtMoney(peopleCost.yearCosts[1]) + '</div></div>'
+    + '<div style="text-align:center"><div style="font-size:11px;color:var(--mid)">Year 3</div><div style="font-size:14px;font-weight:700;color:var(--navy)">' + fmtMoney(peopleCost.yearCosts[2]) + '</div></div>'
+    + '<div style="text-align:center;padding-left:12px;border-left:2px solid var(--navy)"><div style="font-size:11px;color:var(--mid)">Programme total</div><div style="font-size:18px;font-weight:900;color:var(--orange)">' + fmtMoney(adjustedPeopleCost.total) + (salaryRatio !== 1.0 ? ' <span style="font-size:10px;color:' + (salaryRatio<1?'var(--teal)':'var(--orange)') + ';font-weight:600">' + (salaryRatio<1?'▼':'▲') + Math.abs(Math.round((1-salaryRatio)*100)) + '% territory</span>' : '') + '</div></div>'
+    + '</div></div>'
+    + '</div>'
 
-        // Capacity
-        throughput_tokens_per_sec: Math.round(totalThroughput),
-        tokens_per_month_75pct:    Math.round(tokensPerMonth),
-        power_kw:                  Math.round(powerKW * 10) / 10,
+  return html
+}
 
-        // Economics (to be completed by FM with pricing_params)
-        cost_per_mtoken_usd:   null,  // FM layer completes this
-        capex_usd:             null,
+//    ROM Summary tab                                                            
+function renderROMSummary() {
+  var rom = SASC_DATA.rom || { capex_usd:0, opex_usd:0, ucdev_usd:0, total_usd:0 }
+  var pm = PEOPLE_MODEL
+  var duration = pm.duration_months || calcAutoDuration()
+  var peopleCost = calcPeopleCost(pm.team, duration)
+  var _tc = SASC_DATA.territory_costs
+  var salaryRatio = (_tc && _tc.salary_ratio) || 1.0
+  var adjustedPeopleCost = {
+    total:         Math.round((peopleCost.total        || 0) * salaryRatio),
+    yearCosts:     peopleCost.yearCosts  || [],
+    peakHeadcount: peopleCost.peakHeadcount || 0,
+    monthlyBurn:   Math.round((peopleCost.monthlyBurn  || 0) * salaryRatio),
+    managedCost:   Math.round((peopleCost.managedCost  || 0) * salaryRatio),
+    internalCost:  Math.round((peopleCost.internalCost || 0) * salaryRatio)
+  }
+  // Compute confidence as weighted average of pricing_params confidence_range values
+  var confidence = 35
+  if (SASC_DATA.pricingParams && SASC_DATA.pricingParams.length && SASC_DATA.bom && SASC_DATA.bom.length) {
+    var _totalVal = 0, _weightedConf = 0
+    SASC_DATA.bom.forEach(function(line) {
+      var param = (SASC_DATA.pricingParams || []).find(function(p){ return p.component === line.component })
+      var conf = param ? (param.confidence_range || 20) : 25
+      var val = line.usd_total || 0
+      _weightedConf += conf * val
+      _totalVal += val
+    })
+    if (_totalVal > 0) confidence = Math.round(_weightedConf / _totalVal)
+  }
 
-        // Explanation
-        sizing_profile: 'A',
-        notes: [
-          'Profile A (MaaS API): compute-bound at batch 128+',
-          'DAU ' + dau + ' → ' + peakConcurrent + ' peak concurrent (' + peakConcPct + '%)',
-          'Base: max(' + gpusForFit + ' fit, ' + gpusForThroughput + ' throughput) = ' + baseGPUs + ' (' + bindingConstraint + ')',
-          'Buffers: +' + peakBuffer + ' peak(' + headroomPct + '%), +' + failoverReserve + ' failover(' + failoverPct + '%), +' + multiTenancy + ' multi-tenancy(' + multiTenPct + '%)',
-          'Total: ' + totalGPUs + ' GPUs → ' + unitCalc.units + ' ' + unitCalc.unit_type + '(s)'
-        ].join(' | ')
-      }
-    },
+  var totalROM = rom.capex_usd + (rom.opex_usd * 3) + rom.ucdev_usd + adjustedPeopleCost.total
+  var lo = Math.round(totalROM * (1 - confidence/100))
+  var hi = Math.round(totalROM * (1 + confidence/100))
 
-    /**
-     * sizeGPUaaS(config, gpuConfigId)
-     * GPUaaS is a direct allocation — no inference sizing needed.
-     */
-    sizeGPUaaS: function (config, gpuConfigId) {
-      var gpu       = getGPU(gpuConfigId)
-      var archetype = getArchetype(config.archetype_id || 'gpuaas-std')
-      if (!gpu) return { error: 'GPU config not found: ' + gpuConfigId }
+  var html = '<div class="card">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    + '<div><div class="card-title">Programme ROM</div>'
+    + '<div class="card-sub">' + (pm.contract_type==='tm'?'Time & Materials':pm.contract_type==='fixed_price'?'Fixed Price':'Hybrid') + ' &bull; ' + duration + ' months</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:3px">'
+    + ['USD','INR','EUR'].map(function(c) {
+        return '<button class="curr-btn ' + (SASC_CURRENCY===c?'active':'') + '" data-curr="' + c + '" onclick="setCurrency(this.dataset.curr)">' + c + '</button>'
+      }).join('')
+    + '</div></div>'
 
-      var cfg          = (archetype && archetype.config) || {}
-      var reserved     = config.reserved_gpus || cfg.default_reserved_gpus || 8
-      var burst        = config.burst_gpus    || cfg.default_burst_gpus    || 0
-      var haReserve    = Math.ceil(reserved * ((cfg.ha_reserve_pct || 10) / 100))
-      var totalGPUs    = reserved + burst + haReserve
-      var unitCalc     = gpusToUnits(totalGPUs, gpu)
-      var powerKW      = calcPowerKW(unitCalc.units, gpu)
+    + '<table class="bom-table"><tbody>'
+    + '<tr><td>CapEx (hardware + networking + infrastructure)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(rom.capex_usd) + '</td></tr>'
+    + '<tr><td>OpEx (software licences x 3 years)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(rom.opex_usd*3) + '</td></tr>'
+    + '<tr><td>UC development (build + test)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(rom.ucdev_usd) + '</td></tr>'
+    + '<tr><td>People cost (' + duration + ' month programme)</td><td style="font-weight:600;text-align:right" colspan="3">' + fmtMoney(peopleCost.total) + '</td></tr>'
+    + '</tbody></table>'
 
-      return {
-        reserved_gpus: reserved,
-        burst_gpus:    burst,
-        ha_reserve:    haReserve,
-        total_gpus:    totalGPUs,
-        units_required: unitCalc.units,
-        unit_type:     unitCalc.unit_type,
-        actual_gpus:   unitCalc.actual_gpus,
-        power_kw:      Math.round(powerKW * 10) / 10,
-        notes: reserved + ' reserved + ' + burst + ' burst + ' + haReserve + ' HA reserve = ' + totalGPUs + ' GPUs'
-      }
-    },
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:2px solid var(--navy);margin-top:4px">'
+    + '<div style="font-size:15px;font-weight:700;color:var(--navy)">Total Programme ROM</div>'
+    + '<div style="font-size:22px;font-weight:900;color:var(--orange)">' + fmtMoney(totalROM) + '</div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:14px">Range: ' + fmtMoney(lo) + ' &mdash; ' + fmtMoney(hi) + ' at &plusmn;' + confidence + '% confidence</div>'
 
-    /**
-     * sizeBMaaS(config)
-     * BMaaS is CPU servers — no GPU sizing.
-     */
-    sizeBMaaS: function (config) {
-      var archetype = getArchetype(config.archetype_id || 'bmaas-std')
-      var cfg       = (archetype && archetype.config) || {}
-      var servers   = config.servers || cfg.default_servers || 4
-      var haReserve = Math.ceil(servers * ((cfg.ha_reserve_pct || 10) / 100))
-      var total     = servers + haReserve
-      // CPU server power estimate: ~700W per server (2× EPYC 9654)
-      var powerKW   = total * 0.7
+  // Contract-specific view
+  if (pm.contract_type === 'tm') {
+    var avgMonthly = Math.round(totalROM / duration)
+    html += '<div style="background:rgba(0,40,112,0.04);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:14px">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px">T&M view</div>'
+      + '<div style="font-size:12px;color:var(--mid)">Average monthly billing: <strong>' + fmtMoney(avgMonthly) + '</strong></div>'
+      + '<div style="font-size:12px;color:var(--mid)">Over ' + duration + ' months</div>'
+      + '</div>'
+  } else if (pm.contract_type === 'fixed_price') {
+    var margin = 0.18
+    var fixedPrice = Math.round(totalROM * (1 + margin))
+    html += '<div style="background:rgba(0,40,112,0.04);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:14px">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px">Fixed Price view</div>'
+      + '<div style="font-size:12px;color:var(--mid)">Recommended fixed price (18% margin): <strong>' + fmtMoney(fixedPrice) + '</strong></div>'
+      + '<div style="font-size:10px;color:var(--mid);margin-top:2px">Adjust margin in commercial review before quoting.</div>'
+      + '</div>'
+  } else {
+    html += '<div style="background:rgba(0,40,112,0.04);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:14px">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px">Hybrid view</div>'
+      + '<div style="font-size:12px;color:var(--mid)">UC development (fixed): <strong>' + fmtMoney(rom.ucdev_usd * 1.18) + '</strong></div>'
+      + '<div style="font-size:12px;color:var(--mid)">Managed services (T&M): <strong>' + fmtMoney(adjustedPeopleCost.managedCost / duration) + '/month</strong></div>'
+      + '</div>'
+  }
 
-      return {
-        servers:       servers,
-        ha_reserve:    haReserve,
-        total_servers: total,
-        power_kw:      Math.round(powerKW * 10) / 10,
-        notes:         servers + ' servers + ' + haReserve + ' HA = ' + total + ' total servers'
-      }
-    },
+  var fmUrl = ENGAGEMENT_ID ? '../tsap-financial-model/?eng=' + ENGAGEMENT_ID : '../tsap-financial-model/'
+  var fmBtn = ENGAGEMENT_ID
+    ? '<a href="' + fmUrl + '" class="btn btn-outline" style="border-color:var(--teal);color:var(--teal);text-decoration:none">&#128184; Financial Model &rarr;</a>'
+    : '<button class="btn btn-ghost" disabled style="opacity:0.4">&#128184; Financial Model</button>'
+  html += '<div class="actions-bar">'
+    + '<button class="btn btn-ghost" onclick="renderStep(3)">&larr; Back to stack</button>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button class="btn btn-outline" onclick="exportBOM()">&#128196; Export CSV</button>'
+    + '<button class="btn btn-primary" onclick="saveToDocket()">&#128190; Save to docket</button>'
+    + fmBtn
+    + '</div></div>'
+    + '</div>'
 
-    /**
-     * fleetTotal(ucResults, maasResults, gpuaasResult, bmaasResult, mdcSpec)
-     *
-     * Aggregate all GPU allocations and validate against MDC envelope.
-     *
-     * ucResults:    array of sizeUC() results (one per UC)
-     * maasResults:  array of sizeMaaS() results (one per usage type)
-     * gpuaasResult: sizeGPUaaS() result or null
-     * bmaasResult:  sizeBMaaS() result or null
-     * mdcSpec: { capacity_gpus, capacity_kw }
-     */
-    fleetTotal: function (ucResults, maasResults, gpuaasResult, bmaasResult, mdcSpec) {
-      var alloc = []
+  return html
+}
 
-      // UC inference
-      var ucGPUs = 0, ucKW = 0
-      ;(ucResults || []).forEach(function (r) {
-        if (r && !r.error) { ucGPUs += r.actual_gpus || r.total_gpus; ucKW += r.power_kw || 0 }
-      })
-      if (ucGPUs > 0) alloc.push({ label: 'UC Inference', gpus: ucGPUs, kw: Math.round(ucKW * 10)/10, type: 'cost_centre' })
+async function init() {
+  await loadFxRates()
+  // Initialise SizingEngine — loads gpu_configs, model_catalogue, uc_interaction_types,
+  // requirement_archetypes, benchmark_results from Supabase
+  var _sb = getSB()
+  if (_sb.url && window.SizingEngine) {
+    await SizingEngine.init(_sb.url, _sb.key)
+    console.log('[SASC] SizingEngine ready:', SizingEngine.ready)
+  } else {
+    console.warn('[SASC] SizingEngine not available — check shared/sasc-sizing.js is loaded')
+  }
+  var params = new URLSearchParams(window.location.search)
+  SASC_DATA.engId      = params.get('eng') || null
+  SASC_DATA.docketId   = params.get('docket') || null
+  SASC_DATA.docketItemId = params.get('item') || null
 
-      // MaaS per usage type
-      var maasGPUs = 0, maasKW = 0
-      ;(maasResults || []).forEach(function (r) {
-        if (r && !r.error) {
-          alloc.push({
-            label: 'MaaS — ' + (r.usage_type || 'API'),
-            gpus:  r.actual_gpus || r.total_gpus,
-            kw:    r.power_kw || 0,
-            type:  'revenue'
-          })
-          maasGPUs += r.actual_gpus || r.total_gpus
-          maasKW   += r.power_kw || 0
+  // Try to load existing SASC config from docket item
+  if (SASC_DATA.docketItemId) {
+    var items = await sbFetch('docket_items', 'id=eq.' + SASC_DATA.docketItemId, 1)
+    if (items && items[0] && items[0].content && items[0].content.sasc) {
+      var saved = items[0].content.sasc
+      Object.assign(SASC_DATA, saved)
+      // Restore URL params -- they are ground truth; saved content must never overwrite them
+      SASC_DATA.engId        = params.get('eng')    || SASC_DATA.engId
+      SASC_DATA.docketId     = params.get('docket') || SASC_DATA.docketId
+      SASC_DATA.docketItemId = params.get('item')   || SASC_DATA.docketItemId
+      console.log('[SASC] Restored from URL: eng=' + SASC_DATA.engId + ' docket=' + SASC_DATA.docketId)
+    }
+  }
+
+  if (SASC_DATA.engId) {
+    var engs = await sbFetch('engagements', 'id=eq.' + SASC_DATA.engId, 1)
+    if (engs && engs[0]) {
+      ENGAGEMENT = engs[0]
+      SASC_DATA.engName   = engs[0].name || ''
+      SASC_DATA.archetype = engs[0].archetype || ''
+      var custs = await sbFetch('customers', 'id=eq.' + engs[0].customer_id, 1)
+      if (custs && custs[0]) SASC_DATA.customerName = custs[0].name || ''
+      // Load portfolio selection to pre-configure service model
+      if (SASC_DATA.docketId) {
+        var portItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&item_subtype=eq.portfolio_selection', 1)
+        if (portItems && portItems[0]) {
+          try {
+            var portData = portItems[0].content || JSON.parse(portItems[0].notes||'{}')
+            var portSel = portData.items || []
+            SASC_DATA._portfolioItems = portSel
+            if (portSel.includes('L2-MAAS'))   SASC_DATA.serviceModel.maas.enabled   = true
+            if (portSel.includes('L2-GPUAAS')) SASC_DATA.serviceModel.gpuaas.enabled = true
+            if (portSel.includes('L2-BMAAS'))  SASC_DATA.serviceModel.bmaas.enabled  = true
+            var mdcItems = ['L2-MDC','L2-AIC','L2-HPC','L2-AIF']
+            if (portSel.some(function(p){ return mdcItems.includes(p) })) SASC_DATA.dcType = 'mdc'
+            // Populate Output Stack from portfolio
+            var PORT_TO_OS = {
+              'L2-DAC':'ucdev','L2-AIC':'ucdev','L2-AIF':'ucdev','L2-HPC':'ucdev',
+              'L2-MDC':'ucdev','L2-TRC':'ucdev','L2-EDG':'ucdev',
+              'L2-MAAS':'maas','L2-GPUAAS':'gpuaas','L2-BMAAS':'bmaas',
+              'L3-SKL':'skills','L1.3':'coe','L1-TSAP':'coe'
+            }
+            portSel.forEach(function(code) {
+              var k = PORT_TO_OS[code]; if (k) SASC_DATA.outputStack[k] = true
+            })
+          } catch(e) { console.warn('[SASC] Portfolio parse:', e.message) }
         }
-      })
-
-      // GPUaaS
-      var gaasGPUs = 0, gaasKW = 0
-      if (gpuaasResult && !gpuaasResult.error) {
-        gaasGPUs = gpuaasResult.actual_gpus || gpuaasResult.total_gpus
-        gaasKW   = gpuaasResult.power_kw || 0
-        alloc.push({ label: 'GPUaaS', gpus: gaasGPUs, kw: gaasKW, type: 'revenue' })
       }
+      // Load territory cost overrides from Docket territory config
+      try {
+        var tcRows = await sbFetch('app_config', 'key=eq.territory_config_' + encodeURIComponent(SASC_DATA.engId), 1)
+        if (tcRows && tcRows[0] && tcRows[0].value) {
+          var tcCfg = JSON.parse(tcRows[0].value)
+          SASC_DATA.territory_costs = {
+            power_tariff_inr:     tcCfg.power_tariff     || null,
+            engineer_salary_lakh: tcCfg.engineer_salary  || null,
+            civil_cost_index:     tcCfg.civil_index      || null,
+            salary_ratio: tcCfg.engineer_salary ? (tcCfg.engineer_salary / 12.0) : 1.0
+          }
+          console.log('[SASC] Territory costs:', SASC_DATA.territory_costs)
+        }
+      } catch(e) { console.warn('[SASC] Territory config:', e.message) }
+      document.getElementById('hdr-eng-label').innerHTML =
+        '<strong>' + esc(SASC_DATA.customerName) + '</strong> &mdash; ' + esc(SASC_DATA.engName)
+    }
+    // Load UCs from uc_library (status=active) + pre-select from docket
+    var libraryUCs = await sbFetch('uc_library', 'status=eq.active&order=cluster.asc,uc_name.asc', 200)
+    ALL_UCS = libraryUCs || []
+    if (SASC_DATA.docketId) {
+      console.log('[SASC] Fetching UCs for docketId:', SASC_DATA.docketId)
+      var docketUCItems = await sbFetch('docket_items', 'docket_id=eq.' + SASC_DATA.docketId + '&section=eq.uc', 100)
+      console.log('[SASC] docketUCItems raw count:', (docketUCItems||[]).length, docketUCItems && docketUCItems[0] ? JSON.stringify(docketUCItems[0]).substring(0,120) : 'empty')
+      // Build lookups for fallback matching
+      var _ucById   = {}; ALL_UCS.forEach(function(u) { _ucById[u.id] = true })
+      var _ucByName = {}; ALL_UCS.forEach(function(u) { _ucByName[(u.uc_name||'').trim().toLowerCase()] = u.id })
 
-      // BMaaS (servers, not GPUs — listed separately)
-      var bmaasServers = 0, bmaasKW = 0
-      if (bmaasResult && !bmaasResult.error) {
-        bmaasServers = bmaasResult.total_servers
-        bmaasKW      = bmaasResult.power_kw || 0
-        alloc.push({ label: 'BMaaS (CPU servers)', gpus: 0, kw: bmaasKW, type: 'revenue', servers: bmaasServers })
+      var docketRefs = (docketUCItems || []).map(function(d) {
+        // 1. ref_id — uc_library id (may be slug like geo-uc-010 or UUID, accept any non-empty string)
+        var rid = (d.ref_id || '').trim()
+        if (rid && _ucById[rid]) return rid
+
+        // 2. content.uc_id jsonb field
+        var cjson = d.content || {}
+        var cid = (cjson.uc_id || '').trim()
+        if (cid && _ucById[cid]) return cid
+
+        // 3. ref_id present but not in library — still return it (library may load later or UC may be inactive)
+        if (rid) {
+          console.warn('[SASC] ref_id not in active uc_library:', rid, '(title:', d.title + ')')
+          return rid
+        }
+
+        // 4. Title match — last resort when ref_id absent
+        var titleKey = (d.title || '').trim().toLowerCase()
+        if (titleKey && _ucByName[titleKey]) {
+          console.log('[SASC] UC matched by title:', d.title, '->', _ucByName[titleKey])
+          return _ucByName[titleKey]
+        }
+
+        console.warn('[SASC] UC row unmatched - id:', d.id, 'title:', d.title, 'ref_id:', d.ref_id)
+        return null
+      }).filter(Boolean)
+      // Cross-validate against active uc_library — warn on misses but keep ALL refs (docket is source of truth)
+      var _validIds = ALL_UCS.map(function(u){ return u.id })
+      var validRefs   = docketRefs.filter(function(r){ return _validIds.indexOf(r) >= 0 })
+      var invalidRefs = docketRefs.filter(function(r){ return _validIds.indexOf(r) < 0 })
+      if (invalidRefs.length) console.warn('[SASC] ' + invalidRefs.length + ' UC ref(s) not in active uc_library (may be inactive/different cluster):', invalidRefs)
+      console.log('[SASC] docketRefs raw:', docketRefs.length, 'in library:', validRefs.length, 'not in library:', invalidRefs.length)
+      // Use ALL docket refs — UCs not in active library still show with title from docket row
+      var allRefs = docketRefs  // don't filter — docket is source of truth
+      if (allRefs.length) SASC_DATA.outputStack.ucdev = true
+      if (allRefs.length) {
+        SASC_DATA.selectedUCs = allRefs
+        console.log('[SASC] selectedUCs set to', allRefs.length, 'items:', allRefs)
+      } else {
+        console.warn('[SASC] No docketRefs found - check docket_items ref_id column')
       }
-
-      var totalGPUs = ucGPUs + maasGPUs + gaasGPUs
-      var totalKW   = ucKW + maasKW + gaasKW + bmaasKW
-      var capGPUs   = (mdcSpec && mdcSpec.capacity_gpus) || 0
-      var capKW     = (mdcSpec && mdcSpec.capacity_kw)   || 0
-
-      var headroomGPUs = capGPUs > 0 ? capGPUs - totalGPUs : null
-      var headroomKW   = capKW   > 0 ? capKW   - totalKW   : null
-
-      if (headroomGPUs !== null && headroomGPUs > 0)
-        alloc.push({ label: 'Unallocated Headroom', gpus: headroomGPUs, kw: Math.max(0, headroomKW || 0), type: 'reserve' })
-
-      var gpuStatus = capGPUs > 0 ? (totalGPUs > capGPUs ? 'over' : totalGPUs > capGPUs * 0.9 ? 'warning' : 'ok') : 'unchecked'
-      var mwStatus  = capKW   > 0 ? (totalKW   > capKW   ? 'over' : totalKW   > capKW   * 0.9 ? 'warning' : 'ok') : 'unchecked'
-
-      var warnings = []
-      if (gpuStatus === 'over')    warnings.push('GPU demand (' + totalGPUs + ') exceeds MDC capacity (' + capGPUs + '). Upsize MDC or reduce scope.')
-      if (gpuStatus === 'warning') warnings.push('GPU demand at ' + Math.round(totalGPUs/capGPUs*100) + '% of MDC capacity — limited headroom.')
-      if (mwStatus  === 'over')    warnings.push('Power demand (' + totalKW.toFixed(1) + 'kW) exceeds MDC envelope (' + capKW + 'kW). Critical.')
-      if (mwStatus  === 'warning') warnings.push('Power at ' + Math.round(totalKW/capKW*100) + '% of MDC capacity.')
-
-      return {
-        allocation:        alloc,
-        total_gpus:        totalGPUs,
-        total_kw:          Math.round(totalKW * 10) / 10,
-        total_bmaas_servers: bmaasServers,
-        capacity_gpus:     capGPUs,
-        capacity_kw:       capKW,
-        headroom_gpus:     headroomGPUs,
-        headroom_kw:       headroomKW !== null ? Math.round(headroomKW * 10) / 10 : null,
-        gpu_status:        gpuStatus,
-        mw_status:         mwStatus,
-        warnings:          warnings
-      }
-    },
-
-    // ── Utility: resolve precision from model + preference ──────────────────
-    resolvePrecision: function (modelId, preferredPrecision) {
-      var model = getModel(modelId)
-      if (!model || !model.gpu_memory_gb) return preferredPrecision || 'INT4'
-      var memMap = typeof model.gpu_memory_gb === 'string'
-        ? JSON.parse(model.gpu_memory_gb) : model.gpu_memory_gb
-      // Use preferred if model supports it, else fall back to best available
-      if (preferredPrecision && memMap[preferredPrecision]) return preferredPrecision
-      if (memMap['INT4']) return 'INT4'
-      if (memMap['INT8'] || memMap['FP8']) return 'INT8'
-      return 'FP16'
-    },
-
-    // ── Utility: expose core math for UI use ────────────────────────────────
-    calcPeakRPS:        calcPeakRPS,
-    calcModelVRAM:      calcModelVRAM,
-    kvCacheMethod:      kvCacheMethod,
-    calcKVCache:        calcKVCache,
-    calcTotalVRAM:      calcTotalVRAM,
-    calcGPUThroughput:  calcGPUThroughput,
-    gpusToUnits:        gpusToUnits,
-    calcPowerKW:        calcPowerKW,
-    applyBuffers:       applyBuffers,
-
-    // Expose constants for UI reference
-    SLA_BUFFERS:          SLA_BUFFERS,
-    RESILIENCE_OVERHEAD:  RESILIENCE_OVERHEAD,
-    BYTES_PER_PARAM:      BYTES_PER_PARAM,
-    KV_CACHE_MB_PER_TOKEN: KV_CACHE_MB_PER_TOKEN
+    }
+  } else {
+    // Standalone launch -- load all engagements for selection
+    var allEngs = await sbFetch('engagements', 'order=name.asc', 50)
+    ALL_ENGAGEMENTS = allEngs || []
+    document.getElementById('hdr-eng-label').innerHTML = 'Select engagement below'
   }
 
-  // Export
-  root.SizingEngine = SizingEngine
+  // Adjust layers by scope on first load
+  adjustLayersByScope(SASC_DATA.scope)
 
-})(typeof window !== 'undefined' ? window : global)
+  // Load MaaS config from docket for simulation tab
+  await loadMaasCfgFromDocket()
+
+  // Derive outputStack from layers and serviceModel state
+  // NOTE: do NOT overwrite ucdev if already set true from docket UCs above
+  var _os = SASC_DATA.outputStack, _la = SASC_DATA.layers, _sm2 = SASC_DATA.serviceModel
+  if (!_os.ucdev && _la.ucdev   && _la.ucdev.on)   _os.ucdev  = true
+  if (_la.skills  && _la.skills.on)  _os.skills = true
+  if (_sm2.maas.enabled)   _os.maas   = true
+  if (_sm2.gpuaas.enabled) _os.gpuaas = true
+  if (_sm2.bmaas.enabled)  _os.bmaas  = true
+
+  renderStep(1)
+}
+
+function setSASCUCFilter(cluster) {
+  // Legacy   use toggleSASCCluster instead
+  SASC_DATA.ucExpandedCluster = cluster === 'all' ? null : cluster
+  renderStep(1)
+}
+
+function adjustLayersByScope(scope) {
+  var layers = SASC_DATA.layers
+  if (scope === 'hardware') {
+    layers.platform.on  = false
+    layers.security.on  = false
+    layers.data.on      = false
+    layers.ucdev.on     = false
+    layers.skills.on    = false
+  } else if (scope === 'software') {
+    layers.infra.on     = false
+    layers.compute.on   = false
+    layers.network.on   = false
+  } else if (scope === 'full') {
+    layers.infra.on     = true
+    layers.compute.on   = true
+    layers.network.on   = true
+    layers.platform.on  = true
+    layers.security.on  = true
+    layers.resilience.on = true
+    layers.data.on      = true
+    layers.ucdev.on     = true
+  }
+  // skills always defaults off unless manually enabled
+}
+
+// -- Step navigation -----------------------------------------------------------
+// ── Dynamic step computation ─────────────────────────────────────────────────
+function getActiveSteps() {
+  var os = SASC_DATA.outputStack
+  var steps = [{ key:'scope', label:'Scope & Stack' }]
+  if (os.ucdev)  steps.push({ key:'workloads_a', label:'Workloads A — AI UCs' })
+  var _sm = SASC_DATA.serviceModel
+  if (os.maas || os.gpuaas || os.bmaas || _sm.maas.enabled || _sm.gpuaas.enabled || _sm.bmaas.enabled) steps.push({ key:'workloads_b', label:'Workloads B — AI Services' })
+  if (os.skills || os.coe) steps.push({ key:'workloads_c', label:'Workloads C — Capability' })
+  steps.push({ key:'bom', label:'BOM / ROM' })
+  return steps
+}
+
+function getNextStep(currentN) {
+  var steps = getActiveSteps()
+  return currentN < steps.length ? currentN + 1 : null
+}
+function getPrevStep(currentN) {
+  return currentN > 1 ? currentN - 1 : null
+}
+
+function toggleOutputStack(key) {
+  SASC_DATA.outputStack[key] = !SASC_DATA.outputStack[key]
+  // Re-clamp SASC_STEP if active step no longer exists
+  var steps = getActiveSteps()
+  if (SASC_STEP > steps.length) SASC_STEP = steps.length
+  renderStep(SASC_STEP)
+}
+
+function renderWorkloadC() {
+  var html = '<div class="card" style="text-align:center;padding:32px">'
+  html += '<div style="font-size:32px;margin-bottom:12px">🚧</div>'
+  html += '<div class="card-title" style="font-size:16px">Workloads C — AI Capability Building</div>'
+  html += '<div class="card-sub" style="margin:12px 0">Skills Academy &amp; Centre of Excellence sizing coming in the next release.</div>'
+  html += '<div style="font-size:12px;color:var(--mid)">Mark Skills Academy or CoE as enabled in the Output Stack to configure workforce, curriculum and lab infrastructure.</div>'
+  html += '</div>'
+  var steps = getActiveSteps()
+  var lastN = steps.length
+  html += '<div class="actions-bar">'
+  var prev = getPrevStep(SASC_STEP)
+  if (prev) html += '<button class="btn btn-ghost" onclick="renderStep(' + prev + ')">&larr; Back</button>'
+  var next = getNextStep(SASC_STEP)
+  if (next) html += '<button class="btn btn-primary" onclick="renderStep(' + next + ')">Next: BOM / ROM &rarr;</button>'
+  html += '</div>'
+  return html
+}
+
+function renderStep(n) {
+  try {
+    console.log('[renderStep] called with n='+n+' SASC_STEP='+SASC_STEP)
+    SASC_STEP = n
+    SASC_LOAD_GEN++
+    var el = document.getElementById('app-content')
+    if (!el) { console.error('[renderStep] app-content not found!'); return }
+    renderStepNav()
+    var steps = getActiveSteps()
+    console.log('[renderStep] steps='+steps.map(function(s){return s.key}).join(',')+' target='+( steps[n-1]||{}).key)
+    var step = steps[n-1]
+    if (!step) { SASC_STEP = 1; renderStep(1); return }
+    if (step.key === 'scope')       el.innerHTML = renderScreen1()
+    if (step.key === 'workloads_a') { el.innerHTML = renderScreen2Loading(); loadWorkloadProfiles() }
+    if (step.key === 'workloads_b') {
+      console.log('[renderStep] rendering workloads_b')
+      if (SVC_MC_STATE === '' || SVC_MC_STATE === 'loading') {
+        // Load catalogue first, then render once — capture step n so re-render targets correct screen
+        var _wbGen = SASC_LOAD_GEN, _wbN = n
+        loadSvcModelCatalogue().then(function(){
+          if (SASC_LOAD_GEN !== _wbGen) return  // user navigated away
+          el.innerHTML = renderWorkloadB()
+          console.log('[renderStep] workloads_b rendered after catalogue load, length='+el.innerHTML.length)
+        })
+        el.innerHTML = '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue…</div></div>'
+      } else {
+        el.innerHTML = renderWorkloadB()
+        console.log('[renderStep] workloads_b rendered, innerHTML length='+el.innerHTML.length)
+      }
+    }
+    if (step.key === 'workloads_c') el.innerHTML = renderWorkloadC()
+    if (step.key === 'bom')         { el.innerHTML = renderScreen4Loading(); loadAndRenderBOM() }
+  } catch(e) {
+    console.error('[renderStep] EXCEPTION n='+n+':', e.message, e.stack)
+  }
+}
+
+function renderStepNav() {
+  var steps = getActiveSteps()
+  var html = '<div class="step-nav">'
+  steps.forEach(function(s, i) {
+    var stepN = i + 1
+    var state = stepN < SASC_STEP ? 'done' : stepN === SASC_STEP ? 'active' : 'pending'
+    html += '<div class="step-item" onclick="renderStep(' + stepN + ')" style="cursor:pointer">'
+    html += '<div class="step-circle ' + state + '">' + (state==='done'?'&#10003;':stepN) + '</div>'
+    html += '<div class="step-label ' + state + '">' + s.label + '</div>'
+    html += '</div>'
+    if (i < steps.length-1) html += '<div class="step-connector ' + (stepN < SASC_STEP?'done':'') + '"></div>'
+  })
+  html += '</div>'
+  var nav = document.getElementById('step-nav-wrap')
+  if (!nav) {
+    var wrap = document.createElement('div'); wrap.id='step-nav-wrap'
+    document.getElementById('app-content').parentNode.insertBefore(wrap, document.getElementById('app-content'))
+  }
+  document.getElementById('step-nav-wrap').innerHTML = html
+}
+
+// -- Screen 1: Scope & DC -----------------------------------------------------
+function renderScreen1() {
+  var s = SASC_DATA
+  var os = s.outputStack
+
+  // Standalone engagement selector
+  var engHtml = ''
+  if (!s.engId && ALL_ENGAGEMENTS.length) {
+    engHtml = '<div class="card" style="border-left:3px solid var(--orange)">'
+      + '<div class="card-title">Select engagement</div>'
+      + '<div class="card-sub">SASC was opened without an engagement context. Select one to load configuration.</div>'
+      + '<select onchange="selectEngagement(this.value)" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">'
+      + '<option value="">-- Select engagement --</option>'
+      + ALL_ENGAGEMENTS.map(function(e){ return '<option value="' + e.id + '">' + esc(e.name||e.opportunity_name||e.id) + '</option>' }).join('')
+      + '</select></div>'
+  }
+
+  // ── OUTPUT STACK ──────────────────────────────────────────────────────────
+  function osToggle(key, label, desc) {
+    var on = os[key]
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f4">'
+      + '<div class="toggle-sw' + (on?' on':'') + '" onclick="toggleOutputStack(\'' + key + '\')" style="flex-shrink:0;margin-top:2px"></div>'
+      + '<div style="flex:1">'
+      + '<div style="font-weight:600;font-size:13px;color:' + (on?'var(--navy)':'var(--mid)') + '">' + label + '</div>'
+      + '<div style="font-size:11px;color:var(--mid);margin-top:2px">' + desc + '</div>'
+      + '</div></div>'
+  }
+
+  var osHtml = '<div class="card">'
+    + '<div class="card-title">Output Stack <span style="font-size:11px;font-weight:400;color:var(--mid)">— What is the AI Centre delivering?</span></div>'
+
+  // AI Applications
+  osHtml += '<div style="margin-bottom:16px">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--teal)">AI Applications</div>'
+    + osToggle('ucdev', 'AI Use Cases', 'Sovereign AI applications for the territory — governance, agriculture, health, GeoAI etc.')
+    + '</div>'
+
+  // AI Infrastructure Services
+  osHtml += '<div style="margin-bottom:16px">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--blue);margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--blue)">AI Infrastructure Services</div>'
+    + osToggle('maas',   'Model as a Service (MaaS)',        'Sovereign AI inference API — per-token consumption pricing')
+    + osToggle('gpuaas', 'GPU as a Service (GPUaaS)',         'Reserved + burst GPU compute for researchers and enterprises')
+    + osToggle('bmaas',  'Bare Metal as a Service (BMaaS)',   'Dedicated AI servers for maximum isolation and control')
+    + '</div>'
+
+  // AI Capability Building
+  osHtml += '<div>'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--amber);margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--amber)">AI Capability Building</div>'
+    + osToggle('skills', 'AI Skills Academy',    'Workforce development, certifications, AI literacy programmes')
+    + osToggle('coe',    'Centre of Excellence', 'Research, standards, ecosystem development, policy advisory')
+    + '</div>'
+
+  // Validation warning
+  var anyOutput = os.ucdev || os.maas || os.gpuaas || os.bmaas || os.skills || os.coe
+  if (!anyOutput) {
+    osHtml += '<div style="margin-top:12px;padding:10px 12px;background:#FEF9C3;border-radius:6px;font-size:12px;color:#854D0E">'
+      + '⚠ Select at least one output — why else are we deploying AI?'
+      + '</div>'
+  }
+  osHtml += '</div>'  // close card
+
+  // ── INPUT STACK ───────────────────────────────────────────────────────────
+  var isHtml = '<div class="card" style="margin-top:0">'
+    + '<div class="card-title">Input Stack <span style="font-size:11px;font-weight:400;color:var(--mid)">— What infrastructure delivers it?</span></div>'
+
+  var layers = s.layers
+  var LAYER_COLORS = { infra:'#6B7280', compute:'var(--navy)', network:'var(--teal)', platform:'var(--blue)', security:'var(--orange)', resilience:'#8B5CF6', data:'#059669' }
+  var inputLayers = ['infra','compute','network','platform','security','resilience','data']
+  inputLayers.forEach(function(key) {
+    var l = layers[key]
+    if (!l) return
+    var color = LAYER_COLORS[key] || 'var(--navy)'
+    var on = l.on
+    isHtml += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f4">'
+      + '<div class="layer-chk' + (on?' on':'') + '" id="chk-' + key + '" onclick="toggleLayer(\'' + key + '\')" style="flex-shrink:0;margin-top:2px"></div>'
+      + '<div style="flex:1">'
+      + '<div style="font-weight:600;font-size:13px;color:' + (on?color:'var(--mid)') + '">' + esc(l.name) + '</div>'
+      + '<div style="font-size:11px;color:var(--mid);margin-top:1px">' + esc(l.desc) + '</div>'
+      + '</div>'
+      + '<span class="layer-tag">' + esc(l.tag) + '</span>'
+      + '</div>'
+
+    // MDC config — only show if infra layer is ON
+    if (key === 'infra' && on) {
+      var dc = s.mdc
+      var sizes = [{id:'xs',l:'XS — 2MW'},{id:'s',l:'S — 5MW'},{id:'m',l:'M — 10MW'},{id:'l',l:'L — 15MW'},{id:'xl',l:'XL — 20MW'}]
+      isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid #6B7280">'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:8px">MDC Configuration</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
+        + sizes.map(function(sz){ return '<button onclick="SASC_DATA.mdc.tshirt=\'' + sz.id + '\';renderStep(1)" style="padding:4px 12px;font-size:11px;border:1.5px solid ' + (dc.tshirt===sz.id?'var(--navy)':'var(--border)') + ';background:' + (dc.tshirt===sz.id?'var(--navy)':'#fff') + ';color:' + (dc.tshirt===sz.id?'#fff':'var(--mid)') + ';border-radius:5px;cursor:pointer;font-family:inherit">' + sz.l + '</button>' }).join('')
+        + '</div>'
+        + '<div style="display:flex;gap:12px;align-items:center">'
+        + '<span style="font-size:11px;color:var(--mid)">Sites:</span>'
+        + '<input type="number" min="1" max="20" value="' + (dc.sites||1) + '" style="width:60px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.mdc.sites=+this.value">'
+        + '<span style="font-size:11px;color:var(--mid)">Name(s):</span>'
+        + '<input type="text" value="' + esc(dc.siteNames||'') + '" placeholder="e.g. Shimla, Dharamsala" style="flex:1;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit" onchange="SASC_DATA.mdc.siteNames=this.value">'
+        + '</div></div>'
+    }
+  })
+  isHtml += '</div>'  // close card
+
+  // Navigation
+  var nextN = getNextStep(1)
+  var navHtml = '<div class="actions-bar"><div></div>'
+  if (nextN) {
+    navHtml += '<button class="btn btn-primary" onclick="renderStep(' + nextN + ')">Next: ' + (getActiveSteps()[nextN-1]||{}).label + ' &rarr;</button>'
+  } else {
+    navHtml += '<button class="btn btn-primary" onclick="renderStep(2)">Next: BOM / ROM &rarr;</button>'
+  }
+  navHtml += '</div>'
+
+  return engHtml + osHtml + isHtml + navHtml
+}
+
+// -- Screen 2: Stack layers ----------------------------------------------------
+
+function renderScreen2Loading() {
+  return '<div class="card"><div style="display:flex;align-items:center;gap:10px;padding:20px">'
+    + '<div class="spinner"></div>'
+    + '<div class="status-msg">Loading UC workload profiles&hellip;</div>'
+    + '</div></div>'
+}
+
+//    WORKLOAD PROFILER v2                                                       
+// Sizing based on RPS at latency SLA -- not tokens
+// Models from ai_models table, GPU configs from gpu_configs table
+// UC interaction types from uc_interaction_types table
+
+// Extended state for workload v2 (per-UC)
+// ucWorkloads[ucId] = {
+//   uc_type_id:    'citizen_chatbot',    -- from uc_interaction_types
+//   dau:           5000,
+//   peak_mult:     3,                    -- slider
+//   latency_sla_ms:2000,
+//   model_id:      'uuid',               -- from ai_models
+//   training:      false,
+//   train_gpu_hrs: 500,
+//   data_tb:       5,
+//   derating_pct:  80,                   -- slider
+//   expanded:      false
+// }
+
+var ALL_MODELS = []
+var ALL_GPU_CONFIGS = []
+var ALL_UC_TYPES = []
+
+async function loadWorkloadProfiles() {
+  var _myGen = ++SASC_LOAD_GEN  // capture generation; if SASC_LOAD_GEN changes before we finish, abort
+  try {
+  // Load all four reference tables in parallel
+  var results = await Promise.all([
+    sbFetch('model_catalogue',        'enabled=eq.true&order=params_b.asc',     100),
+    sbFetch('gpu_configs',           'active=eq.true&order=name.asc',          50),
+    sbFetch('uc_interaction_types',  'active=eq.true&order=sort_order.asc',    50),
+    sbFetch('benchmark_results', 'order=gpu_config_id.asc', 100).catch(function(){ return [] })
+  ])
+
+  ALL_MODELS      = results[0] || []
+  ALL_GPU_CONFIGS = results[1] || []
+  ALL_UC_TYPES    = results[2] || []
+  SASC_DATA.benchmarks = results[3] || []
+
+  // Set default GPU config — prefer H200 SXM (server class), avoid rack-scale as default
+  if (!SASC_DATA.gpuConfigId && ALL_GPU_CONFIGS.length) {
+    var defGpu = ALL_GPU_CONFIGS.find(function(g) { return g.name === 'H200 SXM 8x' })
+      || ALL_GPU_CONFIGS.find(function(g) { return !g.rack_scale && !g.placeholder })
+      || ALL_GPU_CONFIGS[0]
+    SASC_DATA.gpuConfigId = defGpu.id
+    console.log('[SASC] Default GPU set to:', defGpu.name)
+  }
+
+  // Reload ALL_UCS from uc_library if not already loaded
+  if (!ALL_UCS.length) {
+    var _ucs = await sbFetch('uc_library','status=eq.active&order=cluster.asc,uc_name.asc',200)
+    ALL_UCS = _ucs || []
+  }
+
+  // Pre-fill workload inputs for selected UCs
+  ALL_UCS.forEach(function(uc) {
+    if (SASC_DATA.selectedUCs.indexOf(uc.id) < 0) return
+    if (SASC_DATA.ucWorkloads[uc.id]) return  // already have saved values
+
+    // Match UC name to a UC type (use uc_name as primary, title as fallback)
+    var title = (uc.uc_name || uc.title || '').toLowerCase()
+    var ucType = ALL_UC_TYPES.find(function(t) {
+      return title.indexOf(t.name.toLowerCase().split(' ')[0]) >= 0
+    }) || ALL_UC_TYPES.find(function(t) { return t.name.toLowerCase().indexOf('vision') >= 0 })
+      || ALL_UC_TYPES.find(function(t) { return t.name.toLowerCase().indexOf('image') >= 0 })
+      || ALL_UC_TYPES[0]
+
+    // Find recommended model for this UC type
+    var recModelSize = (ucType && ucType.recommended_model_size) || '7B'
+    // Pick default model: prefer Sarvam (indic/sovereign) else first available
+    var defModel = ALL_MODELS.find(function(m) {
+      var arch = m.archetype
+      if (typeof arch === 'string') { try { arch = JSON.parse(arch) } catch(e) { arch = [] } }
+      return Array.isArray(arch) && arch.indexOf('indic') >= 0
+    }) || ALL_MODELS.find(function(m) { return m.enabled !== false }) || ALL_MODELS[0]
+
+    SASC_DATA.ucWorkloads[uc.id] = {
+      uc_type_id:     ucType ? ucType.id : '',
+      dau:            ucType ? (ucType.requests_per_user_per_day * 100) : 1000,
+      peak_mult:      3,
+      latency_sla_ms: ucType ? (ucType.typical_sla_ms || 2000) : 2000,
+      model_id:       defModel ? defModel.id : '',
+      training:       false,
+      train_gpu_hrs:  500,
+      data_tb:        5,
+      derating_pct:   80,
+      complexity:     'medium',
+      expanded:       false
+    }
+  })
+
+  } catch(lwpErr) {
+    console.error('[SASC] loadWorkloadProfiles error:', lwpErr)
+    document.getElementById('app-content').innerHTML = '<div class="card"><div style="padding:20px;color:red">Load error: ' + lwpErr.message + '</div></div>'
+    return
+  }
+  // Abort if user navigated away while we were loading
+  if (_myGen !== SASC_LOAD_GEN) { console.log('[SASC] loadWorkloadProfiles: stale generation, aborting render'); return }
+  try {
+    document.getElementById('app-content').innerHTML = renderScreen2()
+  } catch(e) {
+    console.error('[SASC] renderScreen2 error:', e)
+    document.getElementById('app-content').innerHTML = '<div class="card"><div style="padding:20px;color:red">Screen 2 error: ' + e.message + '</div></div>'
+  }
+}
+
+//    Sizing calculation (RPS-based, not tokens)                                 
+function calcSizing(wl) {
+  // Wrapper around SizingEngine.sizeUC() — single source of truth for GPU sizing math
+  // Falls back to legacy inline math if SizingEngine not loaded
+  var model  = ALL_MODELS.find(function(m) { return m.id === wl.model_id })
+  var gpuCfg = ALL_GPU_CONFIGS.find(function(g) { return g.id === SASC_DATA.gpuConfigId })
+  var ucType = ALL_UC_TYPES.find(function(t) { return t.id === wl.uc_type_id })
+
+  if (window.SizingEngine && SizingEngine.ready && gpuCfg) {
+    var seResult = SizingEngine.sizeUC({
+      uc_type_id:          wl.uc_type_id,
+      model_id:            wl.model_id,
+      dau:                 wl.dau,
+      peak_multiplier:     wl.peak_mult,
+      avg_input_tokens:    wl.avg_input_tokens,
+      avg_output_tokens:   wl.avg_output_tokens,
+      context_window:      wl.context_window,
+      precision:           wl.precision || 'INT4',
+      sla_tier:            wl.sla_tier || 'standard',
+      ha_required:         wl.ha_required !== undefined ? wl.ha_required : true,
+      dr_type:             wl.dr_type || 'none',
+      growth_headroom_pct: 20,
+      derating_pct:        wl.derating_pct || 80
+    }, SASC_DATA.gpuConfigId)
+
+    if (!seResult.error) {
+      // Map SizingEngine output to shape renderScreen2 already consumes
+      // servers = units_required (racks or servers depending on GPU type)
+      var servers = seResult.units_required || 1
+      var headroom_pct = seResult.actual_gpus > 0
+        ? Math.round((1 - seResult.total_gpus / seResult.actual_gpus) * 100)
+        : 0
+      return {
+        // Legacy fields (renderScreen2 reads these)
+        peak_rps:       seResult.peak_rps,
+        derated_rps:    0,  // not applicable in SizingEngine model
+        rps_capacity:   seResult.throughput_tokens_per_sec,
+        servers:        servers,
+        headroom_pct:   Math.max(0, headroom_pct),
+        power_kw:       seResult.power_kw,
+        p99_bm:         seResult.ttft_estimate_ms || 0,
+        latency_ok:     seResult.sla_met !== false,
+        model_name:     model ? model.name : 'Unknown model',
+        gpu_name:       gpuCfg ? gpuCfg.name : 'Unknown GPU',
+        bm_source:      'SizingEngine',
+        // Extended SizingEngine fields (for expanded UC card detail)
+        _se:            seResult
+      }
+    }
+    console.warn('[calcSizing] SizingEngine error:', seResult.error, '— falling back to legacy')
+  }
+
+  // ── Legacy fallback (used when SizingEngine not loaded or GPU not found) ──
+  var rpud = ucType ? ucType.requests_per_user_per_day : 5
+  var peak_rps = Math.max(1, Math.ceil(wl.dau * wl.peak_mult * rpud / 86400))
+  var gpuName = gpuCfg ? gpuCfg.name : ''
+  var sla = wl.latency_sla_ms || 2000
+  var rps_capacity = gpuName.indexOf('GB200') >= 0 ? (sla <= 2000 ? 980 : 2100)
+                   : gpuName.indexOf('NVL72') >= 0 ? (sla <= 2000 ? 750 : 1600)
+                   : (sla <= 2000 ? 85 : 180)
+  var derated_rps = Math.max(1, Math.round(rps_capacity * (wl.derating_pct || 80) / 100))
+  var servers = Math.max(1, Math.ceil(peak_rps / derated_rps))
+  var headroom_pct = Math.max(0, Math.round((1 - peak_rps / (derated_rps * servers)) * 100))
+  var power_w = gpuCfg ? gpuCfg.power_watts_tdp : 5600
+  var power_kw = Math.round(servers * power_w / 1000 * 10) / 10
+  return {
+    peak_rps: peak_rps, derated_rps: derated_rps, rps_capacity: rps_capacity,
+    servers: servers, headroom_pct: headroom_pct, power_kw: power_kw,
+    p99_bm: 0, latency_ok: true,
+    model_name: model ? model.name : 'Unknown model',
+    gpu_name: gpuCfg ? gpuCfg.name : 'Unknown GPU',
+    bm_source: 'estimate (legacy)', _se: null
+  }
+}
+
+function toggleUCExpand(ucId) {
+  if (SASC_DATA.ucWorkloads[ucId]) {
+    SASC_DATA.ucWorkloads[ucId].expanded = !SASC_DATA.ucWorkloads[ucId].expanded
+    document.getElementById('app-content').innerHTML = renderScreen2()
+  }
+}
+
+function wlChange(el) {
+  var uid = el.dataset.uid
+  if (!uid) {
+    var p = el.parentElement
+    while (p && !uid) { uid = p.dataset && p.dataset.uid; p = p.parentElement }
+  }
+  if (!uid) return
+  var field = el.dataset.field
+  var value = field === 'training' ? (el.value === 'true') : (isNaN(Number(el.value)) ? el.value : Number(el.value))
+  SASC_DATA.ucWorkloads[uid][field] = value
+  document.getElementById('app-content').innerHTML = renderScreen2()
+}
+
+function setUCComplexity(ucId, tier) {
+  if (!SASC_DATA.ucWorkloads[ucId]) SASC_DATA.ucWorkloads[ucId] = {}
+  SASC_DATA.ucWorkloads[ucId].complexity = tier
+  document.getElementById('app-content').innerHTML = renderScreen2()
+}
+
+//    renderScreen2                                                              
+
+// ── SERVICE MODEL (MaaS / GPUaaS / BMaaS) ────────────────────────────────────
+// These add infrastructure capacity to the BOM for service delivery.
+// No revenue calculations here — that belongs in TSAP FM.
+
+var SVC_MC_ROWS = []       // model catalogue rows (loaded async)
+var SVC_MC_STATE = ''      // idle|loading|loaded|error
+
+// ── MaaS Simulation globals ───────────────────────────────────────────────────
+var MAAS_CFG       = null   // loaded from docket_items (maas_config)
+var MAAS_SIM_SEL   = []     // selected gpu_config ids for comparison (1-5)
+var MAAS_SIM_LAYER = 1      // active layer (1=arch, 2=heatmap, 3=mix)
+var MAAS_SIM_PEAK  = 10     // peak % of DAU concurrent (default 10%)
+var MAAS_SIM_AMORT = 36     // CapEx amortisation months
+var MAAS_SIM_MIX   = { text:20, coding:30, document:20, audio:10, indic:10, generic:10 }
+var MAAS_SIM_DAU   = 10000  // target total DAU for Layer 3
+var MAAS_GPU_COST  = {}     // gpu_config_id → cost_usd (user-editable defaults)
+var MAAS_SIM_RESULT = null  // last simulation result (saved to docket)
+
+// Default GPU costs (USD, market estimates 2026)
+var MAAS_GPU_COST_DEFAULTS = {
+  'H200 SXM 8x':        270000,
+  'B200 SXM 8x':        380000,
+  'B200 NVL72':        3500000,
+  'B300 SXM 8x':        480000,
+  'B300 NVL72':        4200000,
+  'GB200 NVL72':       3800000,
+  'GB300 NVL72':       4500000,
+  'Vera Rubin SXM 8x':  550000,
+  'Vera Rubin NVL72':  5500000,
+  'MI355X 8x':          220000,
+  'MI400X 8x':          320000,
+  'Instinct Helios':   4000000
+}
+
+async function loadSvcModelCatalogue() {
+  if (SVC_MC_STATE === 'loading' || SVC_MC_STATE === 'loaded' || SVC_MC_STATE === 'error') return
+  SVC_MC_STATE = 'loading'
+  var sb = getSB()
+  if (!sb.url) { SVC_MC_STATE = 'error'; return }
+  try {
+    var r = await fetch(sb.url + '/rest/v1/model_catalogue?enabled=eq.true&order=vendor.asc,name.asc&limit=200', {
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key }
+    })
+    if (r.ok) { SVC_MC_ROWS = await r.json(); SVC_MC_STATE = 'loaded'; console.log('[SASC] model_catalogue loaded:', SVC_MC_ROWS.length, 'rows') }
+    else { var _et = await r.text(); SVC_MC_STATE = 'error'; console.error('[SASC] model_catalogue fetch failed:', r.status, _et.substring(0,120)) }
+  } catch(e) { SVC_MC_STATE = 'error'; console.error('[SASC] model_catalogue exception:', e.message) }
+}
+
+function toggleSvcModel(id) {
+  var sm = SASC_DATA.serviceModel.maas
+  var idx = sm.models.findIndex(function(m){ return m.id === id })
+  if (idx >= 0) sm.models.splice(idx, 1)
+  else {
+    var m = SVC_MC_ROWS.find(function(r){ return r.id === id })
+    if (m) sm.models.push({ id:m.id, name:m.name, vendor:m.vendor,
+      params_b:m.params_b, gpus_per_instance: m.gpus_per_instance||{'INT4':1},
+      quant: 'INT4', archetype: m.archetype||[] })
+  }
+  // Re-render just the model section
+  var el = document.getElementById('maas-model-section')
+  if (el) el.innerHTML = renderMaasModelSection()
+  updateSvcGPUEst()
+}
+
+function renderMaasModelSection() {
+  var sm = SASC_DATA.serviceModel.maas
+  var capTypes = [
+    { id:'general', label:'Text Generation' }, { id:'coding', label:'Coding' },
+    { id:'vision', label:'Vision' }, { id:'audio', label:'Audio/Speech' },
+    { id:'embedding', label:'Embedding' }, { id:'indic', label:'Indic Languages' },
+    { id:'multimodal', label:'Multimodal' }, { id:'video', label:'Video' }
+  ]
+  // Filter chips for capability type
+  var activeArch = SASC_DATA._maasArchFilter || ''
+  var filtered = SVC_MC_ROWS.filter(function(m){
+    if (!activeArch) return true
+    return (m.archetype||[]).includes(activeArch)
+  }).slice(0, 30) // limit display
+
+  var html = '<div style="margin-bottom:8px">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:5px">Filter by capability</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">'
+    + '<div class="svc-arch-chip" style="cursor:pointer;padding:3px 8px;' + (!activeArch?'background:var(--navy);color:#fff':'') + '" onclick="SASC_DATA._maasArchFilter=\'\';document.getElementById(\'maas-model-section\').innerHTML=renderMaasModelSection()">All</div>'
+    + capTypes.map(function(c){
+        var active = activeArch===c.id
+        return '<div class="svc-arch-chip" style="cursor:pointer;padding:3px 8px;' + (active?'background:var(--navy);color:#fff':'') + '" '
+          + 'onclick="SASC_DATA._maasArchFilter=\'' + c.id + '\';document.getElementById(\'maas-model-section\').innerHTML=renderMaasModelSection()">'
+          + c.label + '</div>'
+      }).join('')
+    + '</div>'
+
+  if (SVC_MC_STATE === 'loading') return html + '<div style="color:var(--mid);font-size:11px">⏳ Loading models...</div></div>'
+  if (SVC_MC_STATE === 'error')   return html + '<div style="color:#991B1B;font-size:11px">✗ Cannot load model catalogue — check Settings → API Keys</div></div>'
+
+  html += '<div class="svc-model-grid">'
+    + filtered.map(function(m) {
+        var sel = sm.models.some(function(x){ return x.id === m.id })
+        var gpuEst = (m.gpus_per_instance && m.gpus_per_instance.INT4) || 1
+        return '<div class="svc-model-item' + (sel?' on':'') + '" onclick="toggleSvcModel(\'' + m.id + '\')">'
+          + '<div class="svc-model-ck">' + (sel?'✓':'') + '</div>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-weight:600;font-size:11px;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(m.name||'') + '</div>'
+          + '<div style="font-size:9px;color:var(--mid)">' + esc(m.vendor||'') + (m.params_b?' · '+m.params_b+'B':'') + ' · ~' + gpuEst + ' GPU/inst</div>'
+          + '</div></div>'
+      }).join('')
+    + '</div>'
+    + (sm.models.length ? '<div style="font-size:11px;color:var(--teal);margin-top:5px">✓ ' + sm.models.length + ' model(s) selected</div>' : '')
+    + '</div>'
+
+  return html
+}
+
+function updateSvcGPUEst() {
+  var el = document.getElementById('svc-gpu-est')
+  if (!el) return
+  var sm = SASC_DATA.serviceModel
+  var maasGPUs = sm.maas.enabled
+    ? sm.maas.models.reduce(function(s,m){ return s + ((m.gpus_per_instance&&m.gpus_per_instance.INT4)||1) }, 0)
+    : 0
+  if (sm.maas.enabled && sm.maas.agentEnabled) maasGPUs += Math.ceil(maasGPUs / 8) || 1
+  var gpuaasGPUs = sm.gpuaas.enabled ? (parseInt(sm.gpuaas.gpus)||0) : 0
+  var bmaasSrvs  = sm.bmaas.enabled  ? (parseInt(sm.bmaas.servers)||0) : 0
+  var totalExtra = maasGPUs + gpuaasGPUs
+  el.innerHTML = totalExtra || bmaasSrvs
+    ? '<div style="display:flex;gap:16px;font-size:11px">'
+      + (maasGPUs   ? '<div>🤖 MaaS: <strong>' + maasGPUs + ' GPUs</strong></div>' : '')
+      + (gpuaasGPUs ? '<div>⚡ GPUaaS: <strong>' + gpuaasGPUs + ' GPUs</strong></div>' : '')
+      + (bmaasSrvs  ? '<div>🖥️ BMaaS: <strong>' + bmaasSrvs + ' servers</strong></div>' : '')
+      + '<div style="margin-left:auto;color:var(--amber);font-weight:700">+' + (totalExtra+bmaasSrvs) + ' additional units → added to BOM</div>'
+      + '</div>'
+    : '<div style="font-size:11px;color:rgba(255,255,255,.5)">Enable a service model above to see additional GPU/server requirements</div>'
+}
+
+// ── MaaS: load config from docket ────────────────────────────────────────────
+async function loadMaasCfgFromDocket() {
+  if (!SASC_DATA.docketId) return
+  try {
+    var rows = await sbFetch('docket_items',
+      'docket_id=eq.'+encodeURIComponent(SASC_DATA.docketId)+'&item_subtype=eq.maas_config', 1)
+    if (rows && rows[0] && rows[0].content) {
+      MAAS_CFG = rows[0].content
+      console.log('[SASC] MaaS config loaded:', (MAAS_CFG.usage_types||[]).length, 'usage types')
+    }
+  } catch(e) { console.warn('[SASC] MaaS cfg load:', e) }
+}
+
+// ── MaaS simulation math ──────────────────────────────────────────────────────
+
+// Get best quantisation for a model on a given GPU
+function bestQuant(model, gpuCfg) {
+  var gmi = model.gpu_memory_gb || {}
+  var vram = (gpuCfg.vram_per_gpu_gb || 80)
+  if (gmi.INT4 && gmi.INT4 <= vram) return 'INT4'
+  if (gmi.FP4  && gmi.FP4  <= vram) return 'FP4'
+  if (gmi.FP16 && gmi.FP16 <= vram) return 'FP16'
+  return 'INT4'  // fallback
+}
+
+// GPU memory required for a model (given GPU's VRAM)
+function modelVram(model, gpuCfg) {
+  var q = bestQuant(model, gpuCfg)
+  var gmi = model.gpu_memory_gb || {}
+  return gmi[q] || (model.params_b || 7) * (q==='FP16'?2:q==='INT4'?0.5:0.5)
+}
+
+// GPUs per instance for a model
+function modelGpis(model, gpuCfg) {
+  var q = bestQuant(model, gpuCfg)
+  var gpi = model.gpus_per_instance || {}
+  return gpi[q] || gpi.INT4 || gpi.FP16 || gpi.FP4 || 1
+}
+
+// Tokens/sec throughput estimate for one model instance on a GPU
+// Uses HBM bandwidth as proxy (LLM inference is memory-bandwidth bound)
+function modelTps(model, gpuCfg) {
+  var q = bestQuant(model, gpuCfg)
+  var bytesPerParam = q === 'FP16' ? 2 : q === 'FP4' ? 0.5 : 0.5  // INT4/FP4
+  var hbm_bps = (gpuCfg.hbm_bw_tbps || 3.0) * 1e12
+  var gpi = modelGpis(model, gpuCfg)
+  var modelBytes = (model.params_b || 7) * 1e9 * bytesPerParam
+  return Math.round(hbm_bps * gpi / modelBytes)
+}
+
+// Concurrent requests per instance (at 2s latency target, 512 avg output tokens)
+function concPerInstance(model, gpuCfg) {
+  var tps = modelTps(model, gpuCfg)
+  var avgOutputTokens = 512
+  var latencyTarget_s = 2.0
+  return Math.max(1, Math.floor(tps * latencyTarget_s / avgOutputTokens))
+}
+
+// GPU count for one usage type on one GPU architecture (with SLA multiplier)
+function calcUsageTypeGpus(ut, gpuCfg, sla) {
+  if (!ut || !ut.enabled || !ut.model_id) return 0
+  var model = SVC_MC_ROWS.find(function(m){ return m.id === ut.model_id })
+  if (!model) return 0
+
+  var dau = ut.dau || ut.concurrent_users || 0
+  var peak_conc = Math.ceil(dau * MAAS_SIM_PEAK / 100)
+  var conc_per = concPerInstance(model, gpuCfg)
+  var gpi = modelGpis(model, gpuCfg)
+
+  // Utilisation ceiling by SLA
+  var util_ceil = sla === 'enterprise' ? 0.50 : 0.70
+  var instances = Math.ceil(Math.ceil(peak_conc / conc_per) / util_ceil)
+
+  // SLA redundancy multiplier
+  var sla_mult = sla === 'enterprise' ? 2.0 : 1.4
+  return Math.ceil(instances * gpi * sla_mult)
+}
+
+// Total GPU count across all enabled usage types
+function calcMaasTotalGpus(gpuCfg, sla, usageTypes) {
+  var uts = usageTypes || (MAAS_CFG && MAAS_CFG.usage_types) || []
+  return uts.reduce(function(s, ut) { return s + calcUsageTypeGpus(ut, gpuCfg, sla) }, 0)
+}
+
+// CapEx in USD for a GPU config
+function calcMaasCapex(gpuCfg, totalGpus, costPerUnit) {
+  var cost = costPerUnit || MAAS_GPU_COST[gpuCfg.id] || MAAS_GPU_COST_DEFAULTS[gpuCfg.name] || 300000
+  var giu = gpuCfg.gpus_in_unit || 8
+  var units = Math.ceil(totalGpus / giu)
+  return units * cost
+}
+
+// Monthly OpEx: power cost
+function calcMaasOpexMonthly(gpuCfg, totalGpus, powerTariffInr) {
+  var tariff = powerTariffInr || 7  // ₹7/kWh default
+  var tdp_per_gpu = (gpuCfg.tdp_kw || 10) / (gpuCfg.gpus_in_unit || 8)  // kW per GPU
+  var kwh_per_month = totalGpus * tdp_per_gpu * 24 * 30
+  return kwh_per_month * tariff  // ₹
+}
+
+// Cost per million tokens (for token pricing)
+function calcCostPerMToken(gpuCfg, totalGpus, sla, usageTypes, powerTariffInr) {
+  var uts = usageTypes || (MAAS_CFG && MAAS_CFG.usage_types) || []
+  var enabledUts = uts.filter(function(u){ return u.enabled && u.model_id })
+  if (!enabledUts.length || !totalGpus) return 0
+
+  // Total tokens/sec capacity
+  var totalTps = enabledUts.reduce(function(s, ut) {
+    var model = SVC_MC_ROWS.find(function(m){ return m.id === ut.model_id })
+    if (!model) return s
+    var gpus = calcUsageTypeGpus(ut, gpuCfg, sla)
+    var gpi = modelGpis(model, gpuCfg)
+    var instances = gpus / gpi
+    return s + instances * modelTps(model, gpuCfg)
+  }, 0)
+
+  if (!totalTps) return 0
+
+  var FX_INR = 85  // USD→INR
+  var capex = calcMaasCapex(gpuCfg, totalGpus) / FX_INR  // USD→INR
+  var amort_monthly = capex / MAAS_SIM_AMORT   // INR/month
+  var opex_monthly  = calcMaasOpexMonthly(gpuCfg, totalGpus, powerTariffInr)
+
+  var total_monthly_inr = amort_monthly + opex_monthly
+  var tokens_per_month  = totalTps * 3600 * 24 * 30  // assume 100% = theoretical max
+  var util_factor = sla === 'enterprise' ? 0.50 : 0.70  // effective utilisation
+  var effective_tokens = tokens_per_month * util_factor
+
+  return (total_monthly_inr / effective_tokens) * 1e6  // INR per million tokens
+}
+
+// Max DAU supportable at a given GPU count
+function calcMaxDau(gpuCfg, totalGpus, sla, usageTypes) {
+  var uts = (usageTypes || (MAAS_CFG && MAAS_CFG.usage_types) || []).filter(function(u){ return u.enabled && u.model_id })
+  if (!uts.length) return 0
+  var sla_mult = sla === 'enterprise' ? 2.0 : 1.4
+  var util_ceil = sla === 'enterprise' ? 0.50 : 0.70
+  // Weighted max DAU: distribute totalGpus proportionally to usage type weight
+  // Simplified: assume equal weight
+  var gpuPerType = totalGpus / uts.length
+  return Math.floor(uts.reduce(function(s, ut) {
+    var model = SVC_MC_ROWS.find(function(m){ return m.id === ut.model_id })
+    if (!model) return s
+    var gpi = modelGpis(model, gpuCfg)
+    var instances = Math.floor(gpuPerType / (gpi * sla_mult))
+    var conc = instances * concPerInstance(model, gpuCfg) * util_ceil
+    return s + conc / (MAAS_SIM_PEAK / 100)
+  }, 0))
+}
+
+// ── Workloads B — AI Infrastructure Services (new Screen 3) ─────────────────
+function renderWorkloadB() {
+  // Catalogue loaded by renderStep before this function is called
+  var html = ''
+  var cfg = MAAS_CFG
+  var uts = cfg && cfg.usage_types ? cfg.usage_types.filter(function(u){ return u.enabled }) : []
+
+  // MaaS Docket config summary
+  html += '<div class="card">'
+  html += '<div class="card-title">MaaS Configuration (from Docket)</div>'
+  if (cfg && uts.length) {
+    html += '<div class="card-sub">' + uts.length + ' of 6 usage types enabled'
+    html += ' &middot; ' + (cfg.total_concurrent_users||0) + ' total DAU'
+    html += ' &middot; SLA: ' + (cfg.sla_tier||'standard').toUpperCase()
+    html += (cfg.trial_enabled ? ' &middot; 15-day trial' : '')
+    html += '</div>'
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">'
+    uts.forEach(function(ut) {
+      html += '<div style="padding:5px 10px;background:rgba(0,178,144,.08);border:1.5px solid var(--teal);border-radius:5px;font-size:11px;color:var(--teal);font-weight:600">'
+      html += esc(ut.label||ut.type) + ' &middot; ' + (ut.dau||ut.concurrent_users||0) + ' DAU'
+      if (ut.model_name) html += ' &middot; ' + esc(ut.model_name)
+      html += '</div>'
+    })
+    html += '</div>'
+  } else if (cfg && !uts.length) {
+    html += '<div style="padding:10px;background:#FEF9C3;border-radius:6px;font-size:12px;color:#854D0E">No usage types enabled yet. Configure in Docket → Service Model.</div>'
+  } else {
+    html += '<div style="padding:10px;background:#FEF9C3;border-radius:6px;font-size:12px;color:#854D0E">No MaaS config found. Set up in Docket → Service Model tab, then reopen SASC.</div>'
+  }
+  html += '</div>'
+
+  // MaaS simulation (3-layer engine)
+  html += renderMaasSimTab()
+
+  // GPUaaS + BMaaS
+  html += renderGpuBmaasSection()
+
+  var _wbprev = getPrevStep(SASC_STEP), _wbnext = getNextStep(SASC_STEP)
+  var _wbsteps = getActiveSteps()
+  html += '<div class="actions-bar">'
+  if (_wbprev) html += '<button class="btn btn-ghost" onclick="renderStep(' + _wbprev + ')">&larr; ' + esc((_wbsteps[_wbprev-1]||{}).label||'Back') + '</button>'
+  if (_wbnext) html += '<button class="btn btn-primary" onclick="renderStep(' + _wbnext + ')">Next: ' + esc((_wbsteps[_wbnext-1]||{}).label||'BOM') + ' &rarr;</button>'
+  html += '</div>'
+  return html
+}
+
+// GPUaaS + BMaaS config section
+function renderGpuBmaasSection() {
+  var sm = SASC_DATA.serviceModel
+  var ga = sm.gpuaas
+  var bm2 = sm.bmaas
+  var html = '<div class="card"><div class="card-title">GPU as a Service &amp; Bare Metal as a Service</div>'
+
+  // GPUaaS
+  html += '<div style="margin-bottom:16px">'
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+  html += '<div class="toggle-sw' + (ga.enabled?' on':'') + '" onclick="SASC_DATA.serviceModel.gpuaas.enabled=!SASC_DATA.serviceModel.gpuaas.enabled;renderStep(3)"></div>'
+  html += '<span style="font-weight:600;font-size:13px;color:var(--navy)">GPU as a Service</span>'
+  html += '<span style="font-size:11px;color:var(--mid)">Reserved + burst GPU compute for external consumers</span>'
+  html += '</div>'
+  if (ga.enabled) {
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 12px;background:var(--light);border-radius:6px">'
+    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">GPUs reserved</div>'
+    html += '<input type="number" value="' + ga.gpus + '" min="0" step="8" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.gpuaas.gpus=+this.value"></div>'
+    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Price USD/GPU-hr</div>'
+    html += '<input type="number" value="' + ga.gpu_hour_price_usd + '" min="0" step="0.5" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.gpuaas.gpu_hour_price_usd=+this.value"></div>'
+    html += '</div>'
+  }
+  html += '</div>'
+
+  // BMaaS
+  html += '<div>'
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+  html += '<div class="toggle-sw' + (bm2.enabled?' on':'') + '" onclick="SASC_DATA.serviceModel.bmaas.enabled=!SASC_DATA.serviceModel.bmaas.enabled;renderStep(3)"></div>'
+  html += '<span style="font-weight:600;font-size:13px;color:var(--navy)">Bare Metal as a Service</span>'
+  html += '<span style="font-size:11px;color:var(--mid)">Dedicated AI servers for maximum isolation</span>'
+  html += '</div>'
+  if (bm2.enabled) {
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 12px;background:var(--light);border-radius:6px">'
+    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Servers</div>'
+    html += '<input type="number" value="' + bm2.servers + '" min="0" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.bmaas.servers=+this.value"></div>'
+    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Price USD/server/hr</div>'
+    html += '<input type="number" value="' + bm2.server_hour_price_usd + '" min="0" step="0.1" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.bmaas.server_hour_price_usd=+this.value"></div>'
+    html += '</div>'
+  }
+  html += '</div>'
+  html += '</div>'
+  return html
+}
+
+function renderServiceModelSection() {
+  var sm = SASC_DATA.serviceModel
+
+  // Load model catalogue in background
+  if (SVC_MC_STATE === '') {
+    SVC_MC_STATE = 'loading'
+    loadSvcModelCatalogue().then(function(){
+      var el = document.getElementById('maas-model-section')
+      if (el) el.innerHTML = renderMaasModelSection()
+    })
+  }
+
+  function svcToggle(type, el) {
+    SASC_DATA.serviceModel[type].enabled = !SASC_DATA.serviceModel[type].enabled
+    var card = el.closest('.svc-card')
+    card.classList.toggle('on', SASC_DATA.serviceModel[type].enabled)
+    el.classList.toggle('on', SASC_DATA.serviceModel[type].enabled)
+    var hdr = card.querySelector('.svc-hdr')
+    if (hdr) hdr.classList.toggle('on', SASC_DATA.serviceModel[type].enabled)
+    updateSvcGPUEst()
+  }
+
+  var html = '<div class="card" style="margin-top:0">'
+    + '<div class="card-title">Service Model <span style="font-size:11px;font-weight:400;color:var(--mid)">— optional, adds infrastructure to BOM</span></div>'
+    + '<div class="card-sub">If this territory will offer AI services to others, select the service delivery models. Each adds GPU or server capacity to the infrastructure BOM. Revenue modelling is in the Financial Model.</div>'
+
+  // MaaS card
+  html += '<div class="svc-card' + (sm.maas.enabled?' on':'') + '">'
+    + '<div class="svc-hdr' + (sm.maas.enabled?' on':'') + '" onclick="this.querySelector(\'.svc-toggle\').click()">'
+    + '<div class="svc-toggle' + (sm.maas.enabled?' on':'') + '" onclick="event.stopPropagation();SASC_DATA.serviceModel.maas.enabled=!SASC_DATA.serviceModel.maas.enabled;this.classList.toggle(\'on\');this.closest(\'.svc-card\').classList.toggle(\'on\');this.closest(\'.svc-hdr\').classList.toggle(\'on\');updateSvcGPUEst()"></div>'
+    + '<div class="svc-title">🤖 MaaS — Model as a Service</div>'
+    + '<div class="svc-desc">Adds GPU capacity to host and serve open-source models via API</div>'
+    + '</div>'
+    + '<div class="svc-body">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">Select models to host</div>'
+    + '<div id="maas-model-section">' + renderMaasModelSection() + '</div>'
+    + '<div style="margin-top:10px">'
+    + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">'
+    + '<input type="checkbox"' + (sm.maas.agentEnabled?' checked':'') + ' onchange="SASC_DATA.serviceModel.maas.agentEnabled=this.checked;updateSvcGPUEst()"> '
+    + '<strong>Include Agent Harness</strong> — adds ~1 GPU per 8 inference GPUs for orchestration</label>'
+    + '</div></div></div>'
+
+  // GPUaaS card
+  html += '<div class="svc-card' + (sm.gpuaas.enabled?' on':'') + '">'
+    + '<div class="svc-hdr' + (sm.gpuaas.enabled?' on':'') + '" onclick="this.querySelector(\'.svc-toggle\').click()">'
+    + '<div class="svc-toggle' + (sm.gpuaas.enabled?' on':'') + '" onclick="event.stopPropagation();SASC_DATA.serviceModel.gpuaas.enabled=!SASC_DATA.serviceModel.gpuaas.enabled;this.classList.toggle(\'on\');this.closest(\'.svc-card\').classList.toggle(\'on\');this.closest(\'.svc-hdr\').classList.toggle(\'on\');updateSvcGPUEst()"></div>'
+    + '<div class="svc-title">⚡ GPUaaS — GPU as a Service</div>'
+    + '<div class="svc-desc">Adds raw GPU capacity for rent to developers/researchers</div>'
+    + '</div>'
+    + '<div class="svc-body">'
+    + '<div class="svc-row">'
+    + '<div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">GPUs to offer as a service</label>'
+    + '<input class="svc-input" type="number" min="0" step="8" value="' + (sm.gpuaas.gpus||0) + '" placeholder="e.g. 32" onchange="SASC_DATA.serviceModel.gpuaas.gpus=+this.value;updateSvcGPUEst()"></div>'
+    + '<div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Indicative price (USD/GPU-hour)</label>'
+    + '<input class="svc-input" type="number" min="0" step="0.1" value="' + (sm.gpuaas.gpu_hour_price_usd||3.50) + '" onchange="SASC_DATA.serviceModel.gpuaas.gpu_hour_price_usd=+this.value"></div>'
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--mid)">Revenue modelling (utilisation × hours × price) is in the TSAP Financial Model → Revenue tab.</div>'
+    + '</div></div>'
+
+  // BMaaS card
+  html += '<div class="svc-card' + (sm.bmaas.enabled?' on':'') + '">'
+    + '<div class="svc-hdr' + (sm.bmaas.enabled?' on':'') + '" onclick="this.querySelector(\'.svc-toggle\').click()">'
+    + '<div class="svc-toggle' + (sm.bmaas.enabled?' on':'') + '" onclick="event.stopPropagation();SASC_DATA.serviceModel.bmaas.enabled=!SASC_DATA.serviceModel.bmaas.enabled;this.classList.toggle(\'on\');this.closest(\'.svc-card\').classList.toggle(\'on\');this.closest(\'.svc-hdr\').classList.toggle(\'on\');updateSvcGPUEst()"></div>'
+    + '<div class="svc-title">🖥️ BMaaS — Bare Metal as a Service</div>'
+    + '<div class="svc-desc">Adds CPU server capacity for HPC/research rental</div>'
+    + '</div>'
+    + '<div class="svc-body">'
+    + '<div class="svc-row">'
+    + '<div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Servers to offer as a service</label>'
+    + '<input class="svc-input" type="number" min="0" value="' + (sm.bmaas.servers||0) + '" placeholder="e.g. 10" onchange="SASC_DATA.serviceModel.bmaas.servers=+this.value;updateSvcGPUEst()"></div>'
+    + '<div><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);margin-bottom:4px">Indicative price (USD/server-hour)</label>'
+    + '<input class="svc-input" type="number" min="0" step="0.1" value="' + (sm.bmaas.server_hour_price_usd||1.20) + '" onchange="SASC_DATA.serviceModel.bmaas.server_hour_price_usd=+this.value"></div>'
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--mid)">Revenue modelling is in the TSAP Financial Model → Revenue tab.</div>'
+    + '</div></div>'
+
+  // GPU estimate box
+  html += '<div class="svc-gpu-est" id="svc-gpu-est">'
+    + '<div style="font-size:10px;color:rgba(255,255,255,.5);margin-bottom:6px">Additional capacity from service models (added to UC infrastructure in BOM)</div>'
+    + '<div style="font-size:11px;color:rgba(255,255,255,.5)">Enable a service model above to see requirements</div>'
+    + '</div>'
+    + '</div>'
+
+  return html
+}
+
+function renderScreen2() {
+  var s = SASC_DATA
+  // Guard: if reference data not yet loaded, show loading state with nav
+  if (!ALL_UCS || !ALL_UCS.length || !ALL_GPU_CONFIGS || !ALL_GPU_CONFIGS.length) {
+    var _s2steps0 = getActiveSteps()
+    var _s2prev0 = getPrevStep(SASC_STEP), _s2next0 = getNextStep(SASC_STEP)
+    if (_s2prev0 && _s2prev0 > _s2steps0.length) _s2prev0 = null
+    if (_s2next0 && _s2next0 > _s2steps0.length) _s2next0 = null
+    return '<div class="card"><div style="padding:20px;color:var(--mid)">Loading use cases...</div>'
+      + '<div class="actions-bar">'
+      + (_s2prev0 ? '<button class="btn btn-ghost" onclick="renderStep('+_s2prev0+')">← '+( _s2steps0[_s2prev0-1]||{}).label+'</button>' : '<div></div>')
+      + (_s2next0 ? '<button class="btn btn-primary" onclick="renderStep('+_s2next0+')">Next: '+(_s2steps0[_s2next0-1]||{}).label+' →</button>' : '')
+      + '</div></div>'
+  }
+  var selectedUCs = ALL_UCS.filter(function(u) { return s.selectedUCs.indexOf(u.id) >= 0 })
+  console.log('[SASC] renderScreen2: ALL_UCS', ALL_UCS.length, 'selectedUCs', s.selectedUCs.length, 'matched', selectedUCs.length)
+  var gpuCfg = ALL_GPU_CONFIGS.find(function(g) { return g.id === s.gpuConfigId }) || ALL_GPU_CONFIGS[0]
+  if (!gpuCfg) gpuCfg = { id:'', name:'No GPU configs loaded', vram_per_gpu_gb:80, hbm_bw_tbps:3.0, power_watts_tdp:5600, gpus_in_unit:8, tdp_kw:10 }
+
+  // Requirements card (from Docket)
+  var req = (ENGAGEMENT && ENGAGEMENT.requirements) || {}
+  var html = ''
+  if (req.objective || req.problem || s.selectedUCs.length) {
+    html += '<div class="card" style="border-left:3px solid var(--teal)">'
+    html += '<div class="card-title">Requirements (from Docket)</div>'
+    if (req.objective) html += '<div style="margin-bottom:6px"><span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Objective</span><div style="font-size:12px;color:var(--dark);margin-top:3px">' + esc(req.objective) + '</div></div>'
+    if (req.problem)   html += '<div style="margin-bottom:6px"><span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Problem</span><div style="font-size:12px;color:var(--dark);margin-top:3px">' + esc(req.problem) + '</div></div>'
+    if (s.selectedUCs.length) {
+      html += '<div style="font-size:11px;color:var(--mid)">' + s.selectedUCs.length + ' UC' + (s.selectedUCs.length>1?'s':'') + ' linked from Docket'
+      + (selectedUCs.length < s.selectedUCs.length ? ' (' + (s.selectedUCs.length-selectedUCs.length) + ' not found in library)' : '') + '</div>'
+    } else {
+      html += '<div style="font-size:11px;color:var(--orange)">No UCs linked from Docket — add UCs in Docket Use Cases tab first</div>'
+    }
+    html += '</div>'
+  }
+  html += '<div class="card">'
+    + '<div class="card-title">UC workload profiler</div>'
+    + '<div class="card-sub">Size compute for each use case. Defaults loaded from UC library &mdash; override as needed.</div>'
+
+    // GPU config selector
+    + '<div class="form-grid" style="margin-bottom:10px">'
+    + '<div><label>GPU configuration</label>'
+    + '<select onchange="SASC_DATA.gpuConfigId=this.value;document.getElementById(\'app-content\').innerHTML=renderScreen2()">'
+    + ALL_GPU_CONFIGS.filter(function(g) { return !g.rack_scale }).map(function(g) {
+        return '<option value="' + g.id + '"' + (s.gpuConfigId===g.id?' selected':'') + '>'
+          + g.name + ' (' + (g.vram_per_gpu_gb||Math.round(g.total_vram_gb/(g.gpus_in_unit||8))) + 'GB/GPU × ' + (g.gpus_in_unit||8) + ' GPUs)'
+          + '</option>'
+      }).join('')
+    + '</select></div>'
+
+    // Derating slider
+    + '<div><label>Derating factor &mdash; <strong id="derating-label">' + (s.deratingPct||80) + '%</strong> sustained utilisation</label>'
+    + '<input type="range" min="50" max="95" step="5" value="' + (s.deratingPct||80) + '" style="width:100%;margin-top:4px"'
+    + ' oninput="SASC_DATA.deratingPct=parseInt(this.value);document.getElementById(\'derating-label\').textContent=this.value+\'%\';document.getElementById(\'app-content\').innerHTML=renderScreen2()">'
+    + '<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--mid);margin-top:2px"><span>50% conservative</span><span>95% optimistic</span></div>'
+    + '</div></div></div>'
+
+  //    No UCs message                                                         
+  if (!selectedUCs.length) {
+    html += '<div class="card" style="border-left:3px solid var(--amber)">'
+      + '<div class="card-sub">No UCs selected. Go back to Step 1 to select UCs, or continue &mdash; BOM will use default compute sizing for the selected MDC T-shirt.</div></div>'
+  }
+
+  //    Per-UC workload cards                                                  
+  var totalServers = 0, totalPowerKW = 0, totalTrainHrs = 0, totalStorageTB = 0
+
+  selectedUCs.forEach(function(uc) {
+    var wl = s.ucWorkloads[uc.id] || {
+      uc_type_id:'', dau:1000, peak_mult:3, latency_sla_ms:2000,
+      model_id:'', training:false, train_gpu_hrs:500, data_tb:5,
+      derating_pct:80, complexity:'medium', expanded:false
+    }
+    // Use global derating if not per-UC overridden
+    wl.derating_pct = s.deratingPct || 80
+
+    var sizing = calcSizing(wl)
+    var ucType = ALL_UC_TYPES.find(function(t) { return t.id === wl.uc_type_id })
+    var model  = ALL_MODELS.find(function(m) { return m.id === wl.model_id })
+
+    totalServers  += sizing.servers
+    totalPowerKW  += sizing.power_kw
+    if (wl.training) totalTrainHrs += wl.train_gpu_hrs
+    totalStorageTB += wl.data_tb * 3
+
+    var headBadgeStyle = sizing.headroom_pct > 50
+      ? 'background:rgba(0,178,144,0.1);color:#085041'
+      : 'background:rgba(255,182,0,0.12);color:#9a6800'
+    var latBadgeStyle = sizing.latency_ok
+      ? 'background:rgba(0,178,144,0.1);color:#085041'
+      : 'background:rgba(255,85,57,0.1);color:#c0341a'
+
+    html += '<div class="card" style="padding:0;overflow:hidden;margin-bottom:8px">'
+
+    //    UC header row                                                         
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--light);cursor:pointer" data-uid="' + uc.id + '" onclick="toggleUCExpand(this.dataset.uid)">'
+      + '<div style="width:28px;height:28px;border-radius:6px;background:var(--navy);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+      + '<span style="color:#fff;font-size:10px;font-weight:700">' + (uc.uc_name||uc.title||'UC').slice(0,2).toUpperCase() + '</span></div>'
+      + '<div style="flex:1">'
+      + '<div style="font-size:13px;font-weight:600;color:var(--dark)">' + esc(uc.uc_name||uc.title||'UC') + '</div>'
+      + '<div style="font-size:10px;color:var(--mid)">'
+      + (ucType ? esc(ucType.name) : 'Unclassified') + ' &bull; '
+      + (model ? esc(model.name) : 'No model') + ' &bull; '
+      + sizing.peak_rps + ' peak RPS'
+      + '</div></div>'
+      + '<div style="display:flex;gap:4px;align-items:center">'
+      + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;' + headBadgeStyle + '">' + (function(){var _gc=ALL_GPU_CONFIGS.find(function(g){return g.id===SASC_DATA.gpuConfigId});var _se=sizing._se;var _g=_se?_se.total_gpus:(sizing.servers*(_gc?(_gc.gpus_in_unit||8):8));var _u=_gc&&_gc.rack_scale?'rack':'server';return _g+' GPUs / '+sizing.servers+' '+_u+(sizing.servers>1?'s':'')})() + '</span>'
+      + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;' + latBadgeStyle + '">' + (sizing.latency_ok?'SLA OK':'SLA risk') + '</span>'
+      + '</div>'
+      + '<span style="font-size:12px;color:var(--mid);margin-left:4px">' + (wl.expanded?'&#9650;':'&#9660;') + '</span>'
+      + '</div>'
+
+    if (wl.expanded) {
+      html += '<div style="padding:14px" data-uid="' + uc.id + '">'
+
+      //    Row 1: UC type + model                                             
+      html += '<div class="cfg-grid" style="margin-bottom:10px">'
+        + '<div><label>UC interaction type</label>'
+        + '<select data-field="uc_type_id" onchange="wlChange(this)">'
+        + '<option value="">-- Select type --</option>'
+        + ALL_UC_TYPES.map(function(t) {
+            return '<option value="' + t.id + '"' + (wl.uc_type_id===t.id?' selected':'') + '>' + esc(t.name) + '</option>'
+          }).join('')
+        + '</select></div>'
+        + '<div><label>AI model</label>'
+        + '<select data-field="model_id" onchange="wlChange(this)">'
+        + '<option value="">-- Select model --</option>'
+        + '<option value="">-- Select model --</option>'
+        + ALL_MODELS.map(function(m) {
+            var arch = m.archetype
+            if (typeof arch === 'string') { try { arch = JSON.parse(arch) } catch(e) { arch = [] } }
+            var isIndic = Array.isArray(arch) && arch.indexOf('indic') >= 0
+            var sizeLabel = m.params_b ? m.params_b + 'B' : (m.model_size_b ? m.model_size_b + 'B' : '?')
+            return '<option value="' + m.id + '"' + (wl.model_id===m.id?' selected':'') + '>'
+              + (isIndic ? '&#127464;&#127475; ' : '') + esc(m.name) + ' (' + sizeLabel + ')'
+              + '</option>'
+          }).join('')
+        + '</select></div>'
+
+        // DAU input box
+        + '<div><label>DAU (daily active users)</label>'
+        + '<input type="number" value="' + wl.dau + '" min="1" data-field="dau" onchange="wlChange(this)"></div>'
+
+        // Peak multiplier slider
+        + '<div><label>Peak multiplier &mdash; <strong id="pm-' + uc.id.replace(/[^a-z0-9]/gi,'') + '">' + wl.peak_mult + 'x</strong></label>'
+        + '<input type="range" min="1" max="10" step="0.5" value="' + wl.peak_mult + '" style="width:100%;margin-top:6px"'
+        + ' data-field="peak_mult" oninput="document.getElementById(\'pm-' + uc.id.replace(/[^a-z0-9]/gi,'') + '\').textContent=this.value+\'x\'" onchange="wlChange(this)">'
+        + '<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--mid)"><span>1x</span><span>10x</span></div>'
+        + '</div>'
+        + '</div>'
+
+      //    Row 2: Latency SLA                                                 
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+        + '<div><label>Latency SLA (p99)</label>'
+        + '<select data-field="latency_sla_ms" onchange="wlChange(this)">'
+        + [
+            {v:500,  l:'< 500ms (real-time)'},
+            {v:1000, l:'< 1s (interactive)'},
+            {v:2000, l:'< 2s (standard)'},
+            {v:5000, l:'< 5s (relaxed)'},
+            {v:10000,l:'< 10s (near-realtime)'},
+            {v:60000,l:'Batch (no SLA)'}
+          ].map(function(o) {
+            return '<option value="' + o.v + '"' + (wl.latency_sla_ms===o.v?' selected':'') + '>' + o.l + '</option>'
+          }).join('')
+        + '</select></div>'
+        + '<div><label>Training / fine-tuning</label>'
+        + '<select data-field="training" onchange="wlChange(this)">'
+        + '<option value="false"' + (!wl.training?' selected':'') + '>Not required</option>'
+        + '<option value="true"' + (wl.training?' selected':'') + '>Yes -- fine-tuning needed</option>'
+        + '</select></div>'
+        + '</div>'
+
+      if (wl.training) {
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+          + '<div><label>Training GPU-hours (one-time)</label>'
+          + '<input type="number" value="' + wl.train_gpu_hrs + '" data-field="train_gpu_hrs" onchange="wlChange(this)"></div>'
+          + '<div><label>Data volume (TB)</label>'
+          + '<input type="number" value="' + wl.data_tb + '" data-field="data_tb" onchange="wlChange(this)"></div>'
+          + '</div>'
+      }
+
+      //    Derived / sizing result                                            
+      html += '<div style="background:var(--light);border-radius:var(--r-sm);padding:10px 12px;margin:8px 0">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Derived sizing</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
+        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--white);border:0.5px solid #e0e0e8;color:var(--mid)">' + wl.dau.toLocaleString() + ' DAU</span>'
+        + '<span style="font-size:10px;color:var(--mid)">&#8594;</span>'
+        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--white);border:0.5px solid #e0e0e8;color:var(--mid)">' + sizing.peak_rps + ' peak RPS</span>'
+        + '<span style="font-size:10px;color:var(--mid)">&#8594;</span>'
+        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--white);border:0.5px solid #e0e0e8;color:var(--mid)">GPU: ' + sizing.derated_rps + ' RPS capacity</span>'
+        + '<span style="font-size:10px;color:var(--mid)">&#8594;</span>'
+        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--navy);color:#fff">' + (function(){var _gc=ALL_GPU_CONFIGS.find(function(g){return g.id===SASC_DATA.gpuConfigId});var _se=sizing._se;var _g=_se?_se.total_gpus:(sizing.servers*(_gc?(_gc.gpus_in_unit||8):8));var _u=_gc&&_gc.rack_scale?'rack':'server';return _g+' GPUs / '+sizing.servers+' '+_u+(sizing.servers>1?'s':'')})() + '</span>'
+        + '<span style="font-size:10px;color:var(--mid)">&#8594;</span>'
+        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--white);border:0.5px solid #e0e0e8;color:var(--mid)">' + sizing.power_kw + ' kW</span>'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+        + '<div style="flex:1;min-width:120px">'
+        + '<div style="font-size:22px;font-weight:700;color:var(--navy)">' + sizing.servers + '</div>'
+        + (function(){ var se=sizing._se; var gc=ALL_GPU_CONFIGS.find(function(g){return g.id===SASC_DATA.gpuConfigId}); var ul=gc&&gc.rack_scale?'rack':'server'; var gpu=(se?se.actual_gpus:(sizing.servers*(gc?gc.gpus_in_unit||8:8))); return '<div style="font-size:10px;color:var(--mid)">'+ul+(sizing.servers>1?'s':'')+' ('+gpu+' GPUs)</div>' })()
+        + '</div>'
+        + '<div style="flex:2;padding-left:10px;border-left:0.5px solid #e0e0e8">'
+        + (function(){ var se=sizing._se; if(se){ return '<div style="font-size:10px;font-weight:700;color:var(--navy);margin-bottom:3px">GPU Allocation</div>'
+          + '<div style="display:grid;grid-template-columns:1fr auto;gap:1px 8px;font-size:10px">'
+          + '<span style="color:var(--mid)">Base ('+se.binding_constraint+')</span><span style="font-weight:600">'+se.base_gpus+'</span>'
+          + '<span style="color:var(--mid)">Peak buffer</span><span style="font-weight:600;color:var(--amber)">+'+se.peak_buffer_gpus+'</span>'
+          + '<span style="color:var(--mid)">Failover</span><span style="font-weight:600;color:var(--amber)">+'+se.failover_gpus+'</span>'
+          + (se.ha_gpus?'<span style="color:var(--mid)">HA</span><span style="font-weight:600;color:var(--amber)">+'+se.ha_gpus+'</span>':'')
+          + (se.growth_gpus?'<span style="color:var(--mid)">Growth</span><span style="font-weight:600;color:var(--mid)">+'+se.growth_gpus+'</span>':'')
+          + '<span style="font-weight:700;border-top:1px solid #e0e0e8;padding-top:2px">Total</span><span style="font-weight:700;color:var(--navy);border-top:1px solid #e0e0e8;padding-top:2px">'+se.total_gpus+'</span>'
+          + '</div>'
+          + '<div style="font-size:9px;color:var(--mid);margin-top:3px">'+(se.sla_met?'&#10003; SLA met':'&#9888; SLA risk')+' &bull; SizingEngine &bull; '+wl.derating_pct+'% derating</div>'
+          } else { return '<div style="font-size:11px;font-weight:600;color:'+(sizing.headroom_pct>50?'var(--teal)':'var(--amber)')+'">'+sizing.headroom_pct+'% headroom</div>'
+          + '<div style="font-size:10px;color:var(--mid)">'+sizing.bm_source+' | '+wl.derating_pct+'% derating</div>' } })()
+        + '</div>'
+        + '<button class="btn btn-ghost btn-xs" style="align-self:flex-start" data-uid="' + uc.id + '" onclick="showHowCalc(this.dataset.uid)">&#9432; How?</button>'
+        + '</div></div>'
+
+      //    Complexity tier                                                     
+      html += renderUCComplexityTier(uc.id)
+
+      html += '</div>'  // end expanded body
+    }
+
+    html += '</div>'  // end UC card
+  })
+
+  //    Total summary                                                          
+  var mdcGPUMap  = { xs:64, s:256, m:512, l:768, xl:1024 }
+  var mdcGPUsPerSite = mdcGPUMap[s.mdc.tshirt] || 512
+  var mdcGPUs = mdcGPUsPerSite * (s.mdc.sites || 1)
+  var totalGPUs = totalServers * 8
+  var headroom  = Math.round((1 - totalGPUs / mdcGPUs) * 100)
+
+  html += '<div class="card" style="border-left:3px solid var(--navy)">'
+    + '<div class="card-title" style="margin-bottom:8px">Total compute across all UCs</div>'
+    + '<div style="background:var(--light);border-radius:var(--r-sm);padding:10px 12px">'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">'
+    + '<span style="color:var(--mid)">GPU servers needed</span>'
+    + '<span style="font-weight:600">' + totalServers + ' servers (' + totalGPUs + ' GPUs)</span></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">'
+    + '<span style="color:var(--mid)">Total inference power</span>'
+    + '<span style="font-weight:600">' + totalPowerKW.toFixed(1) + ' kW</span></div>'
+    + (totalTrainHrs ? '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--mid)">Training (one-time)</span><span style="font-weight:600">' + totalTrainHrs.toLocaleString() + ' GPU-hrs</span></div>' : '')
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">'
+    + '<span style="color:var(--mid)">Storage estimate</span>'
+    + '<span style="font-weight:600">' + totalStorageTB + ' TB</span></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">'
+    + '<span style="color:var(--mid)">MDC capacity (' + (s.mdc.tshirt||'m').toUpperCase() + ' x ' + (s.mdc.sites||1) + ' site' + ((s.mdc.sites||1)>1?'s':'') + ')</span>'
+    + '<span style="font-weight:600;color:' + (headroom>20?'#085041':'#9a6800') + '">' + mdcGPUs + ' GPUs -- ' + Math.max(0,headroom) + '% headroom</span></div>'
+    + '</div>'
+    + (headroom < 0 ? '<div style="font-size:11px;color:#9a6800;margin-top:8px;padding:8px;background:rgba(255,182,0,0.08);border-radius:var(--r-sm)">&#9888; UC requirements exceed selected MDC. Consider upgrading T-shirt size or adding more sites in Step 1.</div>' : '')
+    + '</div>'
+
+  // Service model section moved to Workloads B (Screen 3)
+
+  var _s2steps = getActiveSteps()
+  var _s2prev = getPrevStep(SASC_STEP), _s2next = getNextStep(SASC_STEP)
+  // Guard: clamp to valid step range -- prevents undefined label crash / renderStep(undefined) hang
+  if (_s2prev && _s2prev > _s2steps.length) _s2prev = null
+  if (_s2next && _s2next > _s2steps.length) _s2next = null
+  html += '<div class="actions-bar">'
+    + (_s2prev ? '<button class="btn btn-ghost" onclick="renderStep(' + _s2prev + ')">&larr; ' + esc((_s2steps[_s2prev-1]||{}).label||'Back') + '</button>' : '<div></div>')
+    + (_s2next ? '<button class="btn btn-primary" onclick="renderStep(' + _s2next + ')">Next: ' + esc((_s2steps[_s2next-1]||{}).label||'Next') + ' &rarr;</button>' : '')
+    + '</div>'
+
+  return html
+}
+
+function showHowCalc(ucId) {
+  var wl = SASC_DATA.ucWorkloads[ucId]
+  if (!wl) { alert('No workload data for this UC.'); return }
+  var uc      = ALL_UCS.find(function(u){ return u.id === ucId })
+  var sizing  = calcSizing(wl)
+  var ucType  = ALL_UC_TYPES.find(function(t){ return t.id === wl.uc_type_id })
+  var bm      = SASC_DATA.benchmarks.find(function(b){
+    var gpuCfg = ALL_GPU_CONFIGS.find(function(g){ return g.id === SASC_DATA.gpuConfigId })
+    var model  = ALL_MODELS.find(function(m){ return m.id === wl.model_id })
+    return gpuCfg && model && b.gpu_config_id === gpuCfg.id && b.ai_model_id === model.id
+  })
+
+  var rpud = ucType ? ucType.requests_per_user_per_day : 5
+  alert(
+    'HOW WE CALCULATED THIS\n'
+    + 'UC: ' + (uc ? (uc.uc_name||uc.title) : ucId) + '\n\n'
+    + 'INPUTS\n'
+    + '  DAU: ' + wl.dau.toLocaleString() + '\n'
+    + '  Peak multiplier: ' + wl.peak_mult + 'x\n'
+    + '  Requests per user per day: ' + rpud + '  (from UC type: ' + (ucType ? ucType.name : 'default') + ')\n'
+    + '  Latency SLA: ' + wl.latency_sla_ms + 'ms (p99)\n'
+    + '  Model: ' + sizing.model_name + '\n'
+    + '  GPU: ' + sizing.gpu_name + '\n\n'
+    + 'DERIVED\n'
+    + '  Peak RPS = ' + wl.dau.toLocaleString() + ' DAU x ' + wl.peak_mult + 'x x ' + rpud + ' req/user/day / 86400s\n'
+    + '            = ' + sizing.peak_rps + ' requests/second\n\n'
+    + 'BENCHMARK\n'
+    + '  Raw RPS capacity at SLA: ' + sizing.rps_capacity + ' req/s\n'
+    + '  After ' + wl.derating_pct + '% derating: ' + sizing.derated_rps + ' req/s\n'
+    + '  Source: ' + sizing.bm_source + (bm ? ' | p99 latency: ' + (bm.p99_latency_ms||'N/A') + 'ms' : '') + '\n\n'
+    + 'RESULT\n'
+    + '  Servers = ceil(' + sizing.peak_rps + ' / ' + sizing.derated_rps + ') = ' + sizing.servers + '\n'
+    + '  Headroom: ' + sizing.headroom_pct + '%\n'
+    + '  Power: ' + sizing.power_kw + ' kW\n\n'
+    + 'To update benchmarks: edit the benchmark_results table in Supabase.\n'
+    + 'To update GPU configs: edit the gpu_configs table.\n'
+    + 'To update models: edit the ai_models table.'
+  )
+}
+
+
+
+var LAYER_CFG_DEFAULTS = {
+  infra:      { dcBrand:'standard', rackCount:'auto', cooling:'dlc', powerRed:'n1' },
+  compute:    { gpuVendor:'nvidia', cpuBrand:'amd', storageMode:'auto', nvmeOverride:0, objOverride:0, quant:'fp16' },
+  network:    { ibFabric:'ndr', nsFabric:'nkc', oobSwitch:true, netRed:'dual' },
+  platform:   { sarvam:true, mlops:'kubeflow', observability:true, apiGw:'included' },
+  security:   { airgap:false, dpdp:true, siem:'splunk', ztrust:true },
+  resilience: { ha:true, drSite:false, backupDays:30, rto:'4h' },
+  data:       { pipelineTool:'custom', connectors:3, dataLake:true, dataGov:'basic' },
+  ucdev:      { complexity:'medium', testCoverage:'standard', teamModel:'si' },
+  skills:     { managedService:false, teamSize:'auto' }
+}
+
+var COMPLEXITY_TIERS = [
+  { v:'simple',   l:'Simple',   sub:'Data pipeline + pre-trained model', price:'~$42K/UC',  cls:'sel-simple' },
+  { v:'medium',   l:'Medium',   sub:'Fine-tuning + integration',          price:'~$101K/UC', cls:'sel-medium' },
+  { v:'complex',  l:'Complex',  sub:'Bespoke model + multi-system',       price:'~$208K/UC', cls:'sel-complex' },
+  { v:'research', l:'Research', sub:'Novel model development',            price:'~$476K/UC', cls:'sel-research' }
+]
+
+function initLayerCfg() {
+  if (!SASC_DATA.layerCfg) SASC_DATA.layerCfg = {}
+  Object.keys(LAYER_CFG_DEFAULTS).forEach(function(key) {
+    if (!SASC_DATA.layerCfg[key]) {
+      SASC_DATA.layerCfg[key] = Object.assign({}, LAYER_CFG_DEFAULTS[key])
+    }
+  })
+}
+
+
+var LAYER_COLORS = {
+  infra:'#6B7280', compute:'var(--navy)', network:'var(--teal)',
+  platform:'var(--blue)', security:'var(--orange)', resilience:'#8B5CF6',
+  data:'#059669', ucdev:'var(--amber)', skills:'#6B7280'
+}
+
+
+function setCfgBool(el) {
+  setLayerCfg(el.dataset.lk, el.dataset.lf, el.value === 'true')
+}
+
+
+function getLCfg(key) {
+  if (!SASC_DATA.layerCfg) SASC_DATA.layerCfg = {}
+  if (!SASC_DATA.layerCfg[key]) SASC_DATA.layerCfg[key] = Object.assign({}, LAYER_CFG_DEFAULTS[key] || {})
+  return SASC_DATA.layerCfg[key]
+}
+
+function setLayerCfg(key, field, value) {
+  if (!SASC_DATA.layerCfg) SASC_DATA.layerCfg = {}
+  if (!SASC_DATA.layerCfg[key]) SASC_DATA.layerCfg[key] = Object.assign({}, LAYER_CFG_DEFAULTS[key] || {})
+  SASC_DATA.layerCfg[key][field] = value
+  var el = document.getElementById('layer-cfg-' + key)
+  if (el) el.innerHTML = renderLayerCfgPanel(key)
+}
+
+function renderLayerCfgPanel(key) {
+  var cfg = getLCfg(key)
+  var h = ''
+  if (key === 'infra') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">DC brand</span><select data-lk="infra" data-lf="dcBrand" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + ['<option value="standard"' + (cfg.dcBrand==='standard'?' selected':'') + '>Our MDC (standard)</option>',
+         '<option value="hyperscaler"' + (cfg.dcBrand==='hyperscaler'?' selected':'') + '>Hyperscaler colo</option>',
+         '<option value="custom"' + (cfg.dcBrand==='custom'?' selected':'') + '>Customer custom build</option>'].join('')
+      + '</select></div>'
+      + '<div><span class="lb">Cooling</span><select data-lk="infra" data-lf="cooling" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['dlc','DLC (direct liquid)'],['air','Air cooling'],['hybrid','Hybrid']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.cooling===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Power redundancy</span><select data-lk="infra" data-lf="powerRed" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['2n','2N (full)'],['n1','N+1 (standard)'],['n','N only']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.powerRed||'n1')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Rack count</span><select data-lk="infra" data-lf="rackCount" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + ['auto','20','40','60','80','100','120','160'].map(function(v){ return '<option value="' + v + '"' + (cfg.rackCount===v?' selected':'') + '>' + (v==='auto'?'Auto from compute':v+' racks') + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  } else if (key === 'compute') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">GPU vendor</span><select data-lk="compute" data-lf="gpuVendor" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['nvidia','NVIDIA (H100/H200)'],['amd','AMD (MI325X)'],['gb200','NVIDIA GB200']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.gpuVendor===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">CPU</span><select data-lk="compute" data-lf="cpuBrand" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['amd','AMD EPYC (preferred)'],['intel','Intel Xeon']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.cpuBrand===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Storage sizing</span><select data-lk="compute" data-lf="storageMode" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['auto','Auto from workloads'],['manual','Manual override']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.storageMode===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Quantization</span><select data-lk="compute" data-lf="quant" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['fp16','FP16 (default)'],['fp8','FP8 (faster)'],['int4','INT4 (edge)']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.quant||'fp16')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  } else if (key === 'network') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">E-W GPU fabric</span><select data-lk="network" data-lf="ibFabric" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['ndr','InfiniBand NDR 400G'],['hdr','InfiniBand HDR 200G'],['eth','100GbE (no IB)']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.ibFabric===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">N-S fabric</span><select data-lk="network" data-lf="nsFabric" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['nkc','NKC (proprietary)'],['3rdparty','3rd party 100GbE'],['mellanox','Mellanox']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.nsFabric===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">OOB management</span><select data-lk="network" data-lf="oobSwitch" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.oobSwitch?' selected':'') + '>Yes</option>'
+      + '<option value="false"' + (!cfg.oobSwitch?' selected':'') + '>No</option>'
+      + '</select></div>'
+      + '<div><span class="lb">Redundancy</span><select data-lk="network" data-lf="netRed" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['dual','Dual-homed (HA)'],['single','Single path']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.netRed||'dual')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  } else if (key === 'platform') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">Sovereign LLM</span><select data-lk="platform" data-lf="sarvam" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.sarvam?' selected':'') + '>Sarvam AI (sovereign)</option>'
+      + '<option value="false"' + (!cfg.sarvam?' selected':'') + '>Third-party only</option>'
+      + '</select></div>'
+      + '<div><span class="lb">MLOps</span><select data-lk="platform" data-lf="mlops" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['kubeflow','Kubeflow (OSS)'],['mlflow','MLflow only'],['custom','Custom']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.mlops===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Observability</span><select data-lk="platform" data-lf="observability" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.observability?' selected':'') + '>Full stack</option>'
+      + '<option value="false"' + (!cfg.observability?' selected':'') + '>Minimal</option>'
+      + '</select></div>'
+      + '<div><span class="lb">API gateway</span><select data-lk="platform" data-lf="apiGw" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['included','Included'],['none','Not required']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.apiGw||'included')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  } else if (key === 'security') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">Air-gap</span><select data-lk="security" data-lf="airgap" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="false"' + (!cfg.airgap?' selected':'') + '>No (standard)</option>'
+      + '<option value="true"' + (cfg.airgap?' selected':'') + '>Yes (classified)</option>'
+      + '</select></div>'
+      + '<div><span class="lb">DPDP compliance</span><select data-lk="security" data-lf="dpdp" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.dpdp?' selected':'') + '>Required</option>'
+      + '<option value="false"' + (!cfg.dpdp?' selected':'') + '>Not required</option>'
+      + '</select></div>'
+      + '<div><span class="lb">SIEM</span><select data-lk="security" data-lf="siem" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['splunk','Splunk'],['qradar','IBM QRadar'],['oss','OSS (Wazuh)']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.siem===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Zero-trust</span><select data-lk="security" data-lf="ztrust" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.ztrust?' selected':'') + '>Yes</option>'
+      + '<option value="false"' + (!cfg.ztrust?' selected':'') + '>No</option>'
+      + '</select></div>'
+      + '</div>'
+  } else if (key === 'resilience') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">HA config</span><select data-lk="resilience" data-lf="ha" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.ha?' selected':'') + '>Active-active</option>'
+      + '<option value="false"' + (!cfg.ha?' selected':'') + '>Active-passive</option>'
+      + '</select></div>'
+      + '<div><span class="lb">DR site</span><select data-lk="resilience" data-lf="drSite" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="false"' + (!cfg.drSite?' selected':'') + '>No DR site</option>'
+      + '<option value="true"' + (cfg.drSite?' selected':'') + '>Separate DR site</option>'
+      + '</select></div>'
+      + '<div><span class="lb">Backup retention</span><select data-lk="resilience" data-lf="backupDays" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,+this.value)">'
+      + [7,14,30,90].map(function(d){ return '<option value="' + d + '"' + (cfg.backupDays===d?' selected':'') + '>' + d + ' days</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">RTO target</span><select data-lk="resilience" data-lf="rto" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['4h','4 hours'],['1h','1 hour'],['15m','15 min (premium)']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.rto||'4h')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  } else if (key === 'data') {
+    h += '<div class="cfg-grid">'
+      + '<div><span class="lb">Pipeline tooling</span><select data-lk="data" data-lf="pipelineTool" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['custom','Custom (Spark/Kafka)'],['airflow','Apache Airflow'],['nifi','Apache NiFi']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.pipelineTool===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">Source connectors</span><input type="number" min="1" max="50" value="' + (cfg.connectors||3) + '" data-lk="data" data-lf="connectors" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,+this.value)"></div>'
+      + '<div><span class="lb">Data lake</span><select data-lk="data" data-lf="dataLake" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="true"' + (cfg.dataLake?' selected':'') + '>Yes (Delta Lake)</option>'
+      + '<option value="false"' + (!cfg.dataLake?' selected':'') + '>No</option>'
+      + '</select></div>'
+      + '<div><span class="lb">Data governance</span><select data-lk="data" data-lf="dataGov" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['basic','Basic'],['full','Full (DPDP+masking)'],['none','Not required']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.dataGov||'basic')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  } else if (key === 'ucdev') {
+    h += '<div style="font-size:11px;color:var(--mid);margin-bottom:8px">Default complexity applies to all UCs unless overridden in the Workload Profiler.</div>'
+      + '<div class="tier-opts">'
+      + COMPLEXITY_TIERS.map(function(t) {
+          var isSel = (cfg.complexity === t.v)
+          return '<button class="tier-btn ' + (isSel ? t.cls : '') + '" data-lk="ucdev" data-tv="' + t.v + '" onclick="setLayerCfg(this.dataset.lk,\'complexity\',this.dataset.tv);document.getElementById(\'layer-cfg-ucdev\').innerHTML=renderLayerCfgPanel(\'ucdev\')">'
+            + '<div style="font-weight:700">' + t.l + '</div>'
+            + '<div style="font-size:10px;opacity:0.8">' + t.price + '</div>'
+            + '</button>'
+        }).join('')
+      + '</div>'
+      + '<div class="cfg-grid-2" style="margin-top:10px">'
+      + '<div><span class="lb">Test coverage</span><select data-lk="ucdev" data-lf="testCoverage" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['standard','Standard UAT'],['full','Full incl. security audit'],['minimal','Minimal']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.testCoverage===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '<div><span class="lb">UC team model</span><select data-lk="ucdev" data-lf="teamModel" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['si','SI team (we deliver)'],['customer','Customer team'],['hybrid','Hybrid']].map(function(o){ return '<option value="' + o[0] + '"' + ((cfg.teamModel||'si')===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  } else if (key === 'skills') {
+    h += '<div class="cfg-grid-2">'
+      + '<div><span class="lb">Managed service</span><select data-lk="skills" data-lf="managedService" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value===\'true\')">'
+      + '<option value="false"' + (!cfg.managedService?' selected':'') + '>Customer-managed</option>'
+      + '<option value="true"' + (cfg.managedService?' selected':'') + '>Managed service</option>'
+      + '</select></div>'
+      + '<div><span class="lb">Team sizing</span><select data-lk="skills" data-lf="teamSize" onchange="setLayerCfg(this.dataset.lk,this.dataset.lf,this.value)">'
+      + [['auto','Auto'],['small','Small (3-5)'],['medium','Medium (6-10)'],['large','Large (11-20)']].map(function(o){ return '<option value="' + o[0] + '"' + (cfg.teamSize===o[0]?' selected':'') + '>' + o[1] + '</option>' }).join('')
+      + '</select></div>'
+      + '</div>'
+  }
+  return h
+}
+
+function renderUCComplexityTier(ucId) {
+  var wl = SASC_DATA.ucWorkloads[ucId] || {}
+  var current = wl.complexity || (SASC_DATA.layerCfg && SASC_DATA.layerCfg.ucdev && SASC_DATA.layerCfg.ucdev.complexity) || 'medium'
+  return '<div style="margin-top:10px;padding-top:10px;border-top:0.5px solid #e8e8f0">'
+    + '<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">UC development complexity</div>'
+    + '<div class="tier-opts">'
+    + COMPLEXITY_TIERS.map(function(t) {
+        var isSel = current === t.v
+        return '<button class="tier-btn ' + (isSel ? t.cls : '') + '" data-uid="' + ucId + '" data-tv="' + t.v + '" onclick="setUCComplexity(this.dataset.uid,this.dataset.tv)">'
+          + '<div style="font-weight:700">' + t.l + '</div>'
+          + '<div style="font-size:10px;opacity:0.8">' + t.price + '</div>'
+          + '</button>'
+      }).join('')
+    + '</div></div>'
+}
+
+// renderStackLayers: inline stack section for Screen 1
+function renderStackLayers() {
+  initLayerCfg()
+  var layers = SASC_DATA.layers
+  var html = '<div class="card" style="margin-top:14px"><div class="card-title">Stack Configuration</div>'
+    + '<div class="card-sub" style="margin-bottom:14px">Toggle layers on or off. Pre-selected from your portfolio scope. Click a layer to configure.</div>'
+    + '<div class="layer-list">'
+
+  Object.keys(layers).forEach(function(key) {
+    var l = layers[key]
+    var color = LAYER_COLORS[key] || 'var(--navy)'
+    html += '<div class="card" style="padding:0;overflow:hidden;margin-bottom:8px;border-left:3px solid ' + color + '">'
+      + '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer" data-key="' + key + '" onclick="toggleLayer(this.dataset.key)">'
+      + '<div class="layer-chk ' + (l.on ? 'on' : '') + '" id="chk-' + key + '" style="flex-shrink:0"></div>'
+      + '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--dark)">' + esc(l.name) + '</div>'
+      + '<div style="font-size:10px;color:var(--mid)">' + esc(l.desc) + '</div></div>'
+      + '<div style="display:flex;align-items:center;gap:6px">'
+      + '<span class="layer-tag">' + esc(l.tag) + '</span>'
+      + (l.on ? '<span style="font-size:11px;color:var(--mid);cursor:pointer" data-cfgkey="' + key + '" onclick="event.stopPropagation();toggleLayerCfgPanel(this.dataset.cfgkey)">&#9660; Config</span>' : '')
+      + '</div></div>'
+      + (l.on ? '<div class="layer-cfg" id="layer-cfg-' + key + '" style="display:none">' + renderLayerCfgPanel(key) + '</div>' : '')
+      + '</div>'
+  })
+
+  html += '</div></div>'
+  return html
+}
+
+// -- Screen 3: BOM + ROM -------------------------------------------------------
+function renderScreen4Loading() {
+  return '<div class="card"><div style="display:flex;align-items:center;gap:10px;padding:20px">'
+    + '<div class="spinner"></div>'
+    + '<div class="status-msg">Calculating BOM + ROM from pricing parameters&hellip;</div>'
+    + '</div></div>'
+}
+
+async function loadAndRenderBOM() {
+  var _bomGen = ++SASC_LOAD_GEN  // abort if user navigates away
+  var pricing   = await sbFetch('pricing_params', 'active=eq.true&order=category.asc', 200)
+  if (_bomGen !== SASC_LOAD_GEN) return
+  SASC_DATA.pricingParams = pricing || []
+  try {
+    var bom = calculateBOM(pricing)
+    SASC_DATA.bom = bom
+    if (_bomGen !== SASC_LOAD_GEN) return
+    var el = document.getElementById('app-content')
+    if (el) el.innerHTML = renderScreen4(bom)
+  } catch(e) {
+    console.error('[SASC] BOM error:', e.message, e.stack)
+    var el = document.getElementById('app-content')
+    if (el) el.innerHTML = '<div class="card"><div style="padding:20px;color:red">BOM error: ' + e.message + '<br><small>' + (e.stack||'').split('\n')[1] + '</small></div></div>'
+  }
+}
+
+function calculateBOM(pricing) {
+  var ucProfiles = []  // retired — sizing from SizingEngine
+  var s = SASC_DATA
+  var layers = s.layers
+  var bom = []
+  var totalCapex = 0
+  var totalOpex  = 0
+  var totalUcdev = 0
+
+  function addLine(category, component, qty, unit, usdPrice, notes) {
+    var line = { category: category, component: component, qty: qty, unit: unit, usd_unit: usdPrice, usd_total: qty * usdPrice, notes: notes || '' }
+    bom.push(line)
+    return line.usd_total
+  }
+
+  function findParam(comp) {
+    return pricing.find(function(p) { return p.component === comp }) || null
+  }
+
+  // Resolve the correct GPU server/rack component name from the selected GPU config
+  // Falls back to H200 if selected GPU not found in pricing_params
+  function gpuComponent() {
+    var gpuCfg = ALL_GPU_CONFIGS.find(function(g){ return g.id === s.gpuConfigId }) || ALL_GPU_CONFIGS[0]
+    if (!gpuCfg) return 'GPU Server H200 SXM 8x'
+    // NVL72 rack-level configs
+    if (gpuCfg.name && gpuCfg.name.indexOf('NVL72') >= 0) {
+      if (gpuCfg.name.indexOf('VR') >= 0 || gpuCfg.name.indexOf('Vera') >= 0) return 'GPU Rack Vera Rubin NVL72'
+      if (gpuCfg.name.indexOf('GB300') >= 0) return 'GPU Rack GB300 NVL72'
+      if (gpuCfg.name.indexOf('GB200') >= 0) return 'GPU Rack GB200 NVL72'
+      if (gpuCfg.name.indexOf('B300') >= 0) return 'GPU Rack B300 NVL72'
+      if (gpuCfg.name.indexOf('B200') >= 0) return 'GPU Rack B200 NVL72'
+    }
+    // Per-server configs
+    if (gpuCfg.name.indexOf('Vera') >= 0 || gpuCfg.name.indexOf('VR') >= 0) return 'GPU Server Vera Rubin SXM 8x'
+    if (gpuCfg.name.indexOf('B300') >= 0) return 'GPU Server B300 SXM 8x'
+    if (gpuCfg.name.indexOf('B200') >= 0) return 'GPU Server B200 SXM 8x'
+    if (gpuCfg.name.indexOf('H200') >= 0) return 'GPU Server H200 SXM 8x'
+    if (gpuCfg.name.indexOf('MI355') >= 0) return 'GPU Server AMD MI355X 8x'
+    if (gpuCfg.name.indexOf('MI400') >= 0) return 'GPU Server AMD MI400X 8x'
+    return 'GPU Server H200 SXM 8x'  // default fallback
+  }
+
+  // For NVL72 configs, unit is per_rack (72 GPUs); for servers it's per_server (8 GPUs)
+  function gpusPerUnit() {
+    var name = gpuComponent()
+    return name.indexOf('NVL72') >= 0 ? 72 : 8
+  }
+
+  // -- INFRASTRUCTURE --------------------------------------------------------
+  if (layers.infra.on) {
+    if (s.dcType === 'mdc') {
+      var mdcComp = { xs:'MDC XS (2MW)', s:'MDC S (5MW)', m:'MDC M (10MW)', l:'MDC L (15MW)', xl:'MDC XL (20MW)' }[s.mdc.tshirt]
+      var mdcParam = findParam(mdcComp)
+      var sites = s.mdc.sites || 1
+      if (mdcParam) totalCapex += addLine('Infrastructure', mdcComp + ' x' + sites + ' sites', sites, 'per_site', mdcParam.base_price_usd, 'MDC T-shirt: ' + s.mdc.tshirt.toUpperCase())
+    }
+  }
+
+  // -- COMPUTE ---------------------------------------------------------------
+  if (layers.compute.on) {
+    // Use SizingEngine fleet total if available — single source of truth
+    var maxGPUs = 0
+    var gpuNotes = ''
+
+    if (window.SizingEngine && SizingEngine.ready && s.selectedUCs.length) {
+      // Size each UC and aggregate
+      var ucSizingResults = s.selectedUCs.map(function(ucId) {
+        var wl = s.ucWorkloads[ucId] || { dau:100, peak_mult:3, derating_pct:80 }
+        wl.derating_pct = s.deratingPct || 80
+        return SizingEngine.sizeUC({
+          uc_type_id: wl.uc_type_id, model_id: wl.model_id,
+          dau: wl.dau, peak_multiplier: wl.peak_mult,
+          precision: wl.precision || 'INT4',
+          sla_tier: wl.sla_tier || 'standard',
+          ha_required: wl.ha_required !== undefined ? wl.ha_required : true,
+          dr_type: wl.dr_type || 'none',
+          growth_headroom_pct: 20, derating_pct: wl.derating_pct
+        }, SASC_DATA.gpuConfigId)
+      }).filter(function(r) { return !r.error })
+
+      maxGPUs = ucSizingResults.reduce(function(sum, r) { return sum + (r.actual_gpus || 0) }, 0)
+      gpuNotes = maxGPUs + ' GPUs across ' + s.selectedUCs.length + ' UCs (SizingEngine — incl. buffers)'
+    } else {
+      // Fallback: default by T-shirt size
+      var defaultGPUs = { xs:64, s:256, m:512, l:768, xl:1024 }
+      maxGPUs = s.dcType === 'mdc' ? (defaultGPUs[s.mdc.tshirt] || 512) : 128
+      gpuNotes = maxGPUs + ' GPUs (T-shirt default — no UC workloads profiled)'
+    }
+
+    var _gpuUnit = gpusPerUnit()
+    var gpuUnits = Math.max(1, Math.ceil(maxGPUs / _gpuUnit))
+    var gpuParam = findParam(gpuComponent())
+    var _gpuLabel = gpuComponent()
+    var _gpuUnitLabel = _gpuLabel.indexOf('NVL72') >= 0 ? 'per_rack' : 'per_server'
+    if (gpuParam) totalCapex += addLine('Compute', _gpuLabel, gpuUnits, _gpuUnitLabel, gpuParam.base_price_usd, gpuNotes)
+    // CPU servers (1 per 4 GPU servers)
+    var cpuServers = Math.max(2, Math.ceil(gpuServers / 4))
+    var cpuParam = findParam('CPU Server AMD EPYC 9654')
+    if (cpuParam) totalCapex += addLine('Compute', 'CPU Server AMD EPYC 9654', cpuServers, 'per_server', cpuParam.base_price_usd, 'Platform + orchestration')
+    // Storage
+    var storageParam = findParam('NVMe All-Flash Storage')
+    var storageTB = Math.max(50, gpuServers * 20)
+    if (storageParam) totalCapex += addLine('Storage', 'NVMe All-Flash Storage', storageTB, 'per_tb', storageParam.base_price_usd, storageTB + ' TB estimated')
+    var objParam = findParam('Object Storage')
+    var objTB = storageTB * 3
+    if (objParam) totalCapex += addLine('Storage', 'Object Storage', objTB, 'per_tb', objParam.base_price_usd, objTB + ' TB for models + datasets')
+  }
+
+  // -- NETWORKING ------------------------------------------------------------
+  if (layers.network.on) {
+    var gpuServersCount = bom.find(function(b) { return b.component.indexOf('GPU Server') >= 0 })
+    var srvCount = gpuServersCount ? gpuServersCount.qty : 4
+    var ibSpines = Math.max(1, Math.ceil(srvCount / 8))
+    var ibParam = findParam('InfiniBand NDR 400Gbps Switch')
+    if (ibParam) totalCapex += addLine('Networking', 'InfiniBand NDR 400Gbps Switch', ibSpines, 'per_switch', ibParam.base_price_usd, 'E-W GPU fabric')
+    var nkcSpines = Math.max(2, Math.ceil(srvCount / 16))
+    var nkcParam = findParam('NKC 100GbE Spine Switch')
+    if (nkcParam) totalCapex += addLine('Networking', 'NKC 100GbE Spine Switch', nkcSpines, 'per_switch', nkcParam.base_price_usd, 'N-S fabric (NKC proprietary)')
+    var torCount = Math.max(2, Math.ceil(srvCount / 10))
+    var torParam = findParam('NKC 25GbE ToR Switch')
+    if (torParam) totalCapex += addLine('Networking', 'NKC 25GbE ToR Switch', torCount, 'per_switch', torParam.base_price_usd, 'Top-of-rack')
+  }
+
+  // -- SOFTWARE PLATFORM -----------------------------------------------------
+  if (layers.platform.on) {
+    var nodeCount = (bom.find(function(b){return b.component.indexOf('GPU')+b.component.indexOf('CPU')>0})
+                    ? bom.reduce(function(s,b){return s+(b.component.indexOf('Server')>=0?b.qty:0)},0) : 10)
+    var dfParam = findParam('Data Fusion Platform')
+    if (dfParam) totalOpex += addLine('Software', 'Data Fusion Platform (annual)', nodeCount, 'per_node', dfParam.base_price_usd, 'Year 1 annual licence')
+    var ragParam = findParam('RAG Platform')
+    if (ragParam) totalOpex += addLine('Software', 'RAG Platform (annual)', 1, 'per_instance', ragParam.base_price_usd, 'Per cluster')
+    var mlParam = findParam('Model Registry + MLflow')
+    if (mlParam) totalOpex += addLine('Software', 'Model Registry + MLflow (annual)', 1, 'per_instance', mlParam.base_price_usd, 'Per cluster')
+    var govParam = findParam('AI Governance + Audit')
+    if (govParam) totalOpex += addLine('Software', 'AI Governance + Audit (annual)', 1, 'per_instance', govParam.base_price_usd, '')
+    var sarvamParam = findParam('Sarvam AI Sovereign LLM')
+    if (sarvamParam) totalOpex += addLine('Software', 'Sarvam AI Sovereign LLM licence (annual)', 1, 'per_instance', 50000, 'Annual licence estimate')
+  }
+
+  // -- SECURITY --------------------------------------------------------------
+  if (layers.security.on) {
+    var secNodes = 20
+    var siemParam = findParam('SIEM Platform')
+    if (siemParam) totalOpex += addLine('Security', 'SIEM Platform (annual)', secNodes, 'per_node', siemParam.base_price_usd, '')
+    var ztParam = findParam('Zero-Trust Platform')
+    if (ztParam) totalOpex += addLine('Security', 'Zero-Trust Platform (annual)', secNodes, 'per_node', ztParam.base_price_usd, '')
+    var auditParam = findParam('Security Audit')
+    if (auditParam) totalCapex += addLine('Security', 'Security Audit (per site)', s.dcType === 'mdc' ? (s.mdc.sites||1) : 1, 'per_site', auditParam.base_price_usd, 'CERT-In empanelled')
+  }
+
+  // -- INFRA SOFTWARE --------------------------------------------------------
+  if (layers.platform.on || layers.resilience.on) {
+    var k8sNodes = 15
+    var k8sParam = findParam('Kubernetes + OpenShift')
+    if (k8sParam) totalOpex += addLine('Infra Software', 'Kubernetes + OpenShift (annual)', k8sNodes, 'per_node', k8sParam.base_price_usd, '')
+    var mlopsParam = findParam('MLOps Platform (Kubeflow)')
+    if (mlopsParam) totalOpex += addLine('Infra Software', 'MLOps Platform (annual)', 1, 'per_instance', mlopsParam.base_price_usd, '')
+    var bkpParam = findParam('Backup Software')
+    var bkpTB = 200
+    if (bkpParam) totalOpex += addLine('Infra Software', 'Backup Software (annual)', bkpTB, 'per_tb', bkpParam.base_price_usd, bkpTB + ' TB managed')
+  }
+
+  // -- SERVICES --------------------------------------------------------------
+  if (layers.data.on || layers.compute.on) {
+    var deployDays = 30
+    var saParam = findParam('Solution Architecture')
+    if (saParam) totalCapex += addLine('Services', 'Solution Architecture', deployDays * 0.3, 'person_day', saParam.base_price_usd, '')
+    var platParam = findParam('Platform Deployment')
+    if (platParam) totalCapex += addLine('Services', 'Platform Deployment', deployDays * 0.5, 'person_day', platParam.base_price_usd, '')
+    var netParam2 = findParam('Network Configuration')
+    if (netParam2) totalCapex += addLine('Services', 'Network Configuration', 10, 'person_day', netParam2.base_price_usd, '')
+    var secHParam = findParam('Security Hardening')
+    if (secHParam) totalCapex += addLine('Services', 'Security Hardening', 15, 'person_day', secHParam.base_price_usd, '')
+    var perfParam = findParam('Performance Testing')
+    if (perfParam) totalCapex += addLine('Services', 'Performance Testing', 1, 'fixed', perfParam.base_price_usd, 'Per cluster')
+  }
+
+  // -- UC DEVELOPMENT --------------------------------------------------------
+  if (layers.ucdev.on) {
+    var ucCount = Math.max(1, s.selectedUCs.length || (ALL_UCS.length || 3))
+    var globalComplexity = (s.layerCfg && s.layerCfg.ucdev && s.layerCfg.ucdev.complexity) || 'medium'
+    var complexityMap = { simple:'UC Development - Low', medium:'UC Development - Medium', complex:'UC Development - High', research:'UC Development - High' }
+    var complexityGroups = { simple:0, medium:0, complex:0, research:0 }
+    if (s.selectedUCs.length) {
+      s.selectedUCs.forEach(function(uid) {
+        var wl = s.ucWorkloads[uid] || {}
+        var comp = wl.complexity || globalComplexity
+        complexityGroups[comp] = (complexityGroups[comp] || 0) + 1
+      })
+    } else { complexityGroups[globalComplexity] = ucCount }
+    Object.keys(complexityGroups).forEach(function(comp) {
+      var cnt = complexityGroups[comp]
+      if (!cnt) return
+      var compParam = findParam(complexityMap[comp]) || findParam('UC Development - Medium')
+      if (compParam) totalUcdev += addLine('UC Development', complexityMap[comp], cnt, 'per_uc', compParam.base_price_usd, cnt + ' UC(s) at ' + comp + ' complexity')
+    })
+    var uatParam = findParam('UAT and Acceptance Testing')
+    if (uatParam) totalUcdev += addLine('UC Development', 'UAT and Acceptance Testing', ucCount, 'per_uc', uatParam.base_price_usd, '')
+  }
+
+  // -- SERVICE MODEL ADDITIONS -----------------------------------------------
+  var sm = SASC_DATA.serviceModel || {}
+
+  // MaaS — add GPU servers for model hosting
+  if (sm.maas && sm.maas.enabled && sm.maas.models && sm.maas.models.length) {
+    var maasGPUs = sm.maas.models.reduce(function(sum, m) {
+      var gpuPerInst = (m.gpus_per_instance && (m.gpus_per_instance.INT4 || m.gpus_per_instance.INT8)) || 1
+      return sum + gpuPerInst
+    }, 0)
+    if (sm.maas.agentEnabled) maasGPUs += Math.max(1, Math.ceil(maasGPUs / 8))
+    var maasServers = Math.ceil(maasGPUs / 8)
+    var gpuSvcParam = findParam(gpuComponent())
+    var _maasUnit = gpusPerUnit()
+    var maasUnits = Math.ceil(maasGPUs / _maasUnit)
+    var _maasUnitLabel = gpuComponent().indexOf('NVL72') >= 0 ? 'per_rack' : 'per_server'
+    if (gpuSvcParam && maasUnits > 0) {
+      totalCapex += addLine('MaaS Infrastructure', gpuComponent() + ' (MaaS)', maasUnits, _maasUnitLabel, gpuSvcParam.base_price_usd, maasGPUs + ' GPUs for model hosting' + (sm.maas.agentEnabled ? ' + agent harness' : ''))
+    }
+    // Platform overhead for MaaS (API gateway, billing, routing)
+    var platSvcParam = findParam('Data Fusion Platform')
+    if (platSvcParam) totalOpex += addLine('MaaS Infrastructure', 'MaaS API Gateway + Billing (annual)', 1, 'per_instance', platSvcParam.base_price_usd * 0.5, 'Model serving + token billing platform')
+  }
+
+  // GPUaaS — add GPU servers for raw compute rental
+  if (sm.gpuaas && sm.gpuaas.enabled && sm.gpuaas.gpus > 0) {
+    var gpuaasServers = Math.ceil(sm.gpuaas.gpus / 8)
+    var gpuaasParam = findParam(gpuComponent())
+    var _gaasUnit = gpusPerUnit()
+    var gpuaasUnits = Math.ceil(sm.gpuaas.gpus / _gaasUnit)
+    var _gaasUnitLabel = gpuComponent().indexOf('NVL72') >= 0 ? 'per_rack' : 'per_server'
+    if (gpuaasParam) totalCapex += addLine('GPUaaS Infrastructure', gpuComponent() + ' (GPUaaS — ' + sm.gpuaas.gpus + ' GPUs)', gpuaasUnits, _gaasUnitLabel, gpuaasParam.base_price_usd, 'Raw GPU rental capacity')
+  }
+
+  // BMaaS — add CPU servers for bare metal rental
+  if (sm.bmaas && sm.bmaas.enabled && sm.bmaas.servers > 0) {
+    var bmaasParam = findParam('CPU Server AMD EPYC 9654')
+    if (bmaasParam) totalCapex += addLine('BMaaS Infrastructure', 'CPU Servers for BMaaS (' + sm.bmaas.servers + ' servers)', sm.bmaas.servers, 'per_server', bmaasParam.base_price_usd, 'Bare metal rental capacity')
+  }
+
+  SASC_DATA.rom = {
+    capex_usd: totalCapex,
+    opex_usd: totalOpex,
+    ucdev_usd: totalUcdev,
+    total_usd: totalCapex + (totalOpex * 3) + totalUcdev  // 3-year opex
+  }
+
+  return bom
+}
+
+function renderScreen4(bom) {
+  var tab = window._sascBomTab || 'bom'
+  var tabBar = '<div style="display:flex;gap:0;border-bottom:2px solid #e0e0e8;margin-bottom:16px">'
+    + [{id:'bom',l:'Bill of Materials'},{id:'people',l:'People Model'},{id:'rom',l:'ROM Summary'}].map(function(t){
+        var on = tab === t.id
+        return '<button style="padding:8px 16px;font-size:12px;font-weight:' + (on?'700':'500') + ';border:none;background:transparent;cursor:pointer;border-bottom:' + (on?'2px solid var(--orange)':'2px solid transparent') + ';color:' + (on?'var(--orange)':'var(--mid)') + ';font-family:inherit;margin-bottom:-2px" data-tab="' + t.id + '" onclick="switchBOMTab(this.dataset.tab)">' + t.l + '</button>'
+      }).join('') + '</div>'
+  return '<div id="bom-screen">' + tabBar + '<div id="bom-tab-content">' + renderBOMTabContent(tab, bom) + '</div></div>'
+}
+
+function switchBOMTab(tab) {
+  window._sascBomTab = tab
+  // catalogue load handled by renderStep(workloads_b)
+  if (tab === 'people' && !PEOPLE_MODEL.loaded) {
+    document.getElementById('bom-tab-content').innerHTML = '<div style="padding:20px;display:flex;align-items:center;gap:10px"><div class="spinner"></div><div class="status-msg">Loading people data...</div></div>'
+    loadPeopleModel().then(function() {
+      document.getElementById('bom-tab-content').innerHTML = renderBOMTabContent('people', SASC_DATA.bom)
+      refreshBOMTabs(tab)
+    })
+    return
+  }
+  document.getElementById('bom-tab-content').innerHTML = renderBOMTabContent(tab, SASC_DATA.bom)
+  refreshBOMTabs(tab)
+}
+
+function refreshBOMTabs(activeTab) {
+  var btns = document.querySelectorAll('#bom-screen button[data-tab]')
+  btns.forEach(function(btn) {
+    var on = btn.dataset.tab === activeTab
+    btn.style.fontWeight = on ? '700' : '500'
+    btn.style.borderBottom = on ? '2px solid var(--orange)' : '2px solid transparent'
+    btn.style.color = on ? 'var(--orange)' : 'var(--mid)'
+  })
+}
+
+function renderActiveTab() { return renderBOMTabContent(window._sascBomTab || 'bom', SASC_DATA.bom) }
+
+// ── MaaS Simulation Tab ───────────────────────────────────────────────────────
+function renderMaasSimTab() {
+  var sla = (MAAS_CFG && MAAS_CFG.sla_tier) || 'standard'
+  var uts = (MAAS_CFG && MAAS_CFG.usage_types) || []
+  var enabledUts = uts.filter(function(u){ return u.enabled && u.model_id })
+
+  // Layer nav
+  var html = '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #e0e0e8">'
+  ;['Architecture Comparison','Usage Heatmap','Mix Optimiser'].forEach(function(l,i) {
+    var on = MAAS_SIM_LAYER === i+1
+    html += '<button style="padding:8px 14px;font-size:12px;font-weight:'+(on?'700':'500')+';border:none;background:transparent;cursor:pointer;border-bottom:'+(on?'2px solid var(--teal)':'2px solid transparent')+';color:'+(on?'var(--teal)':'var(--mid)')+';font-family:inherit;margin-bottom:-2px" onclick="MAAS_SIM_LAYER='+(i+1)+';renderStep(SASC_STEP)">'+(i+1)+'. '+l+'</button>'
+  })
+  html += '</div>'
+
+  // Catalogue loading is handled by renderStep — never trigger async re-renders from inside a render function
+
+  if (!MAAS_CFG) {
+    return html + '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">No MaaS configuration found.<br><br>Configure MaaS in the Engagement Docket → Service Model tab, then reopen SASC.</div></div>'
+  }
+  if (!enabledUts.length) {
+    return html + '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">No usage types enabled in MaaS config.<br><br>Enable at least one usage type in the Docket MaaS tab.</div></div>'
+  }
+  if (!SVC_MC_ROWS.length) {
+    return html + '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue…</div></div>'
+  }
+
+  // GPU selector (top of all layers)
+  var availGpus = ALL_GPU_CONFIGS.filter(function(g){ return g.active !== false })
+  html += '<div class="card"><div class="card-title" style="margin-bottom:10px">GPU Architecture Selection <span style="font-size:11px;font-weight:400;color:var(--mid)">(select 1-5 to compare)</span></div>'
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">'
+  availGpus.forEach(function(g) {
+    var sel = MAAS_SIM_SEL.indexOf(g.id) >= 0
+    var isPlaceholder = g.placeholder
+    html += '<button onclick="toggleMaasGpu(\''+g.id+'\')" style="padding:5px 10px;font-size:11px;border:1.5px solid '+(sel?'var(--teal)':'var(--border)')+';background:'+(sel?'rgba(0,178,144,.08)':'#fff')+';color:'+(sel?'var(--teal)':'var(--mid)')+';border-radius:5px;cursor:pointer;font-family:inherit;font-weight:'+(sel?'700':'400')+(isPlaceholder?';opacity:.6':'')+'">'
+      + (sel?'✓ ':'')+g.name+(isPlaceholder?' ⚠':'')+'</button>'
+  })
+  html += '</div>'
+  if (availGpus.some(function(g){ return g.placeholder && MAAS_SIM_SEL.indexOf(g.id)>=0 })) {
+    html += '<div style="font-size:11px;color:var(--amber)">⚠ Placeholder GPU specs are indicative estimates</div>'
+  }
+  html += '</div>'
+
+  if (!MAAS_SIM_SEL.length) {
+    return html + '<div class="card"><div style="padding:16px;text-align:center;color:var(--mid)">Select at least one GPU architecture above to run the simulation.</div></div>'
+  }
+  var selGpus = ALL_GPU_CONFIGS.filter(function(g){ return MAAS_SIM_SEL.indexOf(g.id) >= 0 })
+
+  // Simulation params card
+  html += '<div class="card"><div class="card-title" style="margin-bottom:10px">Simulation Parameters</div>'
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">'
+  var simParams = [
+    {id:'sim_peak',  label:'Peak % of DAU concurrent', val:MAAS_SIM_PEAK,  unit:'%',   tip:'% of DAU active simultaneously at peak hour'},
+    {id:'sim_amort', label:'CapEx amortisation',        val:MAAS_SIM_AMORT, unit:'mo',  tip:'Months to amortise hardware investment'},
+    {id:'sim_dau',   label:'Target DAU (Layer 3)',       val:MAAS_SIM_DAU,   unit:'',    tip:'Total daily active users for mix optimiser'}
+  ]
+  simParams.forEach(function(p) {
+    html += '<div style="background:var(--light);padding:8px 10px;border-radius:6px">'
+      + '<div style="font-size:10px;color:var(--mid);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">'+p.label+'</div>'
+      + '<div style="display:flex;align-items:center;gap:4px">'
+      + '<input type="number" value="'+p.val+'" min="1" style="width:80px;padding:4px 6px;border:1.5px solid var(--border);border-radius:4px;font-size:13px;font-weight:600;font-family:inherit;outline:none" '
+      + 'onchange="'+p.id.replace('sim_','MAAS_SIM_'+(p.id==='sim_peak'?'PEAK':p.id==='sim_amort'?'AMORT':'DAU'))+'=+this.value;renderStep(SASC_STEP)">'
+      + (p.unit?'<span style="font-size:11px;color:var(--mid)">'+p.unit+'</span>':'')
+      + '</div>'
+      + '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">'+p.tip+'</div>'
+      + '</div>'
+  })
+  html += '</div></div>'
+
+  // Dispatch to active layer
+  if      (MAAS_SIM_LAYER === 1) html += renderMaasLayer1(selGpus, enabledUts, sla)
+  else if (MAAS_SIM_LAYER === 2) html += renderMaasLayer2(selGpus, enabledUts, sla)
+  else if (MAAS_SIM_LAYER === 3) html += renderMaasLayer3(selGpus, enabledUts, sla)
+
+  // Save button
+  if (MAAS_SIM_RESULT) {
+    html += '<div class="card" style="border-left:3px solid var(--teal)">'
+      + '<div class="card-title" style="margin-bottom:6px">Simulation Result</div>'
+      + '<div style="font-size:12px;color:var(--mid)">Chosen: <b>'+esc(MAAS_SIM_RESULT.chosen_gpu_name)+'</b>'
+      + ' · '+MAAS_SIM_RESULT.total_gpus+' GPUs'
+      + ' · CapEx $'+fmtNum(Math.round(MAAS_SIM_RESULT.capex_usd/1000))+'K'
+      + ' · ₹'+fmtNum(Math.round(MAAS_SIM_RESULT.cost_per_mtoken))+'/ M tokens'
+      + '</div>'
+      + '<button class="btn btn-sm" style="margin-top:8px" onclick="saveMaasBomToDocket()">↑ Save MaaS BOM to Docket</button>'
+      + '</div>'
+  }
+  return html
+}
+
+function toggleMaasGpu(id) {
+  var idx = MAAS_SIM_SEL.indexOf(id)
+  if (idx >= 0) { MAAS_SIM_SEL.splice(idx,1) }
+  else if (MAAS_SIM_SEL.length < 5) { MAAS_SIM_SEL.push(id) }
+  renderStep(SASC_STEP)
+}
+
+// ── Layer 1: Architecture Comparison Curves ───────────────────────────────────
+function renderMaasLayer1(selGpus, enabledUts, sla) {
+  var COLORS = ['#002870','#FF5539','#00B290','#FFB600','#1C38F5']
+  var html = '<div class="card"><div class="card-title">Layer 1 — Architecture Comparison</div>'
+    + '<div class="card-sub">CapEx vs DAU served. Lower curve = better GPU for this workload at that scale.</div>'
+
+  // DAU range: 0 to 5× max DAU in config or 100K
+  var maxDau = Math.max(
+    (MAAS_CFG.total_concurrent_users || 0) * 10,
+    enabledUts.reduce(function(s,u){ return s+(u.dau||u.concurrent_users||0) },0) * 5,
+    50000
+  )
+  var dauSteps = 20
+  var dauPoints = Array.from({length:dauSteps+1}, function(_,i){ return Math.round(i * maxDau / dauSteps) })
+
+  // Pre-scale usage types to each DAU point
+  var series = selGpus.map(function(g, gi) {
+    var costs = dauPoints.map(function(totalDau) {
+      if (totalDau === 0) return 0
+      // Scale each usage type DAU proportionally
+      var totalCfgDau = enabledUts.reduce(function(s,u){ return s+(u.dau||u.concurrent_users||50) },0) || 1
+      var scaledUts = enabledUts.map(function(ut) {
+        var base = ut.dau || ut.concurrent_users || 50
+        return Object.assign({}, ut, { dau: Math.round(base * totalDau / totalCfgDau) })
+      })
+      var gpus = calcMaasTotalGpus(g, sla, scaledUts)
+      var capex = calcMaasCapex(g, gpus) / 1e6  // USD millions
+      return Math.round(capex * 100) / 100
+    })
+    return { gpu: g, costs: costs, color: COLORS[gi] }
+  })
+
+  // Market reference line: Together AI / Fireworks avg = ~$3/M output, $1/M input
+  // At 500 avg tokens output, 200 input per request: ~$1.70/request
+  // At peak_pct: peak_conc = totalDau * 0.10
+  // Assume 10 req/user/day → cost/day = totalDau × 10 × 0.0017 = totalDau × 0.017
+  // Monthly = totalDau × 0.017 × 30 = totalDau × 0.51 USD
+  // 36-month commitment = totalDau × 18.36 USD (in millions: /1e6)
+  var mktSeries = dauPoints.map(function(d){ return Math.round(d * 18.36 / 1e6 * 100) / 100 })
+
+  // Find config DAU line (current Docket target)
+  var cfgTotalDau = enabledUts.reduce(function(s,u){ return s+(u.dau||u.concurrent_users||50) },0)
+
+  // Render SVG chart
+  var W = 600, H = 280, PL = 60, PR = 20, PT = 20, PB = 40
+  var IW = W-PL-PR, IH = H-PT-PB
+  var allCosts = series.flatMap(function(s){ return s.costs }).concat(mktSeries)
+  var maxY = Math.max.apply(null, allCosts) * 1.1 || 1
+
+  function xp(i){ return PL + Math.round(i * IW / dauSteps) }
+  function yp(v){ return PT + Math.round(IH - (v/maxY)*IH) }
+
+  var svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="overflow:visible">'
+  // Grid
+  for (var gi=0;gi<=4;gi++) {
+    var yv = maxY * gi/4
+    var ygp = yp(yv)
+    svg += '<line x1="'+PL+'" y1="'+ygp+'" x2="'+(W-PR)+'" y2="'+ygp+'" stroke="#e5e7eb" stroke-width="1"/>'
+    svg += '<text x="'+(PL-5)+'" y="'+(ygp+4)+'" text-anchor="end" font-size="9" fill="#9CA3AF">$'+Math.round(yv)+'M</text>'
+  }
+  for (var xi=0;xi<=dauSteps;xi+=5) {
+    svg += '<text x="'+xp(xi)+'" y="'+(H-PB+15)+'" text-anchor="middle" font-size="9" fill="#9CA3AF">'+(Math.round(dauPoints[xi]/1000))+'K</text>'
+  }
+  svg += '<text x="'+(PL+IW/2)+'" y="'+H+'" text-anchor="middle" font-size="10" fill="#6B7280">Daily Active Users</text>'
+
+  // Market reference line (dashed)
+  var mktPath = dauPoints.map(function(d,i){ return (i===0?'M':'L')+xp(i)+' '+yp(mktSeries[i]) }).join(' ')
+  svg += '<path d="'+mktPath+'" fill="none" stroke="#DC2626" stroke-width="1.5" stroke-dasharray="4,3"/>'
+  svg += '<text x="'+(W-PR-5)+'" y="'+yp(mktSeries[dauSteps])+'" font-size="9" fill="#DC2626" text-anchor="end">Market (Cloud API)</text>'
+
+  // Config target vertical line
+  var cfgIdx = Math.round(cfgTotalDau / maxDau * dauSteps)
+  cfgIdx = Math.min(dauSteps, Math.max(0, cfgIdx))
+  svg += '<line x1="'+xp(cfgIdx)+'" y1="'+PT+'" x2="'+xp(cfgIdx)+'" y2="'+(H-PB)+'" stroke="#00B290" stroke-width="1.5" stroke-dasharray="3,3"/>'
+  svg += '<text x="'+xp(cfgIdx)+'" y="'+(PT-5)+'" text-anchor="middle" font-size="9" fill="#00B290">Docket target</text>'
+
+  // GPU cost curves
+  series.forEach(function(s, si) {
+    var path = dauPoints.map(function(d,i){ return (i===0?'M':'L')+xp(i)+' '+yp(s.costs[i]) }).join(' ')
+    svg += '<path d="'+path+'" fill="none" stroke="'+s.color+'" stroke-width="2"/>'
+    // Label at end
+    var lastY = yp(s.costs[dauSteps])
+    svg += '<text x="'+(W-PR+3)+'" y="'+(lastY+4)+'" font-size="9" fill="'+s.color+'">'+esc(s.gpu.name.replace(' 8x','').replace(' NVL72',' N72'))+'</text>'
+  })
+  svg += '</svg>'
+
+  html += svg
+
+  // Summary table
+  html += '<table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:11px">'
+    + '<tr style="background:var(--navy);color:#fff">'
+    + '<th style="padding:6px 8px;text-align:left">GPU</th>'
+    + '<th style="padding:6px 8px;text-align:right">GPUs Needed</th>'
+    + '<th style="padding:6px 8px;text-align:right">CapEx (USD)</th>'
+    + '<th style="padding:6px 8px;text-align:right">₹/M tokens</th>'
+    + '<th style="padding:6px 8px;text-align:right">Mkt ref $/M</th>'
+    + '<th style="padding:6px 8px;text-align:center">Action</th>'
+    + '</tr>'
+
+  var powerTariff = (SASC_DATA.territory_costs && SASC_DATA.territory_costs.power_tariff_inr) || 7
+  series.forEach(function(s, si) {
+    var gpus = calcMaasTotalGpus(s.gpu, sla, enabledUts)
+    var capex = calcMaasCapex(s.gpu, gpus)
+    var cpm   = calcCostPerMToken(s.gpu, gpus, sla, enabledUts, powerTariff)
+    // Market reference: Together AI $3/M output ≈ $2.5/M blended
+    var mktRef = 2.5
+    var isCheaper = (cpm / 85) < mktRef  // ₹cpm ÷ FX vs market USD
+    html += '<tr style="border-bottom:1px solid #e5e7eb;'+(si%2?'background:#F9FAFB':'')+'">'
+      + '<td style="padding:6px 8px;font-weight:600;color:'+s.color+'">'+esc(s.gpu.name)+'</td>'
+      + '<td style="padding:6px 8px;text-align:right">'+gpus+'</td>'
+      + '<td style="padding:6px 8px;text-align:right">$'+fmtNum(Math.round(capex/1000))+'K</td>'
+      + '<td style="padding:6px 8px;text-align:right;color:'+(isCheaper?'var(--teal)':'var(--orange)')+'">₹'+fmtNum(Math.round(cpm))+'</td>'
+      + '<td style="padding:6px 8px;text-align:right;color:#6B7280">$'+mktRef+'/M</td>'
+      + '<td style="padding:6px 8px;text-align:center"><button class="btn btn-sm" onclick="chooseMaasArch(\''+s.gpu.id+'\',\''+esc(s.gpu.name)+'\','+gpus+','+Math.round(capex)+','+Math.round(cpm)+')">Choose</button></td>'
+      + '</tr>'
+  })
+  html += '</table></div>'
+  return html
+}
+
+// ── Layer 2: Usage Type Heatmap ───────────────────────────────────────────────
+function renderMaasLayer2(selGpus, enabledUts, sla) {
+  var html = '<div class="card"><div class="card-title">Layer 2 — Usage Type Heatmap</div>'
+    + '<div class="card-sub">Performance/cost score per GPU × usage type. Green = optimal for this workload.</div>'
+
+  var usageTypes = ['text','coding','document','audio','indic','generic']
+  var utLabels   = {text:'Text/Chat',coding:'Coding',document:'Document',audio:'Audio',indic:'Indic',generic:'Generic'}
+
+  // Score = tokens/sec × cost-efficiency × memory-fit (normalised 0-100)
+  function score(gpu, ut) {
+    if (!ut.model_id) return null
+    var model = SVC_MC_ROWS.find(function(m){ return m.id === ut.model_id })
+    if (!model) return null
+    var tps = modelTps(model, gpu)
+    var gpus = calcUsageTypeGpus(ut, gpu, sla)
+    var capex = calcMaasCapex(gpu, gpus)
+    var costEff = gpus > 0 ? tps / capex * 1e6 : 0  // TPS per $M
+    var memFit  = modelVram(model, gpu) <= (gpu.vram_per_gpu_gb || 80) * (gpu.gpus_in_unit||8) ? 1.0 : 0.3
+    return Math.round(costEff * memFit * 100) / 100
+  }
+
+  // Build score matrix
+  var matrix = {}
+  var maxScore = 0
+  selGpus.forEach(function(g) {
+    matrix[g.id] = {}
+    enabledUts.forEach(function(ut) {
+      var s = score(g, ut)
+      matrix[g.id][ut.type] = s
+      if (s && s > maxScore) maxScore = s
+    })
+  })
+
+  html += '<table style="width:100%;border-collapse:collapse;font-size:11px">'
+    + '<tr><th style="padding:8px;background:var(--light);text-align:left">GPU</th>'
+    + enabledUts.map(function(ut){ return '<th style="padding:8px;background:var(--light);text-align:center">'+esc(utLabels[ut.type]||ut.type)+'</th>' }).join('')
+    + '</tr>'
+
+  selGpus.forEach(function(g, gi) {
+    html += '<tr style="border-bottom:1px solid #e5e7eb">'
+      + '<td style="padding:8px;font-weight:600;font-size:11px;color:var(--navy)">'+esc(g.name)+'</td>'
+    enabledUts.forEach(function(ut) {
+      var s = matrix[g.id][ut.type]
+      if (s === null) { html += '<td style="padding:8px;text-align:center;color:#9CA3AF">—</td>'; return }
+      var pct = maxScore > 0 ? s/maxScore : 0
+      var bg = pct > 0.7 ? '#DCFCE7' : pct > 0.4 ? '#FEF9C3' : '#FEE2E2'
+      var fc = pct > 0.7 ? '#166534' : pct > 0.4 ? '#854D0E' : '#991B1B'
+      var label = pct > 0.7 ? 'Optimal' : pct > 0.4 ? 'Good' : 'Moderate'
+      html += '<td style="padding:8px;text-align:center;background:'+bg+';color:'+fc+';font-weight:600">'+label+'</td>'
+    })
+    html += '</tr>'
+  })
+  html += '</table>'
+  html += '<div style="margin-top:8px;font-size:10px;color:var(--mid)">Score = (tokens/sec) × memory-fit ÷ CapEx. Normalised per usage type. Higher is better.</div>'
+  html += '</div>'
+  return html
+}
+
+// ── Layer 3: Usage Mix Optimiser ──────────────────────────────────────────────
+function renderMaasLayer3(selGpus, enabledUts, sla) {
+  var COLORS = ['#002870','#FF5539','#00B290','#FFB600','#1C38F5']
+  var html = '<div class="card"><div class="card-title">Layer 3 — Usage Mix Optimiser</div>'
+    + '<div class="card-sub">Gross margin at different DAU scales by GPU architecture. Set usage mix below.</div>'
+
+  // Mix sliders
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">'
+  var mixTypes = enabledUts.map(function(u){ return u.type })
+  mixTypes.forEach(function(t) {
+    html += '<div style="background:var(--light);padding:8px 10px;border-radius:6px">'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'
+      + '<span style="font-size:11px;font-weight:600;color:var(--navy)">'+(t.charAt(0).toUpperCase()+t.slice(1))+'</span>'
+      + '<span style="font-size:11px;color:var(--mid)" id="mix-lbl-'+t+'">'+MAAS_SIM_MIX[t]+'%</span>'
+      + '</div>'
+      + '<input type="range" min="0" max="100" value="'+MAAS_SIM_MIX[t]+'" style="width:100%" '
+      + 'oninput="MAAS_SIM_MIX[\''+t+'\']=+this.value;var el=document.getElementById(\'mix-lbl-'+t+'\');if(el)el.textContent=this.value+\'%\'" '
+      + 'onchange="renderStep(SASC_STEP)">'
+      + '</div>'
+  })
+  html += '</div>'
+
+  // Token price input
+  html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;padding:10px 12px;background:var(--light);border-radius:8px">'
+    + '<span style="font-size:11px;font-weight:700;color:var(--mid)">TOKEN PRICE (at target margin)</span>'
+    + '<div style="display:flex;align-items:center;gap:6px">'
+    + '<span style="font-size:11px;color:var(--mid)">₹ / M tokens</span>'
+    + '<input type="number" value="'+(window._maasTokenPriceInr||500)+'" min="1" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-family:inherit" '
+    + 'onchange="window._maasTokenPriceInr=+this.value;renderStep(SASC_STEP)">'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:6px">'
+    + '<span style="font-size:11px;color:var(--mid)">Gross Margin target</span>'
+    + '<input type="number" value="'+(window._maasGmTarget||40)+'" min="1" max="90" style="width:60px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-family:inherit" '
+    + 'onchange="window._maasGmTarget=+this.value;renderStep(SASC_STEP)">%'
+    + '</div>'
+    + '</div>'
+
+  // Calculate GM% at different DAU levels for each GPU
+  var priceInr = window._maasTokenPriceInr || 500
+  var targetGm = window._maasGmTarget || 40
+  var dauRange = Array.from({length:21}, function(_,i){ return Math.round(MAAS_SIM_DAU * i / 10) })
+  var powerTariff = (SASC_DATA.territory_costs && SASC_DATA.territory_costs.power_tariff_inr) || 7
+
+  var series3 = selGpus.map(function(g, gi) {
+    var gms = dauRange.map(function(totalDau) {
+      if (totalDau === 0) return -100
+      var totalMix = mixTypes.reduce(function(s,t){ return s+(MAAS_SIM_MIX[t]||0) },0) || 100
+      var scaledUts = enabledUts.map(function(ut) {
+        var pct = (MAAS_SIM_MIX[ut.type]||0) / totalMix
+        return Object.assign({}, ut, { dau: Math.round(totalDau * pct) })
+      })
+      var gpus = calcMaasTotalGpus(g, sla, scaledUts)
+      var costPerM = calcCostPerMToken(g, gpus, sla, scaledUts, powerTariff)
+      if (!costPerM) return -100
+      var gm = (priceInr - costPerM) / priceInr * 100
+      return Math.round(gm * 10) / 10
+    })
+    return { gpu:g, gms:gms, color:COLORS[gi] }
+  })
+
+  // SVG chart for GM%
+  var W=600,H=260,PL=55,PR=60,PT=20,PB=40
+  var IW=W-PL-PR, IH=H-PT-PB
+  var allGms = series3.flatMap(function(s){ return s.gms })
+  var minY = Math.min(-20, Math.min.apply(null, allGms))
+  var maxY = Math.max(80, Math.max.apply(null, allGms))
+  var rng = maxY-minY || 1
+
+  function xp3(i){ return PL+Math.round(i*IW/20) }
+  function yp3(v){ return PT+Math.round(IH-(v-minY)/rng*IH) }
+
+  var svg3 = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="overflow:visible">'
+  // Grid
+  var zeroY = yp3(0)
+  svg3 += '<line x1="'+PL+'" y1="'+zeroY+'" x2="'+(W-PR)+'" y2="'+zeroY+'" stroke="#9CA3AF" stroke-width="1.5"/>'
+  svg3 += '<text x="'+(PL-5)+'" y="'+(zeroY+4)+'" text-anchor="end" font-size="9" fill="#9CA3AF">0%</text>'
+  // Target GM line
+  if (targetGm >= minY && targetGm <= maxY) {
+    var tgy = yp3(targetGm)
+    svg3 += '<line x1="'+PL+'" y1="'+tgy+'" x2="'+(W-PR)+'" y2="'+tgy+'" stroke="#00B290" stroke-width="1" stroke-dasharray="4,3"/>'
+    svg3 += '<text x="'+(W-PR+3)+'" y="'+(tgy+4)+'" font-size="9" fill="#00B290">Target '+targetGm+'%</text>'
+  }
+  // Y labels
+  for (var yi=-1;yi<=3;yi++) {
+    var yval = minY + (maxY-minY)*(yi+1)/4
+    svg3 += '<text x="'+(PL-5)+'" y="'+(yp3(yval)+4)+'" text-anchor="end" font-size="9" fill="#9CA3AF">'+Math.round(yval)+'%</text>'
+  }
+  // X labels
+  for (var xi=0;xi<=20;xi+=4) {
+    svg3 += '<text x="'+xp3(xi)+'" y="'+(H-PB+14)+'" text-anchor="middle" font-size="9" fill="#9CA3AF">'+Math.round(dauRange[xi]/1000)+'K</text>'
+  }
+  svg3 += '<text x="'+(PL+IW/2)+'" y="'+H+'" text-anchor="middle" font-size="10" fill="#6B7280">Daily Active Users</text>'
+  svg3 += '<text x="12" y="'+(PT+IH/2)+'" text-anchor="middle" font-size="10" fill="#6B7280" transform="rotate(-90,12,'+(PT+IH/2)+')">Gross Margin %</text>'
+
+  // Series
+  series3.forEach(function(s, si) {
+    var path = dauRange.map(function(d,i){ return (i===0?'M':'L')+xp3(i)+' '+yp3(Math.max(minY,Math.min(maxY,s.gms[i]))) }).join(' ')
+    svg3 += '<path d="'+path+'" fill="none" stroke="'+s.color+'" stroke-width="2"/>'
+    var lastGm = s.gms[20]
+    svg3 += '<text x="'+(W-PR+3)+'" y="'+(yp3(Math.max(minY,Math.min(maxY,lastGm)))+4)+'" font-size="9" fill="'+s.color+'">'+esc(s.gpu.name.replace(' 8x','').replace(' NVL72',' N72'))+'</text>'
+  })
+  svg3 += '</svg>'
+  html += svg3
+
+  // Break-even table
+  html += '<table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:11px">'
+    + '<tr style="background:var(--navy);color:#fff"><th style="padding:6px 8px;text-align:left">GPU</th>'
+    + '<th style="padding:6px 8px;text-align:right">GM at target DAU</th>'
+    + '<th style="padding:6px 8px;text-align:right">Break-even DAU</th>'
+    + '<th style="padding:6px 8px;text-align:right">₹/M tokens (cost)</th>'
+    + '</tr>'
+  series3.forEach(function(s, si) {
+    var gmAtTarget = s.gms[10]  // index 10 = MAAS_SIM_DAU
+    // Break-even: first DAU where GM >= 0
+    var beIdx = s.gms.findIndex(function(g){ return g >= 0 })
+    var beDau = beIdx >= 0 ? dauRange[beIdx] : null
+    var scaledUts = enabledUts.map(function(ut) {
+      var totalMix = mixTypes.reduce(function(acc,t){ return acc+(MAAS_SIM_MIX[t]||0) },0)||100
+      var pct=(MAAS_SIM_MIX[ut.type]||0)/totalMix
+      return Object.assign({},ut,{dau:Math.round(MAAS_SIM_DAU*pct)})
+    })
+    var gpus = calcMaasTotalGpus(s.gpu, sla, scaledUts)
+    var cpm = calcCostPerMToken(s.gpu, gpus, sla, scaledUts, powerTariff)
+    html += '<tr style="border-bottom:1px solid #e5e7eb;'+(si%2?'background:#F9FAFB':'')+'">'
+      + '<td style="padding:6px 8px;font-weight:600;color:'+s.color+'">'+esc(s.gpu.name)+'</td>'
+      + '<td style="padding:6px 8px;text-align:right;color:'+(gmAtTarget>=targetGm?'var(--teal)':'var(--orange)')+';font-weight:700">'+gmAtTarget.toFixed(1)+'%</td>'
+      + '<td style="padding:6px 8px;text-align:right">'+(beDau!==null?fmtNum(beDau):'> max')+'</td>'
+      + '<td style="padding:6px 8px;text-align:right">₹'+fmtNum(Math.round(cpm))+'/M</td>'
+      + '</tr>'
+  })
+  html += '</table></div>'
+  return html
+}
+
+// ── Choose arch + save to docket ─────────────────────────────────────────────
+function chooseMaasArch(gpuId, gpuName, gpus, capexUsd, costPerMtoken) {
+  MAAS_SIM_RESULT = {
+    chosen_gpu_id: gpuId, chosen_gpu_name: gpuName,
+    total_gpus: gpus, capex_usd: capexUsd,
+    cost_per_mtoken: costPerMtoken,
+    sla_tier: (MAAS_CFG && MAAS_CFG.sla_tier) || 'standard',
+    usage_types: (MAAS_CFG && MAAS_CFG.usage_types) || [],
+    chosen_at: new Date().toISOString()
+  }
+  showToast('Architecture chosen: '+gpuName+' — save to Docket when ready')
+  renderStep(SASC_STEP)
+}
+
+async function saveMaasBomToDocket() {
+  if (!MAAS_SIM_RESULT || !SASC_DATA.docketId) {
+    showToast('Choose an architecture first, and ensure SASC is linked to a docket'); return
+  }
+  var sb = getSB(); if (!sb.url) { showToast('Supabase not configured'); return }
+  var rowId = SASC_DATA.docketId + '-maas-bom'
+  try {
+    await fetch(sb.url+'/rest/v1/docket_items?id=eq.'+encodeURIComponent(rowId),
+      {method:'DELETE',headers:{apikey:sb.key,Authorization:'Bearer '+sb.key}})
+  } catch(e){}
+  var r = await fetch(sb.url+'/rest/v1/docket_items', {
+    method:'POST',
+    headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},
+    body:JSON.stringify({
+      id:rowId, docket_id:SASC_DATA.docketId,
+      section:'output', item_type:'solution', item_subtype:'maas_bom',
+      title:'MaaS BOM — '+MAAS_SIM_RESULT.chosen_gpu_name,
+      status:'done', created_by:'ATLAS',
+      content: MAAS_SIM_RESULT
+    })
+  })
+  showToast(r.ok ? '✓ MaaS BOM saved to Docket' : 'Save failed ('+r.status+')')
+}
+
+function renderBOMTabContent(tab, bom) {
+  if (tab === 'people') return renderPeopleTab()
+  if (tab === 'rom')    return renderROMSummary()
+  if (tab === 'maas')   return renderMaasSimTab()
+  return renderBOMContent(bom)
+}
+
+function renderBOMContent(bom) {
+  var rom = SASC_DATA.rom
+  // Weighted confidence from pricing_params confidence_range per BOM line
+  var confidence = 35
+  if (SASC_DATA.pricingParams && SASC_DATA.pricingParams.length && bom && bom.length) {
+    var _tv = 0, _wc = 0
+    bom.forEach(function(line) {
+      var p = SASC_DATA.pricingParams.find(function(p){ return p.component === line.component })
+      var c = p ? (p.confidence_range || 20) : 25
+      _wc += c * (line.usd_total || 0); _tv += (line.usd_total || 0)
+    })
+    if (_tv > 0) confidence = Math.round(_wc / _tv)
+  }
+
+  // Group BOM by category
+  var categories = {}
+  bom.forEach(function(line) {
+    if (!categories[line.category]) categories[line.category] = []
+    categories[line.category].push(line)
+  })
+
+  var html = '<div class="card">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    + '<div><div class="card-title">Bill of Materials + ROM</div>'
+    + '<div class="card-sub">' + (SASC_DATA.mdc.sites || 1) + ' site(s) &bull; ' + SASC_DATA.mdc.tshirt.toUpperCase() + '-class MDC &bull; ' + SASC_DATA.scope + ' stack</div>'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:8px">'
+    + '<span class="confidence-badge">&#177;' + confidence + '% confidence</span>'
+    + '<div class="currency-toggle">'
+    + ['USD','INR','EUR'].map(function(c){
+        return '<button class="curr-btn ' + (SASC_CURRENCY===c?'active':'') + '" data-curr="' + c + '" onclick="setCurrency(this.dataset.curr)">' + c + '</button>'
+      }).join('')
+    + '</div></div></div>'
+
+    + '<table class="bom-table"><thead><tr>'
+    + '<th>Component</th><th>Qty</th><th>Unit price</th><th>Total</th>'
+    + '</tr></thead><tbody>'
+
+  Object.keys(categories).forEach(function(cat) {
+    html += '<tr class="cat-row"><td colspan="4">' + esc(cat) + '</td></tr>'
+    categories[cat].forEach(function(line) {
+      html += '<tr><td>' + esc(line.component) + (line.notes ? '<div style="font-size:10px;color:var(--mid)">' + esc(line.notes) + '</div>' : '') + '</td>'
+        + '<td>' + line.qty + '</td>'
+        + '<td>' + fmtMoney(line.usd_unit) + '</td>'
+        + '<td style="font-weight:600">' + fmtMoney(line.usd_total) + '</td></tr>'
+    })
+  })
+
+  html += '</tbody></table>'
+    + '<div class="bom-total"><div class="bom-total-label">Total CapEx</div>'
+    + '<div class="bom-total-val">' + fmtMoney(rom.capex_usd) + '</div></div>'
+    + '</div>'
+
+    // ROM summary card
+    + '<div class="card"><div class="card-title">Rough Order of Magnitude (ROM)</div>'
+    + '<div class="card-sub">3-year programme cost including CapEx, OpEx and UC development</div>'
+    + '<table class="bom-table"><tbody>'
+    + '<tr><td>CapEx (hardware + software + services)</td><td style="font-weight:600;text-align:right">' + fmtMoney(rom.capex_usd) + '</td></tr>'
+    + '<tr><td>OpEx (software licences &times; 3 years)</td><td style="font-weight:600;text-align:right">' + fmtMoney(rom.opex_usd * 3) + '</td></tr>'
+    + '<tr><td>UC development</td><td style="font-weight:600;text-align:right">' + fmtMoney(rom.ucdev_usd) + '</td></tr>'
+    + '</tbody></table>'
+    + '<div class="bom-total"><div class="bom-total-label">Programme ROM (3yr)</div>'
+    + '<div class="bom-total-val">' + fmtMoney(rom.total_usd) + '</div></div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-top:4px">'
+    + 'Range: ' + fmtMoney(rom.total_usd * (1 - confidence/100)) + ' &mdash; ' + fmtMoney(rom.total_usd * (1 + confidence/100))
+    + ' at &plusmn;' + confidence + '% confidence'
+    + '</div></div>'
+
+    + '<div class="actions-bar">'
+    + '<button class="btn btn-ghost" onclick="renderStep(3)">&larr; Back</button>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button class="btn btn-outline" onclick="exportBOM()">&#128196; Export CSV</button>'
+    + '<button class="btn btn-primary" onclick="saveToDocket()">&#128190; Save to docket</button>'
+    + '</div></div>'
+  return html
+}
+
+// -- Actions -------------------------------------------------------------------
+
+async function selectEngagement(engId) {
+  if (!engId) return
+  var engs = await sbFetch('engagements', 'id=eq.' + engId, 1)
+  if (!engs || !engs[0]) return
+  SASC_DATA.engId = engId
+  ENGAGEMENT = engs[0]
+  SASC_DATA.engName = engs[0].name || ''
+  SASC_DATA.archetype = engs[0].archetype || ''
+  var custs = await sbFetch('customers', 'id=eq.' + engs[0].customer_id, 1)
+  if (custs && custs[0]) SASC_DATA.customerName = custs[0].name || ''
+  document.getElementById('hdr-eng-label').innerHTML =
+    '<strong>' + esc(SASC_DATA.customerName) + '</strong> &mdash; ' + esc(SASC_DATA.engName)
+  // Load dockets for this engagement
+  var dockets = await sbFetch('engagement_dockets', 'engagement_id=eq.' + engId + '&order=created_at.desc', 1)
+  if (dockets && dockets[0]) {
+    SASC_DATA.docketId = dockets[0].id
+    var docketItems = await sbFetch('docket_items', 'docket_id=eq.' + dockets[0].id + '&section=eq.uc', 50)
+    var _refs = (docketItems||[]).map(function(d){ return d.ref_id||d.notes||null }).filter(Boolean)
+    SASC_DATA.selectedUCs = _refs
+    if (_refs.length) SASC_DATA.outputStack.ucdev = true
+    var _libUCs = await sbFetch('uc_library', 'status=eq.active&order=cluster.asc,uc_name.asc', 200)
+    ALL_UCS = _libUCs || []
+    // Also load portfolio
+    var _portItems = await sbFetch('docket_items', 'docket_id=eq.' + dockets[0].id + '&item_subtype=eq.portfolio_selection', 1)
+    if (_portItems && _portItems[0] && _portItems[0].content) {
+      var _portSel = (_portItems[0].content.items || [])
+      var _PORT_OS = { 'L2-MAAS':'maas','L2-GPUAAS':'gpuaas','L2-BMAAS':'bmaas','L3-SKL':'skills','L1.3':'coe','L1-TSAP':'coe' }
+      _portSel.forEach(function(code){ var k=_PORT_OS[code]; if(k) SASC_DATA.outputStack[k]=true })
+    }
+  }
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function toggleUC(id) {
+  var idx = SASC_DATA.selectedUCs.indexOf(id)
+  if (idx >= 0) SASC_DATA.selectedUCs.splice(idx, 1)
+  else SASC_DATA.selectedUCs.push(id)
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function toggleSASCCluster(cluster) {
+  SASC_DATA.ucExpandedCluster = (SASC_DATA.ucExpandedCluster === cluster) ? null : cluster
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function selectAllCluster(cluster) {
+  var clusterUCs = ALL_UCS.filter(function(u) { return u.cluster === cluster })
+  clusterUCs.forEach(function(u) {
+    if (SASC_DATA.selectedUCs.indexOf(u.id) < 0) SASC_DATA.selectedUCs.push(u.id)
+  })
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function clearCluster(cluster) {
+  var clusterIds = ALL_UCS.filter(function(u) { return u.cluster === cluster }).map(function(u) { return u.id })
+  SASC_DATA.selectedUCs = SASC_DATA.selectedUCs.filter(function(id) { return clusterIds.indexOf(id) < 0 })
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function clearAllUCs() {
+  SASC_DATA.selectedUCs = []
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function setScope(v) {
+  SASC_DATA.scope = v
+  adjustLayersByScope(v)
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function setDCType(v) {
+  SASC_DATA.dcType = v
+  document.getElementById('app-content').innerHTML = renderScreen1()
+}
+
+function setTshirt(v) {
+  SASC_DATA.mdc.tshirt = v
+  document.getElementById('app-content').innerHTML = renderScreen1()
+  updateMDCSummary()
+}
+
+function updateMDCSummary() {
+  var el = document.getElementById('mdc-summary')
+  if (!el) return
+  var mwMap = { xs:2, s:5, m:10, l:15, xl:20 }
+  var sites = SASC_DATA.mdc.sites || 1
+  var mw = (mwMap[SASC_DATA.mdc.tshirt] || 10) * sites
+  el.textContent = 'Total programme: ' + mw + ' MW across ' + sites + ' site(s)'
+}
+
+
+function toggleLayerCfgPanel(key) {
+  var panel = document.getElementById('layer-cfg-' + key)
+  if (!panel) return
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none'
+}
+
+function toggleLayer(key) {
+  SASC_DATA.layers[key].on = !SASC_DATA.layers[key].on
+  // Re-render Screen 1 to update MDC section and step nav
+  if (SASC_STEP === 1) renderStep(1)
+}
+
+function goToStack() {
+  // Save DC detail inputs before navigating
+  var sitesEl = document.getElementById('mdc-sites')
+  if (sitesEl) SASC_DATA.mdc.sites = parseInt(sitesEl.value) || 1
+  var snEl = document.getElementById('mdc-sitenames')
+  if (snEl) SASC_DATA.mdc.siteNames = snEl.value
+  renderStep(2)
+}
+
+function goStep2() { goToWorkloads() }
+
+async function saveToDocket() {
+  if (!SASC_DATA.docketId) {
+    showToast('No docket linked. Launch SASC from an engagement docket.')
+    return
+  }
+  var itemId = SASC_DATA.docketItemId || genId('SASC')
+  var item = {
+    id: itemId,
+    docket_id: SASC_DATA.docketId,
+    item_type: 'solution',
+    item_subtype: 'sasc_bom',
+    title: 'SASC: ' + SASC_DATA.mdc.tshirt.toUpperCase() + ' MDC x' + (SASC_DATA.mdc.sites||1) + ' — ' + SASC_DATA.scope + ' stack',
+    notes: 'ROM: ' + fmtMoney(SASC_DATA.rom.total_usd, 'USD') + ' (' + fmtMoney(SASC_DATA.rom.total_usd, 'INR') + ')',
+    content: {
+      type: 'sasc',
+      sasc: {
+        engId: SASC_DATA.engId, docketId: SASC_DATA.docketId,
+        scope: SASC_DATA.scope, dcType: SASC_DATA.dcType,
+        mdc: SASC_DATA.mdc, bm: SASC_DATA.bm,
+        layers: Object.fromEntries(Object.entries(SASC_DATA.layers).map(function(e){ return [e[0], {on: e[1].on}] })),
+        selectedUCs: SASC_DATA.selectedUCs,
+        rom: SASC_DATA.rom
+      },
+      bom_lines: SASC_DATA.bom.map(function(l){ return { component: l.component, qty: l.qty, usd_total: l.usd_total } }),
+      rom_usd: SASC_DATA.rom.total_usd,
+      rom_inr: SASC_DATA.rom.total_usd * (FX_RATES.INR || 84.2),
+      // Flat fields for FM to read directly
+      bom: {
+        capex_usd: SASC_DATA.rom.capex_usd,
+        opex_usd:  SASC_DATA.rom.opex_usd,
+        ucdev_usd: SASC_DATA.rom.ucdev_usd,
+        total_usd: SASC_DATA.rom.total_usd
+      },
+      mdc_tshirt: SASC_DATA.mdc.tshirt,
+      selected_ucs: SASC_DATA.selectedUCs,
+      phase1_mw: { xs:2, s:5, m:10, l:15, xl:20 }[SASC_DATA.mdc.tshirt] || 10
+    },
+    status: 'done'
+  }
+  var method = SASC_DATA.docketItemId ? 'PATCH' : 'POST'
+  var url = getSB().url + '/rest/v1/docket_items' + (SASC_DATA.docketItemId ? '?id=eq.' + SASC_DATA.docketItemId : '')
+  try {
+    var r = await fetch(url, {
+      method: method,
+      headers: { apikey: getSB().key, Authorization: 'Bearer ' + getSB().key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(item)
+    })
+    if (r.ok) {
+      SASC_DATA.docketItemId = itemId
+      showToast('Saved to docket')
+      setTimeout(function(){ backToDocket() }, 1200)
+    } else {
+      showToast('Save failed -- check Supabase connection')
+    }
+  } catch(e) { showToast('Error: ' + e.message) }
+}
+
+function exportBOM() {
+  var rows = ['Category,Component,Qty,Unit Price (USD),Total (USD),Total (' + SASC_CURRENCY + ')']
+  SASC_DATA.bom.forEach(function(l) {
+    rows.push([l.category, '"' + l.component + '"', l.qty, l.usd_unit.toFixed(0), l.usd_total.toFixed(0), fmtMoney(l.usd_total)].join(','))
+  })
+  rows.push(',,,,,')
+  rows.push(',Total CapEx,,,' + SASC_DATA.rom.capex_usd.toFixed(0) + ',' + fmtMoney(SASC_DATA.rom.capex_usd))
+  rows.push(',Programme ROM (3yr),,,' + SASC_DATA.rom.total_usd.toFixed(0) + ',' + fmtMoney(SASC_DATA.rom.total_usd))
+  var blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+  var a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'SASC_BOM_' + (SASC_DATA.engName || 'export').replace(/\s+/g,'_') + '.csv'
+  a.click()
+  showToast('BOM exported as CSV')
+}
+
+function backToDocket() {
+  if (SASC_DATA.engId && SASC_DATA.docketId) {
+    window.location.href = DOCKET_URL + '?eng=' + SASC_DATA.engId + '&docket=' + SASC_DATA.docketId
+  } else {
+    window.location.href = DOCKET_URL
+  }
+}
+
+// -- Boot ----------------------------------------------------------------------
+init()
+</script>
+</body>
+</html>
