@@ -1243,10 +1243,13 @@ async function loadWorkloadProfiles() {
   ALL_UC_TYPES    = results[2] || []
   SASC_DATA.benchmarks = results[3] || []
 
-  // Set default GPU config if not set
+  // Set default GPU config — prefer H200 SXM (server class), avoid rack-scale as default
   if (!SASC_DATA.gpuConfigId && ALL_GPU_CONFIGS.length) {
-    var h100 = ALL_GPU_CONFIGS.find(function(g) { return g.name === 'H100 SXM5 8x' })
-    SASC_DATA.gpuConfigId = h100 ? h100.id : ALL_GPU_CONFIGS[0].id
+    var defGpu = ALL_GPU_CONFIGS.find(function(g) { return g.name === 'H200 SXM 8x' })
+      || ALL_GPU_CONFIGS.find(function(g) { return !g.rack_scale && !g.placeholder })
+      || ALL_GPU_CONFIGS[0]
+    SASC_DATA.gpuConfigId = defGpu.id
+    console.log('[SASC] Default GPU set to:', defGpu.name)
   }
 
   // Reload ALL_UCS from uc_library if not already loaded
@@ -1913,8 +1916,9 @@ function renderScreen2() {
     + '<div><label>GPU configuration</label>'
     + '<select onchange="SASC_DATA.gpuConfigId=this.value;document.getElementById(\'app-content\').innerHTML=renderScreen2()">'
     + ALL_GPU_CONFIGS.map(function(g) {
+    + ALL_GPU_CONFIGS.filter(function(g) { return !g.rack_scale }).map(function(g) {
         return '<option value="' + g.id + '"' + (s.gpuConfigId===g.id?' selected':'') + '>'
-          + g.name + ' (' + g.total_vram_gb + 'GB VRAM, ' + Math.round(g.power_watts_tdp/1000*10)/10 + 'kW)'
+          + g.name + ' (' + (g.vram_per_gpu_gb||Math.round(g.total_vram_gb/(g.gpus_in_unit||8))) + 'GB/GPU × ' + (g.gpus_in_unit||8) + ' GPUs)'
           + '</option>'
       }).join('')
     + '</select></div>'
@@ -1974,7 +1978,7 @@ function renderScreen2() {
       + sizing.peak_rps + ' peak RPS'
       + '</div></div>'
       + '<div style="display:flex;gap:4px;align-items:center">'
-      + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;' + headBadgeStyle + '">' + sizing.servers + ' server' + (sizing.servers>1?'s':'') + '</span>'
+      + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;' + headBadgeStyle + '">' + (function(){var _gc=ALL_GPU_CONFIGS.find(function(g){return g.id===SASC_DATA.gpuConfigId});var _se=sizing._se;var _g=_se?_se.total_gpus:(sizing.servers*(_gc?(_gc.gpus_in_unit||8):8));var _u=_gc&&_gc.rack_scale?'rack':'server';return _g+' GPUs / '+sizing.servers+' '+_u+(sizing.servers>1?'s':'')})() + '</span>'
       + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;' + latBadgeStyle + '">' + (sizing.latency_ok?'SLA OK':'SLA risk') + '</span>'
       + '</div>'
       + '<span style="font-size:12px;color:var(--mid);margin-left:4px">' + (wl.expanded?'&#9650;':'&#9660;') + '</span>'
@@ -2060,7 +2064,7 @@ function renderScreen2() {
         + '<span style="font-size:10px;color:var(--mid)">&#8594;</span>'
         + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--white);border:0.5px solid #e0e0e8;color:var(--mid)">GPU: ' + sizing.derated_rps + ' RPS capacity</span>'
         + '<span style="font-size:10px;color:var(--mid)">&#8594;</span>'
-        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--navy);color:#fff">' + sizing.servers + ' server' + (sizing.servers>1?'s':'') + '</span>'
+        + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--navy);color:#fff">' + (function(){var _gc=ALL_GPU_CONFIGS.find(function(g){return g.id===SASC_DATA.gpuConfigId});var _se=sizing._se;var _g=_se?_se.total_gpus:(sizing.servers*(_gc?(_gc.gpus_in_unit||8):8));var _u=_gc&&_gc.rack_scale?'rack':'server';return _g+' GPUs / '+sizing.servers+' '+_u+(sizing.servers>1?'s':'')})() + '</span>'
         + '<span style="font-size:10px;color:var(--mid)">&#8594;</span>'
         + '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--white);border:0.5px solid #e0e0e8;color:var(--mid)">' + sizing.power_kw + ' kW</span>'
         + '</div>'
