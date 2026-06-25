@@ -448,48 +448,150 @@ input:focus,select:focus{border-color:var(--blue);}
   /**
    * GPU throughput (tokens/sec per GPU unit) from benchmark or formula
    *
-   * Profile B (internal UC — low concurrency, latency-bound):
-   *   tokens/sec ≈ GPU_bandwidth_GBs / model_size_GB  (memory bandwidth bound)
+   * Uses the correct dual-bound model:
+   *   - Memory bandwidth bound: always applies, scales with batch size
+   *   - Compute bound: only at high batch (typically B > 128)
+   *   - Actual throughput = min(bandwidth_bound, compute_bound)
+   *     (the binding constraint changes with batch size)
    *
-   * Profile A (MaaS API — high concurrency, compute-bound at batch 128+):
-   *   tokens/sec from benchmark_results (measured)
-   *   fallback: estimate from TFlops × efficiency factor
+   * Profile B (UC internal — low concurrency B=1..8):
+   *   Solidly memory-bandwidth bound. Token gen reads full model weights each step.
+   *   tokens/sec = bandwidth_GBs / model_size_GB  (per GPU)
+   *
+   * Profile A (MaaS API — high concurrency B=64..512+):
+   *   Batch processing helps: bandwidth bound scales as ~sqrt(B/8) relative to B=8
+   *   At B>=128 transitions toward compute-bound.
+   *   We compute both bounds and take minimum.
+   *
+   * Returns tokens/sec for the entire GPU unit (server=8 GPUs or rack=72 GPUs)
    */
-  function calcGPUThroughput (gpu, model, params_b, precision, profile) {
-    // Try benchmark first (most accurate)
+  function calcGPUThroughput (gpu, model, params_b, precision, profile, batchSize) {
+    // Benchmark is most accurate — use if available
     if (model) {
       var bm = getBenchmark(gpu.id, model.id)
       if (bm && bm.tokens_per_sec_p50) return bm.tokens_per_sec_p50
     }
 
-    var modelSizeGB = calcModelVRAM(params_b, precision)
-    var bwGBs = (gpu.hbm_bw_tbps || 3.0) * 1000  // TB/s → GB/s
+    var gpusPerUnit  = gpu.gpus_in_unit || gpu.gpus_per_unit || 8
+    var modelSizeGB  = calcModelVRAM(params_b, precision)           // total model VRAM (GB)
+    var modelPerGPU  = modelSizeGB / gpusPerUnit                    // GB per GPU when sharded
+    var bwPerUnitGBs = (gpu.hbm_bw_tbps || 3.0) * 1000            // total unit bandwidth GB/s
 
-    if (profile === 'B') {
-      // Memory bandwidth bound (small batch, latency-driven)
-      // tokens/sec per GPU ≈ bandwidth / model_size (rough but directionally correct)
-      return Math.round(bwGBs / Math.max(modelSizeGB / (gpu.gpus_in_unit || gpu.gpus_per_unit || 8), 1))
-    } else {
-      // Profile A — compute bound at large batch
-      // Effective tokens/sec: TFlops × 2 (multiply-add) / model_ops_per_token
-      // Model ops per token ≈ 2 × params_b × 1e9 (2 flops per param per token)
-      var tflops = precision === 'INT4' || precision === 'FP4'
-        ? (gpu.int4_tflops || gpu.bf16_tflops * 2)
-        : (gpu.bf16_tflops || 1000)
-      // tflops is per unit (rack or server)
-      var flopsPerToken = 2 * params_b * 1e9  // ~2 flops per param
-      var rawTokensPerSec = (tflops * 1e12) / flopsPerToken
-      // Apply 30% efficiency factor (realistic utilisation of peak TFlops)
-      return Math.round(rawTokensPerSec * 0.30)
+    // ── Bandwidth bound ──────────────────────────────────────────────────────
+    // At batch=1: tokens/sec = bandwidth / model_size_per_GPU (reads weights once per token)
+    // Batch scaling: continuous batching means we amortise the weight reads over B requests
+    // Effective gain is sub-linear: empirically ~B^0.6 for decode phase
+    var B = batchSize || (profile === 'B' ? 4 : 128)
+    var batchGain    = Math.pow(B, 0.6)                             // sub-linear batch amortisation
+    var bwBound      = Math.round((bwPerUnitGBs / Math.max(modelPerGPU, 1)) * batchGain)
+
+    // ── Compute bound ────────────────────────────────────────────────────────
+    // At high batch (B>>128) GPU becomes compute-bound
+    // tokens/sec = TFlops_effective / (2 × params × 1e9)
+    // Efficiency: 15-18% of peak TFlops (realistic vLLM/TRT-LLM with continuous batching)
+    var tflopsTotal  = (precision === 'INT4' || precision === 'FP4')
+      ? (gpu.int4_tflops || (gpu.bf16_tflops || 1000) * 2)
+      : (gpu.bf16_tflops || 1000)
+    var flopsPerTok  = 2 * params_b * 1e9                          // multiply-add per param
+    var computeBound = Math.round((tflopsTotal * 1e12 * 0.17) / flopsPerTok)
+
+    // ── Actual throughput = min of both bounds ───────────────────────────────
+    // At low batch: bandwidth_bound << compute_bound → bandwidth wins
+    // At high batch: bandwidth_bound approaches compute_bound → compute wins
+    var throughput = Math.min(bwBound, computeBound)
+
+    return Math.max(throughput, 1)
+  }
+
+  /**
+   * Return throughput calculation audit trail for UI display
+   */
+  function throughputAudit (gpu, model, params_b, precision, profile, batchSize) {
+    var gpusPerUnit  = gpu.gpus_in_unit || gpu.gpus_per_unit || 8
+    var modelSizeGB  = calcModelVRAM(params_b, precision)
+    var modelPerGPU  = modelSizeGB / gpusPerUnit
+    var bwPerUnitGBs = (gpu.hbm_bw_tbps || 3.0) * 1000
+    var B            = batchSize || (profile === 'B' ? 4 : 128)
+    var batchGain    = Math.pow(B, 0.6)
+    var bwBound      = Math.round((bwPerUnitGBs / Math.max(modelPerGPU, 1)) * batchGain)
+    var tflopsTotal  = (precision === 'INT4' || precision === 'FP4')
+      ? (gpu.int4_tflops || (gpu.bf16_tflops || 1000) * 2)
+      : (gpu.bf16_tflops || 1000)
+    var flopsPerTok  = 2 * params_b * 1e9
+    var computeBound = Math.round((tflopsTotal * 1e12 * 0.17) / flopsPerTok)
+    var binding      = bwBound < computeBound ? 'bandwidth' : 'compute'
+    return {
+      model_size_gb:   Math.round(modelSizeGB * 10) / 10,
+      model_per_gpu:   Math.round(modelPerGPU * 10) / 10,
+      bw_per_unit_gbs: bwPerUnitGBs,
+      batch_size:      B,
+      batch_gain:      Math.round(batchGain * 10) / 10,
+      bw_bound_tps:    bwBound,
+      compute_bound_tps: computeBound,
+      binding:         binding,
+      throughput_tps:  Math.min(bwBound, computeBound),
+      formula:         binding === 'bandwidth'
+        ? 'BW-bound: (' + bwPerUnitGBs + ' GB/s / ' + Math.round(modelPerGPU*10)/10 + ' GB/GPU) × B^0.6(' + Math.round(batchGain*10)/10 + ') = ' + bwBound + ' tok/s'
+        : 'Compute-bound: ' + tflopsTotal + ' TFlops × 17% / ' + Math.round(flopsPerTok/1e9) + 'B flops/tok = ' + computeBound + ' tok/s'
+    }
+  }
+
+  /**
+   * Reverse calculation: given allocated GPU count, how many users can be served?
+   * Used for fleet capacity view — "how many more users can this fleet support?"
+   *
+   * archetypeConfig: the maas_archetype config object for this usage type
+   * allocatedGPUs:   GPUs allocated to this usage type (after removing buffers for sizing)
+   * utilisationPct:  target utilisation (0-100), e.g. 70 means use 70% of capacity
+   */
+  function maxUsersFromGPUs (archetypeConfig, gpu, allocatedGPUs, utilisationPct) {
+    if (!gpu || !archetypeConfig || allocatedGPUs <= 0) return 0
+    var cfg          = archetypeConfig
+    var params_b     = 7   // default if no model specified
+    var precision    = 'INT4'
+    var avgOutputTok = cfg.avg_output_tokens || 500
+    var reqPerDay    = cfg.requests_per_user_per_day || 5
+    var peakConcPct  = cfg.peak_concurrent_pct || 5
+    var utilPct      = utilisationPct || 70
+    var gpusPerUnit  = gpu.gpus_in_unit || gpu.gpus_per_unit || 8
+
+    // Estimate peak concurrent from allocated GPUs
+    // Batch size for capacity calc = peak concurrent (what we're sizing for)
+    // Start with estimate, iterate once
+    var estBatch = Math.max(8, Math.floor(allocatedGPUs * 2))
+    var throughputPerUnit = calcGPUThroughput(gpu, null, params_b, precision, 'A', estBatch)
+    var units      = Math.floor(allocatedGPUs / gpusPerUnit)
+    if (units < 1) units = 1
+
+    // Total throughput at target utilisation
+    var totalTPS   = throughputPerUnit * units * (utilPct / 100)
+
+    // Convert throughput to max RPS
+    var maxRPS     = totalTPS / Math.max(avgOutputTok, 1)
+
+    // Convert RPS to DAU
+    // peak_concurrent_pct of DAU is active simultaneously
+    // peak concurrent = maxRPS × avg_response_time_sec
+    var responseTimeSec = 2.0  // assume 2s avg for API
+    var maxConcurrent   = maxRPS * responseTimeSec
+    var maxDAU          = Math.round(maxConcurrent / (peakConcPct / 100))
+
+    return {
+      max_dau:          maxDAU,
+      max_rps:          Math.round(maxRPS * 10) / 10,
+      max_concurrent:   Math.round(maxConcurrent),
+      throughput_tps:   Math.round(totalTPS),
+      units_used:       units,
+      utilisation_pct:  utilPct
     }
   }
 
   /**
    * GPUs needed to meet throughput demand
    */
-  function calcGPUsForThroughput (peakRPS, avgOutputTokens, gpu, model, params_b, precision, profile, deratingPct) {
+  function calcGPUsForThroughput (peakRPS, avgOutputTokens, gpu, model, params_b, precision, profile, deratingPct, batchSize) {
     var throughputNeeded = calcPeakTokenThroughput(peakRPS, avgOutputTokens)
-    var throughputPerUnit = calcGPUThroughput(gpu, model, params_b, precision, profile)
+    var throughputPerUnit = calcGPUThroughput(gpu, model, params_b, precision, profile, batchSize)
     var derate = (deratingPct || 80) / 100
     var derated = throughputPerUnit * derate
     if (derated <= 0) return 1
@@ -716,19 +818,24 @@ input:focus,select:focus{border-color:var(--blue);}
           'Profile B (UC internal): memory-bandwidth bound at low concurrency',
           'Base: max(' + gpusForFit + ' fit, ' + gpusForThroughput + ' throughput) = ' + baseGPUs + ' GPUs (' + bindingConstraint + ')',
           'Buffers: +' + peakBuffer + ' peak, +' + failoverReserve + ' failover, +' + haGPUs + ' HA, +' + drGPUs + ' DR, +' + growthGPUs + ' growth',
-          'Total: ' + totalGPUs + ' GPUs, KV: ' + kvCacheMethod(model)
-        ].join(' | '),
+          'Total: ' + totalGPUs + ' GPUs | KV: ' + kvCacheMethod(model)
+      ].join(' | '),
 
-        audit: {
-          formula:             'M_total=(M_weights+M_KV)x1.20',
-          m_weights_gb:        Math.round(calcModelVRAM(params_b, precision) * 100) / 100,
-          m_kv_gb:             Math.round(calcKVCache(model, contextLen, concurrentSessions, precision) * 100) / 100,
-          m_total_gb:          Math.round(calcTotalVRAM(params_b, precision, contextLen, concurrentSessions, model) * 100) / 100,
-          vram_per_gpu_gb:     gpu.vram_per_gpu_gb || 80,
-          kv_cache_method:     kvCacheMethod(model),
-          concurrent_sessions: concurrentSessions
-        }
+      // Audit trail — full sizing inputs/outputs for customer transparency
+      audit: {
+        formula:             'M_total = (M_weights + M_KV) × 1.20',
+        m_weights_gb:        Math.round(calcModelVRAM(params_b, precision) * 100) / 100,
+        m_kv_gb:             Math.round(calcKVCache(model, contextLen, concurrentSessions, precision) * 100) / 100,
+        m_total_gb:          Math.round(calcTotalVRAM(params_b, precision, contextLen, concurrentSessions, model) * 100) / 100,
+        vram_per_gpu_gb:     gpu.vram_per_gpu_gb || 80,
+        gpus_for_fit:        gpusForFit,
+        gpus_for_throughput: gpusForThroughput,
+        binding_constraint:  bindingConstraint,
+        kv_cache_method:     kvCacheMethod(model),
+        concurrent_sessions: concurrentSessions,
+        littles_law:         'λ=' + Math.round(peakRPS*100)/100 + ' RPS × W=' + responseTimeSec + 's = N=' + concurrentSessions
       }
+    }
     },
 
     /**
@@ -777,8 +884,8 @@ input:focus,select:focus{border-color:var(--blue);}
       // GPU fit (VRAM for model + KV cache for concurrent sessions)
       var gpusForFit = calcGPUsForFit(params_b, precision, gpu, model, contextLen, peakConcurrent)
 
-      // GPU throughput (Profile A — compute bound at large batch)
-      var gpusForThroughput = calcGPUsForThroughput(peakRPS, outputTok, gpu, model, params_b, precision, 'A', derating)
+      // GPU throughput (Profile A — dual-bound model, batch=peak_concurrent)
+      var gpusForThroughput = calcGPUsForThroughput(peakRPS, outputTok, gpu, model, params_b, precision, 'A', derating, peakConcurrent)
 
       var baseGPUs = Math.max(gpusForFit, gpusForThroughput, 1)
       var bindingConstraint = gpusForFit >= gpusForThroughput ? 'memory_fit' : 'throughput'
@@ -1006,6 +1113,8 @@ input:focus,select:focus{border-color:var(--blue);}
     calcPeakRPS:        calcPeakRPS,
     calcModelVRAM:      calcModelVRAM,
     kvCacheMethod:      kvCacheMethod,
+    throughputAudit:    throughputAudit,
+    maxUsersFromGPUs:   maxUsersFromGPUs,
     calcKVCache:        calcKVCache,
     calcTotalVRAM:      calcTotalVRAM,
     calcGPUThroughput:  calcGPUThroughput,
@@ -1205,6 +1314,11 @@ var SASC_DATA = {
     networking_pct: 2.0,     // % of IT load for networking
     storage_pct:    1.5,     // % of IT load for storage
     mgmt_pct:       1.0,     // % of IT load for management/control nodes
+  },
+  maasMix: null,             // {text:40, coding:30, document:20, indic:10} — mix for capacity view
+  maasParams: {              // per usage-type sizing overrides (editable in SASC S3)
+    // keyed by usage type: 'text','coding','document','audio','indic','generic'
+    // each: { peak_concurrent_pct, avg_input_tokens, avg_output_tokens, precision, derating_pct, growth_pct }
   },
   fleetInventory: {          // computed from MDC + GPU arch + power mode
     it_load_kw:       0,
@@ -2665,6 +2779,109 @@ function calcMaxDau(gpuCfg, totalGpus, sla, usageTypes) {
 }
 
 // ── Workloads B — AI Infrastructure Services (new Screen 3) ─────────────────
+
+function renderMaasCapacityView(enabled, maasResults, gpu) {
+  var inv = calcFleetInventory()
+  if (!inv || !inv.fleet_gpus || !gpu) return ''
+
+  // Get UC GPU demand
+  var ucGPUs = 0
+  if (SASC_DATA.selectedUCs && SASC_DATA.selectedUCs.length && SizingEngine && SizingEngine.ready) {
+    SASC_DATA.selectedUCs.forEach(function(ucId) {
+      var wl = SASC_DATA.ucWorkloads[ucId] || {}
+      var r  = SizingEngine.sizeUC({
+        uc_type_id: wl.uc_type_id, model_id: wl.model_id,
+        dau: wl.dau||1000, peak_multiplier: wl.peak_mult||3,
+        precision: wl.precision||'INT4', sla_tier: wl.sla_tier||'standard',
+        ha_required: true, dr_type: 'none', growth_headroom_pct: 20,
+        derating_pct: wl.derating_pct||80
+      }, SASC_DATA.gpuConfigId)
+      if (!r.error) ucGPUs += r.total_gpus
+    })
+  }
+
+  var sm = SASC_DATA.serviceModel || {}
+  var gaasGPUs = sm.gpuaas && sm.gpuaas.enabled
+    ? (sm.gpuaas.gpus||0) + Math.ceil((sm.gpuaas.gpus||0)*0.10) : 0
+
+  var totalMaasGPU  = SASC_DATA.totalMaasGPU || 0
+  var totalAllocated = ucGPUs + totalMaasGPU + gaasGPUs
+  var headroomGPUs  = Math.max(0, inv.fleet_gpus - totalAllocated)
+
+  // Build usage type mix from current DAU inputs
+  var totalDAU = enabled.reduce(function(s, ut) { return s + (ut.concurrent_users||0) }, 0)
+  var mix = {}
+  enabled.forEach(function(ut) {
+    mix[ut.type] = totalDAU > 0 ? Math.round((ut.concurrent_users||0) / totalDAU * 100) : Math.round(100/enabled.length)
+  })
+  // Normalise to 100
+  var mixSum = Object.values(mix).reduce(function(s,v){return s+v},0)
+  if (mixSum !== 100 && enabled.length) {
+    var firstType = enabled[0].type
+    mix[firstType] = mix[firstType] + (100 - mixSum)
+  }
+  // Use user-saved mix overrides if present
+  if (SASC_DATA.maasMix) Object.assign(mix, SASC_DATA.maasMix)
+
+  // Calculate capacity at different utilisation levels
+  var utils = [50, 70, 90]
+  var capRows = utils.map(function(u) {
+    var totalUsersAtUtil = 0
+    var perType = {}
+    enabled.forEach(function(ut) {
+      var typeMixPct = (mix[ut.type]||0) / 100
+      var typeGPUs   = Math.round(headroomGPUs * typeMixPct)
+      var arch = SizingEngine.getArchetypes().find(function(a){ return a.id === 'maas-'+(ut.type||'generic') })
+      if (!arch || typeGPUs <= 0) { perType[ut.type] = 0; return }
+      var cap = SizingEngine.maxUsersFromGPUs(arch.config, gpu, typeGPUs, u)
+      perType[ut.type] = cap.max_dau || 0
+      totalUsersAtUtil += cap.max_dau || 0
+    })
+    return { util: u, total: totalUsersAtUtil, perType: perType }
+  })
+
+  var html = '<div class="card" style="border-left:3px solid var(--teal)">'    + '<div class="card-title">Fleet Capacity View'    + '<span style="float:right;font-size:11px;font-weight:400;color:var(--mid)">'    + 'Headroom: ' + headroomGPUs.toLocaleString() + ' GPUs (fleet ' + inv.fleet_gpus.toLocaleString() + ' − used ' + totalAllocated.toLocaleString() + ')</span></div>'    + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px">'    + 'At current usage mix, headroom GPUs can serve additional API users. Adjust mix below.</div>'
+
+  // Mix sliders
+  html += '<div style="margin-bottom:14px;padding:10px 12px;background:var(--light);border-radius:6px">'    + '<div style="font-size:10px;font-weight:700;color:var(--navy);margin-bottom:8px">Usage Mix for Capacity Projection</div>'    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">'
+
+  var TYPE_ICONS = { coding:'⌨', text:'💬', document:'📄', audio:'🎙', indic:'🇮🇳', generic:'⚙' }
+  var mixSum2 = enabled.reduce(function(s, ut){ return s + (mix[ut.type]||0) }, 0)
+
+  enabled.forEach(function(ut) {
+    var pct = mix[ut.type] || 0
+    html += '<div>'      + '<div style="font-size:10px;color:var(--mid);margin-bottom:3px">' + (TYPE_ICONS[ut.type]||'⚙') + ' ' + (ut.label||ut.type) + ' <b style="color:var(--navy)">' + pct + '%</b></div>'      + '<input type="range" min="0" max="100" value="' + pct + '"'      + ' oninput="if(!SASC_DATA.maasMix)SASC_DATA.maasMix={};SASC_DATA.maasMix[\''+ut.type+'\']=+this.value;document.getElementById(\'mx-'+ut.type+'\').textContent=this.value+\'%\';renderStep(SASC_STEP)"'      + ' style="width:100%;accent-color:var(--teal)">'      + '</div>'
+  })
+
+  html += '</div>'    + '<div style="font-size:10px;color:'+(mixSum2===100?'var(--teal)':'var(--orange)')+';margin-top:6px">'    + 'Mix total: <b>' + mixSum2 + '%</b>' + (mixSum2!==100?' — adjust to reach 100%':'  ✓') + '</div>'    + '</div>'
+
+  // Capacity table at 3 utilisation levels
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'    + '<tr style="font-size:10px;color:var(--mid);text-transform:uppercase;letter-spacing:.3px">'    + '<th style="text-align:left;padding:6px;font-weight:600">Utilisation</th>'
+  enabled.forEach(function(ut) {
+    html += '<th style="text-align:right;padding:6px;font-weight:600">' + (TYPE_ICONS[ut.type]||'') + ' ' + (ut.label||ut.type) + '</th>'
+  })
+  html += '<th style="text-align:right;padding:6px;font-weight:600;color:var(--navy)">Total Users</th>'    + '</tr>'
+
+  capRows.forEach(function(row) {
+    var bg = row.util===70 ? 'background:rgba(0,178,144,.05)' : ''
+    html += '<tr style="border-top:1px solid #f0f0f4;' + bg + '">'
+    html += '<td style="padding:8px 6px;font-weight:' + (row.util===70?'700':'400') + ';color:var(--navy)">'
+      + row.util + '% utilisation'
+      + (row.util===70 ? ' <span style="font-size:9px;background:var(--teal);color:#fff;padding:1px 5px;border-radius:8px">target</span>' : '')
+      + '</td>'
+    enabled.forEach(function(ut) {
+      html += '<td style="padding:8px 6px;text-align:right">' + ((row.perType[ut.type]||0)/1000).toFixed(1) + 'K</td>'
+    })
+    html += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:var(--navy)">'
+      + (row.total/1000).toFixed(1) + 'K users</td>'
+    html += '</tr>'
+  })
+
+  html += '</table></div>'    + '<div style="margin-top:8px;font-size:10px;color:var(--mid)">'    + '† Capacity above is for headroom GPUs (' + headroomGPUs.toLocaleString() + ') only — additional users beyond current Docket configuration. '    + 'FM will model revenue from this capacity at target token pricing.</div>'    + '</div>'
+
+  return html
+}
+
 function renderFleetAllocation() {
   var inv = calcFleetInventory()
   if (!inv || !inv.fleet_gpus) return ''
@@ -3799,6 +4016,29 @@ function refreshBOMTabs(activeTab) {
 function renderActiveTab() { return renderBOMTabContent(window._sascBomTab || 'bom', SASC_DATA.bom) }
 
 // ── MaaS Simulation Tab ───────────────────────────────────────────────────────
+
+function buildMaasParamsPanel(ut, arch) {
+  var p     = (SASC_DATA.maasParams && SASC_DATA.maasParams[ut.type]) || {}
+  var prec  = p.precision || 'INT4'
+  var derat = p.derating_pct || 80
+  var pcPct = p.peak_concurrent_pct || (arch.config && arch.config.peak_concurrent_pct) || 5
+  var type  = ut.type
+
+  var precBtns = ['INT4','INT8','FP16'].map(function(pv) {
+    var sel = prec === pv
+    var oc  = "if(!SASC_DATA.maasParams['"+type+"'])SASC_DATA.maasParams['"+type+"']={};" +
+              "SASC_DATA.maasParams['"+type+"'].precision='"+pv+"';renderStep(SASC_STEP)"
+    return '<button onclick="'+oc+'" style="padding:2px 7px;font-size:10px;border:1px solid '+(sel?'var(--navy)':'var(--border)')+';background:'+(sel?'var(--navy)':'#fff')+';color:'+(sel?'#fff':'var(--mid)')+';border-radius:3px;cursor:pointer;font-family:inherit">'+pv+'</button>'
+  }).join(' ')
+
+  var deratOC = "if(!SASC_DATA.maasParams['"+type+"'])SASC_DATA.maasParams['"+type+"']={};" +
+                "SASC_DATA.maasParams['"+type+"'].derating_pct=+this.value;renderStep(SASC_STEP)"
+  var pcOC    = "if(!SASC_DATA.maasParams['"+type+"'])SASC_DATA.maasParams['"+type+"']={};" +
+                "SASC_DATA.maasParams['"+type+"'].peak_concurrent_pct=+this.value;renderStep(SASC_STEP)"
+
+  return '<div style="margin-top:8px;padding:8px 10px;background:rgba(28,56,245,.04);border-radius:5px">'    + '<div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:5px">Tune Sizing Parameters</div>'    + '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:10px;color:var(--mid)">'    + '<span>Precision: ' + precBtns + '</span>'    + '<span>Derating: <input type="number" value="'+derat+'" min="50" max="95" step="5" onchange="'+deratOC+'" style="width:44px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:10px">%</span>'    + '<span>Peak concurrency: <input type="number" value="'+pcPct+'" min="1" max="50" step="1" onchange="'+pcOC+'" style="width:36px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:10px">% of DAU</span>'    + '</div></div>'    + '</div>'
+}
+
 function renderMaasSimTab() {
   // ── New: Fleet Capacity Model per usage type ─────────────────────────────
   var sla      = (MAAS_CFG && MAAS_CFG.sla_tier)   || 'standard'
@@ -3827,14 +4067,28 @@ function renderMaasSimTab() {
     if (!arch) arch = SizingEngine.getArchetypes().find(function(a){ return a.archetype_type === 'maas' })
     if (!arch) return
 
+    // Merge archetype defaults with any per-type user overrides from SASC_DATA.maasParams
+    var overrides = (SASC_DATA.maasParams && SASC_DATA.maasParams[ut.type]) || {}
+    var cfg = arch.config || {}
     var result = SizingEngine.sizeMaaS({
-      archetype_id: arch.id,
-      model_id:     ut.model_id,
-      dau:          ut.concurrent_users || 1000,   // Docket stores as concurrent_users label
-      sla_tier:     sla,
-      precision:    'INT4',
-      derating_pct: SASC_DATA.deratingPct || 80
+      archetype_id:          arch.id,
+      model_id:              ut.model_id,
+      dau:                   ut.concurrent_users || 1000,
+      sla_tier:              sla,
+      precision:             overrides.precision            || 'INT4',
+      derating_pct:          overrides.derating_pct         || SASC_DATA.deratingPct || 80,
+      // Archetype overrides — allow user to tune per type
+      peak_concurrent_pct_override: overrides.peak_concurrent_pct || null,
+      avg_output_tokens_override:   overrides.avg_output_tokens   || null
     }, SASC_DATA.gpuConfigId)
+
+    // Store throughput audit for display
+    var gpu2 = ALL_GPU_CONFIGS.find(function(g){ return g.id === SASC_DATA.gpuConfigId })
+    var model2 = ALL_MODELS.find(function(m){ return m.id === ut.model_id })
+    result._audit = gpu2 ? SizingEngine.throughputAudit(
+      gpu2, model2, model2 ? model2.params_b : 7,
+      overrides.precision || 'INT4', 'A', result.peak_concurrent || 128
+    ) : null
 
     maasResults.push({ ut: ut, arch: arch, result: result })
     if (!result.error) totalMaasGPU += result.total_gpus
@@ -3865,12 +4119,17 @@ function renderMaasSimTab() {
     html += '<div style="margin-bottom:12px;padding:12px 14px;background:var(--light);border-radius:8px;border-left:3px solid var(--teal)">'      // Header row
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'      + '<div>'      + '<span style="font-size:13px;font-weight:700;color:var(--navy)">' + ico + ' ' + esc(ut.label||ut.type) + '</span>'      + '<span style="font-size:11px;color:var(--mid);margin-left:8px">' + esc(ut.model_name||'') + '</span>'      + '</div>'      + '<div style="text-align:right">'      + '<span style="font-size:20px;font-weight:800;color:var(--navy)">' + r.total_gpus.toLocaleString() + '</span>'      + '<span style="font-size:11px;color:var(--mid);margin-left:4px">GPUs</span>'      + '</div>'      + '</div>'      // Buffer breakdown row
       + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:8px;text-align:center">'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--navy)">' + r.base_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Base</div>'        + '<div style="font-size:9px;color:var(--mid)">' + r.binding_constraint.replace('_',' ') + '</div>'      + '</div>'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--amber)">+' + r.peak_buffer_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Peak</div>'        + '<div style="font-size:9px;color:var(--mid)">' + (sla==='enterprise'?30:25) + '%</div>'      + '</div>'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--amber)">+' + r.failover_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Failover</div>'        + '<div style="font-size:9px;color:var(--mid)">' + (sla==='enterprise'?30:15) + '%</div>'      + '</div>'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--amber)">+' + r.multi_tenancy_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Multi-T</div>'        + '<div style="font-size:9px;color:var(--mid)">12%</div>'      + '</div>'      + '<div style="background:var(--navy);border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:#fff">' + r.total_gpus + '</div>'        + '<div style="font-size:9px;color:rgba(255,255,255,.7);text-transform:uppercase">Total</div>'        + '<div style="font-size:9px;color:rgba(255,255,255,.5)">' + barPct + '% of MaaS</div>'      + '</div>'      + '</div>'      // Progress bar
-      + '<div style="height:4px;background:#e0e0e8;border-radius:2px">'      + '<div style="height:4px;background:var(--teal);border-radius:2px;width:' + barPct + '%"></div>'      + '</div>'      // Sizing detail row
-      + '<div style="margin-top:6px;font-size:10px;color:var(--mid)">'      + 'DAU: <b>' + (ut.concurrent_users||0).toLocaleString() + '</b>'      + ' · Peak concurrent: <b>' + r.peak_concurrent + '</b>'      + ' · Peak RPS: <b>' + r.peak_rps + '</b>'      + ' · Throughput needed: <b>' + (r.throughput_tokens_per_sec||0).toLocaleString() + ' tok/s</b>'      + ' · Binding: <b>' + r.binding_constraint.replace('_',' ') + '</b>'      + ' · Power: <b>' + r.power_kw + 'kW</b>'      + '</div>'      + '</div>'
+      + '<div style="height:4px;background:#e0e0e8;border-radius:2px">'      + '<div style="height:4px;background:var(--teal);border-radius:2px;width:' + barPct + '%"></div>'      + '</div>'      // Sizing detail + formula audit trail
+      + '<div style="margin-top:8px;padding:8px 10px;background:#fff;border-radius:5px;font-size:10px;color:var(--mid)">'      + '<div style="font-weight:700;color:var(--navy);margin-bottom:4px">Sizing Method</div>'      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px">'      + '<span>DAU (users)</span><span style="font-weight:600;color:var(--dark)">' + (ut.concurrent_users||0).toLocaleString() + '</span>'      + '<span>Peak concurrent (' + (arch.config&&arch.config.peak_concurrent_pct||5) + '% of DAU)</span><span style="font-weight:600">' + (r.peak_concurrent||0) + ' users</span>'      + '<span>Peak RPS (÷10s avg)</span><span style="font-weight:600">' + (r.peak_rps||0) + ' req/s</span>'      + '<span>Model VRAM</span><span style="font-weight:600">' + (r._audit ? r._audit.model_size_gb + 'GB (' + (r.precision||'INT4') + ')' : r.precision||'INT4') + '</span>'      + (r._audit ? '<span>Throughput formula</span><span style="font-weight:600;color:var(--teal)">' + r._audit.formula + '</span>' : '')      + (r._audit ? '<span>Binding constraint</span><span style="font-weight:600;color:var(--orange)">' + r._audit.binding + '-bound (' + r._audit.throughput_tps.toLocaleString() + ' tok/s)</span>' : '')      + '<span>GPU base / total</span><span style="font-weight:600">' + r.base_gpus + ' base → ' + r.total_gpus + ' total (incl. buffers)</span>'      + '<span>Power draw</span><span style="font-weight:600">' + r.power_kw + 'kW</span>'      + '</div></div>'
+      // Editable sizing params panel — built via helper to avoid node parse issues
+      + buildMaasParamsPanel(ut, arch)
   })
 
   // MaaS total row
   html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--navy);border-radius:6px;color:#fff">'    + '<span style="font-size:12px;font-weight:600">Total MaaS GPU Demand</span>'    + '<span style="font-size:22px;font-weight:800">' + totalMaasGPU.toLocaleString() + ' GPUs</span>'    + '</div>'    + '</div>'  // close card
+
+  // ── Capacity View: how many users can the fleet serve? ───────────────────
+  html += renderMaasCapacityView(enabled, maasResults, gpu)
 
   return html
 }
