@@ -1030,6 +1030,7 @@ function renderPortfolioTab() {
 
   var html = '<div class="section-hdr"><div class="section-title">Portfolio Map (' + selCount + ' selected)</div>'
     + '<div style="display:flex;gap:8px"><button class="ai-map-btn" onclick="runAIPortfolioMap()">✨ AI Map</button>'
+    + '<span id="port-save-status" style="font-size:10px;color:var(--mid)">auto-saved</span>'
     + '<button class="btn btn-sm btn-outline" onclick="savePortfolioSelection()">&#8593; Save</button></div></div>'
     + '<div id="ai-map-note" class="ai-map-note">✨ <strong>AI suggested items</strong> based on requirement. Blue = suggested, Green = confirmed. Deselect anything that doesn\'t apply.</div>'
 
@@ -1106,6 +1107,14 @@ function togglePI(id, el) {
   if (hint) hint.style.display = hasMaas ? 'block' : 'none'
   // Update tab bar — add/remove MaaS tab without full re-render
   updateTabBar()
+  // Auto-save portfolio selection (debounced 800ms)
+  clearTimeout(window._portSaveTimer)
+  window._portSaveTimer = setTimeout(function() {
+    savePortfolioSelection(true).then(function() {
+      var el = document.getElementById('port-save-status')
+      if (el) { el.textContent = '✓ Saved'; el.style.color = 'var(--teal)' }
+    })
+  }, 800)
 }
 
 function updateTabBar() {
@@ -1159,7 +1168,7 @@ async function runAIPortfolioMap() {
   renderDocket()
 }
 
-async function savePortfolioSelection() {
+async function savePortfolioSelection(silent) {
   var eng = CURRENT_ENG
   if (!eng) return
   var sb = getSB()
@@ -1195,9 +1204,8 @@ async function savePortfolioSelection() {
     showToast('Portfolio save ' + _portRes.status + ': ' + _pmsg, 'err')
   } else {
     console.log('[savePortfolio] OK', PORTFOLIO_SELECTION.length, 'items')
-    showToast('✓ Portfolio saved (' + PORTFOLIO_SELECTION.length + ' items)')
+    if (!silent) showToast('✓ Portfolio saved (' + PORTFOLIO_SELECTION.length + ' items)')
   }
-  showToast('✓ Portfolio selection saved')
 }
 
 // ── MAAS CONFIG TAB ───────────────────────────────────────────────────────────
