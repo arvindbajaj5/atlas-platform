@@ -2242,7 +2242,11 @@ function renderScreen1() {
         + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">'
         + sizes.map(function(sz){
             var sel=dc.tshirt===sz.id
-            return '<button onclick="SASC_DATA.mdc.tshirt=\''+sz.id+'\';renderStep(1)" style="padding:5px 10px;font-size:11px;font-weight:'+(sel?'700':'400')+';border:1.5px solid '+(sel?'var(--navy)':'var(--border)')+';background:'+(sel?'var(--navy)':'#fff')+';color:'+(sel?'#fff':'var(--mid)')+';border-radius:5px;cursor:pointer;font-family:inherit">'+sz.id.toUpperCase()+' <span style="font-size:9px;opacity:.8">'+sz.mw+'</span></button>'
+            var oc='SASC_DATA.mdc.tshirt=\''+sz.id+'\';renderStep(1)'
+            return '<button onclick="'+oc+'" style="padding:6px 14px;font-size:12px;font-weight:'+(sel?'700':'500')+';border:2px solid '+(sel?'var(--navy)':'var(--border)')+';background:'+(sel?'var(--navy)':'#fff')+';color:'+(sel?'#fff':'var(--mid)')+';border-radius:6px;cursor:pointer;font-family:inherit;line-height:1.4">'
+              + '<div style="font-size:13px;font-weight:700">'+sz.id.toUpperCase()+'</div>'
+              + '<div style="font-size:10px;opacity:'+(sel?'.9':'.7')+'">'+sz.mw+'</div>'
+              + '</button>'
           }).join('')
         + '</div>'
 
@@ -2257,20 +2261,32 @@ function renderScreen1() {
           }).join('')
         + '</select>'
 
-        // Power mode
-        + '<div style="padding:8px 10px;background:#fff;border-radius:6px;border:1px solid var(--border);margin-bottom:10px">'
-        + '<div style="font-size:11px;font-weight:600;color:var(--mid);margin-bottom:5px">Power envelope</div>'
-        + '<div style="display:flex;gap:14px;margin-bottom:'+(s.powerMode!=='gpu'?'6':'0')+'px">'
-        + '<label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;color:'+(s.powerMode!=='gpu'?'var(--navy)':'var(--mid)')+';font-weight:'+(s.powerMode!=='gpu'?'600':'400')+'"><input type="radio" name="pm" value="total"'+(s.powerMode!=='gpu'?' checked':'')+' onchange="SASC_DATA.powerMode=this.value;renderStep(1)"> Total DC power (apply overheads)</label>'
-        + '<label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;color:'+(s.powerMode==='gpu'?'var(--navy)':'var(--mid)')+';font-weight:'+(s.powerMode==='gpu'?'600':'400')+'"><input type="radio" name="pm" value="gpu"'+(s.powerMode==='gpu'?' checked':'')+' onchange="SASC_DATA.powerMode=this.value;renderStep(1)"> GPU-ready power (already net)</label>'
+        // Power mode — card-based segmented control
+        + '<div style="margin-bottom:10px">'  
+        + '<div style="font-size:11px;font-weight:600;color:var(--mid);margin-bottom:6px">The MW figure above represents:</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+        + ['total','gpu'].map(function(v){
+            var sel=(s.powerMode||'total')===v
+            var icon=v==='total'?'🏗':'⚡'
+            var title=v==='total'?'Total DC Power':'GPU-Ready Power'
+            var sub=v==='total'?'We deduct PUE, cooling & infra':'Already net of all overheads'
+            var oc='SASC_DATA.powerMode=\''+v+'\';renderStep(1)'
+            return '<div onclick="'+oc+'" style="padding:8px 10px;border:2px solid '+(sel?'var(--navy)':'var(--border)')+';border-radius:6px;cursor:pointer;background:'+(sel?'rgba(0,40,112,.04)':'#fff')+'">'
+              + '<div style="font-size:15px;margin-bottom:3px">'+icon+'</div>'
+              + '<div style="font-size:11px;font-weight:'+(sel?'700':'500')+';color:'+(sel?'var(--navy)':'var(--mid)')+'">'+title+'</div>'
+              + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+sub+'</div>'
+              + '</div>'
+          }).join('')
         + '</div>'
-        + (s.powerMode!=='gpu' ? '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--mid)">'
-          + 'PUE <input type="number" value="'+(s.pue||1.2)+'" min="1.05" max="2.0" step="0.05" onchange="SASC_DATA.pue=+this.value;renderStep(1)" style="width:44px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:10px"> '
-          + 'Network <input type="number" value="'+((s.overhead&&s.overhead.networking_pct)||2.0)+'" min="0" max="10" step="0.5" onchange="SASC_DATA.overhead.networking_pct=+this.value;renderStep(1)" style="width:36px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:10px">% '
-          + 'Storage <input type="number" value="'+((s.overhead&&s.overhead.storage_pct)||1.5)+'" min="0" max="10" step="0.5" onchange="SASC_DATA.overhead.storage_pct=+this.value;renderStep(1)" style="width:36px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:10px">% '
-          + 'Mgmt <input type="number" value="'+((s.overhead&&s.overhead.mgmt_pct)||1.0)+'" min="0" max="10" step="0.5" onchange="SASC_DATA.overhead.mgmt_pct=+this.value;renderStep(1)" style="width:36px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:10px">%'
+        + (s.powerMode!=='gpu' ? '<div style="padding:8px 10px;background:#F8F9FA;border-radius:5px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--mid)">'
+          + '<span style="font-weight:600;color:var(--navy)">Deduction factors:</span>'
+          + '<span>PUE <input type="number" value="'+(s.pue||1.2)+'" min="1.05" max="2.0" step="0.05" onchange="SASC_DATA.pue=+this.value;renderStep(1)" style="width:48px;padding:3px 5px;border:1px solid var(--border);border-radius:3px;font-size:11px;font-weight:600;text-align:center"></span>'
+          + '<span>Network <input type="number" value="'+((s.overhead&&s.overhead.networking_pct)||2.0)+'" min="0" max="10" step="0.5" onchange="SASC_DATA.overhead.networking_pct=+this.value;renderStep(1)" style="width:36px;padding:3px 4px;border:1px solid var(--border);border-radius:3px;font-size:11px;font-weight:600;text-align:center">%</span>'
+          + '<span>Storage <input type="number" value="'+((s.overhead&&s.overhead.storage_pct)||1.5)+'" min="0" max="10" step="0.5" onchange="SASC_DATA.overhead.storage_pct=+this.value;renderStep(1)" style="width:36px;padding:3px 4px;border:1px solid var(--border);border-radius:3px;font-size:11px;font-weight:600;text-align:center">%</span>'
+          + '<span>Mgmt <input type="number" value="'+((s.overhead&&s.overhead.mgmt_pct)||1.0)+'" min="0" max="10" step="0.5" onchange="SASC_DATA.overhead.mgmt_pct=+this.value;renderStep(1)" style="width:36px;padding:3px 4px;border:1px solid var(--border);border-radius:3px;font-size:11px;font-weight:600;text-align:center">%</span>'
           + '</div>' : '')
         + '</div>'
+
 
         // Fleet inventory panel
         + (inv.fleet_gpus>0
@@ -2304,7 +2320,10 @@ function renderScreen1() {
 
   // Navigation
   var nextN = getNextStep(1)
-  var navHtml = '<div class="actions-bar"><div></div>'
+  var navHtml = '<div class="actions-bar"><div style="font-size:10px;color:var(--mid);display:flex;align-items:center;gap:5px">'
+    + '<span id="sasc-save-status" style="font-size:10px;color:var(--mid)">'
+    + (SASC_DATA.docketId ? '💾 Changes auto-saved' : '⚠ No docket linked')
+    + '</span></div>'
   if (nextN) {
     navHtml += '<button class="btn btn-primary" onclick="renderStep(' + nextN + ')">Next: ' + (getActiveSteps()[nextN-1]||{}).label + ' &rarr;</button>'
   } else {
@@ -3856,12 +3875,12 @@ function calculateBOM(pricing) {
     var _gpuUnitLabel = _gpuLabel.indexOf('NVL72') >= 0 ? 'per_rack' : 'per_server'
     if (gpuParam) totalCapex += addLine('Compute', _gpuLabel, gpuUnits, _gpuUnitLabel, gpuParam.base_price_usd, gpuNotes)
     // CPU servers (1 per 4 GPU servers)
-    var cpuServers = Math.max(2, Math.ceil(gpuServers / 4))
+    var cpuServers = Math.max(2, Math.ceil(gpuUnits / 4))
     var cpuParam = findParam('CPU Server AMD EPYC 9654')
     if (cpuParam) totalCapex += addLine('Compute', 'CPU Server AMD EPYC 9654', cpuServers, 'per_server', cpuParam.base_price_usd, 'Platform + orchestration')
     // Storage
     var storageParam = findParam('NVMe All-Flash Storage')
-    var storageTB = Math.max(50, gpuServers * 20)
+    var storageTB = Math.max(50, gpuUnits * 20)
     if (storageParam) totalCapex += addLine('Storage', 'NVMe All-Flash Storage', storageTB, 'per_tb', storageParam.base_price_usd, storageTB + ' TB estimated')
     var objParam = findParam('Object Storage')
     var objTB = storageTB * 3
@@ -4764,8 +4783,16 @@ async function autoSaveSASC() {
       body: JSON.stringify(item)
     })
     if (r.ok && !SASC_DATA.docketItemId) SASC_DATA.docketItemId = itemId
+    var statusEl = document.getElementById('sasc-save-status')
+    if (statusEl) statusEl.innerHTML = r.ok
+      ? '<span style="color:var(--teal)">✓ Saved ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + '</span>'
+      : '<span style="color:var(--orange)">⚠ Save failed</span>'
     console.log('[SASC] Auto-saved config', r.ok ? 'OK' : 'FAILED ' + r.status)
-  } catch(e) { console.warn('[SASC] Auto-save error:', e.message) }
+  } catch(e) {
+    var statusEl = document.getElementById('sasc-save-status')
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--orange)">⚠ Save error</span>'
+    console.warn('[SASC] Auto-save error:', e.message)
+  }
 }
 
 async function saveToDocket() {
