@@ -1291,8 +1291,8 @@ async function renderSvcModelTab() {
         function _tierLabel(m, arr) {
           var i = arr.indexOf(m)
           var sfx = arr.length===1 ? '' : i===0 ? ' · Basic' : i===arr.length-1 ? ' · Advanced' : ' · Mid'
-          var gpi = m.gpus_per_instance&&(m.gpus_per_instance.INT4||m.gpus_per_instance.FP16||m.gpus_per_instance.FP4)
-          return esc(m.name||'') + sfx + (gpi?' ('+gpi+'GPU)':'')
+          // GPU count removed — belongs in SASC sizing, not Docket wish list
+          return esc(m.name||'') + sfx
         }
 
         var _on = ut.enabled
@@ -1327,20 +1327,12 @@ async function renderSvcModelTab() {
       html += '</div>'  // close usage types container
     }
 
-    // GPU estimate summary
-    var _maasGpus = 0
-    MAAS_USAGE_TYPES.filter(function(u){ return u.enabled && u.model_id }).forEach(function(u) {
-      var m = MC_ROWS_D.find(function(r){ return r.id===u.model_id })
-      if (m) {
-        var gpi = m.gpus_per_instance
-        _maasGpus += gpi ? (gpi.INT4||gpi.FP16||gpi.FP4||1) : 1
-      }
-    })
+    // Configuration summary — GPU sizing done in SASC, not here
     var _activeTypes = MAAS_USAGE_TYPES.filter(function(u){ return u.enabled }).length
     var _totalUsers2 = MAAS_USAGE_TYPES.filter(function(u){ return u.enabled })
       .reduce(function(s,u){ return s+(u.concurrent_users||0) },0)
 
-    html += '<div class="gpu-est" style="margin-top:12px">'      + '<div style="display:flex;justify-content:space-between;margin-bottom:8px">'      + '<span style="font-size:10px;color:rgba(255,255,255,.55)">MaaS GPU estimate (from model tier selection)</span>'      + '<span style="font-size:10px;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:8px;color:rgba(255,255,255,.7)">±20% · full sim in SASC</span>'      + '</div>'      + '<div class="gpu-est-grid">'      + '<div class="gpu-est-item"><div class="gpu-est-val">'+_activeTypes+'</div><div class="gpu-est-lbl">Usage Types</div></div>'      + '<div class="gpu-est-item"><div class="gpu-est-val">'+_totalUsers2+'</div><div class="gpu-est-lbl">Total Users</div></div>'      + '<div class="gpu-est-item"><div class="gpu-est-val" style="color:var(--amber)">'+_maasGpus+'</div><div class="gpu-est-lbl">GPUs Est.</div></div>'      + '<div class="gpu-est-item"><div class="gpu-est-val">'+esc(MAAS_SLA==='enterprise'?'ENT':'STD')+'</div><div class="gpu-est-lbl">SLA</div></div>'      + '</div></div>'
+    html += '<div style="margin-top:12px;padding:10px 14px;background:rgba(0,178,144,.08);border-radius:6px;display:flex;justify-content:space-between;align-items:center">'      + '<div style="display:flex;gap:20px">'      + '<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--teal)">'+_activeTypes+'</div><div style="font-size:10px;color:var(--mid)">Usage Types</div></div>'      + '<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--navy)">'+_totalUsers2.toLocaleString()+'</div><div style="font-size:10px;color:var(--mid)">Total Users</div></div>'      + '<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--navy)">'+esc(MAAS_SLA==='enterprise'?'Enterprise':'Standard')+'</div><div style="font-size:10px;color:var(--mid)">SLA</div></div>'      + '</div>'      + '<div style="font-size:11px;color:var(--mid);font-style:italic">GPU sizing in SASC →</div>'      + '</div>'
 
     html += '</div>'  // close MaaS card
   } // end if(hasMaas)
