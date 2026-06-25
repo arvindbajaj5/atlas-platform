@@ -2243,9 +2243,9 @@ function renderScreen1() {
         + sizes.map(function(sz){
             var sel=dc.tshirt===sz.id
             var oc='SASC_DATA.mdc.tshirt=\''+sz.id+'\';renderStep(1)'
-            return '<button onclick="'+oc+'" style="padding:6px 14px;font-size:12px;font-weight:'+(sel?'700':'500')+';border:2px solid '+(sel?'var(--navy)':'var(--border)')+';background:'+(sel?'var(--navy)':'#fff')+';color:'+(sel?'#fff':'var(--mid)')+';border-radius:6px;cursor:pointer;font-family:inherit;line-height:1.4">'
-              + '<div style="font-size:13px;font-weight:700">'+sz.id.toUpperCase()+'</div>'
-              + '<div style="font-size:10px;opacity:'+(sel?'.9':'.7')+'">'+sz.mw+'</div>'
+            return '<button onclick="'+oc+'" style="padding:6px 14px;font-size:12px;font-weight:'+(sel?'700':'500')+';border:2px solid '+(sel?'var(--navy)':'var(--border)')+';background:'+(sel?'var(--navy)':'#fff')+';color:'+(sel?'#fff':'var(--mid)')+';border-radius:6px;cursor:pointer;font-family:inherit;line-height:1.4;text-align:center">'
+              + '<span style="display:block;font-size:13px;font-weight:700">'+sz.id.toUpperCase()+'</span>'
+              + '<span style="display:block;font-size:10px;opacity:'+(sel?'.9':'.7')+'">'+sz.mw+'</span>'
               + '</button>'
           }).join('')
         + '</div>'
@@ -2262,7 +2262,7 @@ function renderScreen1() {
         + '</select>'
 
         // Power mode — card-based segmented control
-        + '<div style="margin-bottom:10px">'  
+        + '<div style="margin-bottom:10px">'
         + '<div style="font-size:11px;font-weight:600;color:var(--mid);margin-bottom:6px">The MW figure above represents:</div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
         + ['total','gpu'].map(function(v){
@@ -2534,13 +2534,13 @@ function wlChange(el) {
   var field = el.dataset.field
   var value = field === 'training' ? (el.value === 'true') : (isNaN(Number(el.value)) ? el.value : Number(el.value))
   SASC_DATA.ucWorkloads[uid][field] = value
-  document.getElementById('app-content').innerHTML = renderScreen2()
+  renderStep(SASC_STEP)   // triggers auto-save
 }
 
 function setUCComplexity(ucId, tier) {
   if (!SASC_DATA.ucWorkloads[ucId]) SASC_DATA.ucWorkloads[ucId] = {}
   SASC_DATA.ucWorkloads[ucId].complexity = tier
-  document.getElementById('app-content').innerHTML = renderScreen2()
+  renderStep(SASC_STEP)   // triggers auto-save
 }
 
 //    renderScreen2                                                              
@@ -3068,7 +3068,7 @@ function renderGpuBmaasSection() {
   // GPUaaS
   html += '<div style="margin-bottom:16px">'
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
-  html += '<div class="toggle-sw' + (ga.enabled?' on':'') + '" onclick="SASC_DATA.serviceModel.gpuaas.enabled=!SASC_DATA.serviceModel.gpuaas.enabled;renderStep(3)"></div>'
+  html += '<div class="toggle-sw' + (ga.enabled?' on':'') + '" onclick="SASC_DATA.serviceModel.gpuaas.enabled=!SASC_DATA.serviceModel.gpuaas.enabled;renderStep(SASC_STEP)"></div>'
   html += '<span style="font-weight:600;font-size:13px;color:var(--navy)">GPU as a Service</span>'
   html += '<span style="font-size:11px;color:var(--mid)">Reserved + burst GPU compute for external consumers</span>'
   html += '</div>'
@@ -3085,7 +3085,7 @@ function renderGpuBmaasSection() {
   // BMaaS
   html += '<div>'
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
-  html += '<div class="toggle-sw' + (bm2.enabled?' on':'') + '" onclick="SASC_DATA.serviceModel.bmaas.enabled=!SASC_DATA.serviceModel.bmaas.enabled;renderStep(3)"></div>'
+  html += '<div class="toggle-sw' + (bm2.enabled?' on':'') + '" onclick="SASC_DATA.serviceModel.bmaas.enabled=!SASC_DATA.serviceModel.bmaas.enabled;renderStep(SASC_STEP)"></div>'
   html += '<span style="font-weight:600;font-size:13px;color:var(--navy)">Bare Metal as a Service</span>'
   html += '<span style="font-size:11px;color:var(--mid)">Dedicated AI servers for maximum isolation</span>'
   html += '</div>'
