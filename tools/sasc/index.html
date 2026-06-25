@@ -1837,17 +1837,42 @@ async function init() {
   SASC_DATA.docketId   = params.get('docket') || null
   SASC_DATA.docketItemId = params.get('item') || null
 
-  // Try to load existing SASC config from docket item
-  if (SASC_DATA.docketItemId) {
+  // Try to load existing SASC config — check sasc_config first, then fall back to item in URL
+  var _sascConfigItems = await sbFetch('docket_items',
+    'docket_id=eq.' + SASC_DATA.docketId + '&item_subtype=in.(sasc_config,sasc_bom)&order=updated_at.desc', 1)
+  var _primaryItem = (_sascConfigItems && _sascConfigItems[0]) || null
+  if (!_primaryItem && SASC_DATA.docketItemId) {
+    var _byId = await sbFetch('docket_items', 'id=eq.' + SASC_DATA.docketItemId, 1)
+    _primaryItem = (_byId && _byId[0]) || null
+  }
+  if (_primaryItem) SASC_DATA.docketItemId = _primaryItem.id
+  if (_primaryItem && _primaryItem.content && _primaryItem.content.sasc) {
+    var items = [_primaryItem]  // normalise for block below
+  }
+  if (SASC_DATA.docketItemId && !_primaryItem) {
     var items = await sbFetch('docket_items', 'id=eq.' + SASC_DATA.docketItemId, 1)
+  }
+  if (SASC_DATA.docketItemId) {
+    if (!items) var items = []
     if (items && items[0] && items[0].content && items[0].content.sasc) {
       var saved = items[0].content.sasc
+      // Merge saved config into SASC_DATA — URL params always win
       Object.assign(SASC_DATA, saved)
-      // Restore URL params -- they are ground truth; saved content must never overwrite them
+      // Restore URL params — ground truth, never overwritten by saved config
       SASC_DATA.engId        = params.get('eng')    || SASC_DATA.engId
       SASC_DATA.docketId     = params.get('docket') || SASC_DATA.docketId
       SASC_DATA.docketItemId = params.get('item')   || SASC_DATA.docketItemId
-      console.log('[SASC] Restored from URL: eng=' + SASC_DATA.engId + ' docket=' + SASC_DATA.docketId)
+      // Restore nested objects that Object.assign shallow-copies
+      if (saved.ucWorkloads)  SASC_DATA.ucWorkloads  = saved.ucWorkloads
+      if (saved.maasParams)   SASC_DATA.maasParams   = saved.maasParams
+      if (saved.maasMix)      SASC_DATA.maasMix      = saved.maasMix
+      if (saved.outputStack)  SASC_DATA.outputStack  = saved.outputStack
+      if (saved.serviceModel) SASC_DATA.serviceModel = saved.serviceModel
+      if (saved.overhead)     SASC_DATA.overhead     = saved.overhead
+      console.log('[SASC] Config restored: GPU=' + (saved.gpuConfigId||'none') +
+        ' UCs=' + (SASC_DATA.selectedUCs||[]).length +
+        ' UCworkloads=' + Object.keys(SASC_DATA.ucWorkloads||{}).length +
+        ' MaaSparams=' + Object.keys(SASC_DATA.maasParams||{}).length)
     }
   }
 
@@ -2063,6 +2088,11 @@ function renderStep(n) {
     console.log('[renderStep] called with n='+n+' SASC_STEP='+SASC_STEP)
     SASC_STEP = n
     SASC_LOAD_GEN++
+    // Auto-save config to docket on every step change (debounced)
+    if (SASC_DATA.docketId) {
+      clearTimeout(window._sascSaveTimer)
+      window._sascSaveTimer = setTimeout(function(){ autoSaveSASC() }, 1500)
+    }
     var el = document.getElementById('app-content')
     if (!el) { console.error('[renderStep] app-content not found!'); return }
     renderStepNav()
@@ -2074,18 +2104,19 @@ function renderStep(n) {
     if (step.key === 'workloads_a') { el.innerHTML = renderScreen2Loading(); loadWorkloadProfiles() }
     if (step.key === 'workloads_b') {
       console.log('[renderStep] rendering workloads_b')
-      if (SVC_MC_STATE === '' || SVC_MC_STATE === 'loading') {
-        // Load catalogue first, then render once — capture step n so re-render targets correct screen
-        var _wbGen = SASC_LOAD_GEN, _wbN = n
+      // New MaaS screen uses SizingEngine (loaded in init) — no model_catalogue fetch needed
+      if (window.SizingEngine && SizingEngine.ready) {
+        el.innerHTML = renderWorkloadB()
+        console.log('[renderStep] workloads_b rendered via SizingEngine, length='+el.innerHTML.length)
+      } else if (SVC_MC_STATE === '' || SVC_MC_STATE === 'loading') {
+        var _wbGen = SASC_LOAD_GEN
         loadSvcModelCatalogue().then(function(){
-          if (SASC_LOAD_GEN !== _wbGen) return  // user navigated away
+          if (SASC_LOAD_GEN !== _wbGen) return
           el.innerHTML = renderWorkloadB()
-          console.log('[renderStep] workloads_b rendered after catalogue load, length='+el.innerHTML.length)
         })
         el.innerHTML = '<div class="card"><div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading model catalogue…</div></div>'
       } else {
         el.innerHTML = renderWorkloadB()
-        console.log('[renderStep] workloads_b rendered, innerHTML length='+el.innerHTML.length)
       }
     }
     if (step.key === 'workloads_c') el.innerHTML = renderWorkloadC()
@@ -4691,6 +4722,52 @@ function goToStack() {
 
 function goStep2() { goToWorkloads() }
 
+async function autoSaveSASC() {
+  // Silent background save of engineering config — no BOM needed, no toast
+  if (!SASC_DATA.docketId) return
+  var itemId = SASC_DATA.docketItemId || genId('SASC')
+  var item = {
+    id: itemId,
+    docket_id: SASC_DATA.docketId,
+    item_type: 'solution',
+    item_subtype: 'sasc_config',
+    title: 'SASC Config: ' + (SASC_DATA.mdc.tshirt||'').toUpperCase() + ' MDC — ' + SASC_DATA.scope + ' stack',
+    content: {
+      type: 'sasc',
+      saved_at: new Date().toISOString(),
+      sasc: {
+        engId: SASC_DATA.engId, docketId: SASC_DATA.docketId,
+        scope: SASC_DATA.scope, dcType: SASC_DATA.dcType,
+        mdc: SASC_DATA.mdc, bm: SASC_DATA.bm,
+        gpuConfigId: SASC_DATA.gpuConfigId,
+        powerMode:   SASC_DATA.powerMode,
+        pue:         SASC_DATA.pue,
+        overhead:    SASC_DATA.overhead,
+        layers: Object.fromEntries(Object.entries(SASC_DATA.layers).map(function(e){ return [e[0], {on: e[1].on}] })),
+        outputStack:  SASC_DATA.outputStack,
+        serviceModel: SASC_DATA.serviceModel,
+        selectedUCs:  SASC_DATA.selectedUCs,
+        ucWorkloads:  SASC_DATA.ucWorkloads,
+        deratingPct:  SASC_DATA.deratingPct,
+        maasParams:   SASC_DATA.maasParams,
+        maasMix:      SASC_DATA.maasMix
+      }
+    },
+    status: 'in_progress'
+  }
+  var method = SASC_DATA.docketItemId ? 'PATCH' : 'POST'
+  var url = getSB().url + '/rest/v1/docket_items' + (SASC_DATA.docketItemId ? '?id=eq.' + SASC_DATA.docketItemId : '')
+  try {
+    var r = await fetch(url, {
+      method: method,
+      headers: { apikey: getSB().key, Authorization: 'Bearer ' + getSB().key, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(item)
+    })
+    if (r.ok && !SASC_DATA.docketItemId) SASC_DATA.docketItemId = itemId
+    console.log('[SASC] Auto-saved config', r.ok ? 'OK' : 'FAILED ' + r.status)
+  } catch(e) { console.warn('[SASC] Auto-save error:', e.message) }
+}
+
 async function saveToDocket() {
   if (!SASC_DATA.docketId) {
     showToast('No docket linked. Launch SASC from an engagement docket.')
@@ -4707,12 +4784,30 @@ async function saveToDocket() {
     content: {
       type: 'sasc',
       sasc: {
+        // Identity
         engId: SASC_DATA.engId, docketId: SASC_DATA.docketId,
+        // Centre config
         scope: SASC_DATA.scope, dcType: SASC_DATA.dcType,
         mdc: SASC_DATA.mdc, bm: SASC_DATA.bm,
+        // GPU architecture + power model (S1 decisions)
+        gpuConfigId: SASC_DATA.gpuConfigId,
+        powerMode:   SASC_DATA.powerMode,
+        pue:         SASC_DATA.pue,
+        overhead:    SASC_DATA.overhead,
+        // Stack layers
         layers: Object.fromEntries(Object.entries(SASC_DATA.layers).map(function(e){ return [e[0], {on: e[1].on}] })),
+        outputStack: SASC_DATA.outputStack,
+        serviceModel: SASC_DATA.serviceModel,
+        // UC workload profiles (S2 engineering decisions)
         selectedUCs: SASC_DATA.selectedUCs,
-        rom: SASC_DATA.rom
+        ucWorkloads: SASC_DATA.ucWorkloads,
+        deratingPct: SASC_DATA.deratingPct,
+        // MaaS sizing params + mix (S3 engineering decisions)
+        maasParams:  SASC_DATA.maasParams,
+        maasMix:     SASC_DATA.maasMix,
+        // Results
+        rom: SASC_DATA.rom,
+        fleetInventory: SASC_DATA.fleetInventory
       },
       bom_lines: SASC_DATA.bom.map(function(l){ return { component: l.component, qty: l.qty, usd_total: l.usd_total } }),
       rom_usd: SASC_DATA.rom.total_usd,
