@@ -1,5 +1,6 @@
-# ATLAS Claude Session Activator
-**Read this file at the start of every ATLAS build session before touching any code.**
+# ATLAS Claude Session Activator v2.6
+**Read this file fully at the start of every ATLAS build session before touching any code.**
+*Last updated: 2026-06-25 | Build: SizingEngine, MaaS fleet model, fleet capacity view, auto-save, BOM fixes*
 
 ---
 
@@ -9,7 +10,7 @@
 **Owner:** Arvind Bajaj, Mumbai. OEM specialising in AI/HPC hardware + SI delivery.
 **Deployed at:** `arvindbajaj5.github.io/atlas-platform`
 **Stack:** GitHub Pages (hosting) · Supabase (database + auth) · Google Drive (file storage)
-**Brand:** Navy `#002870` · Orange `#FF5539` · Teal `#00B290` · Amber `#FFB600` · Blue `#1C38F5` · Font: Inter
+**Brand:** Navy `#002870` · Orange `#FF5539` · Teal `#00B290` · Amber `#FFB600` · Blue `#1C38F5` · Font: Roboto
 
 **Roles:**
 | Role | Access |
@@ -26,14 +27,14 @@
 | Tool | Path | Status |
 |---|---|---|
 | Portal / Home | `index.html` | Live |
-| Engagement Docket | `tools/engagement-docket/index.html` | v2.3.1 ✓ |
-| SASC | `tools/sasc/index.html` | S2–S3 fixed — validation in progress |
-| TSAP Financial Model | `tools/tsap-financial-model/index.html` | Updated ✓ |
+| Engagement Docket | `tools/engagement-docket/index.html` | v2.3.2 ✓ |
+| SASC | `tools/sasc/index.html` | v3.0 — SizingEngine integrated ✓ |
+| TSAP Financial Model | `tools/tsap-financial-model/index.html` | Live |
 | Inferencing Factory | `tools/inferencing-factory/index.html` | Live |
 | GeoAI Configurator | `tools/geoai-configurator/index.html` | Live |
 | COMPASS | `tools/compass/index.html` | Live |
 | Deal Analysis | `tools/deal-analysis/index.html` | Live |
-| Shared libs | `shared/atlasAI.js`, `shared/atlasExport.js` | Live |
+| SizingEngine | **inlined in sasc/index.html** | v1.2 ✓ (was shared/sasc-sizing.js — 403 on GH Pages) |
 | HPC Monitoring | TBD | Not yet built |
 | AI Sovereignty Index | TBD | Not yet built |
 
@@ -46,9 +47,9 @@
 ### `docket_items` — confirmed columns
 ```
 id (text PK), docket_id (text FK), item_type (text), title (text),
-content (jsonb), source_id (text), status (text), assigned_to (text),
-due_date (date), notes (text), created_at (timestamptz), created_by (text),
-section (text), ref_table (text), ref_id (text), sort_order (int), item_subtype (text)
+content (jsonb), section (text), ref_table (text), ref_id (text),
+item_subtype (text), status (text), sort_order (int),
+created_at (timestamptz), created_by (text), notes (text)
 ```
 
 ### Check constraints — MUST respect on ALL inserts
@@ -59,179 +60,241 @@ status:    pending | in_progress | done | closed
 ```
 
 ### Status translation (UI labels ↔ DB values)
+Functions: `toDbStatus()`, `fromDbStatus(section, s)`, `normalizeItems(arr)`
 ```
 UI → DB:  proposed→pending, agreed→done, scratched→closed
           open→pending, wip→in_progress, blocked→closed, active→pending
-DB → UI:  uc section:     pending→proposed, done→agreed, closed→scratched
-          action section: pending→open, in_progress→wip, done→done, closed→blocked
 ```
-Functions in Docket: `toDbStatus()`, `fromDbStatus(section, s)`, `normalizeItems(arr)`
 
 ### Key save patterns
 ```javascript
-// UC:        section='uc', item_type='uc', ref_table='uc_library', ref_id=ucId (slug e.g. geo-uc-010)
+// UC:        section='uc',     item_type='uc',       ref_table='uc_library', ref_id=ucSlug
 // Portfolio: section='output', item_type='solution', item_subtype='portfolio_selection', content={items:[...]}
-// MaaS:      section='output', item_type='solution', item_subtype='maas_config', content={...}
-// Action:    section='action', item_type='action', status='pending'  (NOT 'open')
-// Strategy:  section='strategy', item_type='pitch', item_subtype='position'|'pitch'|'watch'
-// Vision:    section='output', item_type='exec_doc', item_subtype='vision_doc', content={...}
+// MaaS:      section='output', item_type='solution', item_subtype='maas_config',         content={...}
+// SASC:      section='output', item_type='solution', item_subtype='sasc_config',          content={type:'sasc',sasc:{...}}
+// SASC BOM:  section='output', item_type='solution', item_subtype='sasc_bom',             content={type:'sasc',...}
+// Action:    section='action', item_type='action',   status='pending'
+// Vision:    section='output', item_type='exec_doc', item_subtype='vision_doc'
 ```
-
-**UC ref_id format:** slug (e.g. `geo-uc-010`), NOT a UUID. Accept any non-empty string. Docket is source of truth — all refs kept even if not in active uc_library. Title-match fallback when ref_id absent.
 
 ### Other key tables
-- `engagements` — id, name, customer_id, type, engagement_type, territory, requirements(jsonb), docket_id
-- `territory_profiles` — id(slug), territory, profile(jsonb S1), raw_intel, session(jsonb {s2,objectives,overrides,twoByTwo})
-- `app_config` — key, value. Territory cost overrides: `key=territory_config_{engId}`, value=`{power_tariff, water_cost, land_cost, engineer_salary, civil_index, construction_cr}`
-- `uc_library` — id (slug, e.g. geo-uc-010), uc_name, cluster, complexity, status
-- `gpu_configs` — 12 architectures seeded + simulation columns. NVIDIA: H200 SXM5, B200/B300/GB200/GB200 NVL144/Vera Rubin NVL72. AMD: MI355X, MI400X, MI450X
-- `model_catalogue` — 67 rows confirmed. Coding models added. Codestral disabled (MNPL).
-- `customers`, `profiler_archetypes`, `profiler_archetype_dims`
+- `gpu_configs` — 12 architectures. Columns: `id, name, vram_per_gpu_gb, tdp_kw, gpus_in_unit, rack_scale, hbm_bw_tbps, bf16_tflops, int4_tflops, placeholder, active`
+- `model_catalogue` — 67 rows. Key columns: `id, name, params_b, enabled, vendor, gpu_memory_gb(jsonb), gpus_per_instance(jsonb), num_layers, num_kv_heads, head_dim, kv_cache_dtype, architecture, context_length_k`
+- `uc_interaction_types` — 12 UC archetypes. Key cols: `id, name, requests_per_user_per_day, avg_input_tokens, avg_output_tokens, typical_sla_ms, peak_multiplier, min_precision, compute_intensity, default_headroom_pct, ha_required, batch_tolerant`
+- `requirement_archetypes` — 8 rows: 6 MaaS + 1 GPUaaS + 1 BMaaS. Key cols: `id, archetype_type (maas|gpuaas|bmaas), name, config(jsonb)`
+- `pricing_params` — 47 rows, 10 categories seeded. Columns: `id, category, component, description, unit, base_price_usd, confidence_range, min_quantity, volume_breaks, vendor_options, notes, active`
+- `benchmark_results` — measured throughput (gpu_config_id × model_id → tokens/sec)
+- `app_config` — key, value. Territory cost overrides: `key=territory_config_{engId}`
+- `uc_library` — id (slug e.g. geo-uc-010), uc_name, cluster, complexity, status
+- `engagements`, `customers`, `territory_profiles`, `profiler_archetypes`
+
+### Pending SQL (needs running in Supabase)
+- `model_catalogue_extend.sql` — adds `num_layers, num_kv_heads, head_dim, kv_cache_dtype, architecture` columns + seeds architecture params for exact KV cache formula. **Not yet run.**
 
 ---
 
-## Engagement Docket v2.3.1
+## SizingEngine — Core Physics (v1.2)
 
-### Tab flow
-`Overview → Profile & Intelligence → Portfolio → [Use Cases] → [Service Model] → [Territory] → Actions → Outputs → History`
-- UC tab: only when `L2-DAC` in portfolio selection
-- Service Model tab: when `L2-MAAS/GPUAAS/BMAAS` in portfolio
-- Territory tab: TSAP engagements only
+**Location:** Inlined in `sasc/index.html` as `<script>` block (external file returns 403 on GitHub Pages).
+**Init:** `SizingEngine.init(sbUrl, sbKey)` — called in SASC `init()` before `renderStep(1)`. Loads all reference tables, syncs to `ALL_GPU_CONFIGS`, `ALL_MODELS`, `ALL_UC_TYPES`.
 
-### Territory Intelligence Modal (S1→S2→S3)
-- Opens to **S1** always; "View Strategic Profile →" goes to S3 when S2 exists
-- S1: Gemini search + 12-section extraction → saved to `territory_profiles`
-- S2: Objectives form + AI profiling
-- S3: Radar, 2×2, archetype match, feasibility grid
-- Key TP functions: `tpStartS1`, `tpRunS2`, `tpS3Result`, `tpLoadCached`, `tpSaveProfile`
-- PATCH-first then POST fallback for saves
-- `showToast` requires `<div id="toast">` in HTML body
+### Throughput formula (dual-bound model)
+```
+Bandwidth bound: (BW_GBs / model_GB_per_GPU) × B^0.6   (sub-linear batch amortisation)
+Compute bound:   TFlops × 0.17 / flops_per_token        (17% efficiency — realistic vLLM)
+Actual TPS:      min(bandwidth_bound, compute_bound)     (binding constraint varies with batch)
+```
+- Profile B (UC internal, low concurrency): batch=4, memory-bandwidth bound
+- Profile A (MaaS API, high concurrency): batch=peak_concurrent, transitions to compute-bound
 
-### addUCToDocket — save pattern
+### KV cache formula
+- **Exact** (when `num_layers`, `num_kv_heads`, `head_dim` in model_catalogue):
+  `M_KV = 2 × L × H_kv × D_head × C_max × N × B_cache`
+  KV cache is always FP16 (B_cache=2) regardless of weight precision — standard vLLM/TRT-LLM behaviour
+- **Field rule fallback** (when architecture params absent):
+  Small 7-14B: 0.15 MB/token · Medium 14-35B: 0.25 · Large 70-80B: 0.35 · XLarge: 0.50
+
+### Concurrency model
+- Little's Law: `N = λ × W` where W = latency SLA in seconds (not hardcoded 2s)
+- MaaS peak concurrent = DAU × peak_concurrent_pct (from archetype, default 5%)
+
+### Public API
 ```javascript
-{ id: genId('DI'), docket_id, section:'uc', item_type:'uc',
-  title: uc.uc_name, ref_table:'uc_library', ref_id: ucId,
-  content: { uc_id: ucId, uc_name: uc.uc_name, cluster: uc.cluster },
-  status:'pending', created_by:'ATLAS' }
+SizingEngine.init(sbUrl, sbKey)          // loads all reference data
+SizingEngine.sizeUC(config, gpuId)       // Profile B — raw GPU count, no packaging
+SizingEngine.sizeMaaS(config, gpuId)     // Profile A — GPU count with 3 buffer layers
+SizingEngine.sizeGPUaaS(config, gpuId)  // direct allocation
+SizingEngine.sizeBMaaS(config)           // CPU servers
+SizingEngine.fleetTotal(ucR, maasR, gaas, bmaas, mdcSpec)  // aggregate + MW check
+SizingEngine.maxUsersFromGPUs(archetypeCfg, gpu, gpus, utilisationPct)  // reverse calc
+SizingEngine.throughputAudit(gpu, model, params_b, precision, profile, batchSize)
+SizingEngine.getGPUConfigs()  .getModels()  .getUCTypes()  .getArchetypes()
 ```
 
+### Buffer layers (MaaS Profile A)
+```
+Standard SLA:  +25% peak headroom · +15% failover · +12% multi-tenancy
+Enterprise SLA: +30% peak headroom · +30% failover · +12% multi-tenancy
+```
+
+### GPU count philosophy
+- `sizeUC()` and `sizeMaaS()` return **raw GPU count only**
+- Packaging (GPUs → servers/racks) happens at BOM time only
+- `gpusToUnits()` used in BOM: `ceil(totalGPUs / gpus_per_unit)`
+
 ---
 
-## TSAP Financial Model
-
-- S1-S4 pipeline removed — lives in Docket
-- Opens to `cost` tab; `← Docket` button in header
-- `loadTerritoryConfigFromDocket(engId)` loads overrides from `app_config` on init
-- Tabs: `cost | supply | gap | revenue | cashflow | whatif | terrconfig`
-
----
-
-## SASC — Architecture & Known State
+## SASC v3.0 — Full Architecture
 
 ### Screen structure
 | Step | Key | Condition |
 |---|---|---|
 | 1 | `scope` | Always |
 | 2 | `workloads_a` | `outputStack.ucdev === true` |
-| 3 | `workloads_b` | `outputStack.maas/gpuaas/bmaas === true` |
-| 4 | `workloads_c` | `outputStack.skills/coe` — placeholder 🚧 |
+| 3 | `workloads_b` | MaaS/GPUaaS/BMaaS enabled |
+| 4 | `workloads_c` | Skills/CoE — placeholder 🚧 |
 | 5 | `bom` | Always |
 
-### Critical architecture rules (hard-won)
-- **Render functions must never trigger async re-renders of themselves.** Only `renderStep()` owns the async load → render sequence.
-- `loadSvcModelCatalogue()` is called only from `renderStep(workloads_b)`, never from `renderWorkloadB()` or `renderMaasSimTab()`.
-- `loadWorkloadProfiles()` is called only from `renderStep(workloads_a)`.
-- All `renderStep(N)` hardcodes inside MaaS section must be `renderStep(SASC_STEP)` — step numbers shift with outputStack.
-- `SASC_LOAD_GEN` counter: incremented on every `renderStep()` call; `loadWorkloadProfiles()` captures `_myGen` at start and aborts final DOM write if generation has changed (user navigated away).
-- `SVC_MC_STATE` guards: `loadSvcModelCatalogue()` returns immediately on `loading | loaded | error` — never re-runs on error.
+### Critical architecture rules (hard-won — DO NOT VIOLATE)
+1. **Never hardcode `renderStep(3)`** — always use `renderStep(SASC_STEP)`. Step numbers shift.
+2. **Render functions never trigger async re-renders of themselves.** `renderStep()` owns async.
+3. `loadWorkloadProfiles()` called only from `renderStep(workloads_a)`
+4. S3 (`workloads_b`) skips `loadSvcModelCatalogue()` when `SizingEngine.ready === true` — new MaaS screen uses SizingEngine directly
+5. `wlChange()` calls `renderStep(SASC_STEP)` — not `renderScreen2()` — to trigger auto-save
+6. `SASC_LOAD_GEN` counter: captured at async start, abort if changed (user navigated away)
 
-### SASC reads from Docket
-- Scope, UCs (`section=uc`, `ref_id` = uc_library slug), portfolio (`item_subtype=portfolio_selection`)
-- MaaS config (`item_subtype=maas_config`)
-- Territory cost overrides from `app_config` key `territory_config_{engId}`
-- After `Object.assign(SASC_DATA, saved)` from docket item: URL params are immediately re-applied (docketId/engId must never be overwritten by saved config)
+### SASC_DATA structure (key fields)
+```javascript
+{
+  engId, docketId, docketItemId,
+  scope, dcType, mdc: {tshirt, sites, siteNames}, bm: {...},
+  gpuConfigId,          // centre-level GPU arch — drives ALL sizing
+  powerMode,            // 'total' | 'gpu'
+  pue,                  // default 1.2
+  overhead: {networking_pct, storage_pct, mgmt_pct},
+  fleetInventory,       // computed by calcFleetInventory()
+  layers,               // {infra, compute, network, platform, security, resilience, data}
+  outputStack,          // {ucdev, maas, gpuaas, bmaas, skills, coe}
+  serviceModel,         // {maas, gpuaas, bmaas} with enabled flags
+  selectedUCs,          // array of UC ref_ids
+  ucWorkloads,          // {[ucId]: {dau, peak_mult, model_id, uc_type_id, precision, ...}}
+  deratingPct,          // default 80
+  maasParams,           // {[type]: {precision, derating_pct, peak_concurrent_pct}}
+  maasMix,              // {text:40, coding:30, ...} — capacity view mix
+  maasSizingResults,    // array from renderMaasSimTab()
+  totalMaasGPU,         // sum of MaaS GPU demand
+  rom, bom              // BOM/ROM results
+}
+```
 
-### UC matching priority in init()
-1. `ref_id` direct lookup in `_ucById` map (accepts slug or UUID)
-2. `content.uc_id` jsonb field
-3. `ref_id` present but not in active library — kept anyway (docket is source of truth)
-4. Title match against `uc_library.uc_name` as last resort
+### S1 — Scope & Stack (rebuilt)
+- **GPU Architecture selector** (centre-level, one choice for entire fleet)
+- **MDC T-shirt:** XS/S/M/L/XL (2/5/10/15/20 MW)
+- **Power mode cards:** 🏗 Total DC Power vs ⚡ GPU-Ready Power
+- **Deduction factors:** PUE · Network% · Storage% · Mgmt% (shown when Total DC selected)
+- **Fleet inventory panel (navy):** GPUs available / servers or racks / MW for GPU + trail
+- `calcFleetInventory()` — pure function, no Supabase call
+- Auto-save status indicator bottom-left of nav bar
 
-### Workloads A (S2)
-- UCs display using `uc.uc_name || uc.title` — GeoAI UCs have no `title` field
-- UC type matching uses `uc.uc_name` not `uc.title` for type inference
-- `fmtNum(n)` defined as global utility: `Number(n||0).toLocaleString()`
+### S2 — UC Workloads
+- Reads from `model_catalogue` (67 models) — NOT `ai_models` (10 stale rows)
+- Fleet context banner at top (GPU arch from S1, "Change ↑" link)
+- UC sizing via `SizingEngine.sizeUC()` — GPU count shown as raw number
+- Expanded card: GPU breakdown (base/peak/failover/HA/growth) + formula audit
+- `wlChange()` → `renderStep(SASC_STEP)` → auto-save fires 1.5s later
 
-### Workloads B (S3) — MaaS / GPUaaS / BMaaS
-- MaaS: 3-layer sim (Architecture Comparison, Usage Heatmap, Mix Optimiser)
-- `MAAS_SIM_SEL = []` on init — user must select GPU(s) to run simulation
-- GPUaaS: toggle + GPU count + USD/GPU-hr
-- BMaaS: toggle + server count + USD/server/hr
-- `renderGpuBmaasSection()` toggle buttons still have hardcoded `renderStep(3)` — fix when next touching S3
+### S3 — MaaS / GPUaaS / BMaaS (rebuilt)
+- `renderMaasSimTab()` — new fleet capacity model (replaces old 3-layer simulation)
+  - For each enabled usage type from MAAS_CFG: calls `SizingEngine.sizeMaaS()`
+  - Shows 5-column breakdown: Base / +Peak / +Failover / +Multi-T / Total
+  - Sizing formula trail: model VRAM, throughput formula, binding constraint
+  - Editable params panel: Precision (INT4/INT8/FP16), Derating%, Peak concurrency%
+- `buildMaasParamsPanel(ut, arch)` — helper function (extracted to avoid node parse issues)
+- `renderMaasCapacityView()` — reverse calculation:
+  - Headroom GPUs = fleet − UC − MaaS − GPUaaS
+  - Mix sliders (default from Docket DAU proportions, adjustable to 100%)
+  - Capacity table at 50% / 70% / 90% utilisation showing users per type
+- `renderFleetAllocation()` — stacked bar + table: UC/MaaS/GPUaaS/Unallocated, MW check
+- GPUaaS/BMaaS: toggle + config inputs
 
-### SizingEngine (shared/sasc-sizing.js — inlined in sasc/index.html)
-- **Inlined** directly in sasc/index.html — external script tag caused GitHub Pages 403
-- Loads on `SizingEngine.init(sbUrl, sbKey)` — called in SASC `init()` before `renderStep(1)`
-- After init, syncs to globals: `ALL_GPU_CONFIGS`, `ALL_MODELS`, `ALL_UC_TYPES`
-- Reads from: `gpu_configs`, `model_catalogue`, `uc_interaction_types`, `requirement_archetypes`, `benchmark_results`
-- `sizeUC(config, gpuConfigId)` → raw GPU count (no packaging), Profile B math
-- `sizeMaaS(config, gpuConfigId)` → raw GPU count with 3-layer buffers, Profile A math
-- `fleetTotal(ucResults, maasResults, gpuaas, bmaas, mdcSpec)` → fleet allocation + MW check
-- KV cache: exact formula `2×L×H_kv×D_head×C×N` when `num_layers`/`num_kv_heads`/`head_dim` in model_catalogue; field rule fallback
-- Little's Law for concurrent sessions: `N = λ × W` (W from latency SLA)
-- `model_catalogue_extend.sql` — adds architecture columns, needs running in Supabase
+### BOM (S5)
+- `calculateBOM(pricing)` — `ucProfiles` param removed (uses SizingEngine instead)
+- GPU count from `SizingEngine.sizeUC()` aggregated across UCs
+- CPU servers = `ceil(gpuUnits / 4)` · storage = `gpuUnits × 20TB`
+- `loadAndRenderBOM()` has generation guard + error boundary
+- `adjustedPeopleCost` self-reference fix applied
 
-### S1 Fleet Configuration (rebuilt 2026-06-24)
-- GPU Architecture selector — all 12 architectures, centre-level, drives everything
-- Power mode toggle: Total DC (apply PUE + overheads) vs GPU-ready
-- Overhead inputs: PUE, Network%, Storage%, Mgmt% — all editable
-- Fleet inventory panel: GPUs available / units / MW for GPU — live on selection
-- `calcFleetInventory()` — pure function, MDC kW ÷ PUE ÷ overheads ÷ GPU TDP → GPU count
-- Fleet context banner on S2 shows selected arch + GPU count, "Change" → back to S1
+### Persistence / Auto-save
+```
+Trigger:    renderStep() fires autoSaveSASC() debounced 1.5s
+            wlChange() → renderStep() → auto-save
+Item:       docket_items, item_type='solution', item_subtype='sasc_config', status='in_progress'
+Load:       init() searches for sasc_config|sasc_bom by docket_id first, then URL item param
+Restores:   ucWorkloads, maasParams, maasMix, outputStack, serviceModel, overhead, gpuConfigId
+Status:     'Saved HH:MM' indicator in S1 nav bar
+```
 
-### Single GPU Architecture (decided 2026-06-24)
-- One GPU arch for the entire centre (UC + MaaS + GPUaaS on same fleet)
-- Multi-arch deferred — revisit after single-arch fleet view validated
-- GPU count = raw number (packaging to servers/racks happens at BOM only)
-- Fleet inventory = MDC capacity ÷ GPU TDP after PUE and infra overheads
+---
 
-### Workloads C (S4)
-- Pure placeholder 🚧 — "Skills Academy & CoE sizing coming in next release"
-- Only shown when `outputStack.skills || outputStack.coe`
+## Engagement Docket v2.3.2
 
-### FX rates
-- `loadFxRates()` calls `api.frankfurter.app` — blocked by CORS on GitHub Pages. Non-fatal, falls back to hardcoded rates. Do not attempt to fix via CORS workaround; replace with static fallback table if needed.
+### Key changes in this session
+- MaaS model tier labels: GPU count removed (`"Llama 70B"` not `"Llama 70B (1GPU)"`)
+- GPU estimate panel replaced with config summary (usage types + total users + SLA + "GPU sizing in SASC →")
+- Portfolio selection: `togglePI()` now auto-saves 800ms after every click (silent mode)
+- Portfolio save status indicator next to Save button
+
+### Tab flow
+`Overview → Profile & Intelligence → Portfolio → [Use Cases] → [Service Model] → [Territory] → Actions → Outputs → History`
+
+### Portfolio persistence
+- `savePortfolioSelection(silent?)` — silent=true for auto-save (no toast)
+- Auto-save debounced 800ms in `togglePI()` — NEVER needs manual save again
+- Load: `DOCKET_ITEMS.filter(i => i.item_subtype === 'portfolio_selection')` → `content.items`
+
+---
+
+## Fleet Management Model (decided 2026-06-25)
+
+### Key decisions (locked)
+- **Single GPU architecture** for the entire centre (Phase 1). Multi-arch deferred.
+- GPU count is always a **raw number**. Packaging (servers/racks) at BOM only.
+- Fleet inventory = MDC T-shirt power ÷ PUE ÷ infra overheads ÷ GPU TDP
+- UC sizing = Profile B (memory-bandwidth bound, low concurrency)
+- MaaS sizing = Profile A (dual-bound, high concurrency, 3 buffer layers)
+- **Capacity reverse model:** `maxUsersFromGPUs()` — headroom GPUs → max additional users at utilisation%
+
+### Two directions of calculation
+```
+Direction 1 (Sizing):  Given users → how many GPUs?  [SASC S2/S3]
+Direction 2 (Capacity): Given GPUs → how many users? [SASC S3 Fleet Capacity View → FM]
+```
+
+### Fleet view (bottom of S3)
+```
+Fleet inventory:    X GPUs  (N racks/servers · YMW)
+UC inference:       A GPUs  (Z%) — cost centre
+MaaS total:         B GPUs  (Z%) — revenue
+GPUaaS:             C GPUs  (Z%) — revenue
+Unallocated:        D GPUs  (Z%) — headroom
+MW check:           X.X MW of Y MW  ✓/⚠/🔴
+```
+
+### FM integration (next phase)
+- SASC pushes `max_dau_per_type` at 50%/70%/90% utilisation to `app_config`
+- FM reads these + token pricing → revenue = volume × price
+- Utilisation phasing = the scenario planning tool (Y1/Y2/Y3)
 
 ---
 
 ## MaaS Product Spec
 
-**Pricing model:** API/consumption-only — no subscription bundles
-**Usage types (6 fixed):** text · coding · document · audio · indic · generic
-**Model tiers:** Basic · Mid · Advanced
-**Demand input:** DAU — set in Docket MaaS tab
-**SLA tiers:** Standard · Enterprise
-**Free trial:** 15 days
-
----
-
-## Output Stack Concept
-
-| Bucket | What | Status |
-|---|---|---|
-| AI Applications | Use Cases (UCs) | Active |
-| AI Infrastructure Services | MaaS / GPUaaS / BMaaS | Active |
-| AI Capability Building | Skills Academy / CoE | Placeholder |
-
-**Portfolio A vs B distinction (parked):** A = Centre Build (OEM → SI/govt P&L), B = Centre Services (centre → enterprise/agency P&L).
-
----
-
-## Google Drive Structure
-
-**Root folder ID:** `1L6Ta_fqSlUpzE0iNr0Be9ooRjfhPRsRd`
-Categories: 01-Sales Enablement · 02-Opportunity Management · 03-Presales · 04-Business Operations Management
-Tools baselined: Portfolio Deck V5 · AI Value Chain Tool · Deal Analysis HTML · Sovereign Playbook+Brief · Inferencing Factory v2.2+Profiler+GeoAI NE India · GeoAI Civilian+decks+BOM · GeoAI Military HTML · COMPASS slides+validator · RAC Tool HTML
+**Pricing:** API/consumption-only — no subscription bundles
+**Usage types (6):** text · coding · document · audio · indic · generic
+**Model tiers:** Basic · Mid · Advanced (within same model family)
+**Demand input:** DAU (stored in Docket as `concurrent_users` — label to fix later)
+**SLA:** Standard · Enterprise
+**Free trial:** 15 days, 1M tokens, API only
 
 ---
 
@@ -240,112 +303,97 @@ Tools baselined: Portfolio Deck V5 · AI Value Chain Tool · Deal Analysis HTML 
 ### Python patching
 ```python
 old = "exact string from file"   # must match exactly, count=1
-new = "replacement"
-c = content.count(old)           # verify = 1 before replacing
+c = content.count(old)           # ALWAYS verify = 1 before replacing
 content = content.replace(old, new, 1)
 ```
 
-### Syntax validation
+### Syntax validation (MANDATORY before every present_files)
 ```python
-r = subprocess.run(['node', '--check', '/tmp/check.js'], capture_output=True, text=True)
-fns = re.findall(r'(?:async\s+)?function\s+(\w+)\s*\(', js)
-dupes = [(f,c) for f,c in Counter(fns).items() if c>1]
+# Extract main JS block from HTML
+with open('/home/claude/sasc-live.html') as f: c = f.read()
+s = c.rfind('<script charset="utf-8">')
+e = c.rfind('</script>')
+open('/tmp/sasc_check.js','w').write(c[s+24:e])
+# Run check
+subprocess.run(['node','--check','/tmp/sasc_check.js'], capture_output=True, text=True)
 ```
 
-### atlasAI.js
-```javascript
-atlasAI.init(sbUrl, sbKey)
-atlasAI.call(prompt, opts)        // {ok, text, tokens}
-atlasAI.callAndParse(prompt, opts) // {ok, data, tokens}
+### Div balance check (for HTML-generating JS)
+```python
+import re
+opens  = len(re.findall(r'<div[^/]', block))
+closes = len(re.findall(r'</div>', block))
+# NEVER use <div> inside <button> — use <span style="display:block"> instead
+# Divs in JS string literals are counted by parser — must balance
 ```
 
-### GitHub push
-Token (`$GITHUB_TOKEN`) not available in Claude sessions — always output to `/mnt/user-data/outputs/` for manual deploy. Reliable fetch via `curl -s raw.githubusercontent.com/...`.
+### Binary search for syntax errors
+```python
+# When node --check reports error at "last line" — binary search the function
+lo, hi = 0, len(lines)
+while hi - lo > 5:
+    mid = (lo + hi) // 2
+    if check('\n'.join(lines[:mid])): lo = mid
+    else: hi = mid
+```
+
+### GitHub deployment
+- Token (`$GITHUB_TOKEN`) not available in Claude sessions
+- Always output to `/mnt/user-data/outputs/` for manual deploy
+- GitHub Pages deployment queued/stuck: re-run workflow, or trivial commit to trigger fresh
+- If Pages source stuck on GitHub Actions (greyed out): Settings → Environments → delete `github-pages`
+- FX rates (`frankfurter.app`) blocked by CORS on GitHub Pages — non-fatal, uses fallback rates
 
 ---
 
-## Standards Files (.md) — Build Priority
+## Build Tracker — Current Phase
 
-`brand.md` · `project-definition-schema.md` · `hardware-preferences.md` · `architecture-tiers.md` · `tool-features.md` · `claude-session-activator.md` (this file)
+### Completed this session ✅
+- SizingEngine v1.2: dual-bound throughput formula (BW × B^0.6 vs TFlops × 17%), exact KV cache formula
+- `maxUsersFromGPUs()`: reverse calculation for fleet capacity view
+- `throughputAudit()`: formula trail for UI transparency
+- S1 rebuilt: GPU arch selector + power mode cards + fleet inventory panel + auto-save
+- S2 fixed: model_catalogue (67 models) instead of ai_models (10 stale)
+- S3 rebuilt: fleet capacity model per usage type, capacity view with mix sliders, fleet allocation table
+- BOM: `gpuServers` undefined fixed → `gpuUnits`; `adjustedPeopleCost` self-reference fixed
+- Docket: GPU count removed from model tier labels, portfolio auto-save on every toggle
+- Persistence: full SASC config (UC workloads + MaaS params + GPU config) auto-saved to Supabase
 
----
+### Open — Phase 1 (complete fleet view)
+- [ ] MW envelope validation in fleet allocation (power check vs MDC envelope)
+- [ ] Cost per million tokens in MaaS card (GPU cost ÷ throughput × utilisation)
+- [ ] SASC → FM data push (write capacity projections to app_config)
+- [ ] `model_catalogue_extend.sql` — run in Supabase (adds KV cache architecture params)
+- [ ] Docket MaaS `concurrent_users` label → rename to `dau` for clarity
 
-## Build Tracker & Pending Work
+### Open — Phase 2 (BOM completion)
+- [ ] Networking in BOM (InfiniBand + NKC switch sizing)
+- [ ] Platform software / security / resilience uplifts
+- [ ] UC dev effort in ROM
+- [ ] SASC BOM → FM push
 
-**Primary reference:** `SASC-Requirements-Modelling-Gap-Analysis.md` — the living requirements, design spec, and gap register. Read this at the start of any SASC, MaaS, FM, or BOM build session. It contains the full confirmed spec from the June 23 design session and a prioritised gap register (Sections 5.1–5.6) with status tracking.
+### Open — Phase 3 (commercial model)
+- [ ] FM Revenue tab: MaaS token pricing + margin curves
+- [ ] FM Fleet P&L (GPU cost + power + people → EBITDA)
+- [ ] Utilisation scenario planning (Y1/Y2/Y3 ramp)
 
-**Gap register summary — current Phase:**
-
-Phase 1 — Fleet View (in progress):
-- [x] **[Supabase]** `pricing_params` table seeded — 47 rows, 10 categories (Gap B1 ✅ 2026-06-24)
-- [ ] **[SASC S3]** MaaS buffer model — peak headroom + failover + multi-tenancy (Gaps M1, M2)
-- [ ] **[SASC S3]** Fleet allocation table — aggregate UC + MaaS + GPUaaS GPUs, MW check (Gaps F1, F2, F3)
-- [ ] **[SASC S3]** Demand curves / temporal heatmap — archetype shapes, aggregate curve (Gap M4)
-- [ ] **[SASC S3]** Cost per million tokens — GPU cost ÷ throughput × utilisation (Gap M7)
-
-Phase 2 — Complete BOM:
-- [ ] Networking in BOM (Gap B3)
-- [ ] Platform software / security / resilience uplifts (Gaps B4, B5, B6)
-- [ ] UC dev effort in ROM (Gap B7)
-- [ ] SASC → FM BOM push (Gap FM1)
-
-Phase 3 — Commercial Model:
-- [ ] FM Revenue tab: MaaS token pricing + margin curves (Gap FM2)
-- [ ] FM Fleet P&L (Gap F4)
-
-Other open items:
-- [ ] SASC S3: fix `renderStep(3)` hardcodes in `renderGpuBmaasSection` toggle buttons (Gap H1)
-- [ ] SASC S2–S5: full validation with live docket data — in progress
-- [ ] SASC S4 (Workloads C): Skills Academy / CoE — parked until Phase 1 complete
-- [ ] Docket: UC status display, action persistence, history tab
-- [ ] TSAP FM: verify territory cost override flow end-to-end
-- [ ] Vision Document: generate from Outputs tab
-- [ ] HPC Monitoring tool
-- [ ] AI Sovereignty Index v3.0
-
----
-
-*Last updated: 2026-06-24 | Build: SASC S2–S3 nav fixed, UC matching fixed, MaaS loop fixed, fmtNum added*
-
----
-
-## Vision Document — Architecture
-
-**Function:** `generateVisionDoc()` in Engagement Docket
-**Trigger:** Overview tab OR S3 modal "Generate Vision Doc" button
-**Library:** `atlasExport.word()` · **Logo:** `atlas_global_cfg.company.brandLogoData` or `atlas_logo` localStorage
-
-### AI generation — 3 calls (each under 2000-token Supabase cap)
-```
-Call 1 (~1400 tokens): territory_narrative + needs_narrative + strengths_risks_narrative
-Call 2 (~1300 tokens): strategic_position_narrative + vision_statement
-Call 3 (~1200 tokens): uc_services_narrative + territory_benefits_narrative
-```
-AtlasAI config: `{"model":"gemini-2.5-flash","maxTok":2000,"timeout":30000}` · Per-call maxTokens: 1800
-
-### Caching
-Cache in `docket_items`: `id='{docketId}-vision-narrative'`, `item_type='exec_doc'`, `item_subtype='vision_narrative'`
-`content.inputs_hash` = hash of territory + objectives + UCs + portfolio + S1/S2 headlines
-
-### 10 document sections
-1. Territory — Why Here · 2. The Challenge · 3. Strengths & Risks · 4. Strategic Positioning (2×2)
-5. The Vision · 6. Scope of Work (plain English, NO L1/L2/L3) · 7. What the Centre Will Do (UC table)
-7a. Managed Services · 8. What [Territory] Gains · 9. Investment & Timeline (skips if "Not defined")
-10. Next Steps
-
-### Key rules
-- NEVER use L1/L2/L3 codes — use `SCOPE_LABELS` map
-- Services: "Model as a Service" not "MaaS", "GPU as a Service" not "GPUaaS"
-- 2×2 table: "PRIMARY:" and "Also:" markers, no `\n` in cells
-- All sections have fallback content — doc never renders empty
+### Parked
+- Multi-GPU architecture (Phase 2 — revisit after single-arch validated)
+- SASC S4 Workloads C (Skills/CoE sizing)
+- Portfolio A vs B P&L split
+- HPC Monitoring tool
+- AI Sovereignty Index v3.0
 
 ---
 
 ## Session Rules
 
 - Read this file fully before doing any work
-- Never use L1/L2/L3 codes in customer-facing outputs
-- Currency: USD default (configurable)
-- Tools open in same tab
+- Run `node --check` on extracted JS before every `present_files` — no exceptions
+- Check div balance in any block that generates HTML
+- Never hardcode step numbers — always use `SASC_STEP` or `getActiveSteps()`
+- Never use `<div>` inside `<button>` — use `<span style="display:block">`
+- Currency: USD default (configurable INR/EUR/GBP/AED/SGD)
+- Tools open in same tab (`window.location.href`)
 - 3D Office Visualization and AI Team JDs are NOT part of ATLAS
-- For Sovereign AI Platform engagements: load `Sovereign_AI_Platform_Playbook_v1.0.docx` + Project Brief first. Confirm: *"Playbook v1.0 and [Project name] Brief loaded. Ready to proceed."*
+- For Sovereign AI Platform engagements: load Playbook v1.0 + Project Brief first. Confirm: *"Playbook v1.0 and [Project name] Brief loaded. Ready to proceed."*
