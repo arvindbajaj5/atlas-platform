@@ -1247,18 +1247,8 @@ async function renderSvcModelTab() {
 
   // ── MaaS section ──────────────────────────────────────────────────────────
   if (hasMaas) {
-    // Load model catalogue if not already loaded
-    if (!MC_ROWS_D.length && MC_LOAD_D !== 'loading' && MC_LOAD_D !== 'loaded') {
-      MC_LOAD_D = 'loading'
-      var _sb2 = getSB()
-      if (_sb2.url) {
-        fetch(_sb2.url + '/rest/v1/model_catalogue?enabled=eq.true&order=vendor.asc,family.asc,params_b.asc&limit=300', {
-          headers: { apikey: _sb2.key, Authorization: 'Bearer ' + _sb2.key }
-        }).then(function(r){ return r.ok ? r.json() : [] })
-          .then(function(rows){ MC_ROWS_D = rows; MC_LOAD_D = 'loaded'; switchTab('svcmodel') })
-          .catch(function(){ MC_LOAD_D = 'error' })
-      } else { MC_LOAD_D = 'no-creds' }
-    }
+    // Model catalogue already loaded by await fetch above
+    console.log('[Docket] MC_LOAD_D:', MC_LOAD_D, 'MC_ROWS_D:', MC_ROWS_D.length)
 
     html += '<div class="card">'      + '<div class="card-title">🤖 Model as a Service</div>'      + '<div class="card-sub">Define AI API services by usage type. Select model family and tier for each. Full sizing in SASC · Pricing in FM.</div>'
 
@@ -1274,10 +1264,10 @@ async function renderSvcModelTab() {
         }).join('')      + '</div></div>'      + '<div style="display:flex;align-items:center;gap:8px">'      + '<span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);letter-spacing:.3px">Free Trial (15 days)</span>'      + '<div class="toggle-sw'+(MAAS_TRIAL?' on':'')+'" onclick="MAAS_TRIAL=!MAAS_TRIAL;switchTab(\'svcmodel\')"></div>'      + '</div></div>'
 
     // Usage type rows
-    if (MC_LOAD_D === 'loading' || MC_LOAD_D === '') {
+    if (MC_LOAD_D === 'loading') {
       html += '<div style="padding:20px;text-align:center;color:var(--mid);font-size:12px">⏳ Loading model catalogue…</div>'
     } else if (MC_LOAD_D === 'no-creds' || MC_LOAD_D === 'error') {
-      html += '<div style="padding:12px;background:#FEE2E2;border-radius:6px;font-size:12px;color:#991B1B">⚠ Model catalogue unavailable — check Settings → API Keys</div>'
+      html += '<div style="padding:12px;background:#FEE2E2;border-radius:6px;font-size:12px;color:#991B1B">⚠ Model catalogue unavailable (state: '+MC_LOAD_D+') — check Settings → API Keys. <button onclick="MC_LOAD_D=\'\';MC_ROWS_D=[];switchTab(\'svcmodel\')" style="margin-left:8px;padding:2px 8px;background:#991B1B;color:#fff;border:none;border-radius:4px;cursor:pointer">Retry</button></div>'
     } else {
       html += '<div style="display:flex;flex-direction:column;gap:6px">'
 
