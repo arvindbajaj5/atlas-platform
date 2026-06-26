@@ -566,6 +566,10 @@ var MAAS_USAGE_TYPES = [
 ]
 var MAAS_SLA    = 'standard'   // standard | enterprise
 var MAAS_TRIAL  = false        // 15-day free trial
+var SVCMODEL_CFG = {           // GPUaaS + BMaaS config
+  gpuaas: { gpus: 0, gpu_hour_price_usd: 3.5 },
+  bmaas:  { servers: 0, server_hour_price_usd: 1.2 }
+}
 var MC_ROWS_D   = []           // model_catalogue rows
 var MC_LOAD_D   = ''           // idle|loading|loaded|error|no-creds
 var MAAS_MODELS_SELECTED = []  // legacy compat
