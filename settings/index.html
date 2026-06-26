@@ -148,10 +148,9 @@ body{font-family:'Inter',sans-serif;font-size:13px;color:var(--dark);background:
   <div class="tabs">
     <button class="tab-btn on" data-tab="company"   onclick="showTab('company')">&#127970; Company</button>
     <button class="tab-btn"    data-tab="keys"       onclick="showTab('keys')">&#128274; API Keys</button>
-    <button class="tab-btn"    data-tab="models"     onclick="showTab('models')">&#129302; AI Models</button>
+    <button class="tab-btn"    data-tab="catalogue"  onclick="showTab('catalogue')">&#129302; Model Catalogue</button>
     <button class="tab-btn"    data-tab="hardware"   onclick="showTab('hardware')">&#9881; Hardware &amp; Costs</button>
     <button class="tab-btn"    data-tab="natavg"     onclick="showTab('natavg')">&#127758; National Averages</button>
-    <button class="tab-btn"    data-tab="catalogue"  onclick="showTab('catalogue')">&#129302; Model Catalogue</button>
   </div>
 
   <!-- Tab content -->
@@ -231,9 +230,15 @@ function uploadLogo(input, key, previewId) {
 var MC_ROWS = []
 var MC_STAGING = []
 var MC_LOAD_STATE = ''
-var MC_FILTER_ARCH = ''
+var MC_FILTER_TEXT   = ''
+var MC_FILTER_DOMAIN = ''
+var MC_FILTER_SPEC = ''
+var MC_FILTER_COUNTRY = ''
+var MC_FILTER_LEVEL = ''
+var MC_FILTER_REASONING = ''
 var MC_FILTER_VENDOR = ''
 var MC_FILTER_ENABLED = 'all'
+var MC_FILTER_REVIEW = false
 
 async function loadModelCatalogue() {
   var url = CFG.sbUrl || CFG.sb_url || ''
@@ -332,55 +337,111 @@ function renderCatalogue() {
     return ['Apache2','MIT','CC-BY','Gemma','Llama-Community'].includes(l||'') ? 'open' : 'comm'
   }
 
+  var domains   = ['','general','code','indic','geospatial','biomedical','finance','legal','aerospace','industrial','world_model']
+  var specs     = ['','text_gen','reasoning','vlm','embed','audio_asr','audio_tts','img_gen','video_gen','geo_vision','timeseries','anomaly','world_sim','med_seg']
+  var countries = Array.from(new Set(MC_ROWS.map(function(r){ return r.country_origin }).filter(Boolean))).sort()
+  var levels    = ['','small','medium','large','frontier']
+
+  function domainLabel(d) {
+    return {general:'General',code:'Code',indic:'Indic',geospatial:'Geospatial',biomedical:'Biomedical',
+      finance:'Finance',legal:'Legal',aerospace:'Aerospace',industrial:'Industrial',world_model:'World Model'}[d] || d || '—'
+  }
+  function levelBadge(l) {
+    var c={small:'#6B7280',medium:'#0891B2',large:'var(--navy)',frontier:'var(--orange)'}[l]||'#aaa'
+    return l ? '<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:'+c+';color:#fff;font-weight:600">'+l+'</span>' : '—'
+  }
+  function countryFlag(c) {
+    return ({US:'🇺🇸',CN:'🇨🇳',IN:'🇮🇳',FR:'🇫🇷',DE:'🇩🇪',AE:'🇦🇪',CA:'🇨🇦',UK:'🇬🇧'}[c]||'🌐')+' '+(c||'')
+  }
+
   var rows = MC_ROWS.filter(function(r) {
-    if (MC_FILTER_ARCH && MC_FILTER_ARCH !== 'all' && !(r.archetype||[]).includes(MC_FILTER_ARCH)) return false
-    if (MC_FILTER_VENDOR && r.vendor !== MC_FILTER_VENDOR) return false
-    if (MC_FILTER_ENABLED === 'enabled' && !r.enabled) return false
-    if (MC_FILTER_ENABLED === 'disabled' && r.enabled) return false
+    if (MC_FILTER_TEXT) {
+      var q = MC_FILTER_TEXT.toLowerCase()
+      var hit = (r.name||'').toLowerCase().includes(q)
+        || (r.family_name||'').toLowerCase().includes(q)
+        || (r.vendor||'').toLowerCase().includes(q)
+        || (r.domain||'').toLowerCase().includes(q)
+        || (r.specialisation||[]).some(function(s){ return s.toLowerCase().includes(q) })
+        || (r.country_origin||'').toLowerCase().includes(q)
+      if (!hit) return false
+    }
+    if (MC_FILTER_DOMAIN    && r.domain !== MC_FILTER_DOMAIN) return false
+    if (MC_FILTER_SPEC      && !(r.specialisation||[]).includes(MC_FILTER_SPEC)) return false
+    if (MC_FILTER_COUNTRY   && r.country_origin !== MC_FILTER_COUNTRY) return false
+    if (MC_FILTER_LEVEL     && r.level !== MC_FILTER_LEVEL) return false
+    if (MC_FILTER_REASONING === 'yes' && !r.is_reasoning) return false
+    if (MC_FILTER_REASONING === 'no'  &&  r.is_reasoning) return false
+    if (MC_FILTER_VENDOR    && r.vendor !== MC_FILTER_VENDOR) return false
+    if (MC_FILTER_ENABLED   === 'enabled'  && !r.enabled) return false
+    if (MC_FILTER_ENABLED   === 'disabled' &&  r.enabled) return false
+    if (MC_FILTER_REVIEW    && !r.review_needed) return false
     return true
   })
 
+  var reviewCount = MC_ROWS.filter(function(r){ return r.review_needed }).length
+
   var html = '<div class="card">'
-    + '<div class="card-title">Model Catalogue <span style="font-size:11px;font-weight:400;color:var(--mid)">(' + MC_ROWS.length + ' models · ' + rows.length + ' shown)</span></div>'
-    + '<div class="card-sub">Enable/disable models per row. Featured models appear prominently in Docket MaaS Config. Sync changes saves to Supabase.</div>'
-    + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">'
-    + '<select class="mc-filter" onchange="MC_FILTER_ARCH=this.value;refreshCatalogue()">'
-    + archetypes.map(function(a){ return '<option value="'+a+'"'+(a===MC_FILTER_ARCH?' selected':'')+'>'+( a==='all'?'All archetypes':a.charAt(0).toUpperCase()+a.slice(1))+'</option>' }).join('')
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+    + '<div class="card-title">Model Catalogue <span style="font-size:11px;font-weight:400;color:var(--mid)">'+MC_ROWS.length+' models · '+rows.length+' shown</span></div>'
+    + (reviewCount ? '<span style="font-size:11px;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;cursor:pointer;font-weight:600" onclick="MC_FILTER_REVIEW=true;refreshCatalogue()">⚠ '+reviewCount+' need review</span>' : '')
+    + '</div>'
+    + '<div class="card-sub">Master reference data — admin only. Enable/disable per row. ⚠ = intel update flagged.</div>'
+    + '<div style="margin-bottom:8px">'
+    + '<input type="search" placeholder="Search by name, family, domain, specialisation…" value="'+esc(MC_FILTER_TEXT)+'"'
+    + ' oninput="MC_FILTER_TEXT=this.value;refreshCatalogue()"'
+    + ' style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;box-sizing:border-box">'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:5px;margin-bottom:8px">'
+    + '<select class="mc-filter" onchange="MC_FILTER_DOMAIN=this.value;refreshCatalogue()">'
+    + domains.map(function(d){ return '<option value="'+d+'"'+(d===MC_FILTER_DOMAIN?' selected':'')+'>'+(d?domainLabel(d):'All domains')+'</option>' }).join('')
     + '</select>'
-    + '<select class="mc-filter" onchange="MC_FILTER_VENDOR=this.value;refreshCatalogue()">'
-    + '<option value="">All vendors</option>'
-    + vendors.map(function(v){ return '<option value="'+esc(v)+'"'+(v===MC_FILTER_VENDOR?' selected':'')+'>'+esc(v)+'</option>' }).join('')
+    + '<select class="mc-filter" onchange="MC_FILTER_SPEC=this.value;refreshCatalogue()">'
+    + specs.map(function(s){ return '<option value="'+s+'"'+(s===MC_FILTER_SPEC?' selected':'')+'>'+(s||'All specialisations')+'</option>' }).join('')
+    + '</select>'
+    + '<select class="mc-filter" onchange="MC_FILTER_COUNTRY=this.value;refreshCatalogue()">'
+    + [''].concat(countries).map(function(c){ return '<option value="'+c+'"'+(c===MC_FILTER_COUNTRY?' selected':'')+'>'+(c?countryFlag(c):'All countries')+'</option>' }).join('')
+    + '</select>'
+    + '<select class="mc-filter" onchange="MC_FILTER_LEVEL=this.value;refreshCatalogue()">'
+    + levels.map(function(l){ return '<option value="'+l+'"'+(l===MC_FILTER_LEVEL?' selected':'')+'>'+(l||'All levels')+'</option>' }).join('')
+    + '</select>'
+    + '<select class="mc-filter" onchange="MC_FILTER_REASONING=this.value;refreshCatalogue()">'
+    + [['','All models'],['yes','Reasoning only'],['no','Non-reasoning']].map(function(v){ return '<option value="'+v[0]+'"'+(v[0]===MC_FILTER_REASONING?' selected':'')+'>'+v[1]+'</option>' }).join('')
     + '</select>'
     + '<select class="mc-filter" onchange="MC_FILTER_ENABLED=this.value;refreshCatalogue()">'
-    + ['all','enabled','disabled'].map(function(v){ return '<option value="'+v+'"'+(v===MC_FILTER_ENABLED?' selected':'')+'>'+{all:'All',enabled:'Enabled only',disabled:'Disabled only'}[v]+'</option>' }).join('')
+    + [['all','All status'],['enabled','Enabled'],['disabled','Disabled']].map(function(v){ return '<option value="'+v[0]+'"'+(v[0]===MC_FILTER_ENABLED?' selected':'')+'>'+v[1]+'</option>' }).join('')
     + '</select>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:10px">'
+    + '<button class="btn btn-outline" onclick="MC_FILTER_TEXT=MC_FILTER_DOMAIN=MC_FILTER_SPEC=MC_FILTER_COUNTRY=MC_FILTER_LEVEL=MC_FILTER_REASONING=MC_FILTER_VENDOR=\'\';MC_FILTER_ENABLED=\'all\';MC_FILTER_REVIEW=false;refreshCatalogue()" style="font-size:11px;padding:4px 10px">&#10005; Clear</button>'
+    + (MC_FILTER_REVIEW ? '<button class="btn btn-outline" style="font-size:11px;padding:4px 10px;background:#FEF3C7" onclick="MC_FILTER_REVIEW=false;refreshCatalogue()">Showing ⚠ only — clear</button>' : '')
     + '<div style="flex:1"></div>'
-    + '<button class="btn btn-outline" onclick="MC_LOAD_STATE=\'idle\';MC_ROWS=[];MC_STAGING=[];showTab(\'catalogue\')" style="font-size:11px;padding:5px 10px">&#8635; Reload</button>'
-    + '<button class="btn btn-teal" onclick="saveCatalogueChanges()" style="font-size:11px;padding:5px 12px">&#8593; Sync changes</button>'
-    + '<button class="btn btn-outline" onclick="addModelRow()" style="font-size:11px;padding:5px 12px">+ Add</button>'
+    + '<button class="btn btn-outline" onclick="MC_LOAD_STATE=\'idle\';MC_ROWS=[];MC_STAGING=[];showTab(\'catalogue\')" style="font-size:11px;padding:4px 10px">&#8635; Reload</button>'
+    + '<button class="btn btn-teal" onclick="saveCatalogueChanges()" style="font-size:11px;padding:4px 12px">&#8593; Sync</button>'
+    + '<button class="btn btn-outline" onclick="addModelRow()" style="font-size:11px;padding:4px 12px">+ Add</button>'
     + '</div>'
 
   if (!rows.length) {
     html += '<div style="padding:20px;text-align:center;color:var(--mid);font-size:12px">No models match the current filters.</div>'
   } else {
-    html += '<div style="overflow-x:auto;max-height:440px;overflow-y:auto">'
+    html += '<div style="overflow-x:auto;max-height:480px;overflow-y:auto">'
       + '<table class="mc-table"><tr>'
-      + '<th>On</th><th>Model</th><th>Archetypes</th><th>Params</th>'
-      + '<th>Quant</th><th>Ctx</th><th>MMLU</th><th>HumanEval</th>'
-      + '<th>License</th><th>★</th><th></th></tr>'
+      + '<th>On</th><th>Model</th><th>Domain</th><th>Specialisation</th>'
+      + '<th>Params</th><th>Level</th><th>Country</th><th>Reasoning</th>'
+      + '<th>License</th><th>⚠</th><th></th></tr>'
       + rows.map(function(r) {
           var i = MC_ROWS.indexOf(r)
-          return '<tr class="'+(r.enabled?'':'disabled')+'">'
+          return '<tr class="'+(r.enabled?'':'disabled')+(r.review_needed?' style="background:#FFFBEB"':'')+'">'
             + '<td><div class="mc-toggle '+(r.enabled?'on':'')+'" onclick="toggleModelEnabled('+i+')"></div></td>'
-            + '<td style="min-width:140px"><div class="mc-name">'+esc(r.name||'')+'</div><div class="mc-vendor">'+esc(r.vendor||'')+'</div></td>'
-            + '<td>'+(r.archetype||[]).slice(0,3).map(function(a){ return '<span class="mc-arch">'+esc(a)+'</span>' }).join('')+'</td>'
+            + '<td style="min-width:150px"><div class="mc-name">'+esc(r.name||'')+'</div>'
+            + '<div class="mc-vendor" style="font-size:9px">'+esc(r.family_name||r.vendor||'')+'</div></td>'
+            + '<td style="font-size:11px">'+domainLabel(r.domain||'')+'</td>'
+            + '<td>'+(r.specialisation||[]).slice(0,2).map(function(s){ return '<span class="mc-arch">'+esc(s)+'</span>' }).join('')+'</td>'
             + '<td style="font-size:11px;white-space:nowrap">'+(r.params_b?r.params_b+'B':'—')+'</td>'
-            + '<td style="font-size:10px;color:var(--mid)">'+(r.quant_options||[]).slice(0,3).join(' · ')+'</td>'
-            + '<td style="font-size:11px">'+(r.context_length_k?r.context_length_k+'K':'—')+'</td>'
-            + '<td><span class="mc-bench '+benchColor(r.bench_mmlu)+'">'+(r.bench_mmlu||'—')+'</span></td>'
-            + '<td><span class="mc-bench '+benchColor(r.bench_humaneval)+'">'+(r.bench_humaneval||'—')+'</span></td>'
-            + '<td><span class="mc-lic '+licClass(r.license)+'">'+esc(r.license||'—')+'</span></td>'
-            + '<td><input type="checkbox" '+(r.featured?'checked':'')+' onchange="toggleFeatured('+i+',this.checked)" title="Featured"></td>'
+            + '<td>'+levelBadge(r.level)+'</td>'
+            + '<td style="font-size:11px">'+(r.country_origin?countryFlag(r.country_origin):'—')+'</td>'
+            + '<td style="text-align:center">'+(r.is_reasoning?'🧠':'')+'</td>'
+            + '<td style="font-size:10px;color:var(--mid)">'+esc(r.license_type||r.license||'—')+'</td>'
+            + '<td style="text-align:center">'+(r.review_needed?'<span title="'+esc(r.review_note||'')+'">⚠</span>':'')+'</td>'
             + '<td><button onclick="editModelRow('+i+')" style="padding:2px 6px;font-size:10px;background:var(--light);border:1px solid var(--border);border-radius:4px;cursor:pointer">✏️</button></td>'
             + '</tr>'
         }).join('')
@@ -435,10 +496,13 @@ function toggleFeatured(idx, val) {
 function addModelRow() {
   MC_ROWS.unshift({
     id: 'new-' + Date.now(),
-    name: 'New Model', vendor: '', family: '', archetype: [],
-    params_b: null, quant_options: [], context_length_k: null,
-    gpu_memory_gb: {}, gpus_per_instance: {}, throughput_rps: {},
-    bench_mmlu: null, bench_humaneval: null, license: 'Apache2',
+    name: '', vendor: '', family_name: '',
+    domain: 'general', specialisation: ['text_gen'],
+    country_origin: '', level: 'small',
+    params_b: null, context_length_k: null,
+    gpu_memory_gb: {}, license_type: 'Apache-2.0',
+    is_reasoning: false, is_multimodal: false,
+    review_needed: false, review_note: null,
     enabled: true, featured: false, source: 'manual'
   })
   refreshCatalogue()
@@ -448,17 +512,39 @@ function addModelRow() {
 function editModelRow(idx) {
   var r = MC_ROWS[idx]
   if (!r) return
-  var newName = prompt('Model name:', r.name)
+  var newName = prompt('Model name:', r.name || '')
   if (newName === null) return
   r.name = newName.trim()
-  var newVendor = prompt('Vendor:', r.vendor || '')
-  if (newVendor !== null) r.vendor = newVendor.trim()
-  var newArch = prompt('Archetypes (comma-separated):\ncoding,document,audio,video,vision,multimodal,embedding,reranking,general,indic', (r.archetype||[]).join(','))
-  if (newArch !== null) r.archetype = newArch.split(',').map(function(a){ return a.trim() }).filter(Boolean)
+
+  var newFamily = prompt('Family name (e.g. Llama, Qwen, Sarvam):', r.family_name || r.vendor || '')
+  if (newFamily !== null) r.family_name = newFamily.trim()
+
+  var newDomain = prompt('Domain:\ngeneral | code | indic | geospatial | biomedical | finance | legal | aerospace | industrial | world_model', r.domain || 'general')
+  if (newDomain !== null) r.domain = newDomain.trim()
+
+  var newSpec = prompt('Specialisations (comma-separated):\ntext_gen, reasoning, vlm, embed, audio_asr, audio_tts, img_gen, video_gen, geo_vision, timeseries, anomaly, world_sim, med_seg', (r.specialisation||[]).join(', '))
+  if (newSpec !== null) r.specialisation = newSpec.split(',').map(function(s){ return s.trim() }).filter(Boolean)
+
+  var newCountry = prompt('Country of origin (US/CN/IN/FR/DE/AE/CA):', r.country_origin || '')
+  if (newCountry !== null) r.country_origin = newCountry.trim().toUpperCase()
+
+  var newLevel = prompt('Level (small/medium/large/frontier):', r.level || 'small')
+  if (newLevel !== null) r.level = newLevel.trim()
+
   var newParams = prompt('Parameters (billions):', r.params_b || '')
   if (newParams !== null) r.params_b = parseFloat(newParams) || null
-  var newLic = prompt('License (Apache2/MIT/Llama-Community/CC-BY/Custom):', r.license || 'Apache2')
-  if (newLic !== null) r.license = newLic.trim()
+
+  var newLic = prompt('License type:', r.license_type || r.license || 'Apache-2.0')
+  if (newLic !== null) r.license_type = newLic.trim()
+
+  var isReasoning = confirm('Is this a reasoning/thinking model? (OK=yes, Cancel=no)')
+  r.is_reasoning = isReasoning
+
+  if (r.review_needed) {
+    var clearReview = confirm('Mark review as resolved? (OK=yes)')
+    if (clearReview) { r.review_needed = false; r.review_note = null }
+  }
+
   refreshCatalogue()
   showToast('Row updated — sync to save')
 }
@@ -477,9 +563,24 @@ async function saveCatalogueChanges() {
         method: 'PATCH',
         headers: { apikey: key, Authorization: 'Bearer ' + key,
           'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ enabled: row.enabled, featured: row.featured,
-          name: row.name, vendor: row.vendor, archetype: row.archetype,
-          params_b: row.params_b, license: row.license, updated_at: new Date().toISOString() })
+        body: JSON.stringify({
+          enabled:        row.enabled,
+          featured:       row.featured,
+          name:           row.name,
+          vendor:         row.vendor,
+          family_name:    row.family_name,
+          domain:         row.domain,
+          specialisation: row.specialisation,
+          country_origin: row.country_origin,
+          level:          row.level,
+          is_reasoning:   row.is_reasoning || false,
+          is_multimodal:  row.is_multimodal || false,
+          license_type:   row.license_type || row.license,
+          review_needed:  row.review_needed || false,
+          review_note:    row.review_note || null,
+          params_b:       row.params_b,
+          updated_at:     new Date().toISOString()
+        })
       })
       if (!r.ok) errors++
     } catch(e) { errors++ }
