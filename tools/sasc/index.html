@@ -1236,6 +1236,56 @@ input:focus,select:focus{border-color:var(--blue);}
     calcPowerKW:        calcPowerKW,
     applyBuffers:       applyBuffers,
 
+    /**
+     * throughputAudit(gpu, model, params_b, precision, profile, batchSize)
+     * Returns human-readable audit trail of throughput calculation for UI display
+     * Used by MaaS simulation cards to show formula derivation
+     */
+    throughputAudit: function (gpu, model, params_b, precision, profile, batchSize) {
+      if (!gpu) return null
+      var bpp       = BYTES_PER_PARAM[precision] || 2
+      var modelGB   = params_b * bpp
+      var bwGBs     = (gpu.hbm_bw_tbps || 3) * 1000
+      var gpusInUnit = gpu.gpus_in_unit || 8
+      var bwPerGPU  = bwGBs / gpusInUnit
+
+      // Bandwidth bound (Profile B — low batch)
+      var bwBound   = Math.round(bwPerGPU / Math.max(modelGB / 1, 0.1))
+
+      // Compute bound (Profile A — high batch)
+      var tflops    = (precision === 'INT4' || precision === 'FP4')
+        ? ((gpu.int4_tflops || 0) / gpusInUnit)
+        : ((gpu.bf16_tflops || 0) / gpusInUnit)
+      var flopsPerToken = 2 * params_b * 1e9
+      var computeBound = tflops > 0
+        ? Math.round((tflops * 1e12 * 0.30) / flopsPerToken)
+        : 0
+
+      var batch     = batchSize || 1
+      var actual    = profile === 'B'
+        ? bwBound
+        : Math.min(
+            Math.round(bwBound * Math.pow(batch, 0.6)),
+            computeBound
+          )
+      var binding   = profile === 'B' ? 'bandwidth'
+        : (bwBound * Math.pow(batch, 0.6) < computeBound ? 'bandwidth' : 'compute')
+
+      return {
+        model_gb:       Math.round(modelGB * 10) / 10,
+        bw_per_gpu_gbs: Math.round(bwPerGPU),
+        bw_bound_tps:   bwBound,
+        compute_bound_tps: computeBound,
+        actual_tps:     actual,
+        binding:        binding,
+        batch_size:     batch,
+        profile:        profile,
+        formula: profile === 'B'
+          ? 'BW(' + Math.round(bwPerGPU) + ' GB/s) / model(' + Math.round(modelGB*10)/10 + ' GB) = ' + bwBound + ' tok/s'
+          : 'min(BW×B^0.6=' + Math.round(bwBound*Math.pow(batch,0.6)) + ', compute=' + computeBound + ') = ' + actual + ' tok/s'
+      }
+    },
+
     // Expose constants for UI reference
     SLA_BUFFERS:          SLA_BUFFERS,
     RESILIENCE_OVERHEAD:  RESILIENCE_OVERHEAD,
