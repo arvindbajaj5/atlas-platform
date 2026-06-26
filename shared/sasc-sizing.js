@@ -87,6 +87,96 @@
     very_high: 30
   }
 
+  // Performance tier — derived from latency_sensitivity + context length
+  // Drives: precision enforcement, B_max cap, dedicated pool, concurrency model
+  var PERF_TIER = {
+    interactive:  'tier1',   // TTFT <500ms, real_time latency_sensitivity
+    analytical:   'tier2',   // <5s total, interactive/near_realtime
+    async_batch:  'tier3'    // queue-based, batch latency_sensitivity
+  }
+
+  // Tier hard caps on batch size (B_max cannot exceed this regardless of VRAM/SLA)
+  var TIER_BATCH_CAP = {
+    tier1: 8,           // Tier 1 Interactive — tight latency, no sharing
+    tier2: 32,          // Tier 2 Analytical — shared pool, cost-optimised
+    tier3: Infinity     // Tier 3 Async Batch — maximise throughput
+  }
+
+  // Tier precision enforcement
+  // Tier 1: FP16/BF16 only (warn if INT4 selected — quality risk)
+  // Tier 2: FP8/INT4 preferred (cost reduction)
+  // Tier 3: INT4 enforced (maximum throughput)
+  var TIER_PREFERRED_PRECISION = {
+    tier1: ['FP16', 'BF16'],
+    tier2: ['FP8', 'INT8', 'INT4'],
+    tier3: ['INT4', 'FP4']
+  }
+
+  // Availability SLA → HA reserve percentage
+  var AVAILABILITY_HA_PCT = {
+    '99.5':  0.10,   // N+1 at cluster level
+    '99.9':  0.20,   // N+1 at rack level
+    '99.99': 1.00    // active-active — full duplicate
+  }
+
+  // Coherent memory usability factor
+  // Coherent (CPU) memory is slower than HBM — usable for overflow KV cache
+  // not for hot model weights or active KV cache path
+  var COHERENT_USABILITY = {
+    'NVLink-C2C':       0.30,
+    'NVLink-C2C Gen 2': 0.35,
+    'AMD Infinity Fabric': 0.25
+  }
+
+  // ─── Helper: derive performance tier from UC type + context ─────────────────
+
+  /**
+   * Derive performance tier from uc_interaction_types data + context length
+   * Returns 'tier1' | 'tier2' | 'tier3'
+   *
+   * Logic:
+   *   real_time + short context (<8K)  → Tier 1 Interactive
+   *   batch latency_sensitivity        → Tier 3 Async Batch
+   *   everything else                  → Tier 2 Analytical
+   */
+  function derivePerformanceTier (ucType, maxContextTokens) {
+    var latSens = ucType ? (ucType.latency_sensitivity || 'interactive') : 'interactive'
+    var ctx     = maxContextTokens || 8192
+
+    if (latSens === 'batch') return 'tier3'
+    if ((latSens === 'real_time') && ctx <= 8192) return 'tier1'
+    if (latSens === 'real_time' || latSens === 'interactive') return 'tier2'
+    if (latSens === 'near_realtime') return 'tier2'
+    return 'tier2'  // default
+  }
+
+  /**
+   * Effective GPU VRAM including coherent CPU memory (for unified memory GPUs)
+   * GB200, GB300, VR NVL72, Instinct Helios have NVLink-C2C / Infinity Fabric
+   * CPU memory is slower — apply usability factor for sizing purposes
+   */
+  function effectiveVRAM (gpu) {
+    if (!gpu.unified_memory || !gpu.coherent_cpu_mem_gb) {
+      return gpu.vram_per_gpu_gb || 80
+    }
+    var factor = COHERENT_USABILITY[gpu.coherent_interconnect] || 0.25
+    return (gpu.vram_per_gpu_gb || 80) + (gpu.coherent_cpu_mem_gb * factor)
+  }
+
+  /**
+   * Check and warn if precision is inappropriate for performance tier
+   */
+  function precisionTierWarning (precision, tier) {
+    var preferred = TIER_PREFERRED_PRECISION[tier] || []
+    if (tier === 'tier1' && (precision === 'INT4' || precision === 'FP4')) {
+      return 'Warning: INT4/FP4 not recommended for Tier 1 Interactive — quality degradation risk at low batch sizes'
+    }
+    if (tier === 'tier3' && precision === 'FP16') {
+      return 'Note: FP16 for Tier 3 Batch is cost-inefficient — consider INT4 to maximise throughput'
+    }
+    return null
+  }
+
   // ─── Supabase fetch helper ──────────────────────────────────────────────────
   function _fetch (table, params, limit) {
     var url = _sbUrl + '/rest/v1/' + table + '?' + params + (limit ? '&limit=' + limit : '')
@@ -218,7 +308,19 @@
    * Considers model's gpu_memory_gb jsonb if available (more accurate)
    */
   function calcGPUsForFit (params_b, precision, gpu, model, contextLenTokens, concurrentRequests) {
-    var vramPerGPU = gpu.vram_per_gpu_gb || 80
+    // Use effective VRAM — includes coherent CPU memory for unified memory GPUs
+    // (GB200/GB300/VR NVL72/Instinct Helios with NVLink-C2C or Infinity Fabric)
+    var vramPerGPU = effectiveVRAM(gpu)
+    var isUnified  = !!(gpu.unified_memory && gpu.coherent_cpu_mem_gb)
+
+    // Embedding models (modality='embed') have no autoregressive KV cache
+    // Single forward pass only — size on weights + activation memory
+    var isEmbedding = model && model.modality === 'embed'
+    if (isEmbedding) {
+      var weights = calcModelVRAM(params_b, precision)
+      var activations = params_b * 0.1  // ~10% of weights for activations
+      return Math.max(1, Math.ceil((weights + activations) * RUNTIME_OVERHEAD / vramPerGPU))
+    }
 
     // Use model's known VRAM requirement if available
     var modelVRAMNeeded = null
@@ -229,15 +331,14 @@
     }
 
     if (modelVRAMNeeded) {
-      // Add KV cache on top of known model VRAM
       var kv = calcKVCache(model, contextLenTokens, concurrentRequests, precision)
       var total = (modelVRAMNeeded + kv) * RUNTIME_OVERHEAD
-      return Math.ceil(total / vramPerGPU)
+      return Math.max(1, Math.ceil(total / vramPerGPU))
     }
 
     // Fallback: estimate from params
     var total = calcTotalVRAM(params_b, precision, contextLenTokens, concurrentRequests, model)
-    return Math.ceil(total / vramPerGPU)
+    return Math.max(1, Math.ceil(total / vramPerGPU))
   }
 
   /**
@@ -426,123 +527,240 @@
      * }
      */
     sizeUC: function (config, gpuConfigId) {
-      var gpu   = getGPU(gpuConfigId)
-      var model = getModel(config.model_id)
+      var gpu    = getGPU(gpuConfigId)
+      var model  = getModel(config.model_id)
       var ucType = getUCType(config.uc_type_id)
 
       if (!gpu) return { error: 'GPU config not found: ' + gpuConfigId }
 
-      // Resolve config with uc_type defaults
-      var dau         = config.dau || 100
-      var reqPerDay   = config.requests_per_day    || (ucType && ucType.requests_per_user_per_day) || 5
-      var inputTok    = config.avg_input_tokens    || (ucType && ucType.avg_input_tokens)  || 300
-      var outputTok   = config.avg_output_tokens   || (ucType && ucType.avg_output_tokens) || 500
-      var contextLen  = config.context_window      || ((model && model.context_length_k) ? model.context_length_k * 1000 : 8192)
-      var precision   = config.precision           || (ucType && ucType.min_precision) || 'INT4'
-      var peakMult    = config.peak_multiplier     || (ucType && ucType.peak_multiplier) || 3
-      var slaTier     = config.sla_tier            || 'standard'
-      var haRequired  = config.ha_required !== undefined ? config.ha_required : (ucType && ucType.ha_required !== undefined ? ucType.ha_required : true)
-      var drType      = config.dr_type             || 'none'
-      var growth      = config.growth_headroom_pct !== undefined ? config.growth_headroom_pct : 20
-      var derating    = config.derating_pct        || 80
-      var params_b    = model ? model.params_b : 7
+      // ── Resolve inputs with uc_type defaults ──────────────────────────────
+      var dau        = config.dau || 1000
+      var reqPerDay  = config.requests_per_day   || (ucType && ucType.requests_per_user_per_day) || 5
+      var outputTok  = config.avg_output_tokens  || (ucType && ucType.avg_output_tokens) || 500
+      var precision  = config.precision          || (ucType && ucType.min_precision) || 'INT4'
+      var slaTier    = config.sla_tier           || 'standard'
+      var haRequired = config.ha_required !== undefined ? config.ha_required
+                     : (ucType && ucType.ha_required !== undefined ? ucType.ha_required : true)
+      var drType     = config.dr_type            || 'none'
+      var growth     = config.growth_headroom_pct !== undefined ? config.growth_headroom_pct : 20
+      var derating   = config.derating_pct       || 80
+      var params_b   = model ? model.params_b : 7
+      var availSLA   = config.availability_sla   || '99.5'
 
-      // Peak RPS from demand inputs
-      var peakRPS = calcPeakRPS(dau, reqPerDay, peakMult)
-      // Concurrent sessions via Little's Law: N = λ × W
-      // W = average service time derived from latency SLA
-      // Tighter SLA = shorter service time = fewer concurrent sessions for same RPS
-      var responseTimeSec = config.ttft_sla_ms
-        ? Math.max(0.5, config.ttft_sla_ms / 1000)
-        : (ucType && ucType.typical_sla_ms ? ucType.typical_sla_ms / 1000 : 2.0)
-      var concurrentSessions = Math.max(1, Math.ceil(peakRPS * responseTimeSec))
+      // Context: P50 (typical) and P95 (max/guaranteed) — key for VRAM sizing
+      // P50 drives utilisation estimate, P95 drives SLA guarantee GPU count
+      var contextP50 = config.typical_context_tokens
+        || config.context_window
+        || ((model && model.context_length_k) ? Math.min(model.context_length_k * 1000, 8192) : 4096)
+      var contextP95 = config.max_context_tokens
+        || config.context_window
+        || ((model && model.context_length_k) ? model.context_length_k * 1000 : 8192)
 
-      // GPU fit (VRAM)
-      var gpusForFit        = calcGPUsForFit(params_b, precision, gpu, model, contextLen, concurrentSessions)
+      // Sizing policy from engagement: 'p50_utilisation' or 'p95_guaranteed'
+      var sizingPolicy = config.sizing_policy || 'p95_guaranteed'
 
-      // GPU throughput (Profile B — memory bandwidth bound at low batch)
-      var gpusForThroughput = calcGPUsForThroughput(peakRPS, outputTok, gpu, model, params_b, precision, 'B', derating)
+      // Active context for sizing (P95 for guaranteed, P50 for utilisation)
+      var contextLen = sizingPolicy === 'p50_utilisation' ? contextP50 : contextP95
 
-      // Binding constraint
-      var baseGPUs = Math.max(gpusForFit, gpusForThroughput, 1)
-      var bindingConstraint = gpusForFit >= gpusForThroughput ? 'memory_fit' : 'throughput'
+      // ── Performance tier (derived — not user-selected) ────────────────────
+      var perfTier     = config.performance_tier || derivePerformanceTier(ucType, contextP95)
+      var tierBatchCap = TIER_BATCH_CAP[perfTier] || 32
+      var tierWarning  = precisionTierWarning(precision, perfTier)
+      var dedicatedPool = perfTier === 'tier1'  // Tier 1 never shares pool
 
-      // Apply buffers — note: for UCs we DON'T apply MaaS multi-tenancy overhead
-      var sla = SLA_BUFFERS[slaTier] || SLA_BUFFERS.standard
+      // ── P95 concurrency — Little's Law with P95 peak ──────────────────────
+      // P95 peak multiplier: P95 traffic is typically 2-3× average peak
+      // Use explicit p95_peak_multiplier if provided, else estimate from peak_mult
+      var peakMult     = config.peak_multiplier || (ucType && ucType.peak_multiplier) || 3
+      var p95Mult      = config.p95_peak_multiplier || (peakMult * 1.5)  // P95 ≈ 1.5× avg peak
+
+      var avgRPS   = (dau * reqPerDay) / 86400
+      var peakRPS  = avgRPS * peakMult      // average peak (P50)
+      var p95RPS   = avgRPS * p95Mult       // P95 spike
+
+      // Active RPS for sizing
+      var activeRPS = sizingPolicy === 'p50_utilisation' ? peakRPS : p95RPS
+
+      // Little's Law: concurrent sessions = RPS × response time
+      var ttftSlaMs = config.ttft_sla_ms
+        || (ucType && ucType.typical_sla_ms)
+        || (perfTier === 'tier1' ? 500 : perfTier === 'tier2' ? 3000 : 30000)
+      var responseTimeSec  = Math.max(0.5, ttftSlaMs / 1000)
+      var concurrentSessions = Math.max(1, Math.ceil(activeRPS * responseTimeSec))
+
+      // ── Effective VRAM (includes coherent memory for unified GPUs) ─────────
+      var vramPerGPU    = effectiveVRAM(gpu)
+      var isUnifiedMem  = !!(gpu.unified_memory && gpu.coherent_cpu_mem_gb)
+
+      // ── VRAM constraint: B_max from available KV cache budget ─────────────
+      var W_i           = calcModelVRAM(params_b, precision)
+      var kvPerSession  = calcKVCache(model, contextLen, 1, precision)  // per single session
+      var vramForWeights = W_i * RUNTIME_OVERHEAD
+      var kvBudget      = Math.max(0, vramPerGPU - vramForWeights)
+      var B_max_vram    = Math.max(1, Math.floor(kvBudget / kvPerSession))
+
+      // ── SLA constraint: B_max from TTFT target ────────────────────────────
+      // GPU throughput at this batch size (Profile B — bandwidth bound)
+      var throughputPerGPU = calcGPUThroughput(gpu, model, params_b, precision, 'B')
+      var B_max_sla = Math.max(1, Math.floor(
+        (throughputPerGPU * (derating / 100) * (ttftSlaMs / 1000)) / outputTok
+      ))
+
+      // ── Three-constraint B_max ─────────────────────────────────────────────
+      var B_max = Math.min(B_max_vram, B_max_sla, tierBatchCap)
+      var bindingBatch = B_max === B_max_vram   ? 'vram'
+                       : B_max === B_max_sla    ? 'sla_ttft'
+                       : 'tier_cap_' + perfTier
+
+      // ── GPU fit: TP_i (GPUs per model instance) ────────────────────────────
+      var kvForBmax  = calcKVCache(model, contextLen, B_max, precision)
+      var vramNeeded = (W_i + kvForBmax) * RUNTIME_OVERHEAD
+      var TP_i       = Math.max(1, Math.ceil(vramNeeded / vramPerGPU))
+
+      // ── GPU throughput: I_i (instances needed) ────────────────────────────
+      var gpusForThroughput = calcGPUsForThroughput(activeRPS, outputTok, gpu, model, params_b, precision, 'B', derating)
+      var I_i = Math.max(1, Math.ceil(gpusForThroughput / Math.max(TP_i, 1)))
+
+      // Base GPU count: I_i instances × TP_i GPUs each
+      var baseGPUs          = I_i * TP_i
+      var bindingConstraint = TP_i >= gpusForThroughput ? 'memory_fit' : 'throughput'
+
+      // ── Availability SLA → HA reserve ─────────────────────────────────────
+      var haPct     = AVAILABILITY_HA_PCT[availSLA] || 0.10
+      var haGPUs    = haRequired ? Math.ceil(baseGPUs * haPct) : 0
+      var drGPUs    = drType === 'warm'          ? Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.dr_warm)
+                    : drType === 'active-active'  ? Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.dr_active_active)
+                    : 0
+
+      // ── SLA buffers (no multi-tenancy for UC — dedicated per tenant) ───────
+      var sla             = SLA_BUFFERS[slaTier] || SLA_BUFFERS.standard
       var peakBuffer      = Math.ceil(baseGPUs * sla.peak_headroom_pct / 100)
       var failoverReserve = Math.ceil(baseGPUs * sla.failover_pct / 100)
-      var haGPUs          = haRequired ? Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.ha_standard) : 0
-      var drGPUs          = drType === 'warm' ? Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.dr_warm)
-                          : drType === 'active-active' ? Math.ceil(baseGPUs * RESILIENCE_OVERHEAD.dr_active_active)
-                          : 0
       var growthGPUs      = Math.ceil(baseGPUs * (growth / 100))
-      var totalGPUs       = baseGPUs + peakBuffer + failoverReserve + haGPUs + drGPUs + growthGPUs
 
-      // Convert to units
-      var unitCalc    = gpusToUnits(totalGPUs, gpu)
-      var powerKW     = calcPowerKW(unitCalc.units, gpu)
+      // Tier 1: dedicated pool — no sharing, additional isolation buffer
+      var isolationGPUs   = dedicatedPool ? Math.ceil(baseGPUs * 0.10) : 0
 
-      // Throughput estimate (for SLA validation)
-      var throughputPerUnit = calcGPUThroughput(gpu, model, params_b, precision, 'B')
-      var totalThroughput   = throughputPerUnit * unitCalc.actual_gpus * (derating / 100)
-      var ttftEstimateMs    = model
-        ? Math.round((params_b * 2 * 1e9) / ((gpu.hbm_bw_tbps || 3) * 1e12) * 1000)
-        : null
-      var slaRequired = ucType ? ucType.typical_sla_ms : (config.ttft_sla_ms || 2000)
-      var slaMet = ttftEstimateMs ? ttftEstimateMs <= slaRequired : true
+      var totalGPUs       = baseGPUs + peakBuffer + failoverReserve + haGPUs + drGPUs + growthGPUs + isolationGPUs
+
+      // ── Performance estimates ─────────────────────────────────────────────
+      var unitCalc       = gpusToUnits(totalGPUs, gpu)
+      var powerKW        = calcPowerKW(unitCalc.units, gpu)
+      var totalThroughput = throughputPerGPU * unitCalc.actual_gpus * (derating / 100)
+
+      // TTFT estimate: time to generate first token = model_size / bandwidth
+      var ttftEstimateMs = Math.round(
+        (params_b * (BYTES_PER_PARAM[precision] || 2) * 1e9) /
+        ((gpu.hbm_bw_tbps || 3) * 1e12 / TP_i) * 1000
+      )
+      var slaMet = ttftEstimateMs <= ttftSlaMs
+
+      // ── P50 utilisation estimate ───────────────────────────────────────────
+      // Show what utilisation looks like at normal (P50) load
+      var p50Sessions   = Math.max(1, Math.ceil(peakRPS * responseTimeSec))
+      var p50Util       = Math.round(p50Sessions / Math.max(concurrentSessions, 1) * 100)
 
       return {
-        // Inputs resolved
-        dau: dau, requests_per_day: reqPerDay, peak_rps: Math.round(peakRPS * 100) / 100,
-        precision: precision, params_b: params_b, context_window: contextLen,
+        // Demand inputs
+        dau:                    dau,
+        requests_per_day:       reqPerDay,
+        peak_rps_p50:           Math.round(peakRPS * 100) / 100,
+        peak_rps_p95:           Math.round(p95RPS * 100) / 100,
+        active_rps:             Math.round(activeRPS * 100) / 100,
+        sizing_policy:          sizingPolicy,
 
-        // GPU sizing breakdown
-        gpus_for_fit:        gpusForFit,
-        gpus_for_throughput: gpusForThroughput,
-        binding_constraint:  bindingConstraint,
-        base_gpus:           baseGPUs,
-        peak_buffer_gpus:    peakBuffer,
-        failover_gpus:       failoverReserve,
-        ha_gpus:             haGPUs,
-        dr_gpus:             drGPUs,
-        growth_gpus:         growthGPUs,
-        total_gpus:          totalGPUs,
+        // Performance tier
+        performance_tier:       perfTier,
+        tier_batch_cap:         tierBatchCap,
+        dedicated_pool:         dedicatedPool,
+        precision:              precision,
+        tier_warning:           tierWarning,
 
-        // Units
-        units_required: unitCalc.units,
-        unit_type:      unitCalc.unit_type,
-        actual_gpus:    unitCalc.actual_gpus,
-        gpus_per_unit:  unitCalc.gpus_per_unit,
+        // Context
+        context_p50_tokens:     contextP50,
+        context_p95_tokens:     contextP95,
+        context_used_tokens:    contextLen,
+
+        // Three-constraint B_max
+        b_max_vram:             B_max_vram,
+        b_max_sla:              B_max_sla,
+        b_max_tier_cap:         tierBatchCap,
+        b_max:                  B_max,
+        binding_batch_constraint: bindingBatch,
+
+        // GPU breakdown
+        tp_i:                   TP_i,
+        i_i:                    I_i,
+        gpus_for_fit:           TP_i,
+        gpus_for_throughput:    gpusForThroughput,
+        binding_constraint:     bindingConstraint,
+        base_gpus:              baseGPUs,
+        peak_buffer_gpus:       peakBuffer,
+        failover_gpus:          failoverReserve,
+        ha_gpus:                haGPUs,
+        dr_gpus:                drGPUs,
+        isolation_gpus:         isolationGPUs,
+        growth_gpus:            growthGPUs,
+        total_gpus:             totalGPUs,
+
+        // Coherent memory
+        vram_per_gpu_effective: Math.round(vramPerGPU * 10) / 10,
+        unified_memory:         isUnifiedMem,
+        coherent_note:          isUnifiedMem
+          ? 'Effective VRAM includes coherent CPU memory (' + gpu.coherent_interconnect + ')'
+          : null,
+
+        // Availability
+        availability_sla:       availSLA,
+        ha_pct_applied:         Math.round(haPct * 100),
+
+        // Units (packaging — BOM concern, shown for reference)
+        units_required:         unitCalc.units,
+        unit_type:              unitCalc.unit_type,
+        actual_gpus:            unitCalc.actual_gpus,
+        gpus_per_unit:          unitCalc.gpus_per_unit,
 
         // Performance
+        params_b:               params_b,
         throughput_tokens_per_sec: Math.round(totalThroughput),
-        ttft_estimate_ms:          ttftEstimateMs,
-        sla_met:                   slaMet,
-        power_kw:                  Math.round(powerKW * 10) / 10,
+        ttft_estimate_ms:       ttftEstimateMs,
+        ttft_sla_ms:            ttftSlaMs,
+        sla_met:                slaMet,
+        power_kw:               Math.round(powerKW * 10) / 10,
+        p50_utilisation_pct:    p50Util,
 
-        // Explanation
+        // Sizing profile
         sizing_profile: 'B',
-        notes: [
-          'Profile B (UC internal): memory-bandwidth bound at low concurrency',
-          'Base: max(' + gpusForFit + ' fit, ' + gpusForThroughput + ' throughput) = ' + baseGPUs + ' GPUs (' + bindingConstraint + ')',
-          'Buffers: +' + peakBuffer + ' peak, +' + failoverReserve + ' failover, +' + haGPUs + ' HA, +' + drGPUs + ' DR, +' + growthGPUs + ' growth',
-          'Total: ' + totalGPUs + ' GPUs → ' + unitCalc.units + ' ' + unitCalc.unit_type + '(s) × ' + unitCalc.gpus_per_unit + ' GPUs',
-        'KV: ' + kvCacheMethod(model)
-      ].join(' | '),
 
-      // Audit trail — full sizing inputs/outputs for customer transparency
-      audit: {
-        formula:             'M_total = (M_weights + M_KV) × 1.20',
-        m_weights_gb:        Math.round(calcModelVRAM(params_b, precision) * 100) / 100,
-        m_kv_gb:             Math.round(calcKVCache(model, contextLen, concurrentSessions, precision) * 100) / 100,
-        m_total_gb:          Math.round(calcTotalVRAM(params_b, precision, contextLen, concurrentSessions, model) * 100) / 100,
-        vram_per_gpu_gb:     gpu.vram_per_gpu_gb || 80,
-        gpus_for_fit:        gpusForFit,
-        gpus_for_throughput: gpusForThroughput,
-        binding_constraint:  bindingConstraint,
-        kv_cache_method:     kvCacheMethod(model),
-        concurrent_sessions: concurrentSessions,
-        littles_law:         'λ=' + Math.round(peakRPS*100)/100 + ' RPS × W=' + responseTimeSec + 's = N=' + concurrentSessions
+        // Full audit trail
+        notes: [
+          'Profile B | Tier: ' + perfTier + ' | Policy: ' + sizingPolicy,
+          'P95 RPS: ' + Math.round(p95RPS*100)/100 + ' | Concurrent: ' + concurrentSessions + ' (Littles Law: ' + Math.round(activeRPS*100)/100 + ' RPS × ' + responseTimeSec + 's)',
+          'B_max: min(' + B_max_vram + ' VRAM, ' + B_max_sla + ' SLA, ' + tierBatchCap + ' tier) = ' + B_max + ' [' + bindingBatch + ']',
+          'GPU: TP_i=' + TP_i + ' × I_i=' + I_i + ' = ' + baseGPUs + ' base | Effective VRAM: ' + Math.round(vramPerGPU) + 'GB' + (isUnifiedMem ? ' (unified)' : ''),
+          'Buffers: +' + peakBuffer + ' peak +' + failoverReserve + ' failover +' + haGPUs + ' HA(' + availSLA + '%) +' + isolationGPUs + ' isolation +' + growthGPUs + ' growth = ' + totalGPUs + ' total',
+          'TTFT: ' + ttftEstimateMs + 'ms vs SLA ' + ttftSlaMs + 'ms → ' + (slaMet ? '✓ met' : '✗ breach'),
+          'KV: ' + kvCacheMethod(model)
+        ].join(' | '),
+
+        audit: {
+          formula:              'base = I_i × TP_i | B_max = min(VRAM, SLA, tier)',
+          w_i_gb:               Math.round(W_i * 100) / 100,
+          kv_per_session_gb:    Math.round(kvPerSession * 100) / 100,
+          kv_for_bmax_gb:       Math.round(kvForBmax * 100) / 100,
+          vram_needed_gb:       Math.round(vramNeeded * 100) / 100,
+          vram_available_gb:    Math.round(vramPerGPU * 100) / 100,
+          b_max_vram:           B_max_vram,
+          b_max_sla:            B_max_sla,
+          b_max_final:          B_max,
+          binding_batch:        bindingBatch,
+          tp_i:                 TP_i,
+          i_i:                  I_i,
+          base_gpus:            baseGPUs,
+          kv_cache_method:      kvCacheMethod(model),
+          littles_law:          'N = ' + Math.round(activeRPS*100)/100 + ' RPS × ' + responseTimeSec + 's = ' + concurrentSessions,
+          p95_vs_p50:           'P95 sessions: ' + concurrentSessions + ' | P50 sessions: ' + p50Sessions + ' | P50 util: ' + p50Util + '%'
+        }
       }
     },
 
