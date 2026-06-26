@@ -3411,45 +3411,130 @@ function renderWorkloadB() {
 }
 
 // GPUaaS + BMaaS config section
+function _csTag() {
+  return '<span style="font-size:9px;padding:1px 5px;background:#FEF3C7;color:#92400E;border-radius:3px;font-weight:700;margin-left:6px">COMING SOON</span>'
+}
+
 function renderGpuBmaasSection() {
-  var sm = SASC_DATA.serviceModel
-  var ga = sm.gpuaas
-  var bm2 = sm.bmaas
-  var html = '<div class="card"><div class="card-title">GPU as a Service &amp; Bare Metal as a Service</div>'
+  var sm   = SASC_DATA.serviceModel
+  var ga   = sm.gpuaas
+  var bm2  = sm.bmaas
+  var pp   = SASC_DATA.product_profile || {}
+  var secTier = pp.security_tier || 'S1'
+  var html = '<div class="card"><div class="card-title">Tenant Services — GPUaaS &amp; BMaaS</div>'
+
+  // MaaS provisioning model
+  if (SASC_DATA.outputStack && SASC_DATA.outputStack.maas) {
+    html += '<div style="padding:10px 12px;background:var(--light);border-radius:6px;margin-bottom:14px">'
+    html += '<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">MaaS Provisioning Model ' + _csTag() + '</div>'
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    var pModel = sm.maas_provisioning || 'public_shared'
+    ;[['public_shared','Public Shared','Fleet-level pool — all tenants share capacity, best-effort SLA'],
+      ['enterprise_dedicated','Enterprise Dedicated','Tenant-level — dedicated GPU pool, guaranteed SLA, sized here']
+    ].forEach(function(v) {
+      var sel = pModel === v[0]
+      html += '<div onclick="SASC_DATA.serviceModel.maas_provisioning=\''+v[0]+'\';renderStep(SASC_STEP)" style="padding:8px 10px;border:1.5px solid '+(sel?'var(--navy)':'var(--border)')+';border-radius:5px;cursor:pointer;background:'+(sel?'rgba(0,40,112,.05)':'#fff')+'">'
+      html += '<div style="font-size:11px;font-weight:'+(sel?'700':'500')+';color:'+(sel?'var(--navy)':'var(--mid)')+'">'+v[1]+'</div>'
+      html += '<div style="font-size:9px;color:var(--mid);margin-top:2px">'+v[2]+'</div>'
+      html += '</div>'
+    })
+    html += '</div>'
+    if (pModel === 'enterprise_dedicated') {
+      html += '<div style="margin-top:8px;padding:6px 10px;background:#FEF9C3;border-radius:4px;font-size:11px;color:#854D0E">⚠ Enterprise dedicated MaaS sizing — Coming Soon. GPU allocation will be computed from MaaS DAU using sizeMaaS() with dedicated pool flag.</div>'
+    }
+    html += '</div>'
+  }
 
   // GPUaaS
-  html += '<div style="margin-bottom:16px">'
-  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+  html += '<div style="margin-bottom:14px;padding:12px 14px;background:var(--light);border-radius:8px;border-left:3px solid var(--navy)">'
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
   html += '<div class="toggle-sw' + (ga.enabled?' on':'') + '" onclick="SASC_DATA.serviceModel.gpuaas.enabled=!SASC_DATA.serviceModel.gpuaas.enabled;renderStep(SASC_STEP)"></div>'
-  html += '<span style="font-weight:600;font-size:13px;color:var(--navy)">GPU as a Service</span>'
-  html += '<span style="font-size:11px;color:var(--mid)">Reserved + burst GPU compute for external consumers</span>'
+  html += '<div><div style="font-weight:600;font-size:13px;color:var(--navy)">GPU as a Service</div>'
+  html += '<div style="font-size:11px;color:var(--mid)">Reserved + burst GPU compute for this tenant</div></div>'
   html += '</div>'
   if (ga.enabled) {
-    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 12px;background:var(--light);border-radius:6px">'
-    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">GPUs reserved</div>'
-    html += '<input type="number" value="' + ga.gpus + '" min="0" step="8" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.gpuaas.gpus=+this.value"></div>'
-    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Price USD/GPU-hr</div>'
-    html += '<input type="number" value="' + ga.gpu_hour_price_usd + '" min="0" step="0.5" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.gpuaas.gpu_hour_price_usd=+this.value"></div>'
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:10px">'
+    html += '<div><div style="font-size:10px;color:var(--mid);font-weight:600;margin-bottom:4px">GPUs Reserved</div>'
+    html += '<input type="number" value="'+(ga.gpus||0)+'" min="0" step="8" style="width:80px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-weight:700;font-family:inherit" onchange="SASC_DATA.serviceModel.gpuaas.gpus=+this.value"></div>'
+    html += '<div><div style="font-size:10px;color:var(--mid);font-weight:600;margin-bottom:4px">Burst GPUs</div>'
+    html += '<input type="number" value="'+(ga.burst_gpus||0)+'" min="0" step="8" style="width:80px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-weight:700;font-family:inherit" onchange="SASC_DATA.serviceModel.gpuaas.burst_gpus=+this.value"></div>'
+    html += '<div><div style="font-size:10px;color:var(--mid);font-weight:600;margin-bottom:4px">Price USD/GPU-hr</div>'
+    html += '<input type="number" value="'+(ga.gpu_hour_price_usd||3.5)+'" min="0" step="0.5" style="width:80px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-weight:700;font-family:inherit" onchange="SASC_DATA.serviceModel.gpuaas.gpu_hour_price_usd=+this.value"></div>'
     html += '</div>'
+    // Coming soon items
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    html += '<div style="padding:8px 10px;background:#fff;border:1px dashed var(--border);border-radius:5px">'
+    html += '<div style="font-size:11px;font-weight:600;color:var(--mid)">Availability SLA ' + _csTag() + '</div>'
+    html += '<div style="font-size:10px;color:var(--mid);margin-top:2px">99.5% / 99.9% / 99.99% → drives HA reserve</div></div>'
+    html += '<div style="padding:8px 10px;background:#fff;border:1px dashed var(--border);border-radius:5px">'
+    html += '<div style="font-size:11px;font-weight:600;color:var(--mid)">Isolation Model ' + _csTag() + '</div>'
+    html += '<div style="font-size:10px;color:var(--mid);margin-top:2px">Dedicated / MIG partition / Time-sliced</div></div>'
+    html += '</div>'
+    // Sizing result (interim)
+    var gpuResult = (window.SizingEngine && SizingEngine.ready && SASC_DATA.gpuConfigId)
+      ? SizingEngine.sizeGPUaaS({ archetype_id:'gpuaas-std', reserved_gpus: ga.gpus||0, burst_gpus: ga.burst_gpus||0 }, SASC_DATA.gpuConfigId)
+      : null
+    if (gpuResult && !gpuResult.error) {
+      html += '<div style="margin-top:10px;padding:8px 10px;background:var(--navy);border-radius:5px;color:#fff;display:flex;justify-content:space-between;align-items:center">'
+      html += '<span style="font-size:11px;opacity:.8">GPU allocation (interim — flat 10% HA)</span>'
+      html += '<span style="font-size:18px;font-weight:800">' + gpuResult.total_gpus + ' GPUs · ' + gpuResult.power_kw + 'kW</span>'
+      html += '</div>'
+    }
   }
   html += '</div>'
 
   // BMaaS
-  html += '<div>'
-  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+  html += '<div style="padding:12px 14px;background:var(--light);border-radius:8px;border-left:3px solid var(--teal)">'
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
   html += '<div class="toggle-sw' + (bm2.enabled?' on':'') + '" onclick="SASC_DATA.serviceModel.bmaas.enabled=!SASC_DATA.serviceModel.bmaas.enabled;renderStep(SASC_STEP)"></div>'
-  html += '<span style="font-weight:600;font-size:13px;color:var(--navy)">Bare Metal as a Service</span>'
-  html += '<span style="font-size:11px;color:var(--mid)">Dedicated AI servers for maximum isolation</span>'
+  html += '<div><div style="font-weight:600;font-size:13px;color:var(--navy)">Bare Metal as a Service</div>'
+  html += '<div style="font-size:11px;color:var(--mid)">Dedicated CPU servers for this tenant</div></div>'
   html += '</div>'
   if (bm2.enabled) {
-    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 12px;background:var(--light);border-radius:6px">'
-    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Servers</div>'
-    html += '<input type="number" value="' + bm2.servers + '" min="0" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.bmaas.servers=+this.value"></div>'
-    html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;margin-bottom:4px">Price USD/server/hr</div>'
-    html += '<input type="number" value="' + bm2.server_hour_price_usd + '" min="0" step="0.1" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;font-family:inherit" onchange="SASC_DATA.serviceModel.bmaas.server_hour_price_usd=+this.value"></div>'
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:10px">'
+    html += '<div><div style="font-size:10px;color:var(--mid);font-weight:600;margin-bottom:4px">Servers</div>'
+    html += '<input type="number" value="'+(bm2.servers||0)+'" min="0" style="width:80px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-weight:700;font-family:inherit" onchange="SASC_DATA.serviceModel.bmaas.servers=+this.value"></div>'
+    html += '<div><div style="font-size:10px;color:var(--mid);font-weight:600;margin-bottom:4px">Price USD/server/hr</div>'
+    html += '<input type="number" value="'+(bm2.server_hour_price_usd||1.2)+'" min="0" step="0.1" style="width:80px;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-weight:700;font-family:inherit" onchange="SASC_DATA.serviceModel.bmaas.server_hour_price_usd=+this.value"></div>'
     html += '</div>'
+    // Coming soon items
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">'
+    html += '<div style="padding:8px 10px;background:#fff;border:1px dashed var(--border);border-radius:5px">'
+    html += '<div style="font-size:11px;font-weight:600;color:var(--mid)">Server Class ' + _csTag() + '</div>'
+    html += '<div style="font-size:10px;color:var(--mid);margin-top:2px">Standard / High-core / High-mem</div></div>'
+    html += '<div style="padding:8px 10px;background:#fff;border:1px dashed var(--border);border-radius:5px">'
+    html += '<div style="font-size:11px;font-weight:600;color:var(--mid)">Availability SLA ' + _csTag() + '</div>'
+    html += '<div style="font-size:10px;color:var(--mid);margin-top:2px">99.5% / 99.9% / 99.99%</div></div>'
+    html += '<div style="padding:8px 10px;background:#fff;border:1px dashed var(--border);border-radius:5px">'
+    html += '<div style="font-size:11px;font-weight:600;color:var(--mid)">Network Tier ' + _csTag() + '</div>'
+    html += '<div style="font-size:10px;color:var(--mid);margin-top:2px">10GbE / 25GbE / 100GbE</div></div>'
+    html += '</div>'
+    var bmResult = (window.SizingEngine && SizingEngine.ready)
+      ? SizingEngine.sizeBMaaS({ archetype_id:'bmaas-std', servers: bm2.servers||0 })
+      : null
+    if (bmResult) {
+      html += '<div style="margin-top:10px;padding:8px 10px;background:var(--teal);border-radius:5px;color:#fff;display:flex;justify-content:space-between;align-items:center">'
+      html += '<span style="font-size:11px;opacity:.8">Server allocation (interim — flat 10% HA)</span>'
+      html += '<span style="font-size:18px;font-weight:800">' + bmResult.total_servers + ' servers · ' + bmResult.power_kw + 'kW</span>'
+      html += '</div>'
+    }
   }
   html += '</div>'
+
+  // Security isolation note
+  if (secTier === 'S3' || secTier === 'S4') {
+    html += '<div style="margin-top:10px;padding:10px 12px;background:#FEF3C7;border-radius:6px;border-left:3px solid #D97706">'
+    html += '<div style="font-size:11px;font-weight:700;color:#92400E;margin-bottom:4px">'
+    html += secTier + ' Security — GPU Isolation Impact ' + _csTag() + '</div>'
+    html += '<div style="font-size:11px;color:#92400E">'
+    if (secTier === 'S4') {
+      html += 'S4 Classified requires a separate physical MDC. Fleet sizing for this tenant is a separate exercise outside standard SASC scope.'
+    } else {
+      html += 'S3 Sovereign requires dedicated physical GPU allocation (non-poolable). A 10% isolation buffer will be added to all GPU counts. BOM will include +25% hardware uplift and +15% compliance services uplift.'
+    }
+    html += '</div></div>'
+  }
+
   html += '</div>'
   return html
 }
