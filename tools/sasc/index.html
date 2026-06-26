@@ -1425,10 +1425,22 @@ var SASC_DATA = {
   powerMode: 'total',        // 'total' = full DC power, 'gpu' = already net of overheads
   pue: 1.2,                  // Power Usage Effectiveness (OEM DLC default)
   overhead: {
-    networking_pct: 2.0,     // % of IT load for networking
-    storage_pct:    1.5,     // % of IT load for storage
-    mgmt_pct:       1.0,     // % of IT load for management/control nodes
+    networking_pct: 2.0,
+    storage_pct:    1.5,
+    mgmt_pct:       1.0,
   },
+  // Tenant product profile
+  product_profile: {
+    quadrants:       ['uc_consumer'],  // infra_supplier|uc_supplier|infra_consumer|uc_consumer
+    is_territory:    false,
+    security_tier:   'S1',            // S1|S2|S3|S4
+    chargeout_model: 'external_commercial',
+  },
+  // Engagement-level sizing policy
+  sizing_policy:  'p95_guaranteed',   // 'p95_guaranteed'|'p50_utilisation'
+  serving_engine: 'vllm',             // centre default — per-UC can override
+  // Public MaaS contribution (DAU this tenant contributes to shared pool)
+  maas_contribution: {},              // { text: 1000, coding: 500, ... }
   maasMix: null,             // {text:40, coding:30, document:20, indic:10} — mix for capacity view
   maasParams: {              // per usage-type sizing overrides (editable in SASC S3)
     // keyed by usage type: 'text','coding','document','audio','indic','generic'
@@ -2155,11 +2167,12 @@ function adjustLayersByScope(scope) {
 function getActiveSteps() {
   var os = SASC_DATA.outputStack
   var steps = [{ key:'scope', label:'Scope & Stack' }]
-  if (os.ucdev)  steps.push({ key:'workloads_a', label:'Workloads A — AI UCs' })
+  if (os.ucdev)  steps.push({ key:'workloads_a', label:'S2 — UC Workloads' })
   var _sm = SASC_DATA.serviceModel
-  if (os.maas || os.gpuaas || os.bmaas || _sm.maas.enabled || _sm.gpuaas.enabled || _sm.bmaas.enabled) steps.push({ key:'workloads_b', label:'Workloads B — AI Services' })
+  if (os.maas || os.gpuaas || os.bmaas || os.ptaas || _sm.maas.enabled || _sm.gpuaas.enabled || _sm.bmaas.enabled) steps.push({ key:'workloads_b', label:'S3 — Tenant Services' })
   if (os.skills || os.coe) steps.push({ key:'workloads_c', label:'Workloads C — Capability' })
-  steps.push({ key:'bom', label:'BOM / ROM' })
+  steps.push({ key:'fleet_view', label:'S4 — Fleet Allocation' })
+  steps.push({ key:'bom', label:'S5 — BOM / ROM' })
   return steps
 }
 
@@ -2177,6 +2190,81 @@ function toggleOutputStack(key) {
   var steps = getActiveSteps()
   if (SASC_STEP > steps.length) SASC_STEP = steps.length
   renderStep(SASC_STEP)
+}
+
+function renderFleetView() {
+  var s   = SASC_DATA
+  var inv = calcFleetInventory()
+  var gc  = ALL_GPU_CONFIGS.find(function(g){ return g.id === s.gpuConfigId })
+
+  // Aggregate GPU demand across all sized workloads
+  var ucGPUs      = 0
+  var ucKW        = 0
+  var serviceGPUs = 0
+  var serviceKW   = 0
+
+  // UC sizing results (from SASC_DATA.ucWorkloads)
+  if (window.SizingEngine && SizingEngine.ready && s.selectedUCs && s.selectedUCs.length) {
+    s.selectedUCs.forEach(function(ucId) {
+      var wl = s.ucWorkloads[ucId] || {}
+      var result = SizingEngine.sizeUC({
+        uc_type_id:            wl.uc_type_id,
+        model_id:              wl.model_id,
+        dau:                   wl.dau        || 1000,
+        peak_multiplier:       wl.peak_mult  || 3,
+        precision:             wl.precision  || 'INT4',
+        sla_tier:              wl.sla_tier   || 'standard',
+        sizing_policy:         s.sizing_policy || 'p95_guaranteed',
+        availability_sla:      wl.availability_sla || '99.5',
+        typical_context_tokens: wl.typical_context_tokens,
+        max_context_tokens:     wl.max_context_tokens,
+        derating_pct:          wl.derating_pct || 80
+      }, s.gpuConfigId)
+      if (!result.error) {
+        ucGPUs += result.total_gpus || 0
+        ucKW   += result.power_kw   || 0
+      }
+    })
+  }
+
+  // Service allocations (GPUaaS, BMaaS from serviceModel)
+  var sm = s.serviceModel || {}
+  if (sm.gpuaas && sm.gpuaas.enabled) {
+    var gaResult = window.SizingEngine ? SizingEngine.sizeGPUaaS({ archetype_id:'gpuaas-std', reserved_gpus: sm.gpuaas.reserved_gpus || 8, burst_gpus: sm.gpuaas.burst_gpus || 0 }, s.gpuConfigId) : { total_gpus:8, power_kw:0 }
+    serviceGPUs += gaResult.total_gpus || 0
+    serviceKW   += gaResult.power_kw   || 0
+  }
+
+  var totalDemand   = ucGPUs + serviceGPUs
+  var fleetGPUs     = inv.fleet_gpus || 0
+  var unallocated   = Math.max(0, fleetGPUs - totalDemand)
+  var utilPct       = fleetGPUs > 0 ? Math.round(totalDemand / fleetGPUs * 100) : 0
+  var mwDemand      = ucKW + serviceKW
+  var mwAvail       = inv.gpu_available_kw || 0
+  var mwUtil        = mwAvail > 0 ? Math.round(mwDemand / mwAvail * 100) : 0
+
+  var statusColor   = utilPct > 90 ? 'var(--orange)' : utilPct > 70 ? 'var(--amber)' : 'var(--teal)'
+
+  var html = '<div class="card">'    + '<div class="card-title">S4 — Fleet Allocation View</div>'    + '<div class="card-sub">GPU demand vs fleet inventory. Size to P95 — fleet should absorb peak without degradation.</div>'
+  if (!gc) {
+    html += '<div style="padding:16px;background:#FEF9C3;border-radius:6px;color:#854D0E">⚠ No GPU architecture selected. Go to S1 → Infrastructure to configure the fleet.</div>'
+  } else {
+    // Summary row
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">'      + '<div style="padding:12px;background:var(--light);border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--navy)">' + fleetGPUs.toLocaleString() + '</div><div style="font-size:10px;color:var(--mid)">Fleet GPUs</div></div>'      + '<div style="padding:12px;background:var(--light);border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--navy)">' + totalDemand.toLocaleString() + '</div><div style="font-size:10px;color:var(--mid)">GPUs Allocated</div></div>'      + '<div style="padding:12px;background:var(--light);border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:800;color:' + statusColor + '">' + utilPct + '%</div><div style="font-size:10px;color:var(--mid)">Fleet Utilisation</div></div>'      + '<div style="padding:12px;background:var(--light);border-radius:8px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--teal)">' + unallocated.toLocaleString() + '</div><div style="font-size:10px;color:var(--mid)">GPUs Headroom</div></div>'      + '</div>'
+    // Allocation breakdown
+    html += '<div style="margin-bottom:14px">'      + '<div style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Allocation Breakdown</div>'      + '<table style="width:100%;border-collapse:collapse;font-size:12px">'      + '<tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;padding:6px 8px;color:var(--mid);font-size:10px">Workload</th><th style="text-align:right;padding:6px 8px;color:var(--mid);font-size:10px">GPUs</th><th style="text-align:right;padding:6px 8px;color:var(--mid);font-size:10px">% Fleet</th><th style="text-align:right;padding:6px 8px;color:var(--mid);font-size:10px">kW</th></tr>'      + (ucGPUs > 0 ? '<tr style="border-bottom:1px solid #f0f0f4"><td style="padding:7px 8px;font-weight:600">UC Workloads (' + (s.selectedUCs||[]).length + ' UCs)</td><td style="text-align:right;padding:7px 8px;font-weight:700;color:var(--navy)">' + ucGPUs + '</td><td style="text-align:right;padding:7px 8px;color:var(--mid)">' + (fleetGPUs?Math.round(ucGPUs/fleetGPUs*100):0) + '%</td><td style="text-align:right;padding:7px 8px;color:var(--mid)">' + Math.round(ucKW) + '</td></tr>' : '')      + (serviceGPUs > 0 ? '<tr style="border-bottom:1px solid #f0f0f4"><td style="padding:7px 8px;font-weight:600">Tenant Services (GPUaaS/BMaaS)</td><td style="text-align:right;padding:7px 8px;font-weight:700;color:var(--navy)">' + serviceGPUs + '</td><td style="text-align:right;padding:7px 8px;color:var(--mid)">' + (fleetGPUs?Math.round(serviceGPUs/fleetGPUs*100):0) + '%</td><td style="text-align:right;padding:7px 8px;color:var(--mid)">' + Math.round(serviceKW) + '</td></tr>' : '')      + (unallocated > 0 ? '<tr style="border-bottom:1px solid #f0f0f4;background:rgba(0,178,144,.03)"><td style="padding:7px 8px;color:var(--teal)">Unallocated Headroom</td><td style="text-align:right;padding:7px 8px;font-weight:700;color:var(--teal)">' + unallocated + '</td><td style="text-align:right;padding:7px 8px;color:var(--teal)">' + (fleetGPUs?Math.round(unallocated/fleetGPUs*100):0) + '%</td><td style="text-align:right;padding:7px 8px;color:var(--mid)">—</td></tr>' : '')      + '<tr style="border-top:2px solid var(--navy)"><td style="padding:8px;font-weight:700;color:var(--navy)">Total</td><td style="text-align:right;padding:8px;font-weight:900;color:var(--navy)">' + fleetGPUs + '</td><td style="text-align:right;padding:8px;font-weight:700">100%</td><td style="text-align:right;padding:8px;font-weight:700">' + Math.round(mwAvail) + '</td></tr>'      + '</table></div>'
+    // MW check
+    var mwStatus = mwUtil > 95 ? '🔴 Critical' : mwUtil > 80 ? '🟡 Warning' : '🟢 OK'
+    html += '<div style="padding:10px 12px;background:var(--light);border-radius:6px;display:flex;justify-content:space-between;align-items:center">'      + '<div style="font-size:11px;font-weight:600;color:var(--mid)">Power Envelope Check</div>'      + '<div style="font-size:12px">' + mwStatus + ' — ' + Math.round(mwDemand) + 'kW demand vs ' + Math.round(mwAvail) + 'kW available (' + mwUtil + '% utilised)</div>'      + '</div>'
+    // Sizing policy note
+    html += '<div style="margin-top:10px;font-size:11px;color:var(--mid);padding:8px 10px;background:#F0F9FF;border-radius:5px">'      + 'Sizing policy: <strong>' + (s.sizing_policy === 'p95_guaranteed' ? 'P95 Guaranteed' : 'P50 Utilisation') + '</strong> · '      + 'GPU arch: <strong>' + gc.name + '</strong> · '      + 'Engine: <strong>' + (s.serving_engine || 'vllm') + '</strong> · '      + 'Security: <strong>' + ((s.product_profile||{}).security_tier||'S1') + '</strong>'      + '</div>'  }
+
+  html += '</div>'
+  var steps = getActiveSteps()
+  var prev  = getPrevStep(SASC_STEP)
+  var next  = getNextStep(SASC_STEP)
+  html += '<div class="actions-bar">'    + (prev ? '<button class="btn btn-ghost" onclick="renderStep(' + prev + ')">&larr; Back</button>' : '<div></div>')    + (next ? '<button class="btn btn-primary" onclick="renderStep(' + next + ')">Next: ' + (steps[next-1]||{}).label + ' &rarr;</button>' : '')    + '</div>'
+  return html
 }
 
 function renderWorkloadC() {
@@ -2216,6 +2304,7 @@ function renderStep(n) {
     if (!step) { SASC_STEP = 1; renderStep(1); return }
     if (step.key === 'scope')       el.innerHTML = renderScreen1()
     if (step.key === 'workloads_a') { el.innerHTML = renderScreen2Loading(); loadWorkloadProfiles() }
+    if (step.key === 'fleet_view')    el.innerHTML = renderFleetView()
     if (step.key === 'workloads_b') {
       console.log('[renderStep] rendering workloads_b')
       // New MaaS screen uses SizingEngine (loaded in init) — no model_catalogue fetch needed
@@ -2309,6 +2398,7 @@ function renderScreen1() {
   // AI Capability Building
   osHtml += '<div>'
     + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--amber);margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--amber)">AI Capability Building</div>'
+    + osToggle('ptaas',  'Post-Training as a Service (PTaaS)', 'Fine-tuning, domain model factory, sovereign model programme')
     + osToggle('skills', 'AI Skills Academy',    'Workforce development, certifications, AI literacy programmes')
     + osToggle('coe',    'Centre of Excellence', 'Research, standards, ecosystem development, policy advisory')
     + '</div>'
@@ -2342,6 +2432,39 @@ function renderScreen1() {
       + '</div>'
       + '<span class="layer-tag">' + esc(l.tag) + '</span>'
       + '</div>'
+
+    // Security tier config
+    if (key === 'security' && on) {
+      var pp = s.product_profile || {}
+      var tier = pp.security_tier || 'S1'
+      var tiers = [
+        { id:'S1', label:'S1 Standard',   color:'#6B7280',        desc:'VLAN isolation · encryption · basic audit' },
+        { id:'S2', label:'S2 Enhanced',   color:'var(--teal)',     desc:'Dedicated VLAN · HSM · MFA · SIEM' },
+        { id:'S3', label:'S3 Sovereign',  color:'var(--navy)',     desc:'Physical isolation · data residency · cleared staff' },
+        { id:'S4', label:'S4 Classified', color:'var(--orange)',   desc:'Air-gap · TEMPEST · separate MDC cage' }
+      ]
+      var quadrants = [
+        { id:'infra_supplier', label:'Infra Supplier',  desc:'Co-builds/invests in TSAP' },
+        { id:'uc_supplier',    label:'UC Supplier',     desc:'Builds AI applications (SI)' },
+        { id:'infra_consumer', label:'Infra Consumer',  desc:'Consumes GPUaaS / BMaaS' },
+        { id:'uc_consumer',    label:'UC Consumer',     desc:'Consumes MaaS API' }
+      ]
+      var curQ = pp.quadrants || ['uc_consumer']
+      var secHtml = '<div style="margin:0 0 8px 34px;padding:12px 14px;background:var(--light);border-radius:8px;border-left:3px solid var(--orange)">'
+        + '<div style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Security &amp; Product Profile</div>'
+        + '<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;font-size:12px;font-weight:600;color:'+(pp.is_territory?'var(--navy)':'var(--mid)')+'">'
+        + '<input type="checkbox"'+(pp.is_territory?' checked':'')+' onchange="SASC_DATA.product_profile.is_territory=this.checked;renderStep(1)" style="width:14px;height:14px">'
+        + '&#127963; This customer is the Territory (anchor tenant)</label>'
+        + '<div style="font-size:11px;font-weight:600;color:var(--mid);margin-bottom:5px">Security Tier</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px">'
+        + tiers.map(function(t){ var sel=tier===t.id; return '<div onclick="SASC_DATA.product_profile.security_tier=\''+t.id+'\';renderStep(1)" style="padding:6px 8px;border:2px solid '+(sel?t.color:'var(--border)')+';border-radius:5px;cursor:pointer"><div style="font-size:11px;font-weight:'+(sel?'700':'500')+';color:'+(sel?t.color:'var(--mid)')+'">'+t.label+'</div><div style="font-size:9px;color:var(--mid)">'+t.desc+'</div></div>' }).join('')
+        + '</div>'
+        + '<div style="font-size:11px;font-weight:600;color:var(--mid);margin-bottom:5px">Commercial Position</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'
+        + quadrants.map(function(q){ var sel=curQ.indexOf(q.id)>=0; return '<div onclick="(function(){var qq=(SASC_DATA.product_profile.quadrants||[]).slice();var ix=qq.indexOf(\''+q.id+'\');if(ix>=0)qq.splice(ix,1);else qq.push(\''+q.id+'\');SASC_DATA.product_profile.quadrants=qq;renderStep(1)})()" style="padding:6px 8px;border:1.5px solid '+(sel?'var(--navy)':'var(--border)')+';border-radius:5px;cursor:pointer;background:'+(sel?'rgba(0,40,112,.05)':'#fff')+'"><div style="font-size:11px;font-weight:'+(sel?'700':'500')+';color:'+(sel?'var(--navy)':'var(--mid)')+'">'+q.label+'</div><div style="font-size:9px;color:var(--mid)">'+q.desc+'</div></div>' }).join('')
+        + '</div></div>'
+      isHtml += secHtml
+    }
 
     // MDC config — only show if infra layer is ON
     if (key === 'infra' && on) {
@@ -2429,6 +2552,38 @@ function renderScreen1() {
         + '</div>'
         + '</div>'
     }
+
+    // ── SERVING ENGINE & SIZING POLICY (shown when compute layer is ON) ─────
+    if (key === 'compute' && on) {
+      var engines = [{ id:'vllm',label:'vLLM',desc:'General MaaS & latency-sensitive UCs' },
+                     { id:'trt_llm',label:'TRT-LLM',desc:'+53% throughput — high-volume MaaS & batch' },
+                     { id:'sglang',label:'SGLang',desc:'RAG & shared-prefix (+25% token savings)' },
+                     { id:'llama_cpp',label:'llama.cpp',desc:'Edge / air-gapped / CPU-only' }]
+      var curEngine = s.serving_engine || 'vllm'
+      var curPolicy = s.sizing_policy  || 'p95_guaranteed'
+      isHtml += '<div style="margin:0 0 8px 34px;padding:12px 14px;background:var(--light);border-radius:8px;border-left:3px solid var(--navy)">'
+        + '<div style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Compute Configuration</div>'
+        + '<div style="font-size:11px;font-weight:600;color:var(--mid);margin-bottom:5px">Default Serving Engine <span style="font-weight:400;opacity:.7">(per-UC override in S2)</span></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px">'
+        + engines.map(function(e){
+            var sel=curEngine===e.id
+            return '<div onclick="SASC_DATA.serving_engine=\''+e.id+'\';renderStep(1)" style="padding:6px 8px;border:1.5px solid '+(sel?'var(--navy)':'var(--border)')+';border-radius:5px;cursor:pointer;background:'+(sel?'rgba(0,40,112,.05)':'#fff')+'">'
+              + '<div style="font-size:11px;font-weight:'+(sel?'700':'500')+';color:'+(sel?'var(--navy)':'var(--dark)')+'">'+e.label+'</div>'
+              + '<div style="font-size:9px;color:var(--mid)">'+e.desc+'</div></div>'
+          }).join('')
+        + '</div>'
+        + '<div style="font-size:11px;font-weight:600;color:var(--mid);margin-bottom:5px">Sizing Policy</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'
+        + [['p95_guaranteed','P95 Guaranteed','SLA assured — size for P95 spike'],
+           ['p50_utilisation','P50 Utilisation','Higher utilisation — P95 may degrade']].map(function(v){
+            var sel=curPolicy===v[0]
+            return '<div onclick="SASC_DATA.sizing_policy=\''+v[0]+'\';renderStep(1)" style="padding:6px 8px;border:1.5px solid '+(sel?'var(--teal)':'var(--border)')+';border-radius:5px;cursor:pointer;background:'+(sel?'rgba(0,178,144,.05)':'#fff')+'">'
+              + '<div style="font-size:11px;font-weight:'+(sel?'700':'500')+';color:'+(sel?'var(--teal)':'var(--dark)')+'">'+v[1]+'</div>'
+              + '<div style="font-size:9px;color:var(--mid)">'+v[2]+'</div></div>'
+          }).join('')
+        + '</div></div>'
+    }
+
   })
   isHtml += '</div>'  // close card
 
@@ -2648,7 +2803,10 @@ function wlChange(el) {
   var field = el.dataset.field
   var value = field === 'training' ? (el.value === 'true') : (isNaN(Number(el.value)) ? el.value : Number(el.value))
   SASC_DATA.ucWorkloads[uid][field] = value
-  renderStep(SASC_STEP)   // triggers auto-save
+  // Debounce: update state immediately but defer full re-render 800ms
+  // Prevents screen flash on every keystroke
+  clearTimeout(window._wlChangeTimer)
+  window._wlChangeTimer = setTimeout(function() { renderStep(SASC_STEP) }, 800)
 }
 
 function setUCComplexity(ucId, tier) {
