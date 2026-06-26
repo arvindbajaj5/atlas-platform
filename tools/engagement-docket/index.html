@@ -1408,15 +1408,16 @@ async function renderMaasTab() {
   if (MC_LOAD_D === 'error') return '<div style="padding:20px;background:#FEE2E2;border-radius:8px;font-size:12px;color:#991B1B">✗ Failed to load model catalogue. <button onclick="MC_LOAD_D=\'\';switchTab(\'maas\')" style="margin-left:8px;padding:2px 8px;background:#991B1B;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px">Retry</button></div>'
 
   // Capability types — these help select the right models, not sub-offerings
+  // capType.spec maps to specialisation[] array in model_catalogue
   var capTypes = [
-    { id:'general',    icon:'🎯', label:'Text Generation',     desc:'General LLMs — reasoning, chat, summarisation' },
-    { id:'coding',     icon:'💻', label:'Coding',              desc:'Code generation, completion, review' },
-    { id:'vision',     icon:'👁️', label:'Vision / Multimodal', desc:'Image understanding, visual Q&A' },
-    { id:'audio',      icon:'🎙️', label:'Audio / Speech',      desc:'ASR, TTS, translation' },
-    { id:'embedding',  icon:'🔗', label:'Embedding & RAG',     desc:'Vector search, retrieval, reranking' },
-    { id:'video',      icon:'🎬', label:'Video Generation',    desc:'Text-to-video, video understanding' },
-    { id:'indic',      icon:'🌐', label:'Indic Languages',     desc:'Indian language models — Sarvam, IndicBERT' },
-    { id:'multimodal', icon:'🔮', label:'Multimodal',          desc:'Combined text + vision + audio' }
+    { id:'general',    spec:'text_gen',   icon:'🎯', label:'Text Generation',     desc:'General LLMs — reasoning, chat, summarisation' },
+    { id:'coding',     spec:'text_gen',   icon:'💻', label:'Coding',              desc:'Code generation, completion, review', domain:'code' },
+    { id:'vision',     spec:'vlm',        icon:'👁️', label:'Vision / Multimodal', desc:'Image understanding, visual Q&A' },
+    { id:'audio',      spec:'audio_asr',  icon:'🎙️', label:'Audio / Speech',      desc:'ASR, TTS, translation' },
+    { id:'embedding',  spec:'embed',      icon:'🔗', label:'Embedding & RAG',     desc:'Vector search, retrieval, reranking' },
+    { id:'video',      spec:'video_gen',  icon:'🎬', label:'Video Generation',    desc:'Text-to-video, video understanding' },
+    { id:'indic',      spec:'text_gen',   icon:'🌐', label:'Indic Languages',     desc:'Indian language models — Sarvam family', domain:'indic' },
+    { id:'multimodal', spec:'vlm',        icon:'🔮', label:'Multimodal',          desc:'Combined text + vision + audio' }
   ]
 
   window.MAAS_ARCHS = window.MAAS_ARCHS || []
@@ -1427,7 +1428,7 @@ async function renderMaasTab() {
     + '<div class="card-sub">Select the AI capability types your customer wants to offer. Models are then chosen per type. GPU sizing is computed automatically.</div>'
     + '<div class="arch-grid">'
     + capTypes.map(function(c) {
-        var cnt = MC_ROWS_D.filter(function(m){ return (m.archetype||[]).includes(c.id) }).length
+        var cnt = MC_ROWS_D.filter(function(m){ var spec=m.specialisation||[]; var dom=m.domain||''; return spec.includes(c.spec) && (!c.domain || dom===c.domain) }).length
         var on = window.MAAS_ARCHS.includes(c.id)
         return '<div class="arch-card' + (on?' on':'') + '" onclick="toggleArch(\'' + c.id + '\',this)" title="' + esc(c.desc) + '">'
           + '<div class="arch-icon">' + c.icon + '</div>'
@@ -1441,7 +1442,16 @@ async function renderMaasTab() {
   var selArchs = window.MAAS_ARCHS
   var vendors = Array.from(new Set(MC_ROWS_D.map(function(m){ return m.vendor }))).sort()
   var filteredModels = MC_ROWS_D.filter(function(m) {
-    if (selArchs.length && !selArchs.some(function(a){ return (m.archetype||[]).includes(a) })) return false
+    if (selArchs.length) {
+      var spec = m.specialisation || []
+      var dom  = m.domain || ''
+      var matched = selArchs.some(function(archId) {
+        var cap = capTypes.find(function(c){ return c.id === archId })
+        if (!cap) return false
+        return spec.includes(cap.spec) && (!cap.domain || dom === cap.domain)
+      })
+      if (!matched) return false
+    }
     if (window.MAAS_VENDOR_FILTER && m.vendor !== window.MAAS_VENDOR_FILTER) return false
     return true
   })
