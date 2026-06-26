@@ -2553,6 +2553,36 @@ function renderScreen1() {
         + '</div>'
     }
 
+    // ── NETWORK layer config ──────────────────────────────────────────────────
+    if (key === 'network' && on) {
+      isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid var(--teal)">'        + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Network Configuration</div>'        + '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--mid)">'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.network&&s.layerCfg.network.nvlink?' checked':'')+' onchange="setLayerCfg(\'network\',\'nvlink\',this.checked)"> NVLink fabric</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.network&&s.layerCfg.network.infiniband?' checked':'')+' onchange="setLayerCfg(\'network\',\'infiniband\',this.checked)"> InfiniBand</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.network&&s.layerCfg.network.oobSwitch?' checked':'')+' onchange="setLayerCfg(\'network\',\'oobSwitch\',this.checked)"> OOB management</label>'        + '</div></div>'    }
+
+    // ── PLATFORM layer config ─────────────────────────────────────────────────
+    if (key === 'platform' && on) {
+      isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid var(--blue)">'        + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">AI Platform Configuration</div>'        + '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--mid)">'        + '<label><input type="checkbox" checked disabled> Data Fusion &amp; RAG</label>'        + '<label><input type="checkbox" checked disabled> Model Registry</label>'        + '<label><input type="checkbox" checked disabled> API Gateway</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.platform&&s.layerCfg.platform.sarvam?' checked':'')+' onchange="setLayerCfg(\'platform\',\'sarvam\',this.checked)"> Sovereign LLM (Sarvam)</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.platform&&s.layerCfg.platform.observability?' checked':'')+' onchange="setLayerCfg(\'platform\',\'observability\',this.checked)"> Observability</label>'        + '</div></div>'    }
+
+    // ── RESILIENCE layer config ───────────────────────────────────────────────
+    if (key === 'resilience' && on) {
+      var _avSLA = ((s.product_profile&&s.product_profile.availability_sla)||((s.product_profile&&s.product_profile.security_tier)==='S3'?'99.9':'99.5'))
+      var _resCfg = (s.layerCfg&&s.layerCfg.resilience)||{}
+      var _slaHtml = ['99.5','99.9','99.99'].map(function(v){
+        var sel=_avSLA===v
+        return '<button onclick="if(!SASC_DATA.product_profile)SASC_DATA.product_profile={};SASC_DATA.product_profile.availability_sla=\''+v+'\';renderStep(1)"'
+          + ' style="margin-left:4px;padding:2px 8px;font-size:10px;border:1.5px solid '+( sel?'#8B5CF6':'var(--border)')+';border-radius:4px;background:'+(sel?'rgba(139,92,246,.1)':'#fff')+';cursor:pointer;font-weight:'+(sel?'700':'400')+';color:'+(sel?'#8B5CF6':'var(--mid)')+'">'+v+'%</button>'
+      }).join('')
+      isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid #8B5CF6">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Resilience Configuration</div>'
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--mid)">'
+        + '<div>Availability SLA: ' + _slaHtml + '</div>'
+        + '<label><input type="checkbox"'+(_resCfg.ha?' checked':'')+' onchange="setLayerCfg(\'resilience\',\'ha\',this.checked)"> HA cluster</label>'
+        + '<label><input type="checkbox"'+(_resCfg.drSite?' checked':'')+' onchange="setLayerCfg(\'resilience\',\'drSite\',this.checked)"> DR site</label>'
+        + '</div></div>'
+    }
+
+    // ── DATA layer config ─────────────────────────────────────────────────────
+    if (key === 'data' && on) {
+      isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid #059669">'        + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Data & Integration</div>'        + '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--mid)">'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.data&&s.layerCfg.data.dataLake?' checked':'')+' onchange="setLayerCfg(\'data\',\'dataLake\',this.checked)"> Data lake (Delta Lake)</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.data&&s.layerCfg.data.etl?' checked':'')+' onchange="setLayerCfg(\'data\',\'etl\',this.checked)"> ETL pipelines</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.data&&s.layerCfg.data.connectors?' checked':'')+' onchange="setLayerCfg(\'data\',\'connectors\',this.checked)"> External connectors</label>'        + '</div></div>'    }
+
     // ── SERVING ENGINE & SIZING POLICY (shown when compute layer is ON) ─────
     if (key === 'compute' && on) {
       var engines = [{ id:'vllm',label:'vLLM',desc:'General MaaS & latency-sensitive UCs' },
