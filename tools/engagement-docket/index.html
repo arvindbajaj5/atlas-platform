@@ -557,12 +557,12 @@ var UC_MODAL_FILTER = 'all'
 
 // ── MaaS Service Model globals ────────────────────────────────────────────────
 var MAAS_USAGE_TYPES = [
-  { type:'text',     archetype:'general',  icon:'🎯', label:'Text / Chat',      enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:50,  sla:'standard' },
-  { type:'coding',   archetype:'coding',   icon:'💻', label:'Coding',           enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:50,  sla:'standard' },
-  { type:'document', archetype:'document', icon:'📄', label:'Document',         enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:100, sla:'standard' },
-  { type:'audio',    archetype:'audio',    icon:'🎙️',  label:'Audio / Speech',  enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:20,  sla:'standard' },
-  { type:'indic',    archetype:'indic',    icon:'🌐', label:'Indic / Regional', enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:50,  sla:'standard' },
-  { type:'generic',  archetype:'general',  icon:'🔮', label:'Generic / Other',  enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:30,  sla:'standard' }
+  { type:'text',     archetype:'general',  spec:'text_gen',  domain:'general', icon:'🎯', label:'Text / Chat',      enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:50,  sla:'standard' },
+  { type:'coding',   archetype:'coding',   spec:'text_gen',  domain:'code',    icon:'💻', label:'Coding',           enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:50,  sla:'standard' },
+  { type:'document', archetype:'document', spec:'text_gen',  domain:'general', icon:'📄', label:'Document',         enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:100, sla:'standard' },
+  { type:'audio',    archetype:'audio',    spec:'audio_asr', domain:'',        icon:'🎙️', label:'Audio / Speech',   enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:20,  sla:'standard' },
+  { type:'indic',    archetype:'indic',    spec:'text_gen',  domain:'indic',   icon:'🌐', label:'Indic / Regional', enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:50,  sla:'standard' },
+  { type:'generic',  archetype:'general',  spec:'text_gen',  domain:'general', icon:'🔮', label:'Generic / Other',  enabled:false, model_family:'', model_id:'', model_name:'', concurrent_users:30,  sla:'standard' }
 ]
 var MAAS_SLA    = 'standard'   // standard | enterprise
 var MAAS_TRIAL  = false        // 15-day free trial
@@ -1285,15 +1285,22 @@ async function renderSvcModelTab() {
         // Families available for this archetype
         var _fams = [], _famSeen = {}
         MC_ROWS_D.forEach(function(m) {
-          if ((m.archetype||[]).includes(ut.archetype) && m.family && !_famSeen[m.family]) {
-            _fams.push(m.family); _famSeen[m.family] = 1
+          var spec = m.specialisation || []
+          var dom  = m.domain || ''
+          var match = spec.includes(ut.spec) && (!ut.domain || dom === ut.domain)
+          var fam = m.family_name || m.family || m.vendor
+          if (match && fam && !_famSeen[fam]) {
+            _fams.push(fam); _famSeen[fam] = 1
           }
         })
         _fams.sort()
 
         // Models in selected family (sorted basic→advanced by params_b)
         var _tiers = ut.model_family ? MC_ROWS_D.filter(function(m){
-          return m.family===ut.model_family && (m.archetype||[]).includes(ut.archetype)
+          var spec = m.specialisation || []
+          var dom  = m.domain || ''
+          var fam  = m.family_name || m.family || m.vendor
+          return fam === ut.model_family && spec.includes(ut.spec) && (!ut.domain || dom === ut.domain)
         }).sort(function(a,b){ return (a.params_b||0)-(b.params_b||0) }) : []
 
         function _tierLabel(m, arr) {
