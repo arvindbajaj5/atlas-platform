@@ -448,150 +448,48 @@ input:focus,select:focus{border-color:var(--blue);}
   /**
    * GPU throughput (tokens/sec per GPU unit) from benchmark or formula
    *
-   * Uses the correct dual-bound model:
-   *   - Memory bandwidth bound: always applies, scales with batch size
-   *   - Compute bound: only at high batch (typically B > 128)
-   *   - Actual throughput = min(bandwidth_bound, compute_bound)
-   *     (the binding constraint changes with batch size)
+   * Profile B (internal UC — low concurrency, latency-bound):
+   *   tokens/sec ≈ GPU_bandwidth_GBs / model_size_GB  (memory bandwidth bound)
    *
-   * Profile B (UC internal — low concurrency B=1..8):
-   *   Solidly memory-bandwidth bound. Token gen reads full model weights each step.
-   *   tokens/sec = bandwidth_GBs / model_size_GB  (per GPU)
-   *
-   * Profile A (MaaS API — high concurrency B=64..512+):
-   *   Batch processing helps: bandwidth bound scales as ~sqrt(B/8) relative to B=8
-   *   At B>=128 transitions toward compute-bound.
-   *   We compute both bounds and take minimum.
-   *
-   * Returns tokens/sec for the entire GPU unit (server=8 GPUs or rack=72 GPUs)
+   * Profile A (MaaS API — high concurrency, compute-bound at batch 128+):
+   *   tokens/sec from benchmark_results (measured)
+   *   fallback: estimate from TFlops × efficiency factor
    */
-  function calcGPUThroughput (gpu, model, params_b, precision, profile, batchSize) {
-    // Benchmark is most accurate — use if available
+  function calcGPUThroughput (gpu, model, params_b, precision, profile) {
+    // Try benchmark first (most accurate)
     if (model) {
       var bm = getBenchmark(gpu.id, model.id)
       if (bm && bm.tokens_per_sec_p50) return bm.tokens_per_sec_p50
     }
 
-    var gpusPerUnit  = gpu.gpus_in_unit || gpu.gpus_per_unit || 8
-    var modelSizeGB  = calcModelVRAM(params_b, precision)           // total model VRAM (GB)
-    var modelPerGPU  = modelSizeGB / gpusPerUnit                    // GB per GPU when sharded
-    var bwPerUnitGBs = (gpu.hbm_bw_tbps || 3.0) * 1000            // total unit bandwidth GB/s
+    var modelSizeGB = calcModelVRAM(params_b, precision)
+    var bwGBs = (gpu.hbm_bw_tbps || 3.0) * 1000  // TB/s → GB/s
 
-    // ── Bandwidth bound ──────────────────────────────────────────────────────
-    // At batch=1: tokens/sec = bandwidth / model_size_per_GPU (reads weights once per token)
-    // Batch scaling: continuous batching means we amortise the weight reads over B requests
-    // Effective gain is sub-linear: empirically ~B^0.6 for decode phase
-    var B = batchSize || (profile === 'B' ? 4 : 128)
-    var batchGain    = Math.pow(B, 0.6)                             // sub-linear batch amortisation
-    var bwBound      = Math.round((bwPerUnitGBs / Math.max(modelPerGPU, 1)) * batchGain)
-
-    // ── Compute bound ────────────────────────────────────────────────────────
-    // At high batch (B>>128) GPU becomes compute-bound
-    // tokens/sec = TFlops_effective / (2 × params × 1e9)
-    // Efficiency: 15-18% of peak TFlops (realistic vLLM/TRT-LLM with continuous batching)
-    var tflopsTotal  = (precision === 'INT4' || precision === 'FP4')
-      ? (gpu.int4_tflops || (gpu.bf16_tflops || 1000) * 2)
-      : (gpu.bf16_tflops || 1000)
-    var flopsPerTok  = 2 * params_b * 1e9                          // multiply-add per param
-    var computeBound = Math.round((tflopsTotal * 1e12 * 0.17) / flopsPerTok)
-
-    // ── Actual throughput = min of both bounds ───────────────────────────────
-    // At low batch: bandwidth_bound << compute_bound → bandwidth wins
-    // At high batch: bandwidth_bound approaches compute_bound → compute wins
-    var throughput = Math.min(bwBound, computeBound)
-
-    return Math.max(throughput, 1)
-  }
-
-  /**
-   * Return throughput calculation audit trail for UI display
-   */
-  function throughputAudit (gpu, model, params_b, precision, profile, batchSize) {
-    var gpusPerUnit  = gpu.gpus_in_unit || gpu.gpus_per_unit || 8
-    var modelSizeGB  = calcModelVRAM(params_b, precision)
-    var modelPerGPU  = modelSizeGB / gpusPerUnit
-    var bwPerUnitGBs = (gpu.hbm_bw_tbps || 3.0) * 1000
-    var B            = batchSize || (profile === 'B' ? 4 : 128)
-    var batchGain    = Math.pow(B, 0.6)
-    var bwBound      = Math.round((bwPerUnitGBs / Math.max(modelPerGPU, 1)) * batchGain)
-    var tflopsTotal  = (precision === 'INT4' || precision === 'FP4')
-      ? (gpu.int4_tflops || (gpu.bf16_tflops || 1000) * 2)
-      : (gpu.bf16_tflops || 1000)
-    var flopsPerTok  = 2 * params_b * 1e9
-    var computeBound = Math.round((tflopsTotal * 1e12 * 0.17) / flopsPerTok)
-    var binding      = bwBound < computeBound ? 'bandwidth' : 'compute'
-    return {
-      model_size_gb:   Math.round(modelSizeGB * 10) / 10,
-      model_per_gpu:   Math.round(modelPerGPU * 10) / 10,
-      bw_per_unit_gbs: bwPerUnitGBs,
-      batch_size:      B,
-      batch_gain:      Math.round(batchGain * 10) / 10,
-      bw_bound_tps:    bwBound,
-      compute_bound_tps: computeBound,
-      binding:         binding,
-      throughput_tps:  Math.min(bwBound, computeBound),
-      formula:         binding === 'bandwidth'
-        ? 'BW-bound: (' + bwPerUnitGBs + ' GB/s / ' + Math.round(modelPerGPU*10)/10 + ' GB/GPU) × B^0.6(' + Math.round(batchGain*10)/10 + ') = ' + bwBound + ' tok/s'
-        : 'Compute-bound: ' + tflopsTotal + ' TFlops × 17% / ' + Math.round(flopsPerTok/1e9) + 'B flops/tok = ' + computeBound + ' tok/s'
-    }
-  }
-
-  /**
-   * Reverse calculation: given allocated GPU count, how many users can be served?
-   * Used for fleet capacity view — "how many more users can this fleet support?"
-   *
-   * archetypeConfig: the maas_archetype config object for this usage type
-   * allocatedGPUs:   GPUs allocated to this usage type (after removing buffers for sizing)
-   * utilisationPct:  target utilisation (0-100), e.g. 70 means use 70% of capacity
-   */
-  function maxUsersFromGPUs (archetypeConfig, gpu, allocatedGPUs, utilisationPct) {
-    if (!gpu || !archetypeConfig || allocatedGPUs <= 0) return 0
-    var cfg          = archetypeConfig
-    var params_b     = 7   // default if no model specified
-    var precision    = 'INT4'
-    var avgOutputTok = cfg.avg_output_tokens || 500
-    var reqPerDay    = cfg.requests_per_user_per_day || 5
-    var peakConcPct  = cfg.peak_concurrent_pct || 5
-    var utilPct      = utilisationPct || 70
-    var gpusPerUnit  = gpu.gpus_in_unit || gpu.gpus_per_unit || 8
-
-    // Estimate peak concurrent from allocated GPUs
-    // Batch size for capacity calc = peak concurrent (what we're sizing for)
-    // Start with estimate, iterate once
-    var estBatch = Math.max(8, Math.floor(allocatedGPUs * 2))
-    var throughputPerUnit = calcGPUThroughput(gpu, null, params_b, precision, 'A', estBatch)
-    var units      = Math.floor(allocatedGPUs / gpusPerUnit)
-    if (units < 1) units = 1
-
-    // Total throughput at target utilisation
-    var totalTPS   = throughputPerUnit * units * (utilPct / 100)
-
-    // Convert throughput to max RPS
-    var maxRPS     = totalTPS / Math.max(avgOutputTok, 1)
-
-    // Convert RPS to DAU
-    // peak_concurrent_pct of DAU is active simultaneously
-    // peak concurrent = maxRPS × avg_response_time_sec
-    var responseTimeSec = 2.0  // assume 2s avg for API
-    var maxConcurrent   = maxRPS * responseTimeSec
-    var maxDAU          = Math.round(maxConcurrent / (peakConcPct / 100))
-
-    return {
-      max_dau:          maxDAU,
-      max_rps:          Math.round(maxRPS * 10) / 10,
-      max_concurrent:   Math.round(maxConcurrent),
-      throughput_tps:   Math.round(totalTPS),
-      units_used:       units,
-      utilisation_pct:  utilPct
+    if (profile === 'B') {
+      // Memory bandwidth bound (small batch, latency-driven)
+      // tokens/sec per GPU ≈ bandwidth / model_size (rough but directionally correct)
+      return Math.round(bwGBs / Math.max(modelSizeGB / (gpu.gpus_in_unit || gpu.gpus_per_unit || 8), 1))
+    } else {
+      // Profile A — compute bound at large batch
+      // Effective tokens/sec: TFlops × 2 (multiply-add) / model_ops_per_token
+      // Model ops per token ≈ 2 × params_b × 1e9 (2 flops per param per token)
+      var tflops = precision === 'INT4' || precision === 'FP4'
+        ? (gpu.int4_tflops || gpu.bf16_tflops * 2)
+        : (gpu.bf16_tflops || 1000)
+      // tflops is per unit (rack or server)
+      var flopsPerToken = 2 * params_b * 1e9  // ~2 flops per param
+      var rawTokensPerSec = (tflops * 1e12) / flopsPerToken
+      // Apply 30% efficiency factor (realistic utilisation of peak TFlops)
+      return Math.round(rawTokensPerSec * 0.30)
     }
   }
 
   /**
    * GPUs needed to meet throughput demand
    */
-  function calcGPUsForThroughput (peakRPS, avgOutputTokens, gpu, model, params_b, precision, profile, deratingPct, batchSize) {
+  function calcGPUsForThroughput (peakRPS, avgOutputTokens, gpu, model, params_b, precision, profile, deratingPct) {
     var throughputNeeded = calcPeakTokenThroughput(peakRPS, avgOutputTokens)
-    var throughputPerUnit = calcGPUThroughput(gpu, model, params_b, precision, profile, batchSize)
+    var throughputPerUnit = calcGPUThroughput(gpu, model, params_b, precision, profile)
     var derate = (deratingPct || 80) / 100
     var derated = throughputPerUnit * derate
     if (derated <= 0) return 1
@@ -818,7 +716,8 @@ input:focus,select:focus{border-color:var(--blue);}
           'Profile B (UC internal): memory-bandwidth bound at low concurrency',
           'Base: max(' + gpusForFit + ' fit, ' + gpusForThroughput + ' throughput) = ' + baseGPUs + ' GPUs (' + bindingConstraint + ')',
           'Buffers: +' + peakBuffer + ' peak, +' + failoverReserve + ' failover, +' + haGPUs + ' HA, +' + drGPUs + ' DR, +' + growthGPUs + ' growth',
-          'Total: ' + totalGPUs + ' GPUs | KV: ' + kvCacheMethod(model)
+          'Total: ' + totalGPUs + ' GPUs → ' + unitCalc.units + ' ' + unitCalc.unit_type + '(s) × ' + unitCalc.gpus_per_unit + ' GPUs',
+        'KV: ' + kvCacheMethod(model)
       ].join(' | '),
 
       // Audit trail — full sizing inputs/outputs for customer transparency
@@ -834,8 +733,8 @@ input:focus,select:focus{border-color:var(--blue);}
         kv_cache_method:     kvCacheMethod(model),
         concurrent_sessions: concurrentSessions,
         littles_law:         'λ=' + Math.round(peakRPS*100)/100 + ' RPS × W=' + responseTimeSec + 's = N=' + concurrentSessions
+        }
       }
-    }
     },
 
     /**
@@ -852,6 +751,26 @@ input:focus,select:focus{border-color:var(--blue);}
      *   derating_pct:     number  (optional, default 80)
      * }
      */
+    /**
+     * sizeMaaS(config, gpuConfigId)
+     *
+     * Three-step framework per MaaS Infrastructure Sizing Blueprint:
+     *
+     * Step 1 — Catalog Memory (V_catalog):
+     *   W_i = model weights at precision (params_b × bytes_per_param)
+     *   KV_pool = KV cache per instance (exact formula or field rule)
+     *   VRAM_instance = (W_i + KV_pool) × 1.20 overhead
+     *
+     * Step 2 — Traffic-Driven Concurrency:
+     *   TP_i  = ⌈ VRAM_instance / GPU_vram ⌉         (Tensor Parallelism — GPUs per instance)
+     *   B_max = GPU throughput × derating / output_tps_per_req  (max batch before SLA violation)
+     *   I_i   = ⌈ peak_concurrent / B_max ⌉           (concurrent instances needed)
+     *   base_gpus = I_i × TP_i
+     *
+     * Step 3 — Infrastructure count + HA/SLA buffers:
+     *   total_gpus = base_gpus × (1 + peak_headroom + failover + multi_tenancy)
+     *   Utilisation cap: 75-80% (safety envelope for dynamic context routing)
+     */
     sizeMaaS: function (config, gpuConfigId) {
       var gpu       = getGPU(gpuConfigId)
       var model     = getModel(config.model_id)
@@ -860,99 +779,151 @@ input:focus,select:focus{border-color:var(--blue);}
       if (!gpu)       return { error: 'GPU config not found: ' + gpuConfigId }
       if (!archetype) return { error: 'Archetype not found: ' + config.archetype_id }
 
-      var cfg = archetype.config || {}
-      var dau        = config.dau || 1000
-      var slaTier    = config.sla_tier || 'standard'
+      var cfg        = archetype.config || {}
+      var dau        = config.dau       || 1000
+      var slaTier    = config.sla_tier  || 'standard'
       var precision  = config.precision || 'INT4'
-      var derating   = config.derating_pct || 80
+      var derating   = config.derating_pct || 80   // % of peak TFlops/BW usable — 80% cap per blueprint
 
-      // Resolve from archetype
+      // ── Resolve demand parameters from archetype ──────────────────────────
       var reqPerDay   = cfg.requests_per_user_per_day || 5
-      var inputTok    = cfg.avg_input_tokens  || 300
-      var outputTok   = cfg.avg_output_tokens || 500
+      var inputTok    = cfg.avg_input_tokens          || 300
+      var outputTok   = cfg.avg_output_tokens         || 500
       var contextLen  = (cfg.avg_context_window_k || 8) * 1000
-      var peakConcPct = cfg.peak_concurrent_pct || 5
+      var peakConcPct = cfg.peak_concurrent_pct       || 5
       var params_b    = model ? model.params_b : 7
+      var vramPerGPU  = gpu.vram_per_gpu_gb || 80
 
-      // Peak concurrent users at any moment
+      // Peak concurrent sessions (Little's Law input — users actively generating)
       var peakConcurrent = Math.ceil(dau * peakConcPct / 100)
 
-      // Peak RPS from concurrent users × requests per session
-      // At peak, concurrent users are actively generating — assume 1 req/10s average
-      var peakRPS = Math.ceil(peakConcurrent / 10)
+      // ── STEP 1: Catalog Memory per instance ───────────────────────────────
+      // W_i: model weight VRAM at chosen precision
+      var W_i = calcModelVRAM(params_b, precision)
 
-      // GPU fit (VRAM for model + KV cache for concurrent sessions)
-      var gpusForFit = calcGPUsForFit(params_b, precision, gpu, model, contextLen, peakConcurrent)
+      // KV cache pool per instance — sized for peakConcurrent sessions sharing one instance
+      // Each instance serves B_max concurrent requests; use peakConcurrent as upper bound
+      // (refined in Step 2 once B_max is known — use peakConcurrent as conservative first pass)
+      var KV_pool = calcKVCache(model, contextLen, peakConcurrent, precision)
 
-      // GPU throughput (Profile A — dual-bound model, batch=peak_concurrent)
-      var gpusForThroughput = calcGPUsForThroughput(peakRPS, outputTok, gpu, model, params_b, precision, 'A', derating, peakConcurrent)
+      // VRAM per instance (weights + KV cache + framework overhead)
+      var VRAM_instance = (W_i + KV_pool) * RUNTIME_OVERHEAD
 
-      var baseGPUs = Math.max(gpusForFit, gpusForThroughput, 1)
-      var bindingConstraint = gpusForFit >= gpusForThroughput ? 'memory_fit' : 'throughput'
+      // ── STEP 2: Tensor Parallelism + Instance Count ───────────────────────
+      // TP_i: GPUs needed for one model instance (model may not fit in single GPU)
+      var TP_i = Math.max(1, Math.ceil(VRAM_instance / vramPerGPU))
 
-      // MaaS buffers — all three layers applied
-      var headroomPct    = slaTier === 'enterprise' ? (cfg.peak_headroom_pct_enterprise || 30) : (cfg.peak_headroom_pct_standard || 25)
-      var failoverPct    = slaTier === 'enterprise' ? (cfg.failover_pct_enterprise || 30)      : (cfg.failover_pct_standard || 15)
+      // GPU throughput (tokens/sec) per TP_i-GPU instance at large batch (Profile A)
+      // Uses compute-bound formula: TFlops × efficiency / flops_per_token
+      var tflops = (precision === 'INT4' || precision === 'FP4')
+        ? (gpu.int4_tflops  || (gpu.bf16_tflops || 1000) * 2)
+        : (gpu.bf16_tflops  || 1000)
+      // TFlops in gpu_configs is per unit (rack or server) — scale to per GPU then per TP_i instance
+      var gpusInUnit       = gpu.gpus_in_unit || 8
+      var tflops_per_gpu   = tflops / gpusInUnit
+      var tflops_instance  = tflops_per_gpu * TP_i
+      var flopsPerToken    = 2 * params_b * 1e9     // ~2 flops per param per token
+      var rawToksPerSec    = (tflops_instance * 1e12) / flopsPerToken
+      var throughput_instance = rawToksPerSec * (derating / 100)  // apply efficiency cap
+
+      // B_max_sla: max concurrent requests per instance before TTFT SLA violated
+      // Derived from throughput and target TTFT:
+      //   B_max = throughput_instance × TTFT_sla / avg_output_tokens
+      // (at B_max requests, each waits at most TTFT_sla ms for first token)
+      var ttft_sla_ms = slaTier === 'enterprise' ? 1000 : 2000  // enterprise: 1s, standard: 2s
+      var B_max = Math.max(1, Math.floor(
+        (throughput_instance * ttft_sla_ms / 1000) / outputTok
+      ))
+
+      // I_i: concurrent model instances needed to serve all peakConcurrent sessions
+      var I_i = Math.max(1, Math.ceil(peakConcurrent / B_max))
+
+      // Refine KV cache now that B_max is known (each instance serves B_max sessions)
+      KV_pool = calcKVCache(model, contextLen, B_max, precision)
+      VRAM_instance = (W_i + KV_pool) * RUNTIME_OVERHEAD
+      TP_i = Math.max(1, Math.ceil(VRAM_instance / vramPerGPU))
+
+      // Base GPU count: I_i instances × TP_i GPUs each
+      var baseGPUs = I_i * TP_i
+
+      // ── STEP 3: HA/SLA buffers ────────────────────────────────────────────
+      // Three layers per blueprint + SLA tier
+      var headroomPct    = slaTier === 'enterprise'
+        ? (cfg.peak_headroom_pct_enterprise || 30)
+        : (cfg.peak_headroom_pct_standard   || 25)
+      var failoverPct    = slaTier === 'enterprise'
+        ? (cfg.failover_pct_enterprise || 30)
+        : (cfg.failover_pct_standard   || 15)
       var multiTenPct    = cfg.multi_tenancy_overhead_pct || 12
 
-      var peakBuffer      = Math.ceil(baseGPUs * headroomPct  / 100)
-      var failoverReserve = Math.ceil(baseGPUs * failoverPct  / 100)
-      var multiTenancy    = Math.ceil(baseGPUs * multiTenPct  / 100)
+      var peakBuffer      = Math.ceil(baseGPUs * headroomPct / 100)
+      var failoverReserve = Math.ceil(baseGPUs * failoverPct / 100)
+      var multiTenancy    = Math.ceil(baseGPUs * multiTenPct / 100)
       var totalGPUs       = baseGPUs + peakBuffer + failoverReserve + multiTenancy
 
-      // Units
-      var unitCalc = gpusToUnits(totalGPUs, gpu)
-      var powerKW  = calcPowerKW(unitCalc.units, gpu)
+      // Fleet capacity metrics
+      var totalThroughput     = throughput_instance * I_i  // aggregate at base load
+      var tokensPerMonth_75pct = totalThroughput * 60 * 60 * 24 * 30 * 0.75
 
-      // Cost per million tokens (at 75% utilisation)
-      var throughputPerUnit  = calcGPUThroughput(gpu, model, params_b, precision, 'A')
-      var totalThroughput    = throughputPerUnit * unitCalc.actual_gpus * (derating / 100)
-      var tokensPerMonth     = totalThroughput * 60 * 60 * 24 * 30 * 0.75  // 75% utilisation
-      var capexPerUnit       = null  // populated externally from pricing_params
-      var powerCostPerMonth  = null  // populated externally from territory config
+      // Power (raw GPU power — packaging is BOM concern)
+      var unitsForPower = Math.ceil(totalGPUs / gpusInUnit)
+      var powerKW       = calcPowerKW(unitsForPower, gpu)
 
       return {
         // Demand
-        usage_type:            cfg.usage_type,
-        dau:                   dau,
-        peak_concurrent:       peakConcurrent,
-        peak_rps:              peakRPS,
-        precision:             precision,
-        params_b:              params_b,
+        usage_type:         cfg.usage_type,
+        dau:                dau,
+        peak_concurrent:    peakConcurrent,
+        precision:          precision,
+        params_b:           params_b,
 
-        // GPU breakdown
-        gpus_for_fit:          gpusForFit,
-        gpus_for_throughput:   gpusForThroughput,
-        binding_constraint:    bindingConstraint,
-        base_gpus:             baseGPUs,
-        peak_buffer_gpus:      peakBuffer,
-        failover_gpus:         failoverReserve,
-        multi_tenancy_gpus:    multiTenancy,
-        total_gpus:            totalGPUs,
+        // Step 1 — Catalog memory
+        w_i_gb:             Math.round(W_i * 10) / 10,
+        kv_pool_gb:         Math.round(KV_pool * 10) / 10,
+        vram_instance_gb:   Math.round(VRAM_instance * 10) / 10,
 
-        // Units
-        units_required:        unitCalc.units,
-        unit_type:             unitCalc.unit_type,
-        actual_gpus:           unitCalc.actual_gpus,
-        gpus_per_unit:         unitCalc.gpus_per_unit,
+        // Step 2 — Concurrency
+        tp_i:               TP_i,           // GPUs per instance (Tensor Parallelism)
+        b_max:              B_max,           // max batch per instance (SLA-bounded)
+        i_i:                I_i,            // concurrent instances needed
+        ttft_sla_ms:        ttft_sla_ms,
+        throughput_per_instance_tps: Math.round(throughput_instance),
+
+        // Step 3 — GPU count
+        base_gpus:          baseGPUs,       // I_i × TP_i
+        peak_buffer_gpus:   peakBuffer,
+        failover_gpus:      failoverReserve,
+        multi_tenancy_gpus: multiTenancy,
+        total_gpus:         totalGPUs,
 
         // Capacity
         throughput_tokens_per_sec: Math.round(totalThroughput),
-        tokens_per_month_75pct:    Math.round(tokensPerMonth),
+        tokens_per_month_75pct:    Math.round(tokensPerMonth_75pct),
         power_kw:                  Math.round(powerKW * 10) / 10,
 
-        // Economics (to be completed by FM with pricing_params)
-        cost_per_mtoken_usd:   null,  // FM layer completes this
-        capex_usd:             null,
+        // Economics (FM layer completes)
+        cost_per_mtoken_usd: null,
+        capex_usd:           null,
 
-        // Explanation
+        // Sizing profile identifier
         sizing_profile: 'A',
+
+        // Audit trail
+        audit: {
+          formula:          'base = I_i x TP_i',
+          step1:            'VRAM_instance = (W_i=' + Math.round(W_i*10)/10 + ' + KV=' + Math.round(KV_pool*10)/10 + ') x 1.20 = ' + Math.round(VRAM_instance*10)/10 + 'GB',
+          step2_tp:         'TP_i = ceil(' + Math.round(VRAM_instance*10)/10 + ' / ' + vramPerGPU + ') = ' + TP_i + ' GPUs/instance',
+          step2_bmax:       'B_max = floor(' + Math.round(throughput_instance) + ' tps x ' + ttft_sla_ms + 'ms / ' + outputTok + ' tok) = ' + B_max + ' concurrent/instance',
+          step2_instances:  'I_i = ceil(' + peakConcurrent + ' peak / ' + B_max + ' B_max) = ' + I_i + ' instances',
+          step3_base:       'base = ' + I_i + ' x ' + TP_i + ' = ' + baseGPUs + ' GPUs',
+          step3_buffers:    '+' + peakBuffer + ' peak(' + headroomPct + '%) +' + failoverReserve + ' failover(' + failoverPct + '%) +' + multiTenancy + ' multi-tenancy(' + multiTenPct + '%) = ' + totalGPUs + ' total',
+          kv_method:        kvCacheMethod(model)
+        },
+
         notes: [
-          'Profile A (MaaS API): compute-bound at batch 128+',
-          'DAU ' + dau + ' → ' + peakConcurrent + ' peak concurrent (' + peakConcPct + '%)',
-          'Base: max(' + gpusForFit + ' fit, ' + gpusForThroughput + ' throughput) = ' + baseGPUs + ' (' + bindingConstraint + ')',
-          'Buffers: +' + peakBuffer + ' peak(' + headroomPct + '%), +' + failoverReserve + ' failover(' + failoverPct + '%), +' + multiTenancy + ' multi-tenancy(' + multiTenPct + '%)',
-          'Total: ' + totalGPUs + ' GPUs → ' + unitCalc.units + ' ' + unitCalc.unit_type + '(s)'
+          'Step 1: VRAM_instance=' + Math.round(VRAM_instance*10)/10 + 'GB (W_i=' + Math.round(W_i*10)/10 + ' + KV=' + Math.round(KV_pool*10)/10 + ' x 1.20)',
+          'Step 2: TP_i=' + TP_i + ' GPUs/instance | B_max=' + B_max + ' concurrent | I_i=' + I_i + ' instances',
+          'Step 3: base=' + I_i + 'x' + TP_i + '=' + baseGPUs + ' + buffers = ' + totalGPUs + ' GPUs total'
         ].join(' | ')
       }
     },
@@ -1006,6 +977,37 @@ input:focus,select:focus{border-color:var(--blue);}
         total_servers: total,
         power_kw:      Math.round(powerKW * 10) / 10,
         notes:         servers + ' servers + ' + haReserve + ' HA = ' + total + ' total servers'
+      }
+    },
+
+    /**
+     * calcVCatalog(maasResults)
+     *
+     * Step 1 of blueprint: Total Minimum Catalog Memory across all MaaS usage types.
+     *   V_catalog = Σ (W_i × I_i) for each active usage type
+     * Used as a sanity check — the fleet must have enough total VRAM to hold the catalog.
+     * Returns GB required and breakdown per usage type.
+     */
+    calcVCatalog: function (maasResults) {
+      var total_gb = 0
+      var breakdown = []
+      ;(maasResults || []).forEach(function (r) {
+        if (r && !r.error) {
+          // W_i × I_i: model weights per instance × number of active instances
+          var entry_gb = (r.w_i_gb || 0) * (r.i_i || 1)
+          total_gb += entry_gb
+          breakdown.push({
+            usage_type: r.usage_type,
+            w_i_gb:     r.w_i_gb,
+            i_i:        r.i_i,
+            catalog_gb: Math.round(entry_gb * 10) / 10
+          })
+        }
+      })
+      return {
+        total_catalog_gb: Math.round(total_gb * 10) / 10,
+        breakdown:        breakdown,
+        note: 'V_catalog = Σ(W_i × I_i) — total VRAM to hold all active model instances'
       }
     },
 
@@ -1081,18 +1083,41 @@ input:focus,select:focus{border-color:var(--blue);}
       if (mwStatus  === 'over')    warnings.push('Power demand (' + totalKW.toFixed(1) + 'kW) exceeds MDC envelope (' + capKW + 'kW). Critical.')
       if (mwStatus  === 'warning') warnings.push('Power at ' + Math.round(totalKW/capKW*100) + '% of MDC capacity.')
 
+      // ── Section 3 of blueprint: Host RAM & NVMe sizing ────────────────────
+      // RAM = 2x–3x total GPU VRAM (holds inactive model weights in vLLM Level-1 Sleep)
+      // NVMe: PCIe Gen5 RAID-0, >10 GB/s read per node for cold-start avoidance
+      // Total fleet VRAM = totalGPUs × vram_per_gpu (from mdcSpec or first GPU result)
+      var vramPerGPU_fleet = (mdcSpec && mdcSpec.vram_per_gpu_gb) || 80
+      var totalFleetVRAM   = totalGPUs * vramPerGPU_fleet          // GB
+      var ram_min_gb       = Math.round(totalFleetVRAM * 2)         // 2× VRAM (minimum)
+      var ram_rec_gb       = Math.round(totalFleetVRAM * 2.5)       // 2.5× VRAM (recommended)
+      // NVMe: assume 1 node per 8 GPUs, 20TB raw per node at Gen5 NVMe
+      var gpu_nodes        = Math.ceil(totalGPUs / ((mdcSpec && mdcSpec.gpus_per_unit) || 8))
+      var nvme_tb_per_node = 20   // conservative — PCIe Gen5 NVMe array per node
+      var nvme_total_tb    = gpu_nodes * nvme_tb_per_node
+
       return {
-        allocation:        alloc,
-        total_gpus:        totalGPUs,
-        total_kw:          Math.round(totalKW * 10) / 10,
+        allocation:          alloc,
+        total_gpus:          totalGPUs,
+        total_kw:            Math.round(totalKW * 10) / 10,
         total_bmaas_servers: bmaasServers,
-        capacity_gpus:     capGPUs,
-        capacity_kw:       capKW,
-        headroom_gpus:     headroomGPUs,
-        headroom_kw:       headroomKW !== null ? Math.round(headroomKW * 10) / 10 : null,
-        gpu_status:        gpuStatus,
-        mw_status:         mwStatus,
-        warnings:          warnings
+        capacity_gpus:       capGPUs,
+        capacity_kw:         capKW,
+        headroom_gpus:       headroomGPUs,
+        headroom_kw:         headroomKW !== null ? Math.round(headroomKW * 10) / 10 : null,
+        gpu_status:          gpuStatus,
+        mw_status:           mwStatus,
+        warnings:            warnings,
+        // Host-level sizing (blueprint Section 3)
+        host_sizing: {
+          total_fleet_vram_gb: Math.round(totalFleetVRAM),
+          ram_min_gb:          ram_min_gb,
+          ram_rec_gb:          ram_rec_gb,
+          gpu_nodes:           gpu_nodes,
+          nvme_total_tb:       nvme_total_tb,
+          nvme_per_node_tb:    nvme_tb_per_node,
+          note: 'RAM = 2-2.5x fleet VRAM for vLLM L1 sleep. NVMe >10GB/s read per node.'
+        }
       }
     },
 
@@ -1113,8 +1138,6 @@ input:focus,select:focus{border-color:var(--blue);}
     calcPeakRPS:        calcPeakRPS,
     calcModelVRAM:      calcModelVRAM,
     kvCacheMethod:      kvCacheMethod,
-    throughputAudit:    throughputAudit,
-    maxUsersFromGPUs:   maxUsersFromGPUs,
     calcKVCache:        calcKVCache,
     calcTotalVRAM:      calcTotalVRAM,
     calcGPUThroughput:  calcGPUThroughput,
