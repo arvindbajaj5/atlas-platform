@@ -2488,37 +2488,7 @@ function renderScreen1() {
       + '</div>'
 
     // Security tier config
-    if (key === 'security' && on) {
-      var pp = s.product_profile || {}
-      var tier = pp.security_tier || 'S1'
-      var tiers = [
-        { id:'S1', label:'S1 Standard',   color:'#6B7280',        desc:'VLAN isolation · encryption · basic audit' },
-        { id:'S2', label:'S2 Enhanced',   color:'var(--teal)',     desc:'Dedicated VLAN · HSM · MFA · SIEM' },
-        { id:'S3', label:'S3 Sovereign',  color:'var(--navy)',     desc:'Physical isolation · data residency · cleared staff' },
-        { id:'S4', label:'S4 Classified', color:'var(--orange)',   desc:'Air-gap · TEMPEST · separate MDC cage' }
-      ]
-      var quadrants = [
-        { id:'infra_supplier', label:'Infra Supplier',  desc:'Co-builds/invests in TSAP' },
-        { id:'uc_supplier',    label:'UC Supplier',     desc:'Builds AI applications (SI)' },
-        { id:'infra_consumer', label:'Infra Consumer',  desc:'Consumes GPUaaS / BMaaS' },
-        { id:'uc_consumer',    label:'UC Consumer',     desc:'Consumes MaaS API' }
-      ]
-      var curQ = pp.quadrants || ['uc_consumer']
-      var secHtml = '<div style="margin:0 0 8px 34px;padding:12px 14px;background:var(--light);border-radius:8px;border-left:3px solid var(--orange)">'
-        + '<div style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Security &amp; Product Profile</div>'
-        + '<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;font-size:12px;font-weight:600;color:'+(pp.is_territory?'var(--navy)':'var(--mid)')+'">'
-        + '<input type="checkbox"'+(pp.is_territory?' checked':'')+' onchange="SASC_DATA.product_profile.is_territory=this.checked;renderStep(1)" style="width:14px;height:14px">'
-        + '&#127963; This customer is the Territory (anchor tenant)</label>'
-        + '<div style="font-size:11px;font-weight:600;color:var(--mid);margin-bottom:5px">Security Tier</div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px">'
-        + tiers.map(function(t){ var sel=tier===t.id; return '<div onclick="SASC_DATA.product_profile.security_tier=\''+t.id+'\';renderStep(1)" style="padding:6px 8px;border:2px solid '+(sel?t.color:'var(--border)')+';border-radius:5px;cursor:pointer"><div style="font-size:11px;font-weight:'+(sel?'700':'500')+';color:'+(sel?t.color:'var(--mid)')+'">'+t.label+'</div><div style="font-size:9px;color:var(--mid)">'+t.desc+'</div></div>' }).join('')
-        + '</div>'
-        + '<div style="font-size:11px;font-weight:600;color:var(--mid);margin-bottom:5px">Commercial Position</div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'
-        + quadrants.map(function(q){ var sel=curQ.indexOf(q.id)>=0; return '<div onclick="(function(){var qq=(SASC_DATA.product_profile.quadrants||[]).slice();var ix=qq.indexOf(\''+q.id+'\');if(ix>=0)qq.splice(ix,1);else qq.push(\''+q.id+'\');SASC_DATA.product_profile.quadrants=qq;renderStep(1)})()" style="padding:6px 8px;border:1.5px solid '+(sel?'var(--navy)':'var(--border)')+';border-radius:5px;cursor:pointer;background:'+(sel?'rgba(0,40,112,.05)':'#fff')+'"><div style="font-size:11px;font-weight:'+(sel?'700':'500')+';color:'+(sel?'var(--navy)':'var(--mid)')+'">'+q.label+'</div><div style="font-size:9px;color:var(--mid)">'+q.desc+'</div></div>' }).join('')
-        + '</div></div>'
-      isHtml += secHtml
-    }
+    // Security tier & product profile shown in dedicated panel above the input stack
 
     // MDC config — only show if infra layer is ON
     if (key === 'infra' && on) {
@@ -2625,26 +2595,9 @@ function renderScreen1() {
       isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid var(--blue)">'        + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">AI Platform Configuration</div>'        + '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--mid)">'        + '<label><input type="checkbox" checked disabled> Data Fusion &amp; RAG</label>'        + '<label><input type="checkbox" checked disabled> Model Registry</label>'        + '<label><input type="checkbox" checked disabled> API Gateway</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.platform&&s.layerCfg.platform.sarvam?' checked':'')+' onchange="setLayerCfg(\'platform\',\'sarvam\',this.checked)"> Sovereign LLM (Sarvam)</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.platform&&s.layerCfg.platform.observability?' checked':'')+' onchange="setLayerCfg(\'platform\',\'observability\',this.checked)"> Observability</label>'        + '</div></div>'    }
 
     // ── RESILIENCE layer config ───────────────────────────────────────────────
-    if (key === 'resilience' && on) {
-      var _avSLA = ((s.product_profile&&s.product_profile.availability_sla)||((s.product_profile&&s.product_profile.security_tier)==='S3'?'99.9':'99.5'))
-      var _resCfg = (s.layerCfg&&s.layerCfg.resilience)||{}
-      var _slaHtml = ['99.5','99.9','99.99'].map(function(v){
-        var sel=_avSLA===v
-        return '<button onclick="if(!SASC_DATA.product_profile)SASC_DATA.product_profile={};SASC_DATA.product_profile.availability_sla=\''+v+'\';renderStep(1)"'
-          + ' style="margin-left:4px;padding:2px 8px;font-size:10px;border:1.5px solid '+( sel?'#8B5CF6':'var(--border)')+';border-radius:4px;background:'+(sel?'rgba(139,92,246,.1)':'#fff')+';cursor:pointer;font-weight:'+(sel?'700':'400')+';color:'+(sel?'#8B5CF6':'var(--mid)')+'">'+v+'%</button>'
-      }).join('')
-      isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid #8B5CF6">'
-        + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Resilience Configuration</div>'
-        + '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--mid)">'
-        + '<div>Availability SLA: ' + _slaHtml + '</div>'
-        + '<label><input type="checkbox"'+(_resCfg.ha?' checked':'')+' onchange="setLayerCfg(\'resilience\',\'ha\',this.checked)"> HA cluster</label>'
-        + '<label><input type="checkbox"'+(_resCfg.drSite?' checked':'')+' onchange="setLayerCfg(\'resilience\',\'drSite\',this.checked)"> DR site</label>'
-        + '</div></div>'
-    }
+    // Resilience SLA configured per UC in S2 and per service in S3
 
-    // ── DATA layer config ─────────────────────────────────────────────────────
-    if (key === 'data' && on) {
-      isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid #059669">'        + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Data & Integration</div>'        + '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--mid)">'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.data&&s.layerCfg.data.dataLake?' checked':'')+' onchange="setLayerCfg(\'data\',\'dataLake\',this.checked)"> Data lake (Delta Lake)</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.data&&s.layerCfg.data.etl?' checked':'')+' onchange="setLayerCfg(\'data\',\'etl\',this.checked)"> ETL pipelines</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.data&&s.layerCfg.data.connectors?' checked':'')+' onchange="setLayerCfg(\'data\',\'connectors\',this.checked)"> External connectors</label>'        + '</div></div>'    }
+    // Data layer — fleet-level config not needed here
 
     // ── SERVING ENGINE & SIZING POLICY (shown when compute layer is ON) ─────
     if (key === 'compute' && on) {
@@ -4636,7 +4589,7 @@ function renderMaasSimTab() {
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'      + '<div>'      + '<span style="font-size:13px;font-weight:700;color:var(--navy)">' + ico + ' ' + esc(ut.label||ut.type) + '</span>'      + '<span style="font-size:11px;color:var(--mid);margin-left:8px">' + esc(ut.model_name||'') + '</span>'      + '</div>'      + '<div style="text-align:right">'      + '<span style="font-size:20px;font-weight:800;color:var(--navy)">' + r.total_gpus.toLocaleString() + '</span>'      + '<span style="font-size:11px;color:var(--mid);margin-left:4px">GPUs</span>'      + '</div>'      + '</div>'      // Buffer breakdown row
       + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:8px;text-align:center">'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--navy)">' + r.base_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Base</div>'        + '<div style="font-size:9px;color:var(--mid)">' + r.binding_constraint.replace('_',' ') + '</div>'      + '</div>'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--amber)">+' + r.peak_buffer_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Peak</div>'        + '<div style="font-size:9px;color:var(--mid)">' + (sla==='enterprise'?30:25) + '%</div>'      + '</div>'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--amber)">+' + r.failover_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Failover</div>'        + '<div style="font-size:9px;color:var(--mid)">' + (sla==='enterprise'?30:15) + '%</div>'      + '</div>'      + '<div style="background:#fff;border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:var(--amber)">+' + r.multi_tenancy_gpus + '</div>'        + '<div style="font-size:9px;color:var(--mid);text-transform:uppercase">Multi-T</div>'        + '<div style="font-size:9px;color:var(--mid)">12%</div>'      + '</div>'      + '<div style="background:var(--navy);border-radius:4px;padding:5px 4px">'        + '<div style="font-size:13px;font-weight:700;color:#fff">' + r.total_gpus + '</div>'        + '<div style="font-size:9px;color:rgba(255,255,255,.7);text-transform:uppercase">Total</div>'        + '<div style="font-size:9px;color:rgba(255,255,255,.5)">' + barPct + '% of MaaS</div>'      + '</div>'      + '</div>'      // Progress bar
       + '<div style="height:4px;background:#e0e0e8;border-radius:2px">'      + '<div style="height:4px;background:var(--teal);border-radius:2px;width:' + barPct + '%"></div>'      + '</div>'      // Sizing detail + formula audit trail
-      + '<div style="margin-top:8px;padding:8px 10px;background:#fff;border-radius:5px;font-size:10px;color:var(--mid)">'      + '<div style="font-weight:700;color:var(--navy);margin-bottom:4px">Sizing Method</div>'      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px">'      + '<span>DAU (users)</span><span style="font-weight:600;color:var(--dark)">' + (ut.concurrent_users||0).toLocaleString() + '</span>'      + '<span>Peak concurrent (' + (arch.config&&arch.config.peak_concurrent_pct||5) + '% of DAU)</span><span style="font-weight:600">' + (r.peak_concurrent||0) + ' users</span>'      + '<span>Peak RPS (÷10s avg)</span><span style="font-weight:600">' + (r.peak_rps||0) + ' req/s</span>'      + '<span>Model VRAM</span><span style="font-weight:600">' + (r._audit ? r._audit.model_size_gb + 'GB (' + (r.precision||'INT4') + ')' : r.precision||'INT4') + '</span>'      + (r._audit ? '<span>Throughput formula</span><span style="font-weight:600;color:var(--teal)">' + r._audit.formula + '</span>' : '')      + (r._audit ? '<span>Binding constraint</span><span style="font-weight:600;color:var(--orange)">' + r._audit.binding + '-bound (' + r._audit.throughput_tps.toLocaleString() + ' tok/s)</span>' : '')      + '<span>GPU base / total</span><span style="font-weight:600">' + r.base_gpus + ' base → ' + r.total_gpus + ' total (incl. buffers)</span>'      + '<span>Power draw</span><span style="font-weight:600">' + r.power_kw + 'kW</span>'      + '</div></div>'
+      + '<div style="margin-top:8px;padding:8px 10px;background:#fff;border-radius:5px;font-size:10px;color:var(--mid)">'      + '<div style="font-weight:700;color:var(--navy);margin-bottom:4px">Sizing Method</div>'      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px">'      + '<span>DAU (users)</span><span style="font-weight:600;color:var(--dark)">' + (ut.concurrent_users||0).toLocaleString() + '</span>'      + '<span>Peak concurrent (' + (arch.config&&arch.config.peak_concurrent_pct||5) + '% of DAU)</span><span style="font-weight:600">' + (r.peak_concurrent||0) + ' users</span>'      + '<span>Peak RPS (÷10s avg)</span><span style="font-weight:600">' + (r.peak_rps||0) + ' req/s</span>'      + '<span>Model VRAM</span><span style="font-weight:600">' + (r._audit ? (r._audit.model_gb||'?') + 'GB (' + (r.precision||'INT4') + ')' : r.precision||'INT4') + '</span>'      + (r._audit ? '<span>Throughput formula</span><span style="font-weight:600;color:var(--teal)">' + r._audit.formula + '</span>' : '')      + (r._audit ? '<span>Binding constraint</span><span style="font-weight:600;color:var(--orange)">' + r._audit.binding + '-bound (' + (r._audit.actual_tps||0).toLocaleString() + ' tok/s)</span>' : '')      + '<span>GPU base / total</span><span style="font-weight:600">' + r.base_gpus + ' base → ' + r.total_gpus + ' total (incl. buffers)</span>'      + '<span>Power draw</span><span style="font-weight:600">' + r.power_kw + 'kW</span>'      + '</div></div>'
       // Editable sizing params panel — built via helper to avoid node parse issues
       + buildMaasParamsPanel(ut, arch)
   })
@@ -4644,8 +4597,7 @@ function renderMaasSimTab() {
   // MaaS total row
   html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--navy);border-radius:6px;color:#fff">'    + '<span style="font-size:12px;font-weight:600">Total MaaS GPU Demand</span>'    + '<span style="font-size:22px;font-weight:800">' + totalMaasGPU.toLocaleString() + ' GPUs</span>'    + '</div>'    + '</div>'  // close card
 
-  // ── Capacity View: how many users can the fleet serve? ───────────────────
-  html += renderMaasCapacityView(enabled, maasResults, gpu)
+  // Fleet capacity view — coming in next build
 
   return html
 }
