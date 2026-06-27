@@ -4154,12 +4154,12 @@ async function openEngagement(eng) {
   if (CURRENT_DOCKET_ID) {
     var piItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'portfolio_selection' })
     if (piItems.length) {
-      try { var d = piItems[0].content || JSON.parse(piItems[0].data||'{}'); PORTFOLIO_SELECTION = d.items || [] } catch(e) {}
+      try { var _pc = piItems[0].content; if (typeof _pc === 'string') _pc = JSON.parse(_pc); var d = _pc || JSON.parse(piItems[0].data||'{}'); PORTFOLIO_SELECTION = d.items || []; console.log('[Docket] Portfolio restored:', PORTFOLIO_SELECTION.length, 'items') } catch(e) { console.error('[Docket] Portfolio restore error:', e) }
     }
     var maasItems = DOCKET_ITEMS.filter(function(i){ return i.item_subtype === 'maas_config' })
     if (maasItems.length) {
       try {
-        var md = maasItems[0].content || JSON.parse(maasItems[0].data||'{}')
+        var _mc = maasItems[0].content; if (typeof _mc === 'string') _mc = JSON.parse(_mc); var md = _mc || JSON.parse(maasItems[0].data||'{}')
         // New format: usage_types array
         if (md.usage_types && md.usage_types.length) {
           md.usage_types.forEach(function(saved) {
