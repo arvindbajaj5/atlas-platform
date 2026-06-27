@@ -670,7 +670,7 @@ input:focus,select:focus{border-color:var(--blue);}
         _fetch('model_catalogue',       'enabled=eq.true&order=name.asc', 100),
         _fetch('uc_interaction_types',  'active=eq.true&order=sort_order.asc', 50),
         _fetch('requirement_archetypes','active=eq.true&order=sort_order.asc', 20),
-        _fetch('benchmark_results',     'order=created_at.desc', 200)
+        Promise.resolve([])  // benchmark_results — skip, fetched separately when available
       ]).then(function (results) {
         _gpuConfigs  = results[0] || []
         _models      = results[1] || []
@@ -1477,14 +1477,14 @@ var SASC_DATA = {
   overhead: {
     networking_pct: 2.0,
     storage_pct:    1.5,
-    mgmt_pct:       1.0,
+    mgmt_pct:       1.0
   },
   // Tenant product profile
   product_profile: {
     quadrants:       ['uc_consumer'],  // infra_supplier|uc_supplier|infra_consumer|uc_consumer
     is_territory:    false,
     security_tier:   'S1',            // S1|S2|S3|S4
-    chargeout_model: 'external_commercial',
+    chargeout_model: 'external_commercial'
   },
   // Engagement-level sizing policy
   sizing_policy:  'p95_guaranteed',   // 'p95_guaranteed'|'p50_utilisation'
@@ -2015,7 +2015,7 @@ async function init() {
 
   // Try to load existing SASC config — check sasc_config first, then fall back to item in URL
   var _sascConfigItems = await sbFetch('docket_items',
-    'docket_id=eq.' + SASC_DATA.docketId + '&item_subtype=in.(sasc_config,sasc_bom)&order=updated_at.desc', 1)
+    'docket_id=eq.' + SASC_DATA.docketId + '&item_subtype=in.(sasc_config,sasc_bom)&order=created_at.desc', 1)
   var _primaryItem = (_sascConfigItems && _sascConfigItems[0]) || null
   if (!_primaryItem && SASC_DATA.docketItemId) {
     var _byId = await sbFetch('docket_items', 'id=eq.' + SASC_DATA.docketItemId, 1)
@@ -2219,7 +2219,9 @@ function getActiveSteps() {
   var steps = [{ key:'scope', label:'Scope & Stack' }]
   if (os.ucdev)  steps.push({ key:'workloads_a', label:'S2 — UC Workloads' })
   var _sm = SASC_DATA.serviceModel
-  if (os.maas || os.gpuaas || os.bmaas || os.ptaas || _sm.maas.enabled || _sm.gpuaas.enabled || _sm.bmaas.enabled) steps.push({ key:'workloads_b', label:'S3 — Tenant Services' })
+  // S3 always shows when infra layer is on — tenant services are always relevant
+  var _infraOn = SASC_DATA.layers && SASC_DATA.layers.infra && SASC_DATA.layers.infra.on
+  if (_infraOn || os.maas || os.gpuaas || os.bmaas || os.ptaas || _sm.maas.enabled || _sm.gpuaas.enabled || _sm.bmaas.enabled) steps.push({ key:'workloads_b', label:'S3 — Tenant Services' })
   if (os.skills || os.coe) steps.push({ key:'workloads_c', label:'Workloads C — Capability' })
   steps.push({ key:'fleet_view', label:'S4 — Fleet Allocation' })
   steps.push({ key:'bom', label:'S5 — BOM / ROM' })
@@ -2260,15 +2262,17 @@ function renderFleetView() {
       var result = SizingEngine.sizeUC({
         uc_type_id:            wl.uc_type_id,
         model_id:              wl.model_id,
-        dau:                   wl.dau        || 1000,
-        peak_multiplier:       wl.peak_mult  || 3,
-        precision:             wl.precision  || 'INT4',
-        sla_tier:              wl.sla_tier   || 'standard',
-        sizing_policy:         s.sizing_policy || 'p95_guaranteed',
-        availability_sla:      wl.availability_sla || '99.5',
-        typical_context_tokens: wl.typical_context_tokens,
-        max_context_tokens:     wl.max_context_tokens,
-        derating_pct:          wl.derating_pct || 80
+        dau:                    wl.dau        || 1000,
+        peak_multiplier:        wl.peak_mult  || 3,
+        precision:              wl.precision  || 'INT4',
+        sla_tier:               wl.sla_tier   || 'standard',
+        sizing_policy:          wl.sizing_policy || s.sizing_policy || 'p95_guaranteed',
+        availability_sla:       wl.availability_sla || '99.5',
+        typical_context_tokens: wl.typical_context_tokens || 4096,
+        max_context_tokens:     wl.max_context_tokens || 8192,
+        avg_output_tokens:      wl.avg_output_tokens || 500,
+        ttft_sla_ms:            wl.latency_sla_ms || 2000,
+        derating_pct:           wl.derating_pct || 80
       }, s.gpuConfigId)
       if (!result.error) {
         ucGPUs += result.total_gpus || 0
@@ -2605,7 +2609,16 @@ function renderScreen1() {
 
     // ── NETWORK layer config ──────────────────────────────────────────────────
     if (key === 'network' && on) {
-      isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid var(--teal)">'        + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Network Configuration</div>'        + '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--mid)">'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.network&&s.layerCfg.network.nvlink?' checked':'')+' onchange="setLayerCfg(\'network\',\'nvlink\',this.checked)"> NVLink fabric</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.network&&s.layerCfg.network.infiniband?' checked':'')+' onchange="setLayerCfg(\'network\',\'infiniband\',this.checked)"> InfiniBand</label>'        + '<label><input type="checkbox"'+(s.layerCfg&&s.layerCfg.network&&s.layerCfg.network.oobSwitch?' checked':'')+' onchange="setLayerCfg(\'network\',\'oobSwitch\',this.checked)"> OOB management</label>'        + '</div></div>'    }
+      var _netCfg = (s.layerCfg&&s.layerCfg.network)||{}
+      isHtml += '<div style="margin:0 0 8px 34px;padding:10px 12px;background:var(--light);border-radius:6px;border-left:3px solid var(--teal)">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Network Configuration</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px">'
+        + '<label style="display:flex;align-items:center;gap:5px;color:var(--mid)"><input type="checkbox"'+(_netCfg.nvlink?' checked':'')+' onchange="setLayerCfg(\'network\',\'nvlink\',this.checked)"> NVLink fabric</label>'
+        + '<label style="display:flex;align-items:center;gap:5px;color:var(--mid)"><input type="checkbox"'+(_netCfg.infiniband?' checked':'')+' onchange="setLayerCfg(\'network\',\'infiniband\',this.checked)"> InfiniBand</label>'
+        + '<label style="display:flex;align-items:center;gap:5px;color:var(--mid)"><input type="checkbox"'+(_netCfg.oobSwitch?' checked':'')+' onchange="setLayerCfg(\'network\',\'oobSwitch\',this.checked)"> OOB management</label>'
+        + '</div></div>'
+    }
+
 
     // ── PLATFORM layer config ─────────────────────────────────────────────────
     if (key === 'platform' && on) {
@@ -3637,8 +3650,8 @@ function renderScreen2() {
       + '<div class="actions-bar">'
       + (_s2prev0 ? '<button class="btn btn-ghost" onclick="renderStep('+_s2prev0+')">← '+( _s2steps0[_s2prev0-1]||{}).label+'</button>' : '<div></div>')
       + (_s2next0 ? '<button class="btn btn-primary" onclick="renderStep('+_s2next0+')">Next: '+(_s2steps0[_s2next0-1]||{}).label+' →</button>' : '')
+      + '<button class="btn btn-outline" onclick="autoSaveSASC().then(function(){ showToast(\'Saved\') })" style="font-size:11px;padding:4px 12px">&#128190; Save</button>'
       + '</div></div>'
-  }
   var selectedUCs = ALL_UCS.filter(function(u) { return s.selectedUCs.indexOf(u.id) >= 0 })
   console.log('[SASC] renderScreen2: ALL_UCS', ALL_UCS.length, 'selectedUCs', s.selectedUCs.length, 'matched', selectedUCs.length)
   var gpuCfg = ALL_GPU_CONFIGS.find(function(g) { return g.id === s.gpuConfigId }) || ALL_GPU_CONFIGS[0]
@@ -3780,36 +3793,51 @@ function renderScreen2() {
         + '</div>'
         + '</div>'
 
-      //    Row 2: Latency SLA                                                 
-      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
-        + '<div><label>Latency SLA (p99)</label>'
-        + '<select data-field="latency_sla_ms" onchange="wlChange(this)">'
-        + [
-            {v:500,  l:'< 500ms (real-time)'},
-            {v:1000, l:'< 1s (interactive)'},
-            {v:2000, l:'< 2s (standard)'},
-            {v:5000, l:'< 5s (relaxed)'},
-            {v:10000,l:'< 10s (near-realtime)'},
-            {v:60000,l:'Batch (no SLA)'}
-          ].map(function(o) {
-            return '<option value="' + o.v + '"' + (wl.latency_sla_ms===o.v?' selected':'') + '>' + o.l + '</option>'
-          }).join('')
-        + '</select></div>'
-        + '<div><label>Training / fine-tuning</label>'
-        + '<select data-field="training" onchange="wlChange(this)">'
-        + '<option value="false"' + (!wl.training?' selected':'') + '>Not required</option>'
-        + '<option value="true"' + (wl.training?' selected':'') + '>Yes -- fine-tuning needed</option>'
+      //    Row 2: Context + Precision
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">'
+        + '<div><label>P50 Context (tokens)</label>'
+        + '<input type="number" value="'+(wl.typical_context_tokens||4096)+'" min="512" step="512" data-field="typical_context_tokens" onchange="wlChange(this)"></div>'
+        + '<div><label>P95 Max Context (tokens)</label>'
+        + '<input type="number" value="'+(wl.max_context_tokens||8192)+'" min="512" step="512" data-field="max_context_tokens" onchange="wlChange(this)"></div>'
+        + '<div><label>Avg Output Tokens</label>'
+        + '<input type="number" value="'+(wl.avg_output_tokens||500)+'" min="10" data-field="avg_output_tokens" onchange="wlChange(this)"></div>'
+        + '<div><label>Precision</label>'
+        + '<select data-field="precision" onchange="wlChange(this)">'
+        + ['INT4','INT8','FP16'].map(function(p){ return '<option value="'+p+'"'+(( wl.precision||'INT4')===p?' selected':'')+'>'+p+'</option>' }).join('')
         + '</select></div>'
         + '</div>'
 
-      if (wl.training) {
-        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
-          + '<div><label>Training GPU-hours (one-time)</label>'
-          + '<input type="number" value="' + wl.train_gpu_hrs + '" data-field="train_gpu_hrs" onchange="wlChange(this)"></div>'
-          + '<div><label>Data volume (TB)</label>'
-          + '<input type="number" value="' + wl.data_tb + '" data-field="data_tb" onchange="wlChange(this)"></div>'
-          + '</div>'
-      }
+      //    Row 3: TTFT + Availability SLA + Serving engine
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">'
+        + '<div><label>TTFT Target (time-to-first-token)</label>'
+        + '<select data-field="latency_sla_ms" onchange="wlChange(this)">'
+        + [
+            {v:200,   l:'< 200ms — Tier 1 Interactive'},
+            {v:500,   l:'< 500ms — Tier 1 Real-time'},
+            {v:2000,  l:'< 2s — Tier 2 Standard'},
+            {v:5000,  l:'< 5s — Tier 2 Analytical'},
+            {v:10000, l:'< 10s — Tier 2 Near-realtime'},
+            {v:60000, l:'Batch — Tier 3'}
+          ].map(function(o){ return '<option value="'+o.v+'"'+(wl.latency_sla_ms===o.v?' selected':'')+'>'+o.l+'</option>' }).join('')
+        + '</select></div>'
+        + '<div><label>Availability SLA</label>'
+        + '<select data-field="availability_sla" onchange="wlChange(this)">'
+        + ['99.5','99.9','99.99'].map(function(v){ return '<option value="'+v+'"'+((wl.availability_sla||'99.5')===v?' selected':'')+'>'+v+'%</option>' }).join('')
+        + '</select></div>'
+        + '<div><label>Serving Engine</label>'
+        + '<select data-field="serving_engine" onchange="wlChange(this)">'
+        + ['vllm','trt_llm','sglang','llama_cpp'].map(function(e){ var sel=(wl.serving_engine||SASC_DATA.serving_engine||'vllm')===e; return '<option value="'+e+'"'+(sel?' selected':'')+'>'+e+'</option>' }).join('')
+        + '</select></div>'
+        + '</div>'
+
+      //    Row 4: Training
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+        + '<div><label>Training / fine-tuning</label>'
+        + '<select data-field="training" onchange="wlChange(this)">'
+        + '<option value="false"' + (!wl.training?' selected':'') + '>Not required</option>'
+        + '<option value="true"' + (wl.training?' selected':'') + '>Yes — fine-tuning needed</option>'
+        + '</select></div>'
+        + '</div>'
 
       //    Derived / sizing result                                            
       html += '<div style="background:var(--light);border-radius:var(--r-sm);padding:10px 12px;margin:8px 0">'
