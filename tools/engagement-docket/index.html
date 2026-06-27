@@ -1622,6 +1622,12 @@ async function saveMaasConfig() {
   var _mr = await fetch(sb.url+'/rest/v1/docket_items', { method:'POST',
     headers:{apikey:sb.key,Authorization:'Bearer '+sb.key,'Content-Type':'application/json',Prefer:'return=minimal'},
     body:JSON.stringify(_maasRow) })
+  if (_mr.ok) {
+    console.log('[Docket] MaaS config saved OK. ID:', _maasRow.id, 'usage_types:', _maasRow.content.usage_types.length, 'enabled:', _maasRow.content.usage_types.filter(function(u){return u.enabled}).length)
+  } else {
+    var _errText = await _mr.text().catch(function(){return ''})
+    console.error('[Docket] MaaS save FAILED', _mr.status, _errText.substring(0,200))
+  }
   showToast(_mr.ok ? '✓ MaaS config saved' : 'MaaS save failed ('+_mr.status+')')
 }
 
@@ -4178,7 +4184,9 @@ async function openEngagement(eng) {
         // Legacy compat: old format
         AGENT_ON = md.agent_enabled || false
         MAAS_MODELS_SELECTED = md.models || []
-      } catch(e) {}
+      } catch(e) { console.error('[Docket] MaaS restore error:', e) }
+    } else {
+      console.log('[Docket] No maas_config item found in DOCKET_ITEMS. Total items:', DOCKET_ITEMS.length, 'subtypes:', DOCKET_ITEMS.map(function(i){return i.item_subtype}).join(','))
     }
   }
   renderSidebar(document.getElementById('sb-search').value)
