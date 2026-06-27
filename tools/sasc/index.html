@@ -3652,6 +3652,7 @@ function renderScreen2() {
       + (_s2next0 ? '<button class="btn btn-primary" onclick="renderStep('+_s2next0+')">Next: '+(_s2steps0[_s2next0-1]||{}).label+' →</button>' : '')
       + '<button class="btn btn-outline" onclick="autoSaveSASC().then(function(){ showToast(\'Saved\') })" style="font-size:11px;padding:4px 12px">&#128190; Save</button>'
       + '</div></div>'
+  }
   var selectedUCs = ALL_UCS.filter(function(u) { return s.selectedUCs.indexOf(u.id) >= 0 })
   console.log('[SASC] renderScreen2: ALL_UCS', ALL_UCS.length, 'selectedUCs', s.selectedUCs.length, 'matched', selectedUCs.length)
   var gpuCfg = ALL_GPU_CONFIGS.find(function(g) { return g.id === s.gpuConfigId }) || ALL_GPU_CONFIGS[0]
