@@ -807,13 +807,15 @@ input:focus,select:focus{border-color:var(--blue);}
       var vramNeeded = (W_i + kvForBmax) * RUNTIME_OVERHEAD
       var TP_i       = Math.max(1, Math.ceil(vramNeeded / vramPerGPU))
 
-      // ── GPU throughput: I_i (instances needed) ────────────────────────────
+      // ── I_i: instances needed — binding of concurrency vs throughput ────────
       var gpusForThroughput = calcGPUsForThroughput(activeRPS, outputTok, gpu, model, params_b, precision, 'B', derating)
-      var I_i = Math.max(1, Math.ceil(gpusForThroughput / Math.max(TP_i, 1)))
+      var I_i_concurrent = Math.max(1, Math.ceil(concurrentSessions / Math.max(B_max, 1)))
+      var I_i_throughput = Math.max(1, Math.ceil(gpusForThroughput / Math.max(TP_i, 1)))
+      var I_i = Math.max(I_i_concurrent, I_i_throughput)
 
       // Base GPU count: I_i instances × TP_i GPUs each
       var baseGPUs          = I_i * TP_i
-      var bindingConstraint = TP_i >= gpusForThroughput ? 'memory_fit' : 'throughput'
+      var bindingConstraint = I_i_concurrent >= I_i_throughput ? 'concurrency' : 'throughput'
 
       // ── Availability SLA → HA reserve ─────────────────────────────────────
       var haPct     = AVAILABILITY_HA_PCT[availSLA] || 0.10
@@ -2045,6 +2047,17 @@ async function init() {
           }
         })
       }
+      // Restore all nested objects explicitly
+      if (saved.ucWorkloads)      SASC_DATA.ucWorkloads      = saved.ucWorkloads
+      if (saved.maasParams)       SASC_DATA.maasParams       = saved.maasParams
+      if (saved.maasMix)          SASC_DATA.maasMix          = saved.maasMix
+      if (saved.outputStack)      SASC_DATA.outputStack      = saved.outputStack
+      if (saved.serviceModel)     SASC_DATA.serviceModel     = saved.serviceModel
+      if (saved.overhead)         SASC_DATA.overhead         = saved.overhead
+      if (saved.product_profile)  SASC_DATA.product_profile  = saved.product_profile
+      if (saved.serving_engine)   SASC_DATA.serving_engine   = saved.serving_engine
+      if (saved.sizing_policy)    SASC_DATA.sizing_policy    = saved.sizing_policy
+      if (saved.maas_contribution)SASC_DATA.maas_contribution= saved.maas_contribution
       // Restore URL params — ground truth, never overwritten by saved config
       SASC_DATA.engId        = params.get('eng')    || SASC_DATA.engId
       SASC_DATA.docketId     = params.get('docket') || SASC_DATA.docketId
@@ -2778,19 +2791,23 @@ function calcSizing(wl) {
 
   if (window.SizingEngine && SizingEngine.ready && gpuCfg) {
     var seResult = SizingEngine.sizeUC({
-      uc_type_id:          wl.uc_type_id,
-      model_id:            wl.model_id,
-      dau:                 wl.dau,
-      peak_multiplier:     wl.peak_mult,
-      avg_input_tokens:    wl.avg_input_tokens,
-      avg_output_tokens:   wl.avg_output_tokens,
-      context_window:      wl.context_window,
-      precision:           wl.precision || 'INT4',
-      sla_tier:            wl.sla_tier || 'standard',
-      ha_required:         wl.ha_required !== undefined ? wl.ha_required : true,
-      dr_type:             wl.dr_type || 'none',
-      growth_headroom_pct: 20,
-      derating_pct:        wl.derating_pct || 80
+      uc_type_id:             wl.uc_type_id,
+      model_id:               wl.model_id,
+      dau:                    wl.dau,
+      peak_multiplier:        wl.peak_mult || 3,
+      avg_input_tokens:       wl.avg_input_tokens,
+      avg_output_tokens:      wl.avg_output_tokens || 500,
+      typical_context_tokens: wl.typical_context_tokens || 4096,
+      max_context_tokens:     wl.max_context_tokens || 8192,
+      ttft_sla_ms:            wl.latency_sla_ms || 2000,
+      availability_sla:       wl.availability_sla || '99.5',
+      sizing_policy:          wl.sizing_policy || SASC_DATA.sizing_policy || 'p95_guaranteed',
+      precision:              wl.precision || 'INT4',
+      sla_tier:               wl.sla_tier || 'standard',
+      ha_required:            wl.ha_required !== undefined ? wl.ha_required : true,
+      dr_type:                wl.dr_type || 'none',
+      growth_headroom_pct:    20,
+      derating_pct:           wl.derating_pct || 80
     }, SASC_DATA.gpuConfigId)
 
     if (!seResult.error) {
@@ -3212,9 +3229,9 @@ function renderMaasCapacityView(enabled, maasResults, gpu) {
       var typeGPUs   = Math.round(headroomGPUs * typeMixPct)
       var arch = SizingEngine.getArchetypes().find(function(a){ return a.id === 'maas-'+(ut.type||'generic') })
       if (!arch || typeGPUs <= 0) { perType[ut.type] = 0; return }
-      var cap = SizingEngine.maxUsersFromGPUs(arch.config, gpu, typeGPUs, u)
-      perType[ut.type] = cap.max_dau || 0
-      totalUsersAtUtil += cap.max_dau || 0
+      // maxUsersFromGPUs not yet in SizingEngine — skip capacity calc
+      perType[ut.type] = 0
+      totalUsersAtUtil += 0
     })
     return { util: u, total: totalUsersAtUtil, perType: perType }
   })
@@ -5200,8 +5217,12 @@ async function autoSaveSASC() {
         selectedUCs:  SASC_DATA.selectedUCs,
         ucWorkloads:  SASC_DATA.ucWorkloads,
         deratingPct:  SASC_DATA.deratingPct,
-        maasParams:   SASC_DATA.maasParams,
-        maasMix:      SASC_DATA.maasMix
+        maasParams:      SASC_DATA.maasParams,
+        maasMix:         SASC_DATA.maasMix,
+        product_profile: SASC_DATA.product_profile,
+        serving_engine:  SASC_DATA.serving_engine,
+        sizing_policy:   SASC_DATA.sizing_policy,
+        maas_contribution: SASC_DATA.maas_contribution
       }
     },
     status: 'in_progress'
