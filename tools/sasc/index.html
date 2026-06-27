@@ -2033,7 +2033,18 @@ async function init() {
     if (items && items[0] && items[0].content && items[0].content.sasc) {
       var saved = items[0].content.sasc
       // Merge saved config into SASC_DATA — URL params always win
-      Object.assign(SASC_DATA, saved)
+      // Restore scalar fields from saved config — exclude layers (restored separately below to preserve metadata)
+      var _savedWithoutLayers = Object.assign({}, saved)
+      delete _savedWithoutLayers.layers
+      Object.assign(SASC_DATA, _savedWithoutLayers)
+      // Restore layer ON state only — preserve name/desc/tag from defaults
+      if (saved.layers) {
+        Object.keys(saved.layers).forEach(function(k) {
+          if (SASC_DATA.layers[k] && saved.layers[k] !== undefined) {
+            SASC_DATA.layers[k].on = !!(saved.layers[k].on !== undefined ? saved.layers[k].on : saved.layers[k])
+          }
+        })
+      }
       // Restore URL params — ground truth, never overwritten by saved config
       SASC_DATA.engId        = params.get('eng')    || SASC_DATA.engId
       SASC_DATA.docketId     = params.get('docket') || SASC_DATA.docketId
@@ -2472,16 +2483,16 @@ function renderScreen1() {
 
   var layers = s.layers
   var LAYER_COLORS = { infra:'#6B7280', compute:'var(--navy)', network:'var(--teal)', platform:'var(--blue)', security:'var(--orange)', resilience:'#8B5CF6', data:'#059669' }
-  var inputLayers = ['infra','compute','network','platform','security','resilience','data']
+  var inputLayers = ['infra','compute','network','platform']  // security/resilience/data are tenant/UC-level settings
   inputLayers.forEach(function(key) {
     var l = layers[key]
     if (!l) return
     var color = LAYER_COLORS[key] || 'var(--navy)'
     var on = l.on
-    isHtml += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f4">'
-      + '<div class="layer-chk' + (on?' on':'') + '" id="chk-' + key + '" onclick="toggleLayer(\'' + key + '\')" style="flex-shrink:0;margin-top:2px"></div>'
+    isHtml += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f4">'
+      + '<div style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex-shrink:0"></div>'
       + '<div style="flex:1">'
-      + '<div style="font-weight:600;font-size:13px;color:' + (on?color:'var(--mid)') + '">' + esc(l.name) + '</div>'
+      + '<div style="font-weight:600;font-size:13px;color:var(--dark)">' + esc(l.name) + '</div>'
       + '<div style="font-size:11px;color:var(--mid);margin-top:1px">' + esc(l.desc) + '</div>'
       + '</div>'
       + '<span class="layer-tag">' + esc(l.tag) + '</span>'
@@ -3329,37 +3340,40 @@ function renderFleetAllocation() {
 }
 
 function renderWorkloadB() {
-  // Catalogue loaded by renderStep before this function is called
   var html = ''
   var cfg = MAAS_CFG
   var uts = cfg && cfg.usage_types ? cfg.usage_types.filter(function(u){ return u.enabled }) : []
 
-  // MaaS Docket config summary
-  html += '<div class="card">'
-  html += '<div class="card-title">MaaS Configuration (from Docket)</div>'
-  if (cfg && uts.length) {
-    html += '<div class="card-sub">' + uts.length + ' of 6 usage types enabled'
-    html += ' &middot; ' + (cfg.total_concurrent_users||0) + ' total DAU'
-    html += ' &middot; SLA: ' + (cfg.sla_tier||'standard').toUpperCase()
-    html += (cfg.trial_enabled ? ' &middot; 15-day trial' : '')
-    html += '</div>'
-    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">'
-    uts.forEach(function(ut) {
-      html += '<div style="padding:5px 10px;background:rgba(0,178,144,.08);border:1.5px solid var(--teal);border-radius:5px;font-size:11px;color:var(--teal);font-weight:600">'
-      html += esc(ut.label||ut.type) + ' &middot; ' + (ut.dau||ut.concurrent_users||0) + ' DAU'
-      if (ut.model_name) html += ' &middot; ' + esc(ut.model_name)
-      html += '</div>'
-    })
-    html += '</div>'
-  } else if (cfg && !uts.length) {
-    html += '<div style="padding:10px;background:#FEF9C3;border-radius:6px;font-size:12px;color:#854D0E">No usage types enabled yet. Configure in Docket → Service Model.</div>'
-  } else {
-    html += '<div style="padding:10px;background:#FEF9C3;border-radius:6px;font-size:12px;color:#854D0E">No MaaS config found. Set up in Docket → Service Model tab, then reopen SASC.</div>'
-  }
-  html += '</div>'
+  // S3 header
+  html += '<div class="card" style="border-left:3px solid var(--navy);padding:14px 18px">'
+    + '<div class="card-title" style="margin-bottom:4px">S3 — Tenant Services</div>'
+    + '<div style="font-size:11px;color:var(--mid)">Configure infrastructure services this tenant will offer. '
+    + 'GPU and server allocations here are added to the fleet BOM on top of UC workloads.</div>'
+    + '</div>'
 
-  // MaaS sizing per usage type
-  html += renderMaasSimTab()
+  // MaaS section — only if in output stack
+  if (SASC_DATA.outputStack && SASC_DATA.outputStack.maas) {
+    html += '<div class="card">'
+    html += '<div class="card-title">MaaS — Model as a Service</div>'
+    if (cfg && uts.length) {
+      html += '<div class="card-sub">' + uts.length + ' usage type' + (uts.length>1?'s':'') + ' configured · SLA: ' + (cfg.sla_tier||'standard').toUpperCase() + ' · ' + (cfg.total_concurrent_users||0).toLocaleString() + ' total DAU</div>'
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">'
+      uts.forEach(function(ut) {
+        html += '<div style="padding:5px 10px;background:rgba(0,178,144,.08);border:1.5px solid var(--teal);border-radius:5px;font-size:11px;color:var(--teal);font-weight:600">'
+        html += esc(ut.label||ut.type) + ' · ' + (ut.dau||ut.concurrent_users||0).toLocaleString() + ' DAU'
+        if (ut.model_name) html += ' · ' + esc(ut.model_name)
+        html += '</div>'
+      })
+      html += '</div>'
+    } else {
+      html += '<div style="padding:10px 12px;background:#F0F9FF;border-radius:6px;font-size:12px;color:#0369A1">'
+        + '&#8505; MaaS usage types are configured in the <strong>Docket → Service Model</strong> tab. '
+        + 'Once saved there, return here to see GPU sizing per usage type.</div>'
+    }
+    html += '</div>'
+    // MaaS GPU sizing (only if config present)
+    if (cfg && uts.length) html += renderMaasSimTab()
+  }
 
   // GPUaaS + BMaaS
   html += renderGpuBmaasSection()
