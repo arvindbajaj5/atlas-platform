@@ -222,32 +222,82 @@ var M = {
   }
 }
 
-// ── PORTFOLIO COUPLING RULES ─────────────────────────────────────────
-// When a user selects a portfolio item, these rules fire:
-//   requires[]  → auto-include these codes (mandatory with this selection)
-//   conflicts[] → deselect these codes (mutually exclusive)
-//   suggests[]  → show suggestion toast
+// ── PORTFOLIO DEPENDENCY GRAPH ───────────────────────────────────────
+// Four relationship types:
+//   requires[]   → auto-select when this item is selected (hard prerequisite)
+//   one_of[]     → selecting this deselects others in same group
+//   suggests[]   → toast recommendation only (no auto-select)
+//   auto_bom     → generates BOM lines but NOT a selectable portfolio item
+//
+// B2C is NOT in this graph — it is auto-generated in BOM when B2A/B2B selected.
+// Rule: L5 (what customer wants to DO) cascades down the full stack automatically.
 
-var COUPLING = {
-  'B1A': { conflicts:['B1B','B1C','B1D','B1E'] },
-  'B1B': { conflicts:['B1A','B1D'], suggests:['B3A'] },
-  'B1C': { conflicts:['B1A','B1D'] },
-  'B1D': { conflicts:['B1A','B1B','B1C','B1E'] },
-  'B2A': { requires:['B2C'] },
-  'B2B': { requires:['B2C'] },
-  'B4A': { },
-  'B4B': { requires:['B4A'] },
-  'B4C': { requires:['B4A'] },
-  'B5A': { requires:['B4A'] },
-  'B5B': { requires:['B4A'] },
-  'B5C': { requires:['B4A'] },
-  'B5D': { requires:['B4A'] },
-  'B5E': { requires:['B4A'], suggests:['B3G'] },
-  'B5F': { requires:['B2A'] },
-  'B5G': { requires:['B2A'] },
-  'B5H': { requires:['B4C'], suggests:['B2B'] },
-  'O01': { requires:[] },  // scope driven by BUILD — no hard requirements
+var GRAPH = {
+  // ── PREPARE ─────────────────────────────────────────────────────────
+  'P01':{ }, 'P02':{ }, 'P03':{ }, 'P04':{ },
+  'P05':{ }, 'P06':{ }, 'P07':{ }, 'P08':{ },
+
+  // ── BUILD L1 — DC/Facility (ONE_OF group — pick one DC type) ────────
+  'B1A':{ one_of:['B1B','B1C','B1D','B1E'], suggests:['B2E'] },  // MDC → rack-scale suggestion
+  'B1B':{ one_of:['B1A','B1C','B1D','B1E'], suggests:['B3A'] },
+  'B1C':{ one_of:['B1A','B1B','B1D','B1E'] },
+  'B1D':{ one_of:['B1A','B1B','B1C','B1E'] },
+  'B1E':{ one_of:['B1A','B1B','B1C','B1D'] },
+  'B1F':{ },  // Multi-site — additive, no conflict
+
+  // ── BUILD L2 — Hardware (B2C auto-BOM, not selectable) ──────────────
+  'B2A':{ },  // GPU inference — B2C auto-generated in BOM
+  'B2B':{ },  // GPU training  — B2C auto-generated in BOM
+  // B2C: NOT SELECTABLE — auto-generated BOM lines when B2A or B2B selected
+  'B2D':{ requires:['B2A'] },   // HPC Middleware needs GPU
+  'B2E':{ requires:['B2A'] },   // Rack-scale needs GPU inference
+  'B2F':{ requires:['B2A'] },   // Heterogeneous needs base GPU
+
+  // ── BUILD L3 — Orchestration ─────────────────────────────────────────
+  'B3A':{ },         // K8s/OpenShift — default
+  'B3B':{ },         // VM-based
+  'B3C':{ suggests:['B6C'] },  // Bare metal → suggest SIEM
+  'B3D':{ requires:['B3A'] },  // Hybrid needs K8s base
+  'B3E':{ },         // IAM — standalone add-on
+  'B3F':{ },         // Zero-trust — standalone add-on
+  'B3G':{ },         // Multi-tenancy isolation — standalone add-on
+
+  // ── BUILD L4 — AI Platform ───────────────────────────────────────────
+  'B4A':{ requires:['B2A'] },                     // AI Platform Core needs GPU
+  'B4B':{ requires:['B4A'] },                     // Pro needs Core
+  'B4C':{ requires:['B4A'], suggests:['B2B'] },   // Fine-tuning needs Core + suggests training GPU
+
+  // ── BUILD L5 — UCs & aaS (demand-drivers — cascade down) ────────────
+  // These are what the customer wants to DO.
+  // Selecting any L5 item auto-fills the required stack beneath it.
+  'B5A':{ requires:['B4A','B2A'], auto_stack:true },   // UCs need Platform + GPU
+  'B5B':{ requires:['B4A','B2A'], auto_stack:true },   // Agents need Platform + GPU
+  'B5C':{ requires:['B4A','B2A'], auto_stack:true },   // Public services same
+  'B5D':{ requires:['B4A','B2A'] },                    // Analytics same
+  'B5E':{ requires:['B4A','B2A'], suggests:['B3G'] },  // MaaS → multi-tenancy
+  'B5F':{ requires:['B2A'],       suggests:['B3G'] },  // GPUaaS → GPU + multi-tenancy
+  'B5G':{ requires:['B2A'],       suggests:['B3G'] },  // BMaaS → GPU + multi-tenancy
+  'B5H':{ requires:['B4C'],       suggests:['B2B'] },  // PTaaS → Fine-tune Platform
+  'B5I':{ requires:['B4A','B2A'], suggests:['B3G'] },  // API Marketplace same as MaaS
+
+  // ── BUILD L6 — Governance ────────────────────────────────────────────
+  'B6A':{ }, 'B6B':{ }, 'B6C':{ }, 'B6D':{ },
+
+  // ── BUILD L7 — Capability ────────────────────────────────────────────
+  'B7A':{ }, 'B7B':{ }, 'B7C':{ },
+
+  // ── OPERATE ──────────────────────────────────────────────────────────
+  'O01':{ },   // Scope driven by BUILD — no auto-select
+
+  // ── SUSTAIN ──────────────────────────────────────────────────────────
+  'S01':{ }, 'S02':{ }, 'S03':{ }, 'S04':{ }, 'S05':{ },
 }
+
+// Default orchestration when L5 selected and no L3 present
+var DEFAULT_ORCH = 'B3A'   // K8s — always the safe default
+
+// Default DC when needed and none selected
+var DEFAULT_DC_WARN = true  // warn rather than auto-select (DC is a big choice)
 
 // ── DUMMY DATA — M prototype ──────────────────────────────────────────
 // Real shapes, fake values. Replaced by atlasDB calls when C is wired.
@@ -542,8 +592,10 @@ var V = {
 
   // ── TAB 3: PORTFOLIO ─────────────────────────────────────────────────
   renderPortfolioTab: function() {
-    var sel  = M.portfolioItems
-    var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-4)">'
+    var portItem = M.docketItems.find(function(i){ return i.item_subtype === 'portfolio_selection' })
+    var sel     = M.portfolioItems
+    var reasons = (portItem && portItem.content && portItem.content.auto_reasons) || {}
+    var html    = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-4)">'
     html += '<div><strong>' + sel.length + '</strong> items selected</div>'
     html += '<div style="display:flex;gap:var(--sp-2);align-items:center">'
     html += '<span id="port-save-status" class="save-status"></span>'
@@ -552,7 +604,10 @@ var V = {
 
     // Coupling note
     html += '<div class="card-info card" style="font-size:var(--text-xs);margin-bottom:var(--sp-4)">'
-    html += '<strong>Coupling rules active:</strong> B2A/B2B → B2C auto-included. B4A required for B5A-I. B1A conflicts with B1B/C/D. Selecting B5E suggests B3G.'
+    html += '<strong>Dependency rules active</strong> &nbsp;·&nbsp; '
+    html += 'Selecting any L5 item auto-fills the required stack beneath it (GPU → Platform → Orchestration). '
+    html += 'B2C (CPU/storage/network) is auto-generated in BOM — not a portfolio selection. '
+    html += 'Only one DC type (B1A-E) allowed. <span style="color:var(--teal)">Auto-included items are labelled [auto].</span>'
     html += '</div>'
 
     var BLOCKS = [
@@ -576,10 +631,9 @@ var V = {
             {code:'B1E',name:'Edge / container'},{code:'B1F',name:'Multi-site'},
           ]},
           {label:'L2 — Hardware Platform',items:[
-            {code:'B2A',name:'GPU compute — inference'},
-            {code:'B2B',name:'GPU compute — training'},
-            {code:'B2C',name:'CPU + storage + network',auto:true},
-            {code:'B2D',name:'HPC Middleware'},{code:'B2E',name:'Rack-scale (NVL72)'},{code:'B2F',name:'Heterogeneous GPU'},
+            {code:'B2A',name:'GPU compute — inference (CPU + storage + network auto-included in BOM)'},
+            {code:'B2B',name:'GPU compute — training (CPU + storage + network auto-included in BOM)'},
+            {code:'B2D',name:'HPC Middleware'},{code:'B2E',name:'Rack-scale systems (NVL72)'},{code:'B2F',name:'Heterogeneous GPU architecture'},
           ]},
           {label:'L3 — Virtualisation & Orchestration',items:[
             {code:'B3A',name:'Kubernetes / OpenShift'},{code:'B3B',name:'VM-based (hypervisor)'},
@@ -635,10 +689,10 @@ var V = {
       if (block.sections) {
         block.sections.forEach(function(sec) {
           html += '<div style="font-size:10px;font-weight:var(--fw-bold);color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin:var(--sp-3) 0 var(--sp-2)">' + sec.label + '</div>'
-          sec.items.forEach(function(item){ html += V.renderPortItem(item, sel) })
+          sec.items.forEach(function(item){ html += V.renderPortItem(item, sel, reasons) })
         })
       } else {
-        block.items.forEach(function(item){ html += V.renderPortItem(item, sel) })
+        block.items.forEach(function(item){ html += V.renderPortItem(item, sel, reasons) })
       }
 
       html += '</div></div>'
@@ -648,14 +702,18 @@ var V = {
     return html
   },
 
-  renderPortItem: function(item, sel) {
+  renderPortItem: function(item, sel, reasons) {
+    reasons = reasons || {}
     var isSelected = sel.includes(item.code)
-    var isAuto     = item.auto
-    var rules      = COUPLING[item.code] || {}
-    return '<div class="portfolio-item' + (isSelected?' selected':'') + (isAuto?' opacity-50':'') + '" id="pi-' + item.code + '" onclick="C.togglePort(\'' + item.code + '\')">'
+    var isAuto     = !!(reasons[item.code] && reasons[item.code].length)
+    var rules      = GRAPH[item.code] || {}
+    var reqs       = (rules.requires||[]).join(', ')
+    return '<div class="portfolio-item' + (isSelected?' selected':'') + '" id="pi-' + item.code + '" onclick="C.togglePort(\'' + item.code + '\')">'
       + '<div class="portfolio-item-ck"></div>'
-      + '<div><div class="portfolio-item-name">' + atlasDB.esc(item.name) + (isAuto?' <span style="font-size:9px;color:var(--mid)">[auto]</span>':'') + '</div>'
-      + '<div style="font-size:10px;color:var(--mid)">' + item.code + (rules.requires && rules.requires.length ? ' · needs: ' + rules.requires.join(', ') : '') + '</div></div>'
+      + '<div><div class="portfolio-item-name">' + atlasDB.esc(item.name)
+      + (isAuto && isSelected ? ' <span class="auto-tag" style="font-size:9px;color:var(--teal);font-weight:600" title="Auto for: ' + (reasons[item.code]||[]).join(', ') + '">[auto]</span>' : '')
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--mid)">' + item.code + (reqs ? ' · requires: ' + reqs : '') + '</div></div>'
       + '</div>'
   },
 
@@ -921,52 +979,118 @@ var C = {
 
   // Portfolio
   togglePort: function(code) {
-    // Apply coupling rules
-    var rules = COUPLING[code] || {}
+    if (!GRAPH[code]) return  // B2C and other auto-BOM items not selectable
 
-    // Find or create portfolio_selection item
+    // Get or create portfolio selection
     var portItem = M.docketItems.find(function(i){ return i.item_subtype === 'portfolio_selection' })
     if (!portItem) {
-      portItem = { id:atlasDB.genId('port'), item_type:'solution', item_subtype:'portfolio_selection', section:'output', status:'done', content:{ items:[] } }
+      portItem = { id:atlasDB.genId('port'), item_type:'solution', item_subtype:'portfolio_selection', section:'output', status:'done', content:{ items:[], auto_reasons:{} } }
       M.docketItems.push(portItem)
     }
-    var items = portItem.content.items
-    var idx   = items.indexOf(code)
+    if (!portItem.content.auto_reasons) portItem.content.auto_reasons = {}
+
+    var items   = portItem.content.items
+    var reasons = portItem.content.auto_reasons  // tracks why each auto-item was added
+    var rules   = GRAPH[code] || {}
+    var affected = [code]
+    var idx = items.indexOf(code)
 
     if (idx >= 0) {
-      // Deselecting
-      items.splice(idx,1)
-      // Remove auto-required items if no other item requires them
-      if (rules.requires) {
-        rules.requires.forEach(function(req) {
-          var stillNeeded = Object.keys(COUPLING).some(function(k) {
-            return k !== code && items.includes(k) && (COUPLING[k].requires||[]).includes(req)
-          })
-          if (!stillNeeded) { var ri = items.indexOf(req); if (ri>=0) items.splice(ri,1) }
-        })
-      }
-    } else {
-      // Selecting
-      items.push(code)
-      // Auto-include required items
+      // ── DESELECTING ──────────────────────────────────────────────────
+      items.splice(idx, 1)
+      delete reasons[code]
+
+      // Remove auto-included items that were added because of THIS code
+      // only if no other selected item still requires them
       ;(rules.requires||[]).forEach(function(req) {
-        if (!items.includes(req)) { items.push(req); V.toast(req + ' auto-included (required by ' + code + ')','info') }
+        var stillNeeded = items.some(function(k) {
+          return k !== code && (GRAPH[k] && (GRAPH[k].requires||[]).includes(req))
+        })
+        if (!stillNeeded && reasons[req] && reasons[req].includes(code)) {
+          var ri = items.indexOf(req)
+          if (ri >= 0) {
+            items.splice(ri, 1)
+            delete reasons[req]
+            affected.push(req)
+            V.toast(req + ' removed (was auto-included for ' + code + ')', 'info')
+          }
+        }
       })
-      // Remove conflicts
-      ;(rules.conflicts||[]).forEach(function(conf) {
-        var ci = items.indexOf(conf)
-        if (ci >= 0) { items.splice(ci,1); V.toast(conf + ' removed (conflicts with ' + code + ')','warning') }
+    } else {
+      // ── SELECTING ────────────────────────────────────────────────────
+      items.push(code)
+
+      // 1. Enforce ONE_OF (DC type group — pick one)
+      ;(rules.one_of||[]).forEach(function(other) {
+        var oi = items.indexOf(other)
+        if (oi >= 0) {
+          items.splice(oi, 1)
+          delete reasons[other]
+          affected.push(other)
+          V.toast(other + ' removed — only one DC type allowed', 'warning')
+        }
       })
-      // Suggest
+
+      // 2. Auto-select REQUIRES chain (full cascade)
+      function autoRequire(reqCode, becauseOf) {
+        if (items.includes(reqCode)) return  // already present
+        if (!GRAPH[reqCode]) return          // not a selectable item
+        items.push(reqCode)
+        reasons[reqCode] = reasons[reqCode] || []
+        if (!reasons[reqCode].includes(becauseOf)) reasons[reqCode].push(becauseOf)
+        affected.push(reqCode)
+        V.toast(reqCode + ' auto-included — required by ' + becauseOf, 'info')
+        // Cascade: also satisfy the new item's requirements
+        ;(GRAPH[reqCode].requires||[]).forEach(function(r) { autoRequire(r, reqCode) })
+      }
+      ;(rules.requires||[]).forEach(function(req) { autoRequire(req, code) })
+
+      // 3. If L5 item and no L3 orchestration selected → auto-add K8s default
+      var isL5  = ['B5A','B5B','B5C','B5D','B5E','B5F','B5G','B5H','B5I'].includes(code)
+      var hasL3 = ['B3A','B3B','B3C'].some(function(k){ return items.includes(k) })
+      if (isL5 && !hasL3) {
+        items.push(DEFAULT_ORCH)
+        reasons[DEFAULT_ORCH] = reasons[DEFAULT_ORCH] || []
+        reasons[DEFAULT_ORCH].push(code)
+        affected.push(DEFAULT_ORCH)
+        V.toast(DEFAULT_ORCH + ' auto-included — default orchestration for UC deployment', 'info')
+      }
+
+      // 4. If L5 item and no DC type selected → warn (don't auto-select — DC is a big decision)
+      var hasL1 = ['B1A','B1B','B1C','B1D','B1E'].some(function(k){ return items.includes(k) })
+      if (isL5 && !hasL1) {
+        V.toast('Select a DC/Facility type (L1) to complete the stack', 'warning')
+      }
+
+      // 5. Suggestions — toast only, never auto-select
       ;(rules.suggests||[]).forEach(function(sug) {
-        if (!items.includes(sug)) V.toast('Suggestion: consider adding ' + sug,'info')
+        if (!items.includes(sug)) V.toast('Consider: ' + sug + ' (recommended with ' + code + ')', 'info')
       })
     }
 
-    // Update UI — toggle just the affected items, no full re-render
-    items.concat([code]).forEach(function(c) {
+    // Update UI for all affected items only — no full re-render
+    affected.forEach(function(c) {
       var el = document.getElementById('pi-' + c)
-      if (el) el.classList.toggle('selected', items.includes(c))
+      if (el) {
+        var isSelected = items.includes(c)
+        var isAuto     = !!(reasons && reasons[c] && reasons[c].length)
+        el.classList.toggle('selected', isSelected)
+        // Update auto label
+        var nameEl = el.querySelector('.portfolio-item-name')
+        if (nameEl && isAuto && isSelected) {
+          if (!nameEl.querySelector('.auto-tag')) {
+            var tag = document.createElement('span')
+            tag.className = 'auto-tag'
+            tag.style.cssText = 'font-size:9px;color:var(--teal);margin-left:6px;font-weight:600'
+            tag.textContent = '[auto]'
+            tag.title = 'Auto-included because: ' + reasons[c].join(', ')
+            nameEl.appendChild(tag)
+          }
+        } else if (nameEl) {
+          var existing = nameEl.querySelector('.auto-tag')
+          if (existing) existing.remove()
+        }
+      }
     })
   },
 
