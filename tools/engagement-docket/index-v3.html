@@ -233,63 +233,78 @@ var M = {
 // Rule: L5 (what customer wants to DO) cascades down the full stack automatically.
 
 var GRAPH = {
-  // ── PREPARE ─────────────────────────────────────────────────────────
+  // ── RULE: L2 GPU compute is the anchor of the entire BUILD stack ─────
+  // Nothing in BUILD (L1, L3, L4, L5, L6, L7), OPERATE, or SUSTAIN
+  // makes commercial sense without GPU hardware.
+  // PREPARE is the only block truly independent of GPU.
+  //
+  // Relationship types:
+  //   requires[]  → auto-select on click (hard prerequisite)
+  //   one_of[]    → deselect others in same group
+  //   suggests[]  → toast recommendation only
+
+  // ── PREPARE — truly independent ──────────────────────────────────────
   'P01':{ }, 'P02':{ }, 'P03':{ }, 'P04':{ },
   'P05':{ }, 'P06':{ }, 'P07':{ }, 'P08':{ },
 
-  // ── BUILD L1 — DC/Facility (ONE_OF group — pick one DC type) ────────
-  'B1A':{ one_of:['B1B','B1C','B1D','B1E'], suggests:['B2E'] },  // MDC → rack-scale suggestion
-  'B1B':{ one_of:['B1A','B1C','B1D','B1E'], suggests:['B3A'] },
-  'B1C':{ one_of:['B1A','B1B','B1D','B1E'] },
-  'B1D':{ one_of:['B1A','B1B','B1C','B1E'] },
-  'B1E':{ one_of:['B1A','B1B','B1C','B1D'] },
-  'B1F':{ },  // Multi-site — additive, no conflict
-
-  // ── BUILD L2 — Hardware (B2C auto-BOM, not selectable) ──────────────
-  'B2A':{ },  // GPU inference — B2C auto-generated in BOM
-  'B2B':{ },  // GPU training  — B2C auto-generated in BOM
-  // B2C: NOT SELECTABLE — auto-generated BOM lines when B2A or B2B selected
+  // ── BUILD L2 — GPU ANCHOR (no prerequisites — this IS the anchor) ────
+  'B2A':{ },   // GPU inference  → B2C auto-BOM (CPU/storage/network)
+  'B2B':{ },   // GPU training   → B2C auto-BOM
+  // B2C: NOT SELECTABLE — auto-generated BOM lines when B2A or B2B present
   'B2D':{ requires:['B2A'] },   // HPC Middleware needs GPU
-  'B2E':{ requires:['B2A'] },   // Rack-scale needs GPU inference
+  'B2E':{ requires:['B2A'] },   // Rack-scale needs GPU
   'B2F':{ requires:['B2A'] },   // Heterogeneous needs base GPU
 
-  // ── BUILD L3 — Orchestration ─────────────────────────────────────────
-  'B3A':{ },         // K8s/OpenShift — default
-  'B3B':{ },         // VM-based
-  'B3C':{ suggests:['B6C'] },  // Bare metal → suggest SIEM
-  'B3D':{ requires:['B3A'] },  // Hybrid needs K8s base
-  'B3E':{ },         // IAM — standalone add-on
-  'B3F':{ },         // Zero-trust — standalone add-on
-  'B3G':{ },         // Multi-tenancy isolation — standalone add-on
+  // ── BUILD L1 — DC/Facility (needs L2 — no point without GPU) ─────────
+  // ONE_OF group — pick exactly one DC type
+  'B1A':{ requires:['B2A'], one_of:['B1B','B1C','B1D','B1E'] },  // MDC full turn-key
+  'B1B':{ requires:['B2A'], one_of:['B1A','B1C','B1D','B1E'] },  // B&M existing
+  'B1C':{ requires:['B2A'], one_of:['B1A','B1B','B1D','B1E'] },  // Customer DC
+  'B1D':{ requires:['B2A'], one_of:['B1A','B1B','B1C','B1E'] },  // GPU cluster only
+  'B1E':{ requires:['B2A'], one_of:['B1A','B1B','B1C','B1D'] },  // Edge/container
+  'B1F':{ requires:['B2A'] },                                      // Multi-site (additive)
 
-  // ── BUILD L4 — AI Platform ───────────────────────────────────────────
-  'B4A':{ requires:['B2A'] },                     // AI Platform Core needs GPU
-  'B4B':{ requires:['B4A'] },                     // Pro needs Core
-  'B4C':{ requires:['B4A'], suggests:['B2B'] },   // Fine-tuning needs Core + suggests training GPU
+  // ── BUILD L3 — Orchestration (needs L2) ──────────────────────────────
+  'B3A':{ requires:['B2A'] },                      // K8s/OpenShift — default
+  'B3B':{ requires:['B2A'] },                      // VM-based
+  'B3C':{ requires:['B2A'], suggests:['B6C'] },    // Bare metal → suggest SIEM
+  'B3D':{ requires:['B3A'] },                      // Hybrid needs K8s base
+  'B3E':{ requires:['B2A'] },                      // IAM
+  'B3F':{ requires:['B2A'] },                      // Zero-trust
+  'B3G':{ requires:['B2A'] },                      // Multi-tenancy isolation
 
-  // ── BUILD L5 — UCs & aaS (demand-drivers — cascade down) ────────────
-  // These are what the customer wants to DO.
-  // Selecting any L5 item auto-fills the required stack beneath it.
-  'B5A':{ requires:['B4A','B2A'], auto_stack:true },   // UCs need Platform + GPU
-  'B5B':{ requires:['B4A','B2A'], auto_stack:true },   // Agents need Platform + GPU
-  'B5C':{ requires:['B4A','B2A'], auto_stack:true },   // Public services same
-  'B5D':{ requires:['B4A','B2A'] },                    // Analytics same
-  'B5E':{ requires:['B4A','B2A'], suggests:['B3G'] },  // MaaS → multi-tenancy
-  'B5F':{ requires:['B2A'],       suggests:['B3G'] },  // GPUaaS → GPU + multi-tenancy
-  'B5G':{ requires:['B2A'],       suggests:['B3G'] },  // BMaaS → GPU + multi-tenancy
-  'B5H':{ requires:['B4C'],       suggests:['B2B'] },  // PTaaS → Fine-tune Platform
-  'B5I':{ requires:['B4A','B2A'], suggests:['B3G'] },  // API Marketplace same as MaaS
+  // ── BUILD L4 — AI Platform (needs L2 + L3) ───────────────────────────
+  'B4A':{ requires:['B2A','B3A'] },                // Core: GPU + K8s (B3A auto-brings L3)
+  'B4B':{ requires:['B4A'] },                      // Pro needs Core
+  'B4C':{ requires:['B4A'], suggests:['B2B'] },    // Fine-tuning → suggest training GPU
 
-  // ── BUILD L6 — Governance ────────────────────────────────────────────
-  'B6A':{ }, 'B6B':{ }, 'B6C':{ }, 'B6D':{ },
+  // ── BUILD L5 — UCs & aaS (demand drivers → cascade down) ────────────
+  // B5F/B5G are GPUaaS/BMaaS — need L2 only, NOT L4 (raw compute sale)
+  'B5A':{ requires:['B4A','B2A'] },   // UCs → Platform + GPU → L3 auto-cascades
+  'B5B':{ requires:['B4A','B2A'] },   // Agents same
+  'B5C':{ requires:['B4A','B2A'] },   // Public services same
+  'B5D':{ requires:['B4A','B2A'] },   // Analytics same
+  'B5E':{ requires:['B4A','B2A'], suggests:['B3G'] },   // MaaS → multi-tenancy
+  'B5F':{ requires:['B2A'],       suggests:['B3G'] },   // GPUaaS: L2 only, not L4
+  'B5G':{ requires:['B2A'],       suggests:['B3G'] },   // BMaaS: L2 only, not L4
+  'B5H':{ requires:['B4C'],       suggests:['B2B'] },   // PTaaS → fine-tune platform
+  'B5I':{ requires:['B4A','B2A'], suggests:['B3G'] },   // API Marketplace same as MaaS
 
-  // ── BUILD L7 — Capability ────────────────────────────────────────────
-  'B7A':{ }, 'B7B':{ }, 'B7C':{ },
+  // ── BUILD L6 — Governance (needs L2 — governing what without hardware?) ─
+  'B6A':{ requires:['B2A'] },
+  'B6B':{ requires:['B2A'] },
+  'B6C':{ requires:['B2A'] },
+  'B6D':{ requires:['B2A'] },
 
-  // ── OPERATE ──────────────────────────────────────────────────────────
-  'O01':{ },   // Scope driven by BUILD — no auto-select
+  // ── BUILD L7 — Capability Building (needs L2 — CoE around what?) ─────
+  'B7A':{ requires:['B2A'] },
+  'B7B':{ requires:['B2A'] },
+  'B7C':{ requires:['B2A'] },
 
-  // ── SUSTAIN ──────────────────────────────────────────────────────────
+  // ── OPERATE (needs L2 — validated on Save, not on click) ─────────────
+  'O01':{ },   // Gate check: B2A must be present → enforced in C.savePortfolio()
+
+  // ── SUSTAIN (needs L2 — validated on Save, not on click) ─────────────
   'S01':{ }, 'S02':{ }, 'S03':{ }, 'S04':{ }, 'S05':{ },
 }
 
@@ -604,10 +619,11 @@ var V = {
 
     // Coupling note
     html += '<div class="card-info card" style="font-size:var(--text-xs);margin-bottom:var(--sp-4)">'
-    html += '<strong>Dependency rules active</strong> &nbsp;·&nbsp; '
-    html += 'Selecting any L5 item auto-fills the required stack beneath it (GPU → Platform → Orchestration). '
-    html += 'B2C (CPU/storage/network) is auto-generated in BOM — not a portfolio selection. '
-    html += 'Only one DC type (B1A-E) allowed. <span style="color:var(--teal)">Auto-included items are labelled [auto].</span>'
+    html += '<strong>GPU (B2A/B2B) is the anchor of the entire BUILD stack.</strong> &nbsp;·&nbsp; '
+    html += 'L1 (DC/Facility), L3-L7, OPERATE and SUSTAIN all require GPU. '
+    html += 'Only PREPARE is independent. '
+    html += 'Selecting any item auto-fills prerequisites. B2C (CPU/storage/network) auto-generated in BOM — not selectable. '
+    html += '<span style="color:var(--teal)">[auto] = auto-included by dependency rule.</span>'
     html += '</div>'
 
     var BLOCKS = [
@@ -1095,12 +1111,50 @@ var C = {
   },
 
   savePortfolio: function() {
-    var port = M.docketItems.find(function(i){ return i.item_subtype === 'portfolio_selection' })
-    var count = port ? port.content.items.length : 0
+    var port  = M.docketItems.find(function(i){ return i.item_subtype === 'portfolio_selection' })
+    var items = (port && port.content && port.content.items) ? port.content.items : []
+    var hasGPU = items.includes('B2A') || items.includes('B2B')
+
+    // ── BLOCK GATE VALIDATION ─────────────────────────────────────────
+    // GPU (L2) is the anchor. OPERATE and SUSTAIN cannot exist without it.
+    var hasOperate = items.includes('O01')
+    var hasSustain = ['S01','S02','S03','S04','S05'].some(function(s){ return items.includes(s) })
+    var hasBuildNonGPU = items.some(function(i){
+      return ['B1A','B1B','B1C','B1D','B1E','B1F',
+              'B3A','B3B','B3C','B3D','B3E','B3F','B3G',
+              'B4A','B4B','B4C',
+              'B5A','B5B','B5C','B5D','B5E','B5F','B5G','B5H','B5I',
+              'B6A','B6B','B6C','B6D',
+              'B7A','B7B','B7C'].includes(i)
+    })
+
+    var errors = []
+    if ((hasOperate || hasSustain) && !hasGPU) {
+      errors.push('OPERATE / SUSTAIN selected but no GPU hardware (B2A/B2B). What are we operating? Add GPU compute first.')
+    }
+    if (hasBuildNonGPU && !hasGPU) {
+      // This shouldn't happen with cascade rules — safety net
+      errors.push('BUILD items selected without GPU hardware. GPU (B2A/B2B) is the anchor of the BUILD stack.')
+    }
+
+    if (errors.length) {
+      errors.forEach(function(e){ V.toast('⚠ ' + e, 'error') })
+      var el = document.getElementById('port-save-status')
+      if (el) { el.textContent = '✗ Fix errors first'; el.className = 'save-status unsaved' }
+      return
+    }
+
+    // ── WARN if GPU selected but no DC type ───────────────────────────
+    var hasL1 = ['B1A','B1B','B1C','B1D','B1E','B1F'].some(function(k){ return items.includes(k) })
+    if (hasGPU && !hasL1) {
+      V.toast('Note: GPU hardware selected but no DC/Facility type chosen. Where will the hardware live?', 'warning')
+    }
+
+    var count = items.length
     var el = document.getElementById('port-save-status')
     if (el) { el.textContent = '✓ Saved · ' + count + ' items'; el.className = 'save-status saved' }
     V.toast('Portfolio saved · ' + count + ' items')
-    // WHEN C WIRED: await atlasDB.savePortfolioSelection(M.currentDocketId, port.id, port.content.items, M.currentEng.id)
+    // WHEN C WIRED: await atlasDB.savePortfolioSelection(M.currentDocketId, port.id, items, M.currentEng.id)
   },
 
   // Actions
