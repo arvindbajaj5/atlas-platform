@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATLAS — Engagement Docket v3</title>
+  <link rel="stylesheet" href="https://arvindbajaj5.github.io/atlas-platform/shared/atlas.css">
+  <style>
+    /* Tool-specific overrides — max 50 lines */
+    .req-add-row { display:flex; gap:var(--sp-3); margin-bottom:var(--sp-4); }
+    .req-add-row textarea { flex:1; min-height:60px; resize:none; }
+    .source-btns { display:flex; flex-direction:column; gap:var(--sp-1); }
+    .source-btn  { padding:4px 10px; border-radius:var(--r-sm); font-size:10px; font-weight:var(--fw-bold); border:1.5px solid; cursor:pointer; font-family:var(--font); white-space:nowrap; }
+    .source-btn.explicit  { border-color:var(--navy);  color:var(--navy);  background:rgba(0,40,112,0.06);  }
+    .source-btn.implicit  { border-color:var(--blue);  color:var(--blue);  background:rgba(28,56,245,0.06); }
+    .source-btn.suggested { border-color:var(--teal);  color:var(--teal);  background:rgba(0,178,144,0.06); }
+    .source-btn:hover { opacity:0.8; }
+    .intel-run-bar { display:flex; align-items:center; justify-content:space-between; padding:var(--sp-3) var(--sp-4); background:var(--light); border-radius:var(--r); margin-bottom:var(--sp-4); border:1px solid var(--border); }
+    .intel-run-meta { font-size:var(--text-xs); color:var(--mid); }
+    .intel-run-meta strong { color:var(--dark); }
+    .pulse-item { padding:var(--sp-3) var(--sp-4); border:1px solid var(--border); border-radius:var(--r-sm); margin-bottom:var(--sp-2); background:var(--white); }
+    .pulse-item-hdr { display:flex; align-items:flex-start; gap:var(--sp-2); margin-bottom:var(--sp-1); }
+    .pulse-item-title { font-size:var(--text-sm); font-weight:var(--fw-semi); color:var(--dark); flex:1; }
+    .pulse-item-date  { font-size:10px; color:var(--mid); white-space:nowrap; }
+    .pulse-item-body  { font-size:var(--text-xs); color:var(--mid); line-height:1.5; }
+    .brief-section { margin-bottom:var(--sp-5); }
+    .brief-section h4 { font-size:var(--text-sm); font-weight:var(--fw-bold); color:var(--navy); margin-bottom:var(--sp-2); border-bottom:1px solid var(--border); padding-bottom:var(--sp-1); }
+    .brief-q { padding:var(--sp-2) var(--sp-3); background:var(--light); border-radius:var(--r-sm); margin-bottom:var(--sp-1); font-size:var(--text-sm); color:var(--dark); }
+    .uc-match-item { display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-3); border:1px solid var(--border); border-radius:var(--r-sm); margin-bottom:var(--sp-2); background:var(--white); }
+    .uc-match-score { font-size:var(--text-lg); font-weight:var(--fw-black); color:var(--teal); min-width:44px; text-align:center; }
+    .uc-match-info { flex:1; }
+    .uc-match-name { font-size:var(--text-sm); font-weight:var(--fw-semi); color:var(--dark); }
+    .uc-match-meta { font-size:var(--text-xs); color:var(--mid); }
+  </style>
+</head>
+<body>
+
+<!-- ── MASTHEAD ────────────────────────────────────────────────────────────── -->
+<div class="atlas-hdr">
+  <div class="atlas-hdr-left">
+    <div class="atlas-brand">ATL<span>A</span>S</div>
+    <div class="atlas-tool-name">Engagement Docket</div>
+  </div>
+  <div class="atlas-hdr-right">
+    <span class="atlas-ver">v3.0 — prototype</span>
+    <button class="atlas-nav-btn" onclick="window.location.href='../../'">&#8592; Portal</button>
+  </div>
+</div>
+
+<!-- ── LAYOUT ──────────────────────────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-search">
+      <input type="text" id="sb-search" placeholder="Search customers, engagements..."
+             oninput="M.filterSidebar(this.value)">
+    </div>
+    <div class="sb-body" id="sb-body"></div>
+    <div style="padding:var(--sp-3) 14px;border-top:1px solid var(--border)">
+      <button class="btn btn-outline" style="width:100%;font-size:11px"
+              onclick="V.openNewCustomerModal()">+ New Customer</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div id="docket-area">
+      <div class="empty-state" style="margin:auto;padding-top:80px">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">Select an engagement</div>
+        <div class="empty-desc">Choose a customer and engagement from the left panel, or create a new one.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── MODALS ──────────────────────────────────────────────────────────────── -->
+
+<!-- New Customer -->
+<div class="modal-overlay" id="modal-customer" style="display:none" onclick="if(event.target===this)V.closeModal('modal-customer')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">New Customer</div>
+      <button class="btn btn-ghost btn-sm" onclick="V.closeModal('modal-customer')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Organisation Name</label>
+        <input type="text" id="cust-name" placeholder="e.g. Government of Himachal Pradesh">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)">
+        <div class="form-group">
+          <label class="form-label">Organisation Type</label>
+          <select id="cust-type">
+            <option value="state_govt">State Government</option>
+            <option value="central_govt">Central Government</option>
+            <option value="defence">Defence / Intelligence</option>
+            <option value="enterprise">Enterprise</option>
+            <option value="csp">CSP / Cloud Provider</option>
+            <option value="ai_lab">AI Lab / University</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Location</label>
+          <input type="text" id="cust-location" placeholder="e.g. Shimla, India">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Primary Contact</label>
+        <input type="text" id="cust-contact" placeholder="e.g. Secretary IT">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="V.closeModal('modal-customer')">Cancel</button>
+      <button class="btn btn-primary" onclick="C.saveCustomer()">Create Customer</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Engagement -->
+<div class="modal-overlay" id="modal-engagement" style="display:none" onclick="if(event.target===this)V.closeModal('modal-engagement')">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">New Engagement</div>
+      <button class="btn btn-ghost btn-sm" onclick="V.closeModal('modal-engagement')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="eng-cust-id">
+      <div class="form-group">
+        <label class="form-label">Engagement Name</label>
+        <input type="text" id="eng-name" placeholder="e.g. HP State — Himalayan AI Centre of Excellence">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Engagement Archetypes</label>
+        <div style="display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-top:var(--sp-1)" id="archetype-selector">
+          <!-- populated by V.renderArchetypeSelector() -->
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Territory / Geography</label>
+        <input type="text" id="eng-territory" placeholder="e.g. Himachal Pradesh, India">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="V.closeModal('modal-engagement')">Cancel</button>
+      <button class="btn btn-primary" onclick="C.saveEngagement()">Create Engagement</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Run Intel -->
+<div class="modal-overlay" id="modal-intel-run" style="display:none">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <div class="modal-title">Run Intelligence Collection?</div>
+    </div>
+    <div class="modal-body">
+      <div id="intel-run-details"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="V.closeModal('modal-intel-run')">Cancel</button>
+      <button class="btn btn-ghost" onclick="C.runIntelCollection('stale')">Refresh stale only</button>
+      <button class="btn btn-primary" onclick="C.runIntelCollection('full')">Run full refresh</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ── SCRIPTS ─────────────────────────────────────────────────────────────── -->
+<script src="https://arvindbajaj5.github.io/atlas-platform/shared/atlas-tokens.js"></script>
+<script src="https://arvindbajaj5.github.io/atlas-platform/shared/atlas-db.js"></script>
+<script>
+'use strict'
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODEL — Single source of truth for all page state
+// Never written to by View functions. Only written to by Controllers.
+// REFACTOR-MARKER: extract to shared/atlas-model.js in maintainability phase
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var M = {
+  // ── Data ──────────────────────────────────────────────────────────────────
+  customers:       [],
+  engagements:     [],
+  currentEng:      null,
+  currentDocketId: null,
+  docketItems:     [],         // ALL items for current engagement
+  ucLibrary:       [],
+  activeTab:       'overview',
+  selectedArchetypes: [],      // for new engagement modal
+
+  // ── Derived collections (computed from docketItems, not fetched separately) ─
+  get requirements() {
+    return this.docketItems.filter(function(i) { return i.item_type === ATLAS.ITEM_TYPE.REQUIREMENT })
+  },
+  get portfolioSelection() {
+    var item = this.docketItems.find(function(i) { return i.item_subtype === 'portfolio_selection' })
+    return (item && item.content && item.content.items) ? item.content.items : []
+  },
+  get maasConfig() {
+    var item = this.docketItems.find(function(i) { return i.item_subtype === 'maas_config' })
+    return item ? atlasDB.parseContent(item).content : null
+  },
+  get ucItems() {
+    return this.docketItems.filter(function(i) { return i.item_type === ATLAS.ITEM_TYPE.UC })
+  },
+  get actionItems() {
+    return this.docketItems.filter(function(i) { return i.item_type === ATLAS.ITEM_TYPE.ACTION })
+  },
+  get outputItems() {
+    return this.docketItems.filter(function(i) {
+      return [ATLAS.ITEM_TYPE.PROPOSAL, ATLAS.ITEM_TYPE.BOM, ATLAS.ITEM_TYPE.EXEC_DOC].includes(i.item_type)
+    })
+  },
+  get intelItems() {
+    return this.docketItems.filter(function(i) { return i.item_type === ATLAS.ITEM_TYPE.INTEL })
+  },
+
+  // ── Sidebar filter ────────────────────────────────────────────────────────
+  sidebarFilter: '',
+  filterSidebar: function(q) {
+    M.sidebarFilter = (q || '').toLowerCase()
+    V.renderSidebar()
+  },
+
+  // ── Intel ops run state ───────────────────────────────────────────────────
+  lastIntelRun: null,
+  lastRunCost:  0,
+  lastRunItems: 0,
+}
+
+// ─── DUMMY DATA ──────────────────────────────────────────────────────────────
+// This is the M prototype — real shapes, fake values.
+// When C is wired, these are replaced with atlasDB calls.
+// The shapes here define what the Supabase schema must support.
+// REFACTOR-MARKER: replace with atlasDB.get() calls in Controller wiring phase
+
+var DUMMY = {
+  customers: [
+    { id: 'cust-001', name: 'Government of Himachal Pradesh', type: 'state_govt', location: 'Shimla, India', contact: 'Secretary IT' },
+    { id: 'cust-002', name: 'NE India GeoAI Consortium', type: 'central_govt', location: 'Guwahati, India', contact: 'Director GIS' },
+    { id: 'cust-003', name: 'DGCA — Civil Aviation', type: 'central_govt', location: 'New Delhi, India', contact: 'DG Civil Aviation' },
+  ],
+  engagements: [
+    { id: 'ENG-2026-HP-001', customer_id: 'cust-001', name: 'HAICE — Himalayan AI Centre of Excellence', archetypes: [ATLAS.ARCHETYPE.TSAP], territory: 'Himachal Pradesh', docket_id: 'DOC-HP-001', status: 'active' },
+    { id: 'ENG-2026-NE-001', customer_id: 'cust-002', name: 'Sovereign GeoAI Platform NE India', archetypes: [ATLAS.ARCHETYPE.TSAP, ATLAS.ARCHETYPE.DEPLOYER], territory: 'Northeast India', docket_id: 'DOC-NE-001', status: 'active' },
+    { id: 'ENG-2026-DG-001', customer_id: 'cust-003', name: 'DGCA AI Safety Platform', archetypes: [ATLAS.ARCHETYPE.DEPLOYER, ATLAS.ARCHETYPE.DEFENCE], territory: 'India', docket_id: 'DOC-DG-001', status: 'active' },
+  ],
+  docketItems: {
+    'DOC-HP-001': [
+      // Requirements
+      { id: 'req-001', docket_id: 'DOC-HP-001', item_type: 'requirement', source: 'explicit', status: 'active', text: 'We have a 10MW plot in Shimla for the AI Centre. Site is near the glacial river.', tags: ['10MW+', 'greenfield', 'DLC', 'free-cooling', 'S3-sovereign'], created_at: '2026-06-01T10:00:00Z' },
+      { id: 'req-002', docket_id: 'DOC-HP-001', item_type: 'requirement', source: 'explicit', status: 'active', text: 'Must serve all 50 government departments as tenants. Need separate billing per department.', tags: ['sell-to-others', 'cost-recovery', 'S2-enhanced'], created_at: '2026-06-01T10:05:00Z' },
+      { id: 'req-003', docket_id: 'DOC-HP-001', item_type: 'requirement', source: 'implicit', status: 'accepted', text: 'Glacial river proximity implies free cooling opportunity via river water. Significant opex saving.', tags: ['free-cooling', 'river-water', 'DLC'], created_at: '2026-06-01T10:10:00Z' },
+      { id: 'req-004', docket_id: 'DOC-HP-001', item_type: 'requirement', source: 'suggested', status: 'accepted', text: 'Glacier Lake Outburst Flood (GLOF) early warning system using GeoAI — critical for Himachal.', tags: ['agriculture', 'geospatial', 'governance'], created_at: '2026-06-02T09:00:00Z' },
+      { id: 'req-005', docket_id: 'DOC-HP-001', item_type: 'requirement', source: 'suggested', status: 'active', text: 'Horticulture AI for apple crop disease detection and yield prediction.', tags: ['agriculture'], created_at: '2026-06-02T09:05:00Z' },
+      // Portfolio selection
+      { id: 'port-001', docket_id: 'DOC-HP-001', item_type: 'solution', item_subtype: 'portfolio_selection', section: 'output', status: 'done', content: { items: ['P02', 'P03', 'P04', 'P08', 'B1A', 'B2A', 'B2C', 'B3A', 'B3G', 'B4A', 'B4B', 'B5A', 'B5E', 'B5F', 'B6A', 'B6B', 'B7A', 'B7B', 'O01', 'S01', 'S02', 'S05'] }, created_at: '2026-06-03T10:00:00Z' },
+      // UC items
+      { id: 'uc-001', docket_id: 'DOC-HP-001', item_type: 'uc', title: 'GLOF Early Warning System', status: 'agreed', content: { uc_id: 'UC-GEO-003', domain: 'geospatial', dau: 500 }, created_at: '2026-06-03T11:00:00Z' },
+      { id: 'uc-002', docket_id: 'DOC-HP-001', item_type: 'uc', title: 'Crop Disease Detection', status: 'proposed', content: { uc_id: 'UC-AGR-002', domain: 'agriculture', dau: 50000 }, created_at: '2026-06-03T11:05:00Z' },
+      // Actions
+      { id: 'act-001', docket_id: 'DOC-HP-001', item_type: 'action', section: 'action', title: 'Send HAICE concept paper to Secretary IT', status: 'done', assigned_to: 'Arvind Bajaj', due_date: '2026-06-15', created_at: '2026-06-05T09:00:00Z' },
+      { id: 'act-002', docket_id: 'DOC-HP-001', item_type: 'action', section: 'action', title: 'Follow up on site visit approval', status: 'open', assigned_to: 'Arvind Bajaj', due_date: '2026-07-05', created_at: '2026-06-20T09:00:00Z' },
+      // Intel items
+      { id: 'int-001', docket_id: 'DOC-HP-001', item_type: 'intel', title: 'HP announces ₹2000Cr AI budget in state budget 2026-27', content: { summary: 'Himachal Pradesh government allocated ₹2000 crore for AI infrastructure and digital governance in the state budget announced June 2026.', confidence_score: 0.92, domain_code: 'GOV', scraped_at: '2026-06-15T00:00:00Z' }, created_at: '2026-06-15T06:00:00Z' },
+      { id: 'int-002', docket_id: 'DOC-HP-001', item_type: 'intel', title: 'NIT Hamirpur launches AI research centre in collaboration with MeitY', content: { summary: 'NIT Hamirpur has partnered with MeitY to establish an AI research centre focused on mountain ecosystem monitoring and disaster prediction.', confidence_score: 0.78, domain_code: 'EDU', scraped_at: '2026-06-10T00:00:00Z' }, created_at: '2026-06-10T06:00:00Z' },
+    ]
+  },
+  ucLibrary: [
+    { id: 'UC-GEO-003', uc_name: 'GLOF Early Warning System', cluster: 'Disaster Management', domain: 'geospatial', complexity: 'complex' },
+    { id: 'UC-AGR-002', uc_name: 'Crop Disease Detection', cluster: 'Agriculture', domain: 'agriculture', complexity: 'medium' },
+    { id: 'UC-AGR-005', uc_name: 'Horticulture Yield Prediction', cluster: 'Agriculture', domain: 'agriculture', complexity: 'medium' },
+    { id: 'UC-GOV-001', uc_name: 'Smart Grievance Redressal', cluster: 'Governance', domain: 'governance', complexity: 'simple' },
+    { id: 'UC-HLT-003', uc_name: 'Remote Health Diagnostics', cluster: 'Health', domain: 'health', complexity: 'complex' },
+  ],
+  intelRun: {
+    lastRun: '2026-06-25T09:14:00Z',
+    itemsCollected: 47,
+    itemsDeduplicated: 12,
+    cost: 0.072,
+    domainsStale: 2,
+    domainsTotal: 10,
+  }
+}
+
+// ─── Load dummy data into Model on startup ──────────────────────────────────
+function loadDummyData() {
+  M.customers   = DUMMY.customers
+  M.engagements = DUMMY.engagements
+  M.ucLibrary   = DUMMY.ucLibrary
+  M.lastIntelRun = DUMMY.intelRun.lastRun
+  M.lastRunCost  = DUMMY.intelRun.cost
+  M.lastRunItems = DUMMY.intelRun.itemsCollected
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VIEW — Pure render functions. Read from M only. Never write to M or DB.
+// REFACTOR-MARKER: extract components to shared/atlas-components.js
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var V = {
+
+  // ── Sidebar ────────────────────────────────────────────────────────────────
+  renderSidebar: function() {
+    var q    = M.sidebarFilter
+    var html = ''
+    var customers = M.customers.filter(function(c) {
+      if (!q) return true
+      return c.name.toLowerCase().includes(q) || (c.location||'').toLowerCase().includes(q)
+    })
+    customers.forEach(function(cust) {
+      var engs = M.engagements.filter(function(e) { return e.customer_id === cust.id })
+      html += '<div class="sb-section" style="cursor:pointer" onclick="C.toggleCustomer(\'' + cust.id + '\')">'
+      html += '<span>' + atlasDB.esc(cust.name) + '</span>'
+      html += '<button onclick="event.stopPropagation();C.newEngagement(\'' + cust.id + '\')" title="New engagement">+</button>'
+      html += '</div>'
+      engs.forEach(function(eng) {
+        var isActive = M.currentEng && M.currentEng.id === eng.id
+        html += '<div class="sb-item' + (isActive ? ' active' : '') + '" onclick="C.openEngagement(\'' + eng.id + '\')">'
+        html += '<span class="sb-item-name">' + atlasDB.esc(eng.name) + '</span>'
+        html += '</div>'
+      })
+    })
+    if (!customers.length) {
+      html = '<div style="padding:var(--sp-4) 14px;font-size:var(--text-sm);color:var(--mid)">No results</div>'
+    }
+    document.getElementById('sb-body').innerHTML = html
+  },
+
+  // ── Docket shell ──────────────────────────────────────────────────────────
+  renderDocket: function() {
+    var eng = M.currentEng
+    if (!eng) return
+    var cust = M.customers.find(function(c) { return c.id === eng.customer_id }) || {}
+    var archetypeLabels = {
+      'sovereign-ai-platform': 'Sovereign AI Platform',
+      'ai-infra-provider': 'AI Infrastructure Provider',
+      'ai-application-deployer': 'AI Application Deployer',
+      'ai-research-platform': 'AI Research Platform',
+      'ai-services-consumer': 'AI Services Consumer',
+      'defence-classified-ai': 'Defence / Classified'
+    }
+    var archBadges = (eng.archetypes || []).map(function(a) {
+      return '<span class="badge badge-navy">' + (archetypeLabels[a] || a) + '</span>'
+    }).join(' ')
+
+    var html = ''
+    // Engagement header
+    html += '<div style="padding:var(--sp-5) var(--sp-6);background:var(--white);border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4)">'
+    html += '<div>'
+    html += '<div style="font-size:var(--text-xs);color:var(--mid);margin-bottom:var(--sp-1)">' + atlasDB.esc(cust.name) + ' · ' + atlasDB.esc(eng.territory || '') + '</div>'
+    html += '<div style="font-size:var(--text-xl);font-weight:var(--fw-bold);color:var(--navy);margin-bottom:var(--sp-2)">' + atlasDB.esc(eng.name) + '</div>'
+    html += '<div style="display:flex;gap:var(--sp-1);flex-wrap:wrap">' + archBadges + '</div>'
+    html += '</div>'
+    html += '<button class="btn btn-orange btn-sm" onclick="C.openInSASC()">Open in Solution Builder →</button>'
+    html += '</div>'
+
+    // Tab bar
+    var tabs = [
+      { key: 'overview',      label: 'Overview' },
+      { key: 'requirements',  label: 'Requirements' },
+      { key: 'portfolio',     label: 'Portfolio' },
+      { key: 'uc',            label: 'Use Cases' },
+      { key: 'intel',         label: 'Intelligence' },
+      { key: 'actions',       label: 'Actions' },
+      { key: 'outputs',       label: 'Outputs' },
+      { key: 'history',       label: 'History' },
+    ]
+    html += '<div class="tab-bar">'
+    tabs.forEach(function(t) {
+      var isActive = M.activeTab === t.key
+      html += '<button class="tab-btn' + (isActive ? ' active' : '') + '" onclick="C.switchTab(\'' + t.key + '\')">' + t.label + '</button>'
+    })
+    html += '</div>'
+
+    // Tab body
+    html += '<div class="tab-body" id="tab-body">' + V.renderTab(M.activeTab) + '</div>'
+
+    document.getElementById('docket-area').innerHTML = html
+  },
+
+  renderTab: function(tab) {
+    switch(tab) {
+      case 'overview':     return V.renderOverviewTab()
+      case 'requirements': return V.renderRequirementsTab()
+      case 'portfolio':    return V.renderPortfolioTab()
+      case 'uc':           return V.renderUCTab()
+      case 'intel':        return V.renderIntelTab()
+      case 'actions':      return V.renderActionsTab()
+      case 'outputs':      return V.renderOutputsTab()
+      case 'history':      return V.renderHistoryTab()
+      default:             return ''
+    }
+  },
+
+  // ── OVERVIEW TAB ──────────────────────────────────────────────────────────
+  renderOverviewTab: function() {
+    var eng   = M.currentEng
+    var reqs  = M.requirements
+    var ports = M.portfolioSelection
+    var ucs   = M.ucItems
+    var acts  = M.actionItems
+    var openActs = acts.filter(function(a) { return a.status !== 'done' })
+
+    var html = ''
+
+    // Stats row
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-4);margin-bottom:var(--sp-5)">'
+    var stats = [
+      { label: 'Requirements', val: reqs.length, sub: reqs.filter(function(r){ return r.status==='accepted' }).length + ' accepted', color: ATLAS.COLORS.NAVY },
+      { label: 'Portfolio items', val: ports.length, sub: 'selected', color: ATLAS.COLORS.BLUE },
+      { label: 'Use Cases', val: ucs.length, sub: ucs.filter(function(u){ return u.status==='agreed' }).length + ' agreed', color: ATLAS.COLORS.TEAL },
+      { label: 'Open actions', val: openActs.length, sub: acts.length + ' total', color: openActs.length > 0 ? ATLAS.COLORS.ORANGE : ATLAS.COLORS.TEAL },
+    ]
+    stats.forEach(function(s) {
+      html += '<div class="card" style="margin:0;text-align:center">'
+      html += '<div style="font-size:32px;font-weight:900;color:' + s.color + '">' + s.val + '</div>'
+      html += '<div style="font-size:var(--text-sm);font-weight:var(--fw-semi);color:var(--dark);margin:4px 0">' + s.label + '</div>'
+      html += '<div style="font-size:var(--text-xs);color:var(--mid)">' + s.sub + '</div>'
+      html += '</div>'
+    })
+    html += '</div>'
+
+    // Recent requirements
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)">'
+
+    html += '<div class="card" style="margin:0">'
+    html += '<div class="card-title">Recent Requirements</div>'
+    reqs.slice(0,4).forEach(function(r) {
+      html += '<div class="req-item" style="margin-bottom:var(--sp-2)">'
+      html += '<div class="req-item-top">'
+      html += '<span class="req-item-source req-source-' + r.source + '">' + r.source + '</span>'
+      html += '<span class="req-item-text" style="font-size:var(--text-xs)">' + atlasDB.esc(r.text.slice(0,80)) + (r.text.length>80?'…':'') + '</span>'
+      html += '</div></div>'
+    })
+    if (!reqs.length) html += '<div style="color:var(--mid);font-size:var(--text-sm)">No requirements yet</div>'
+    html += '<button class="btn btn-ghost btn-sm" style="margin-top:var(--sp-2)" onclick="C.switchTab(\'requirements\')">View all →</button>'
+    html += '</div>'
+
+    // Open actions
+    html += '<div class="card" style="margin:0">'
+    html += '<div class="card-title">Open Actions</div>'
+    openActs.slice(0,4).forEach(function(a) {
+      html += '<div style="display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) 0;border-bottom:1px solid var(--border)">'
+      html += '<span style="width:8px;height:8px;border-radius:50%;background:var(--amber);flex-shrink:0"></span>'
+      html += '<span style="flex:1;font-size:var(--text-sm)">' + atlasDB.esc(a.title) + '</span>'
+      html += '<span style="font-size:10px;color:var(--mid)">' + (a.due_date||'') + '</span>'
+      html += '</div>'
+    })
+    if (!openActs.length) html += '<div style="color:var(--teal);font-size:var(--text-sm)">✓ No open actions</div>'
+    html += '</div>'
+
+    html += '</div>'
+    return html
+  },
+
+  // ── REQUIREMENTS TAB ──────────────────────────────────────────────────────
+  renderRequirementsTab: function() {
+    var reqs = M.requirements
+    var html = ''
+
+    // Add requirement row
+    html += '<div class="card">'
+    html += '<div class="card-title">Capture Requirement</div>'
+    html += '<div class="req-add-row">'
+    html += '<textarea id="req-text" placeholder="Enter requirement in customer\'s own words or your interpretation..."></textarea>'
+    html += '<div class="source-btns">'
+    html += '<button class="source-btn explicit"  onclick="C.addRequirement(\'explicit\')">Explicit</button>'
+    html += '<button class="source-btn implicit"  onclick="C.addRequirement(\'implicit\')">Implicit</button>'
+    html += '<button class="source-btn suggested" onclick="C.addRequirement(\'suggested\')">Suggested</button>'
+    html += '</div></div>'
+    html += '<div style="font-size:var(--text-xs);color:var(--mid)">Explicit = customer stated · Implicit = your addition · Suggested = our proposition</div>'
+    html += '</div>'
+
+    // Requirements list by status
+    var statuses = [
+      { key: 'active',   label: 'Active',   color: 'var(--dark)' },
+      { key: 'accepted', label: 'Accepted', color: 'var(--teal)' },
+      { key: 'deferred', label: 'Deferred', color: 'var(--amber)' },
+      { key: 'dropped',  label: 'Dropped',  color: 'var(--mid)'  },
+    ]
+
+    statuses.forEach(function(s) {
+      var filtered = reqs.filter(function(r) { return r.status === s.key })
+      if (!filtered.length && s.key !== 'active') return
+      html += '<div style="margin-bottom:var(--sp-3)">'
+      html += '<div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:' + s.color + ';text-transform:uppercase;letter-spacing:.5px;margin-bottom:var(--sp-2)">'
+      html += s.label + ' (' + filtered.length + ')</div>'
+      if (!filtered.length) {
+        html += '<div style="color:var(--mid);font-size:var(--text-sm);padding:var(--sp-3) 0">No ' + s.label.toLowerCase() + ' requirements</div>'
+      }
+      filtered.forEach(function(r) {
+        html += V.renderRequirementItem(r)
+      })
+      html += '</div>'
+    })
+
+    return html
+  },
+
+  renderRequirementItem: function(r) {
+    var html = '<div class="req-item">'
+    html += '<div class="req-item-top">'
+    html += '<span class="req-item-source req-source-' + r.source + '">' + r.source + '</span>'
+    html += '<span class="req-item-text">' + atlasDB.esc(r.text) + '</span>'
+    html += '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
+    if (r.status === 'active') {
+      html += '<button onclick="C.updateReqStatus(\'' + r.id + '\',\'accepted\')" class="btn btn-teal btn-sm">Accept</button>'
+      html += '<button onclick="C.updateReqStatus(\'' + r.id + '\',\'dropped\')"  class="btn btn-ghost btn-sm">Drop</button>'
+    }
+    if (r.status === 'accepted') {
+      html += '<button onclick="C.updateReqStatus(\'' + r.id + '\',\'dropped\')" class="btn btn-ghost btn-sm">Drop</button>'
+    }
+    html += '</div></div>'
+    if (r.tags && r.tags.length) {
+      html += '<div class="req-item-tags">'
+      r.tags.forEach(function(t) { html += '<span class="tag active">' + t + '</span>' })
+      html += '</div>'
+    }
+    // Portfolio suggestions placeholder
+    html += '<div style="margin-top:var(--sp-2);font-size:10px;color:var(--mid)">Portfolio suggestions: loading... <span style="color:var(--blue)">[AI-powered — coming when C is wired]</span></div>'
+    html += '</div>'
+    return html
+  },
+
+  // ── PORTFOLIO TAB ─────────────────────────────────────────────────────────
+  renderPortfolioTab: function() {
+    var sel  = M.portfolioSelection
+    var html = '<div style="margin-bottom:var(--sp-4);display:flex;align-items:center;justify-content:space-between">'
+    html += '<div style="font-size:var(--text-sm);color:var(--mid)">' + sel.length + ' items selected</div>'
+    html += '<div style="display:flex;gap:var(--sp-2)">'
+    html += '<span id="port-save-status" class="save-status"></span>'
+    html += '<button class="btn btn-primary btn-sm" onclick="C.savePortfolio()">💾 Save Portfolio</button>'
+    html += '</div></div>'
+
+    var blocks = [
+      {
+        key: 'PREPARE', label: 'PREPARE', sub: 'Consulting & advisory before we build',
+        items: [
+          { code: 'P01', name: 'AI Readiness Assessment' },
+          { code: 'P02', name: 'Strategy & Governance' },
+          { code: 'P03', name: 'Data Estate Planning' },
+          { code: 'P04', name: 'Use Case Discovery' },
+          { code: 'P05', name: 'Procurement Advisory' },
+          { code: 'P06', name: 'AI Literacy Programme' },
+          { code: 'P07', name: 'Organisational Change Management' },
+          { code: 'P08', name: 'Regulatory Compliance Advisory' },
+        ]
+      },
+      {
+        key: 'BUILD', label: 'BUILD', sub: 'Everything we design, procure and deliver',
+        sections: [
+          { label: 'L1 — DC / Facility', items: [
+            { code: 'B1A', name: 'MDC — full turn-key' },
+            { code: 'B1B', name: 'B&M DC — existing building, no civil' },
+            { code: 'B1C', name: 'Customer DC — hardware + platform only' },
+            { code: 'B1D', name: 'GPU cluster — no facility' },
+            { code: 'B1E', name: 'Edge / container' },
+            { code: 'B1F', name: 'Multi-site' },
+          ]},
+          { label: 'L2 — Hardware Platform', items: [
+            { code: 'B2A', name: 'GPU compute — inference' },
+            { code: 'B2B', name: 'GPU compute — training' },
+            { code: 'B2C', name: 'CPU + storage + network (auto with B2A/B2B)' },
+            { code: 'B2D', name: 'HPC Middleware' },
+            { code: 'B2E', name: 'Rack-scale systems (NVL72)' },
+            { code: 'B2F', name: 'Heterogeneous GPU architecture' },
+          ]},
+          { label: 'L3 — Virtualisation & Orchestration', items: [
+            { code: 'B3A', name: 'Kubernetes / OpenShift' },
+            { code: 'B3B', name: 'VM-based (hypervisor)' },
+            { code: 'B3C', name: 'Bare metal' },
+            { code: 'B3D', name: 'Hybrid orchestration' },
+            { code: 'B3E', name: 'Identity & Access Management (optional)' },
+            { code: 'B3F', name: 'Zero-trust Network Access (optional)' },
+            { code: 'B3G', name: 'Multi-tenancy Isolation Layer (optional)' },
+          ]},
+          { label: 'L4 — AI Platform', items: [
+            { code: 'B4A', name: 'AI Platform Core (Registry, RAG, API Gateway, Obs, Vector DB)' },
+            { code: 'B4B', name: 'AI Platform Pro (Data Fusion, MLOps)' },
+            { code: 'B4C', name: 'Model Fine-tuning Platform' },
+          ]},
+          { label: 'L5 — Use Cases & aaS Services', items: [
+            { code: 'B5A', name: 'Domain Use Cases' },
+            { code: 'B5B', name: 'AI Agents' },
+            { code: 'B5C', name: 'Public-facing services' },
+            { code: 'B5D', name: 'Analytics & dashboards' },
+            { code: 'B5E', name: 'MaaS — Model as a Service' },
+            { code: 'B5F', name: 'GPUaaS — GPU as a Service' },
+            { code: 'B5G', name: 'BMaaS — Bare Metal as a Service' },
+            { code: 'B5H', name: 'PTaaS — Post-Training as a Service' },
+            { code: 'B5I', name: 'AI API Marketplace' },
+          ]},
+          { label: 'L6 — Governance & Compliance', items: [
+            { code: 'B6A', name: 'AI Governance framework + model cards' },
+            { code: 'B6B', name: 'Regulatory compliance (DPDP, sectoral)' },
+            { code: 'B6C', name: 'Security posture management (SIEM)' },
+            { code: 'B6D', name: 'Data sovereignty controls' },
+          ]},
+          { label: 'L7 — Capability Building', items: [
+            { code: 'B7A', name: 'AI Centre of Excellence' },
+            { code: 'B7B', name: 'AI Skills Academy' },
+            { code: 'B7C', name: 'Startup Incubator' },
+          ]},
+        ]
+      },
+      {
+        key: 'OPERATE', label: 'OPERATE', sub: 'Our team, fully managed, always-on runtime services',
+        items: [
+          { code: 'O01', name: 'Fully managed runtime (hardware + software + application + sysadmin)' },
+        ]
+      },
+      {
+        key: 'SUSTAIN', label: 'SUSTAIN', sub: 'Periodic projects to evolve and extend',
+        items: [
+          { code: 'S01', name: 'Model Refresh & Retraining' },
+          { code: 'S02', name: 'UC Enhancements' },
+          { code: 'S03', name: 'Hardware Refresh (end of life)' },
+          { code: 'S04', name: 'Capacity Expansion' },
+          { code: 'S05', name: 'Security Compliance Audits' },
+        ]
+      },
+    ]
+
+    html += '<div class="portfolio-grid">'
+    blocks.forEach(function(block) {
+      var isOpen = ['PREPARE','BUILD','OPERATE','SUSTAIN'].includes(block.key)
+      html += '<div class="portfolio-block ' + block.key + (isOpen ? ' open' : '') + '" id="block-' + block.key + '">'
+      html += '<div class="portfolio-block-hdr" onclick="V.toggleBlock(\'' + block.key + '\')">'
+      html += '<div><div style="font-size:var(--text-md);font-weight:var(--fw-bold)">' + block.label + '</div>'
+      html += '<div style="font-size:var(--text-xs);font-weight:var(--fw-normal);margin-top:2px">' + block.sub + '</div></div>'
+      html += '<span id="block-arrow-' + block.key + '">' + (isOpen ? '▲' : '▼') + '</span>'
+      html += '</div>'
+      html += '<div class="portfolio-block-body">'
+
+      if (block.sections) {
+        block.sections.forEach(function(section) {
+          html += '<div style="font-size:10px;font-weight:var(--fw-bold);color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin:var(--sp-3) 0 var(--sp-2)">' + section.label + '</div>'
+          section.items.forEach(function(item) {
+            html += V.renderPortfolioItem(item, sel)
+          })
+        })
+      } else {
+        block.items.forEach(function(item) {
+          html += V.renderPortfolioItem(item, sel)
+        })
+      }
+
+      html += '</div></div>'
+    })
+    html += '</div>'
+
+    // AMC note
+    html += '<div class="card-info card" style="margin-top:var(--sp-4);font-size:var(--text-sm)">'
+    html += '<strong>AMC</strong> — Annual Maintenance Contract is a commercial parameter, not a portfolio selection. '
+    html += 'Hardware AMC (8-12% of hardware value) and Software AMC (18-22% of licence ACV) are auto-derived from BUILD selections.'
+    html += '</div>'
+
+    return html
+  },
+
+  renderPortfolioItem: function(item, sel) {
+    var isSelected = sel.includes(item.code)
+    var html = '<div class="portfolio-item' + (isSelected ? ' selected' : '') + '" onclick="C.togglePortfolioItem(\'' + item.code + '\')" id="pi-' + item.code + '">'
+    html += '<div class="portfolio-item-ck"></div>'
+    html += '<div><div class="portfolio-item-name">' + atlasDB.esc(item.name) + '</div>'
+    html += '<div class="portfolio-item-desc" style="color:var(--mid);font-size:10px">' + item.code + '</div></div>'
+    html += '</div>'
+    return html
+  },
+
+  toggleBlock: function(key) {
+    var block = document.getElementById('block-' + key)
+    var arrow = document.getElementById('block-arrow-' + key)
+    if (!block) return
+    block.classList.toggle('open')
+    if (arrow) arrow.textContent = block.classList.contains('open') ? '▲' : '▼'
+  },
+
+  // ── UC TAB ────────────────────────────────────────────────────────────────
+  renderUCTab: function() {
+    var ucs  = M.ucItems
+    var html = ''
+
+    // UC match suggestions from requirements
+    html += '<div class="card">'
+    html += '<div class="card-title">UC Suggestions from Requirements</div>'
+    html += '<div class="card-sub">Matched from UC library via vector similarity · Accept to add to engagement</div>'
+    var suggestions = [
+      { uc_id: 'UC-AGR-005', name: 'Horticulture Yield Prediction', domain: 'Agriculture', score: 94, reason: 'Matched from requirement: "apple crop disease detection and yield prediction"' },
+      { uc_id: 'UC-HLT-003', name: 'Remote Health Diagnostics',     domain: 'Health',      score: 71, reason: 'Matched from archetype TSAP — typical health UC for state governments' },
+    ]
+    suggestions.forEach(function(s) {
+      html += '<div class="uc-match-item">'
+      html += '<div class="uc-match-score">' + s.score + '%</div>'
+      html += '<div class="uc-match-info">'
+      html += '<div class="uc-match-name">' + atlasDB.esc(s.name) + '</div>'
+      html += '<div class="uc-match-meta">' + s.domain + ' · ' + atlasDB.esc(s.reason) + '</div>'
+      html += '</div>'
+      html += '<button class="btn btn-teal btn-sm" onclick="C.acceptUC(\'' + s.uc_id + '\',\'' + s.name + '\')">Accept</button>'
+      html += '<button class="btn btn-ghost btn-sm" onclick="C.rejectUC(\'' + s.uc_id + '\')">Skip</button>'
+      html += '</div>'
+    })
+    html += '</div>'
+
+    // Confirmed UCs
+    html += '<div class="card">'
+    html += '<div class="card-title">Confirmed Use Cases (' + ucs.length + ')</div>'
+    if (!ucs.length) {
+      html += '<div class="empty-state"><div class="empty-desc">No UCs confirmed yet. Accept suggestions above or search the library.</div></div>'
+    } else {
+      html += '<table class="tbl"><thead><tr><th>Use Case</th><th>Domain</th><th>Status</th><th>DAU</th><th></th></tr></thead><tbody>'
+      ucs.forEach(function(u) {
+        html += '<tr>'
+        html += '<td><strong>' + atlasDB.esc(u.title) + '</strong></td>'
+        html += '<td>' + (u.content && u.content.domain ? u.content.domain : '—') + '</td>'
+        html += '<td><span class="badge badge-' + (u.status==='agreed'?'teal':'navy') + '">' + u.status + '</span></td>'
+        html += '<td class="num">' + ((u.content && u.content.dau) ? u.content.dau.toLocaleString() : '—') + '</td>'
+        html += '<td><button class="btn btn-ghost btn-sm" onclick="C.configureUC(\'' + u.id + '\')">Configure →</button></td>'
+        html += '</tr>'
+      })
+      html += '</tbody></table>'
+    }
+    html += '<div style="margin-top:var(--sp-4)">'
+    html += '<button class="btn btn-outline btn-sm" onclick="C.openUCLibrary()">+ Search UC Library</button>'
+    html += '</div></div>'
+
+    return html
+  },
+
+  // ── INTELLIGENCE TAB ──────────────────────────────────────────────────────
+  renderIntelTab: function() {
+    var html = ''
+
+    // Run control bar
+    var lastRun = M.lastIntelRun ? new Date(M.lastIntelRun) : null
+    var daysSince = lastRun ? Math.floor((Date.now() - lastRun.getTime()) / 86400000) : null
+    html += '<div class="intel-run-bar">'
+    html += '<div class="intel-run-meta">'
+    if (lastRun) {
+      html += '<strong>Last run:</strong> ' + daysSince + ' days ago (' + lastRun.toLocaleDateString() + ')  ·  '
+      html += '<strong>Items collected:</strong> ' + M.lastRunItems + '  ·  '
+      html += '<strong>Cost:</strong> $' + M.lastRunCost.toFixed(3)
+    } else {
+      html += 'Never run — click to collect intelligence for this engagement'
+    }
+    html += '</div>'
+    html += '<button class="btn btn-navy btn-sm" onclick="C.confirmIntelRun()">↻ Refresh Intelligence</button>'
+    html += '</div>'
+
+    // Four intel views as sub-tabs
+    var subTabs = ['Market Pulse', 'Customer Profile', 'Engagement Brief', 'UC Opportunities']
+    var activeIntelTab = M.activeIntelTab || 'Market Pulse'
+    html += '<div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:var(--sp-4)">'
+    subTabs.forEach(function(t) {
+      var isActive = activeIntelTab === t
+      html += '<button style="padding:var(--sp-2) var(--sp-4);font-size:var(--text-xs);font-weight:var(--fw-semi);color:' + (isActive?'var(--navy)':'var(--mid)') + ';background:none;border:none;border-bottom:2px solid ' + (isActive?'var(--orange)':'transparent') + ';cursor:pointer;margin-bottom:-2px;font-family:var(--font)" onclick="C.switchIntelTab(\'' + t + '\')">' + t + '</button>'
+    })
+    html += '</div>'
+
+    switch(activeIntelTab) {
+      case 'Market Pulse':     html += V.renderMarketPulse(); break
+      case 'Customer Profile': html += V.renderCustomerProfile(); break
+      case 'Engagement Brief': html += V.renderEngagementBrief(); break
+      case 'UC Opportunities': html += V.renderUCOpportunities(); break
+    }
+
+    return html
+  },
+
+  renderMarketPulse: function() {
+    var items = M.intelItems
+    var html  = '<div class="card"><div class="card-title">Market Pulse — Recent Intelligence</div>'
+    if (!items.length) {
+      html += '<div class="coming-soon"><strong>No intelligence collected yet</strong>Run a collection to see domain developments relevant to this engagement.</div>'
+    } else {
+      items.forEach(function(item) {
+        var conf = (item.content && item.content.confidence_score) || 0.8
+        var confClass = conf > 0.8 ? 'conf-high' : conf > 0.5 ? 'conf-medium' : 'conf-low'
+        html += '<div class="pulse-item">'
+        html += '<div class="pulse-item-hdr">'
+        html += '<span class="conf-dot ' + confClass + '"></span>'
+        html += '<span class="pulse-item-title">' + atlasDB.esc(item.title || '') + '</span>'
+        html += '<span class="pulse-item-date">' + (item.content && item.content.scraped_at ? new Date(item.content.scraped_at).toLocaleDateString() : '') + '</span>'
+        html += '</div>'
+        html += '<div class="pulse-item-body">' + atlasDB.esc((item.content && item.content.summary) || '') + '</div>'
+        html += '</div>'
+      })
+    }
+    html += '</div>'
+    return html
+  },
+
+  renderCustomerProfile: function() {
+    var cust = M.customers.find(function(c) { return c.id === (M.currentEng && M.currentEng.customer_id) }) || {}
+    var html = '<div class="card"><div class="card-title">Customer Profile</div>'
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);margin-bottom:var(--sp-4)">'
+    var fields = [
+      { label: 'Organisation', val: cust.name },
+      { label: 'Type', val: cust.type },
+      { label: 'Location', val: cust.location },
+      { label: 'Primary Contact', val: cust.contact },
+    ]
+    fields.forEach(function(f) {
+      html += '<div><div style="font-size:10px;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">' + f.label + '</div>'
+      html += '<div style="font-size:var(--text-sm);font-weight:var(--fw-medium)">' + atlasDB.esc(f.val||'—') + '</div></div>'
+    })
+    html += '</div>'
+    html += '<div class="coming-soon"><strong>AI-generated customer profile</strong>Run intelligence collection to generate a profile with org structure, key decision makers, budget signals, and competitive context. [C will call atlas-ai.js → atlas-intel.js]</div>'
+    html += '</div>'
+    return html
+  },
+
+  renderEngagementBrief: function() {
+    var html = '<div class="card"><div class="card-title">Engagement Brief</div>'
+    html += '<div class="card-sub">What to know before the next customer meeting</div>'
+    html += '<div class="brief-section">'
+    html += '<h4>Key Signals</h4>'
+    html += '<div class="pulse-item">HP announced ₹2000Cr AI budget for 2026-27 — strong government commitment to AI investment. Use this to anchor urgency of proposal.</div>'
+    html += '</div>'
+    html += '<div class="brief-section">'
+    html += '<h4>Suggested Questions</h4>'
+    ;['Has the site survey for the Shimla plot been completed?',
+      'What is the timeline for HP legislature session where budget allocation is approved?',
+      'Which departments have highest political priority for early UC deployment?',
+      'Is NIT Hamirpur partnership confirmed for the Skills Academy?',
+      'What are the security classification requirements for revenue department data?'].forEach(function(q) {
+      html += '<div class="brief-q">' + atlasDB.esc(q) + '</div>'
+    })
+    html += '</div>'
+    html += '<div class="brief-section">'
+    html += '<h4>Risks to Flag</h4>'
+    html += '<div class="warn-panel"><div class="warn-title">⚠ Election cycle risk</div><div class="warn-body">HP state elections due in 2027. Large capex projects may face budget freeze if political priorities shift. Build phased delivery option into proposal.</div></div>'
+    html += '</div>'
+    html += '<div class="card-info card" style="font-size:var(--text-xs)">This brief is generated by AI from collected intelligence items. <button class="btn btn-ghost btn-sm" onclick="C.regenerateBrief()">↻ Regenerate</button></div>'
+    html += '</div>'
+    return html
+  },
+
+  renderUCOpportunities: function() {
+    var html = '<div class="card"><div class="card-title">UC Opportunities from Intelligence</div>'
+    html += '<div class="card-sub">UCs identified from intelligence items not yet in UC library</div>'
+    var opps = [
+      { name: 'Smart Grid AI for Hydel Power Management', reason: 'HP has significant hydel power infrastructure. AI optimisation could save 15-20% transmission loss.', domain: 'Energy', tags: ['smart-city', 'governance'] },
+      { name: 'Snow/Avalanche Risk Prediction', reason: 'High mountain terrain + climate change signals in recent intel suggest growing need.', domain: 'Disaster Management', tags: ['geospatial', 'governance'] },
+    ]
+    opps.forEach(function(o) {
+      html += '<div class="card" style="margin-bottom:var(--sp-3)">'
+      html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-3)">'
+      html += '<div><div style="font-weight:var(--fw-semi);color:var(--dark);margin-bottom:4px">' + atlasDB.esc(o.name) + '</div>'
+      html += '<div style="font-size:var(--text-xs);color:var(--mid);margin-bottom:var(--sp-2)">' + atlasDB.esc(o.reason) + '</div>'
+      html += '<div style="display:flex;gap:4px">' + o.tags.map(function(t){ return '<span class="tag active">' + t + '</span>' }).join('') + '</div></div>'
+      html += '<div style="display:flex;flex-direction:column;gap:var(--sp-1);flex-shrink:0">'
+      html += '<button class="btn btn-teal btn-sm" onclick="C.addToUCQueue(\'' + o.name + '\')">Add to UC Queue</button>'
+      html += '<button class="btn btn-ghost btn-sm">Dismiss</button>'
+      html += '</div></div></div>'
+    })
+    html += '</div>'
+    return html
+  },
+
+  // ── ACTIONS TAB ───────────────────────────────────────────────────────────
+  renderActionsTab: function() {
+    var acts = M.actionItems
+    var html = ''
+
+    // Add action
+    html += '<div class="card">'
+    html += '<div style="display:flex;gap:var(--sp-3);align-items:flex-end">'
+    html += '<div style="flex:1"><label class="form-label">New Action</label>'
+    html += '<input type="text" id="act-title" placeholder="e.g. Send ROM to Secretary IT"></div>'
+    html += '<div><label class="form-label">Due Date</label><input type="date" id="act-due" style="width:160px"></div>'
+    html += '<button class="btn btn-primary" onclick="C.addAction()">Add</button>'
+    html += '</div></div>'
+
+    // Actions list
+    var statuses = ['open', 'wip', 'done']
+    statuses.forEach(function(s) {
+      var filtered = acts.filter(function(a) { return a.status === s })
+      if (!filtered.length) return
+      html += '<div class="card"><div class="card-title">' + s.toUpperCase() + ' (' + filtered.length + ')</div>'
+      html += '<table class="tbl"><thead><tr><th>Action</th><th>Assigned To</th><th>Due</th><th></th></tr></thead><tbody>'
+      filtered.forEach(function(a) {
+        html += '<tr>'
+        html += '<td>' + atlasDB.esc(a.title) + '</td>'
+        html += '<td>' + atlasDB.esc(a.assigned_to||'—') + '</td>'
+        html += '<td>' + (a.due_date||'—') + '</td>'
+        html += '<td style="white-space:nowrap">'
+        if (s !== 'done') html += '<button class="btn btn-teal btn-sm" onclick="C.updateActionStatus(\'' + a.id + '\',\'done\')">✓ Done</button> '
+        if (s === 'open') html += '<button class="btn btn-ghost btn-sm" onclick="C.updateActionStatus(\'' + a.id + '\',\'wip\')">Start</button>'
+        html += '</td></tr>'
+      })
+      html += '</tbody></table></div>'
+    })
+
+    return html
+  },
+
+  // ── OUTPUTS TAB ───────────────────────────────────────────────────────────
+  renderOutputsTab: function() {
+    var html = '<div class="card"><div class="card-title">Solution Versions & Documents</div>'
+    html += '<div class="coming-soon"><strong>Solution versions appear here</strong>After creating a BOM in the Solution Builder, versions are stored and linked to this engagement. Each version generates an internal document and a customer-facing document.</div>'
+    html += '</div>'
+    html += '<div class="card"><div class="card-title">Vision Document</div>'
+    html += '<button class="btn btn-outline" onclick="C.generateVisionDoc()">Generate Vision Document</button>'
+    html += '</div>'
+    return html
+  },
+
+  // ── HISTORY TAB ───────────────────────────────────────────────────────────
+  renderHistoryTab: function() {
+    var html = '<div class="card"><div class="card-title">Engagement History</div>'
+    html += '<div class="coming-soon"><strong>Timeline of all changes</strong>Every save, status change, version creation, and document generation is logged here with timestamp and user.</div>'
+    html += '</div>'
+    return html
+  },
+
+  // ── Archetype selector (for new engagement modal) ─────────────────────────
+  renderArchetypeSelector: function() {
+    var archetypes = [
+      { key: ATLAS.ARCHETYPE.TSAP,     label: 'Sovereign AI Platform',     desc: 'National/state govt — supply + consume' },
+      { key: ATLAS.ARCHETYPE.CSP,      label: 'AI Infrastructure Provider', desc: 'CSP, GPU rental, wholesale infra' },
+      { key: ATLAS.ARCHETYPE.DEPLOYER, label: 'AI Application Deployer',    desc: 'Enterprise/public dept — use cases' },
+      { key: ATLAS.ARCHETYPE.RESEARCH, label: 'AI Research Platform',       desc: 'University, AI lab, R&D' },
+      { key: ATLAS.ARCHETYPE.CONSUMER, label: 'AI Services Consumer',       desc: 'Consume MaaS/GPUaaS only' },
+      { key: ATLAS.ARCHETYPE.DEFENCE,  label: 'Defence / Classified',       desc: 'S3/S4 mandatory, air-gap' },
+    ]
+    var html = ''
+    archetypes.forEach(function(a) {
+      var isSelected = M.selectedArchetypes.includes(a.key)
+      html += '<div onclick="C.toggleArchetype(\'' + a.key + '\')" style="cursor:pointer;padding:6px 10px;border-radius:var(--r-sm);border:1.5px solid ' + (isSelected?'var(--navy)':'var(--border)') + ';background:' + (isSelected?'rgba(0,40,112,0.06)':'transparent') + ';font-size:var(--text-xs)">'
+      html += '<div style="font-weight:var(--fw-semi);color:' + (isSelected?'var(--navy)':'var(--dark)') + '">' + a.label + '</div>'
+      html += '<div style="color:var(--mid)">' + a.desc + '</div>'
+      html += '</div>'
+    })
+    document.getElementById('archetype-selector').innerHTML = html
+  },
+
+  // ── Modals ────────────────────────────────────────────────────────────────
+  openNewCustomerModal: function() {
+    document.getElementById('cust-name').value = ''
+    document.getElementById('cust-location').value = ''
+    document.getElementById('cust-contact').value = ''
+    document.getElementById('modal-customer').style.display = 'flex'
+    setTimeout(function(){ document.getElementById('cust-name').focus() }, 100)
+  },
+  closeModal: function(id) {
+    document.getElementById(id).style.display = 'none'
+  },
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  toast: function(msg, type) {
+    type = type || 'success'
+    var container = document.getElementById('toast-container')
+    var el = document.createElement('div')
+    el.className = 'toast toast-' + type
+    el.textContent = msg
+    container.appendChild(el)
+    setTimeout(function(){ el.remove() }, 3000)
+  },
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONTROLLER — Process orchestration.
+// Reads M, calls shared utilities, writes back to M, then calls V to re-render.
+// REFACTOR-MARKER: when C is wired, replace DUMMY lookups with atlasDB calls
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var C = {
+
+  // ── Engagement lifecycle ──────────────────────────────────────────────────
+  openEngagement: function(engId) {
+    var eng = M.engagements.find(function(e) { return e.id === engId })
+    if (!eng) return
+    // Step 1: update Model
+    M.currentEng      = eng
+    M.currentDocketId = eng.docket_id
+    M.activeTab       = 'overview'
+    M.activeIntelTab  = 'Market Pulse'
+    // Step 2: load items from dummy data (replace with atlasDB.getDocketItems() when C wired)
+    M.docketItems = (DUMMY.docketItems[eng.docket_id] || []).map(function(i) {
+      return atlasDB.parseContent(Object.assign({}, i))
+    })
+    // Step 3: render
+    V.renderSidebar()
+    V.renderDocket()
+  },
+
+  switchTab: function(tab) {
+    M.activeTab = tab
+    var body = document.getElementById('tab-body')
+    if (body) body.innerHTML = V.renderTab(tab)
+    // Update tab button active state
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+      btn.classList.toggle('active', btn.textContent.toLowerCase().replace(/ /g,'') === tab.replace(/ /g,'') || btn.onclick.toString().includes("'" + tab + "'"))
+    })
+  },
+
+  switchIntelTab: function(tab) {
+    M.activeIntelTab = tab
+    var body = document.getElementById('tab-body')
+    if (body) body.innerHTML = V.renderTab('intel')
+  },
+
+  toggleCustomer: function(custId) {
+    // In full build: collapse/expand customer in sidebar
+    // For prototype: just show engagements for this customer
+  },
+
+  newEngagement: function(custId) {
+    M.selectedArchetypes = []
+    document.getElementById('eng-cust-id').value = custId
+    document.getElementById('eng-name').value = ''
+    document.getElementById('eng-territory').value = ''
+    document.getElementById('modal-engagement').style.display = 'flex'
+    V.renderArchetypeSelector()
+    setTimeout(function(){ document.getElementById('eng-name').focus() }, 100)
+  },
+
+  toggleArchetype: function(key) {
+    var idx = M.selectedArchetypes.indexOf(key)
+    if (idx >= 0) M.selectedArchetypes.splice(idx, 1)
+    else M.selectedArchetypes.push(key)
+    V.renderArchetypeSelector()
+  },
+
+  // ── Saves (dummy — will call atlasDB when C is wired) ─────────────────────
+  saveCustomer: function() {
+    var name = document.getElementById('cust-name').value.trim()
+    if (!name) { V.toast('Enter organisation name', 'error'); return }
+    // DUMMY: add to model
+    var newCust = {
+      id:       atlasDB.genId('cust'),
+      name:     name,
+      type:     document.getElementById('cust-type').value,
+      location: document.getElementById('cust-location').value.trim(),
+      contact:  document.getElementById('cust-contact').value.trim(),
+    }
+    M.customers.push(newCust)
+    V.closeModal('modal-customer')
+    V.renderSidebar()
+    V.toast('Customer created — ' + name)
+    // WHEN C WIRED: await atlasDB.post('customers', newCust)
+  },
+
+  saveEngagement: function() {
+    var name = document.getElementById('eng-name').value.trim()
+    var custId = document.getElementById('eng-cust-id').value
+    if (!name) { V.toast('Enter engagement name', 'error'); return }
+    if (!M.selectedArchetypes.length) { V.toast('Select at least one archetype', 'warning'); return }
+    var newEng = {
+      id:         atlasDB.genId('ENG'),
+      customer_id: custId,
+      name:       name,
+      archetypes: M.selectedArchetypes.slice(),
+      territory:  document.getElementById('eng-territory').value.trim(),
+      docket_id:  atlasDB.genId('DOC'),
+      status:     'active',
+    }
+    M.engagements.push(newEng)
+    DUMMY.docketItems[newEng.docket_id] = []
+    V.closeModal('modal-engagement')
+    V.renderSidebar()
+    C.openEngagement(newEng.id)
+    V.toast('Engagement created — ' + name)
+    // WHEN C WIRED: await atlasDB.post('engagements', newEng)
+  },
+
+  // ── Requirements ──────────────────────────────────────────────────────────
+  addRequirement: function(source) {
+    var text = (document.getElementById('req-text').value || '').trim()
+    if (!text) { V.toast('Enter requirement text', 'warning'); return }
+    var newReq = {
+      id:         atlasDB.genId('req'),
+      docket_id:  M.currentDocketId,
+      item_type:  ATLAS.ITEM_TYPE.REQUIREMENT,
+      source:     source,
+      status:     'active',
+      text:       text,
+      tags:       [],
+      created_at: new Date().toISOString(),
+    }
+    M.docketItems.push(newReq)
+    document.getElementById('req-text').value = ''
+    document.getElementById('tab-body').innerHTML = V.renderTab('requirements')
+    V.toast('Requirement added · AI tagging coming soon')
+    // WHEN C WIRED: await atlasDB.saveDocketItem(newReq) then call atlas-ai.js for tags
+  },
+
+  updateReqStatus: function(reqId, newStatus) {
+    var req = M.docketItems.find(function(i) { return i.id === reqId })
+    if (!req) return
+    req.status = newStatus
+    document.getElementById('tab-body').innerHTML = V.renderTab('requirements')
+    V.toast('Requirement ' + newStatus)
+    // WHEN C WIRED: await atlasDB.saveDocketItem(req)
+  },
+
+  // ── Portfolio ─────────────────────────────────────────────────────────────
+  togglePortfolioItem: function(code) {
+    // Find or create portfolio_selection item in M.docketItems
+    var portItem = M.docketItems.find(function(i) { return i.item_subtype === 'portfolio_selection' })
+    if (!portItem) {
+      portItem = { id: atlasDB.genId('port'), docket_id: M.currentDocketId, item_type: 'solution', item_subtype: 'portfolio_selection', section: 'output', status: 'done', content: { items: [] } }
+      M.docketItems.push(portItem)
+    }
+    var items = portItem.content.items
+    var idx   = items.indexOf(code)
+    if (idx >= 0) items.splice(idx, 1)
+    else          items.push(code)
+    // Update UI directly (no full re-render — just toggle the item)
+    var el = document.getElementById('pi-' + code)
+    if (el) el.classList.toggle('selected', items.includes(code))
+  },
+
+  savePortfolio: function() {
+    var portItem = M.docketItems.find(function(i) { return i.item_subtype === 'portfolio_selection' })
+    var count = portItem ? portItem.content.items.length : 0
+    var statusEl = document.getElementById('port-save-status')
+    if (statusEl) { statusEl.textContent = '✓ Saved · ' + count + ' items'; statusEl.className = 'save-status saved' }
+    V.toast('Portfolio saved · ' + count + ' items selected')
+    // WHEN C WIRED: await atlasDB.savePortfolioSelection(M.currentDocketId, portItem.id, portItem.content.items, M.currentEng.id)
+  },
+
+  // ── UCs ───────────────────────────────────────────────────────────────────
+  acceptUC: function(ucId, name) {
+    var newUC = {
+      id:         atlasDB.genId('uc'),
+      docket_id:  M.currentDocketId,
+      item_type:  ATLAS.ITEM_TYPE.UC,
+      title:      name,
+      status:     'proposed',
+      content:    { uc_id: ucId, domain: '', dau: 0 },
+      created_at: new Date().toISOString(),
+    }
+    M.docketItems.push(newUC)
+    document.getElementById('tab-body').innerHTML = V.renderTab('uc')
+    V.toast('UC added — ' + name)
+  },
+
+  rejectUC: function(ucId) {
+    V.toast('UC skipped', 'info')
+  },
+
+  configureUC: function(ucId) {
+    V.toast('UC configuration — coming in Solution Builder', 'info')
+  },
+
+  openUCLibrary: function() {
+    V.toast('UC library search — coming soon', 'info')
+  },
+
+  addToUCQueue: function(name) {
+    V.toast('Added to UC review queue — ' + name)
+  },
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+  addAction: function() {
+    var title = (document.getElementById('act-title').value || '').trim()
+    if (!title) { V.toast('Enter action title', 'warning'); return }
+    var newAct = {
+      id:          atlasDB.genId('act'),
+      docket_id:   M.currentDocketId,
+      item_type:   ATLAS.ITEM_TYPE.ACTION,
+      section:     'action',
+      title:       title,
+      status:      'open',
+      assigned_to: 'Arvind Bajaj',
+      due_date:    document.getElementById('act-due').value || null,
+      created_at:  new Date().toISOString(),
+    }
+    M.docketItems.push(newAct)
+    document.getElementById('act-title').value = ''
+    document.getElementById('act-due').value   = ''
+    document.getElementById('tab-body').innerHTML = V.renderTab('actions')
+    V.toast('Action added')
+    // WHEN C WIRED: await atlasDB.saveDocketItem(newAct)
+  },
+
+  updateActionStatus: function(actId, newStatus) {
+    var act = M.docketItems.find(function(i) { return i.id === actId })
+    if (!act) return
+    act.status = newStatus
+    document.getElementById('tab-body').innerHTML = V.renderTab('actions')
+    V.toast('Action marked ' + newStatus)
+    // WHEN C WIRED: await atlasDB.saveDocketItem(act)
+  },
+
+  // ── Intel Ops ─────────────────────────────────────────────────────────────
+  confirmIntelRun: function() {
+    var el = document.getElementById('intel-run-details')
+    var lastRun = M.lastIntelRun ? new Date(M.lastIntelRun) : null
+    var days    = lastRun ? Math.floor((Date.now() - lastRun.getTime()) / 86400000) : null
+    if (el) {
+      el.innerHTML = '<div style="font-size:var(--text-sm);margin-bottom:var(--sp-3)">'
+        + (days !== null ? 'You last ran this <strong>' + days + ' days ago</strong>.' : 'This is your first run.')
+        + '</div>'
+        + '<div class="tbl-wrapper"><table class="tbl"><tr><th>Estimated cost</th><td>~$0.07</td></tr>'
+        + '<tr><th>Domains to refresh</th><td>8 of 10 (2 already current)</td></tr>'
+        + '<tr><th>Estimated time</th><td>4-6 minutes</td></tr></table></div>'
+    }
+    document.getElementById('modal-intel-run').style.display = 'flex'
+  },
+
+  runIntelCollection: function(mode) {
+    V.closeModal('modal-intel-run')
+    V.toast('Intelligence collection started (' + mode + ') · Results in 4-6 minutes', 'info')
+    // WHEN C WIRED: await atlasIntel.runCollection(mode)
+  },
+
+  regenerateBrief: function() {
+    V.toast('Regenerating engagement brief · AI call in progress', 'info')
+    // WHEN C WIRED: await atlasIntel.generateEngagementBrief(M.currentEng.id)
+  },
+
+  // ── Solution Builder ──────────────────────────────────────────────────────
+  openInSASC: function() {
+    if (!M.currentEng) return
+    var url = '../sasc/index.html?eng=' + M.currentEng.id + '&docket=' + M.currentDocketId
+    window.open(url, '_blank')
+  },
+
+  // ── Outputs ───────────────────────────────────────────────────────────────
+  generateVisionDoc: function() {
+    V.toast('Vision document generation — coming soon', 'info')
+  },
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INIT — Page startup sequence
+// ═══════════════════════════════════════════════════════════════════════════════
+
+;(function init() {
+  // 1. Load dummy data into Model
+  loadDummyData()
+  // 2. Render sidebar
+  V.renderSidebar()
+  // 3. Open first engagement by default (for prototype inspection)
+  C.openEngagement('ENG-2026-HP-001')
+})()
+
+</script>
+</body>
+</html>
