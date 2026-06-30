@@ -478,3 +478,21 @@ Why deferred: requires seeing the WHOLE solution's model mix
 Suggested phase: After Fleet Aggregation has real populated rows to
              analyse — natural fit once Controller wiring (Phase A) is
              further along. See Solution Builder Spec Section 13.
+
+---
+
+## ADDITIONS FROM 30 JUNE 2026 (continued) — prototype scope notes
+
+**[2026-06-30] — Model dropdown list is intentionally short in prototype**
+Both UC and MaaS Workload Profiler tabs show a curated subset of models
+(confirmed via real MaaS architecture discussion — ~17 models across
+6 usage types), NOT the full 103 rows in model_catalogue.
+Why: prototype scope only — enough variety to validate the UI pattern
+     (dropdown, grouping, n/n-2 versioning) without needing every model
+     wired in before visual confirmation.
+Action needed before Controller wiring: Model dropdown must read the
+     FULL model_catalogue (103 rows) live via atlasDB, filtered/grouped
+     sensibly (by usage type or family) so the real list is available,
+     not just the curated demonstration subset.
+Confirmed (30 June 2026): user flagged this as the one observation on
+     an otherwise-confirmed-correct review of Tenant/UC/MaaS prototype.
