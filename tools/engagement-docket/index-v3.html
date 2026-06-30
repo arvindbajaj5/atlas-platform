@@ -40,6 +40,7 @@
     <span class="atlas-ver">v3.0</span>
   </div>
   <div class="atlas-hdr-right">
+    <span id="data-mode-badge" class="atlas-ver" style="display:none"></span>
     <button class="atlas-nav-btn" onclick="window.location.href='../../'">&#8592; Portal</button>
   </div>
 </div>
@@ -910,17 +911,59 @@ var V = {
 
 var C = {
 
-  openEngagement: function(id) {
+  openEngagement: async function(id) {
     var eng = M.engagements.find(function(e){ return e.id === id })
     if (!eng) return
     M.currentEng      = eng
     M.currentDocketId = eng.docket_id
     M.activeTab       = 'customer'
-    // Load items from dummy (WHEN C WIRED: await atlasDB.getDocketItems(eng.docket_id))
-    M.docketItems = (DUMMY.items[eng.docket_id]||[]).map(function(i){
-      return atlasDB.parseContent(Object.assign({},i))
-    })
-    M.intelRun = DUMMY.intelRun
+
+    document.getElementById('docket-area').innerHTML = '<div class="loading"><span class="spinner"></span>Loading engagement...</div>'
+
+    if (atlasDB.isConfigured() && eng.docket_id) {
+      // ── REAL DATA MODE ────────────────────────────────────────────
+      var docketItemsP    = atlasDB.getDocketItems(eng.docket_id)
+      var requirementsP   = atlasDB.get('requirement_items', 'engagement_id=eq.' + eng.id + '&order=created_at.asc')
+      var intelP          = atlasDB.get('intelligence_items', 'order=scraped_at.desc', 20)
+      var intelRunP       = atlasDB.get('intel_runs', 'order=started_at.desc', 1)
+
+      var results = await Promise.all([docketItemsP, requirementsP, intelP, intelRunP])
+      var docketItems  = results[0] || []
+      var requirements = results[1] || []
+      var intelItems   = results[2] || []
+      var intelRuns    = results[3] || []
+
+      // Merge requirement_items into docketItems shape (so M.requirements getter works)
+      var reqAsItems = requirements.map(function(r) {
+        return {
+          id: r.id, item_type: 'requirement', source: r.source, status: r.status,
+          text: r.text, tags: r.tags || [], portfolio_links: r.portfolio_links || [],
+          created_at: r.created_at
+        }
+      })
+
+      // Map intelligence_items into docket-shaped intel items
+      var intelAsItems = intelItems.slice(0, 5).map(function(i) {
+        return {
+          id: i.id, item_type: 'intel', title: i.title,
+          content: { summary: i.summary, confidence_score: i.confidence_score || 0.8, scraped_at: i.scraped_at },
+          created_at: i.scraped_at
+        }
+      })
+
+      M.docketItems = docketItems.concat(reqAsItems).concat(intelAsItems)
+      M.intelRun = intelRuns.length ? {
+        lastRun: intelRuns[0].started_at, cost: intelRuns[0].cost_usd || 0,
+        items: intelRuns[0].items_collected || 0, stale: 0, total: 10
+      } : null
+    } else {
+      // ── FALLBACK: dummy data ─────────────────────────────────────
+      M.docketItems = (DUMMY.items[eng.docket_id]||[]).map(function(i){
+        return atlasDB.parseContent(Object.assign({},i))
+      })
+      M.intelRun = DUMMY.intelRun
+    }
+
     V.renderSidebar()
     V.renderDocket()
   },
@@ -952,45 +995,85 @@ var C = {
     V.renderArchetypeSelector()
   },
 
-  saveCustomer: function() {
+  saveCustomer: async function() {
     var name = (document.getElementById('cust-name').value||'').trim()
     if (!name) { V.toast('Enter organisation name','error'); return }
-    var c = { id:atlasDB.genId('cust'), name:name, type:document.getElementById('cust-type').value, location:(document.getElementById('cust-location').value||'').trim(), contact:(document.getElementById('cust-contact').value||'').trim(), ai_maturity:'exploring', budget_signal:'', existing_infra:'' }
-    M.customers.push(c)
+    var cust = {
+      id: atlasDB.genId('cust'), name: name,
+      type: document.getElementById('cust-type').value,
+      location: (document.getElementById('cust-location').value||'').trim(),
+      contact:  (document.getElementById('cust-contact').value||'').trim(),
+      ai_maturity: 'exploring', budget_signal: '', existing_infra: ''
+    }
+    M.customers.push(cust)
     V.closeModal('modal-customer')
     V.renderSidebar()
     V.toast('Customer created — ' + name)
-    // WHEN C WIRED: await atlasDB.post('customers', c)
+
+    if (atlasDB.isConfigured()) {
+      var result = await atlasDB.post('customers', cust)
+      if (!result.ok) V.toast('Save failed — ' + (result.error||'unknown error'), 'error')
+    }
   },
 
-  saveEngagement: function() {
+  saveEngagement: async function() {
     var name = (document.getElementById('eng-name').value||'').trim()
     if (!name)                        { V.toast('Enter engagement name','error'); return }
     if (!M.selectedArchetypes.length) { V.toast('Select at least one archetype','warning'); return }
-    var eng = { id:atlasDB.genId('ENG'), customer_id:document.getElementById('eng-cust-id').value, name:name, archetypes:M.selectedArchetypes.slice(), territory:(document.getElementById('eng-territory').value||'').trim(), docket_id:atlasDB.genId('DOC'), status:'active' }
+    var eng = {
+      id: atlasDB.genId('ENG'), customer_id: document.getElementById('eng-cust-id').value,
+      name: name, archetypes: M.selectedArchetypes.slice(),
+      territory: (document.getElementById('eng-territory').value||'').trim(),
+      docket_id: atlasDB.genId('DOC'), status: 'active'
+    }
     M.engagements.push(eng)
     DUMMY.items[eng.docket_id] = []
     V.closeModal('modal-engagement')
-    C.openEngagement(eng.id)
     V.toast('Engagement created — ' + name)
-    // WHEN C WIRED: await atlasDB.post('engagements', eng)
+
+    if (atlasDB.isConfigured()) {
+      var result = await atlasDB.post('engagements', eng)
+      if (!result.ok) V.toast('Save failed — ' + (result.error||'unknown error'), 'error')
+    }
+    await C.openEngagement(eng.id)
   },
 
   // Requirements
-  addReq: function(source) {
+  addReq: async function(source) {
     var text = (document.getElementById('req-text').value||'').trim()
     if (!text) { V.toast('Enter requirement text','warning'); return }
-    M.docketItems.push({ id:atlasDB.genId('req'), item_type:'requirement', source:source, status:'active', text:text, tags:[], created_at:new Date().toISOString() })
+    var req = {
+      id: atlasDB.genId('req'), item_type: 'requirement', source: source,
+      status: 'active', text: text, tags: [], portfolio_links: [],
+      created_at: new Date().toISOString()
+    }
+    M.docketItems.push(req)
     document.getElementById('req-text').value = ''
     document.getElementById('tab-body').innerHTML = V.renderTab('requirements')
-    V.toast('Requirement added · AI tagging will fire when C is wired')
-    // WHEN C WIRED: await atlasDB.saveDocketItem(req), then atlasAI.call(ATLAS.TASKS.TAG_SUGGEST, req.text)
+    V.toast('Requirement added')
+
+    if (atlasDB.isConfigured() && M.currentEng) {
+      var row = {
+        id: req.id, engagement_id: M.currentEng.id, docket_id: M.currentDocketId,
+        text: text, source: source, status: 'active', tags: [], portfolio_links: []
+      }
+      var result = await atlasDB.post('requirement_items', row)
+      if (!result.ok) V.toast('Save failed — ' + (result.error||'unknown'), 'error')
+      // TAG_SUGGEST and embedding are Phase 2 extension — atlas-ai.js not yet wired
+    }
   },
 
-  setReqStatus: function(id, status) {
+  setReqStatus: async function(id, status) {
     var r = M.docketItems.find(function(i){ return i.id === id })
-    if (r) { r.status = status; document.getElementById('tab-body').innerHTML = V.renderTab('requirements'); V.toast('Requirement ' + status) }
-    // WHEN C WIRED: await atlasDB.saveDocketItem(r)
+    if (!r) return
+    r.status = status
+    document.getElementById('tab-body').innerHTML = V.renderTab('requirements')
+    V.toast('Requirement ' + status)
+
+    if (atlasDB.isConfigured()) {
+      var result = await atlasDB.patch('requirement_items', 'id=eq.' + id, { status: status, updated_at: new Date().toISOString() })
+      if (!result.ok) V.toast('Update failed — ' + (result.error||'unknown'), 'error')
+    }
   },
 
   // Portfolio
@@ -1110,7 +1193,7 @@ var C = {
     })
   },
 
-  savePortfolio: function() {
+  savePortfolio: async function() {
     var port  = M.docketItems.find(function(i){ return i.item_subtype === 'portfolio_selection' })
     var items = (port && port.content && port.content.items) ? port.content.items : []
     var hasGPU = items.includes('B2A') || items.includes('B2B')
@@ -1152,27 +1235,56 @@ var C = {
 
     var count = items.length
     var el = document.getElementById('port-save-status')
-    if (el) { el.textContent = '✓ Saved · ' + count + ' items'; el.className = 'save-status saved' }
-    V.toast('Portfolio saved · ' + count + ' items')
-    // WHEN C WIRED: await atlasDB.savePortfolioSelection(M.currentDocketId, port.id, items, M.currentEng.id)
+    if (el) { el.textContent = 'Saving...'; el.className = 'save-status' }
+
+    if (atlasDB.isConfigured() && M.currentDocketId && port) {
+      var result = await atlasDB.savePortfolioSelection(M.currentDocketId, port.id, items, M.currentEng.id)
+      if (result.ok) {
+        if (el) { el.textContent = '✓ Saved · ' + count + ' items'; el.className = 'save-status saved' }
+        V.toast('Portfolio saved · ' + count + ' items')
+      } else {
+        if (el) { el.textContent = '✗ Save failed'; el.className = 'save-status unsaved' }
+        V.toast('Save failed — ' + (result.error||'unknown'), 'error')
+      }
+    } else {
+      if (el) { el.textContent = '✓ Saved · ' + count + ' items'; el.className = 'save-status saved' }
+      V.toast('Portfolio saved · ' + count + ' items')
+    }
   },
 
   // Actions
-  addAction: function() {
+  addAction: async function() {
     var title = (document.getElementById('act-title').value||'').trim()
     if (!title) { V.toast('Enter action title','warning'); return }
-    M.docketItems.push({ id:atlasDB.genId('act'), item_type:'action', section:'action', title:title, status:'open', assigned_to:'Arvind Bajaj', due_date:document.getElementById('act-due').value||null, created_at:new Date().toISOString() })
+    var act = {
+      id: atlasDB.genId('act'), docket_id: M.currentDocketId,
+      item_type: 'action', section: 'action', title: title, status: 'open',
+      assigned_to: 'Arvind Bajaj', due_date: document.getElementById('act-due').value || null,
+      created_at: new Date().toISOString()
+    }
+    M.docketItems.push(act)
     document.getElementById('act-title').value = ''
     document.getElementById('act-due').value   = ''
     document.getElementById('tab-body').innerHTML = V.renderTab('actions')
     V.toast('Action added')
-    // WHEN C WIRED: await atlasDB.saveDocketItem(act)
+
+    if (atlasDB.isConfigured()) {
+      var result = await atlasDB.saveDocketItem(act)
+      if (!result.ok) V.toast('Save failed — ' + (result.error||'unknown'), 'error')
+    }
   },
 
-  setActStatus: function(id, status) {
+  setActStatus: async function(id, status) {
     var a = M.docketItems.find(function(i){ return i.id === id })
-    if (a) { a.status = status; document.getElementById('tab-body').innerHTML = V.renderTab('actions'); V.toast('Action ' + status) }
-    // WHEN C WIRED: await atlasDB.saveDocketItem(a)
+    if (!a) return
+    a.status = status
+    document.getElementById('tab-body').innerHTML = V.renderTab('actions')
+    V.toast('Action ' + status)
+
+    if (atlasDB.isConfigured()) {
+      var result = await atlasDB.saveDocketItem(a)
+      if (!result.ok) V.toast('Update failed — ' + (result.error||'unknown'), 'error')
+    }
   },
 
   // Intel
@@ -1237,11 +1349,50 @@ var C = {
 // INIT
 // ═══════════════════════════════════════════════════════════════════════
 
-function init() {
+async function init() {
   // atlasDB.init() is called automatically by atlas-db.js on load
-  loadDummy()
+  V.renderSidebar()  // show loading state first
+  document.getElementById('sb-body').innerHTML = '<div class="loading"><span class="spinner"></span>Loading...</div>'
+
+  if (atlasDB.isConfigured()) {
+    // ── REAL DATA MODE ──────────────────────────────────────────────
+    M.customers   = await atlasDB.get('customers', 'order=name.asc')
+    M.engagements = await atlasDB.get('engagements', 'order=name.asc')
+    if (!M.customers.length && !M.engagements.length) {
+      // Empty DB — fall back to dummy for demo purposes
+      loadDummy()
+      V.toast('No data in Supabase yet — showing demo data', 'info')
+    }
+  } else {
+    // ── NO SUPABASE CONFIGURED — use dummy data ────────────────────
+    loadDummy()
+    V.toast('Supabase not configured — showing demo data', 'warning')
+  }
+
+  // Show data source mode
+  var badge = document.getElementById('data-mode-badge')
+  if (badge) {
+    if (atlasDB.isConfigured()) {
+      badge.textContent = '● Live Supabase'
+      badge.style.cssText = 'display:inline-block;background:rgba(0,178,144,.2);color:#00B290'
+    } else {
+      badge.textContent = '● Demo data'
+      badge.style.cssText = 'display:inline-block;background:rgba(255,182,0,.2);color:#FFB600'
+    }
+  }
+
   V.renderSidebar()
-  C.openEngagement('ENG-HP-001')  // open HP State HAICE for prototype inspection
+
+  // Open first engagement if any exist
+  if (M.engagements.length) {
+    await C.openEngagement(M.engagements[0].id)
+  } else {
+    document.getElementById('docket-area').innerHTML =
+      '<div class="empty-state" style="padding-top:80px">'
+      + '<div class="empty-icon">📋</div>'
+      + '<div class="empty-title">No engagements yet</div>'
+      + '<div class="empty-desc">Create a customer and engagement to get started.</div></div>'
+  }
 }
 </script>
 </body>
