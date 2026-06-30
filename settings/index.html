@@ -170,6 +170,17 @@ body{font-family:'Inter',sans-serif;font-size:13px;color:var(--dark);background:
 <div class="toast" id="toast"></div>
 
 <script>
+// Supabase key format detection — legacy JWT keys (eyJ...) need Authorization: Bearer.
+// New-format keys (sb_publishable_/sb_secret_) must NOT be sent in Authorization header
+// or Supabase rejects with HTTP 401 ("not a JWT"). Send apikey header only for those.
+// Reference: https://supabase.com/docs/guides/api/api-keys
+function sbHeaders(key, extra){
+  var h = { apikey: key }
+  if (/^eyJ/.test(key||'')) h['Authorization'] = 'Bearer ' + key
+  if (extra) Object.assign(h, extra)
+  return h
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 var CFG = {}  // live config object, loaded on boot and mutated by UI
 
@@ -250,7 +261,7 @@ async function loadModelCatalogue() {
   MC_LOAD_STATE = 'loading'
   try {
     var r = await fetch(url + '/rest/v1/model_catalogue?order=vendor.asc,name.asc&limit=200', {
-      headers: { apikey: key, Authorization: 'Bearer ' + key }
+      headers: sbHeaders(key)
     })
     if (r.ok) {
       MC_ROWS = await r.json()
@@ -260,7 +271,7 @@ async function loadModelCatalogue() {
       return
     }
     var r2 = await fetch(url + '/rest/v1/model_catalogue_staging?status=eq.pending&order=created_at.desc&limit=50', {
-      headers: { apikey: key, Authorization: 'Bearer ' + key }
+      headers: sbHeaders(key)
     })
     if (r2.ok) MC_STAGING = await r2.json()
     MC_LOAD_STATE = 'loaded'
@@ -561,8 +572,7 @@ async function saveCatalogueChanges() {
     try {
       var r = await fetch(url + '/rest/v1/model_catalogue?id=eq.' + encodeURIComponent(row.id), {
         method: 'PATCH',
-        headers: { apikey: key, Authorization: 'Bearer ' + key,
-          'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        headers: sbHeaders(key, {'Content-Type': 'application/json', Prefer: 'return=minimal'}),
         body: JSON.stringify({
           enabled:        row.enabled,
           featured:       row.featured,
@@ -607,16 +617,14 @@ async function approveStaging(id) {
     }
     var r1 = await fetch(url + '/rest/v1/model_catalogue', {
       method: 'POST',
-      headers: { apikey: key, Authorization: 'Bearer ' + key,
-        'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      headers: sbHeaders(key, {'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal'}),
       body: JSON.stringify(newRow)
     })
     if (r1.ok) {
       // Update staging status
       await fetch(url + '/rest/v1/model_catalogue_staging?id=eq.' + encodeURIComponent(id), {
         method: 'PATCH',
-        headers: { apikey: key, Authorization: 'Bearer ' + key,
-          'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        headers: sbHeaders(key, {'Content-Type': 'application/json', Prefer: 'return=minimal'}),
         body: JSON.stringify({ status: 'approved', reviewed_at: new Date().toISOString() })
       })
       MC_STAGING = MC_STAGING.filter(function(i){ return i.id !== id })
@@ -634,8 +642,7 @@ async function rejectStaging(id) {
   try {
     await fetch(url + '/rest/v1/model_catalogue_staging?id=eq.' + encodeURIComponent(id), {
       method: 'PATCH',
-      headers: { apikey: key, Authorization: 'Bearer ' + key,
-        'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      headers: sbHeaders(key, {'Content-Type': 'application/json', Prefer: 'return=minimal'}),
       body: JSON.stringify({ status: 'rejected', reviewed_at: new Date().toISOString() })
     })
     MC_STAGING = MC_STAGING.filter(function(i){ return i.id !== id })
@@ -660,7 +667,7 @@ async function loadFromSupabase() {
   try {
     var r = await fetch(
       url + '/rest/v1/app_config?key=in.(brand_name,brand_tagline,brand_logo_url,brand_doc_logo_url,brand_colour_primary,brand_colour_accent,parent_company_name,parent_company_website,parent_company_addr1,parent_company_addr2,parent_company_city,parent_company_country,local_company_name,local_company_addr1,local_company_addr2,local_company_city,doc_author_default,doc_prefix,nat_avg_power_tariff_inr,nat_avg_water_cost_inr_kl,nat_avg_land_cost_lakh_acre,nat_avg_engineer_salary_lakh,nat_avg_civil_cost_index,nat_avg_construction_cr_mw,atlasai_primary_model,gpu_skus)&limit=50',
-      { headers: { apikey: key, Authorization: 'Bearer ' + key } }
+      { headers: sbHeaders(key) }
     )
     if (!r.ok) return
     var rows = await r.json()
@@ -1107,7 +1114,7 @@ async function saveSkus() {
   try {
     var r = await fetch(url + '/rest/v1/app_config', {
       method: 'POST',
-      headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      headers: sbHeaders(key, {'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal'}),
       body: JSON.stringify([{ key: 'gpu_skus', value: JSON.stringify(CFG.gpu_skus || []) }])
     })
     if (r.ok) showToast('\u2713 GPU SKUs saved to Supabase')
@@ -1124,7 +1131,7 @@ async function saveHardwareCosts() {
   try {
     var r = await fetch(url + '/rest/v1/app_config', {
       method: 'POST',
-      headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      headers: sbHeaders(key, {'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal'}),
       body: JSON.stringify(rows)
     })
     if (r.ok) showToast('\u2713 Hardware costs saved to Supabase')
@@ -1351,9 +1358,8 @@ async function syncToSupabase() {
   try {
     var r = await fetch(url + '/rest/v1/app_config', {
       method: 'POST',
-      headers: { apikey: key, Authorization: 'Bearer ' + key,
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal' },
+      headers: sbHeaders(key, {'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal'}),
       body: JSON.stringify(rows)
     })
     if (r.ok) console.log('[Settings] Synced ' + rows.length + ' rows to Supabase')
@@ -1397,8 +1403,10 @@ async function testSupabase() {
   if (!url || !key) { showResult('sb-test-result', 'Enter URL and key first', false); return }
   showResult('sb-test-result', 'Testing...', null)
   try {
-    var r = await fetch(url + '/rest/v1/', { headers: { apikey: key, Authorization: 'Bearer ' + key } })
-    if (r.ok || r.status === 404) {
+    // NOTE: root /rest/v1/ endpoint requires a SECRET key and always 401s for
+    // publishable/anon keys by Supabase design. Query a real table instead.
+    var r = await fetch(url + '/rest/v1/app_config?limit=1&select=key', { headers: sbHeaders(key) })
+    if (r.ok) {
       showResult('sb-test-result', '\u2713 Supabase connected', true)
     } else {
       showResult('sb-test-result', '\u2717 Connection failed (HTTP ' + r.status + ')', false)
@@ -1419,8 +1427,7 @@ async function syncNatAvgToSupabase() {
   try {
     var r = await fetch(url + '/rest/v1/app_config', {
       method: 'POST',
-      headers: { apikey: key, Authorization: 'Bearer ' + key,
-        'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      headers: sbHeaders(key, {'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal'}),
       body: JSON.stringify(rows)
     })
     if (r.ok) showToast('\u2713 National averages synced to Supabase')
