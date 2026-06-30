@@ -254,7 +254,7 @@ async function loadUnitCosts() {
   if (!sbUrl) { el.innerHTML = '<div style="padding:20px;color:#666">Configure Supabase first.</div>'; return }
   el.innerHTML = '<div style="padding:20px">Loading...</div>'
   try {
-    var r = await fetch(sbUrl + '/rest/v1/tsap_unit_costs?order=category.asc,item_code.asc&limit=200', { headers: { apikey:sbKey, Authorization:'Bearer '+sbKey } })
+    var r = await fetch(sbUrl + '/rest/v1/tsap_unit_costs?order=category.asc,item_code.asc&limit=200', { headers: sbHeaders(sbKey) })
     ALL_UNIT_COSTS = r.ok ? await r.json() : []
     renderUnitCosts()
   } catch(e) { el.innerHTML = '<div style="padding:20px">Error: '+e.message+'</div>' }
@@ -304,7 +304,7 @@ async function patchUC(inp) {
   patch.updated_at = new Date().toISOString()
   await fetch(cfg.sbUrl + '/rest/v1/tsap_unit_costs?id=eq.' + id, {
     method: 'PATCH',
-    headers: { apikey:cfg.sbKey, Authorization:'Bearer '+cfg.sbKey, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    headers: sbHeaders(cfg.sbKey, {'Content-Type':'application/json', Prefer:'return=minimal'}),
     body: JSON.stringify(patch)
   })
   var row = ALL_UNIT_COSTS.find(function(r){ return r.id === id })
@@ -317,7 +317,7 @@ async function toggleUCActive(id, newState) {
   var patch = { active: newState === 'true' || newState === true, updated_at: new Date().toISOString() }
   await fetch(cfg.sbUrl + '/rest/v1/tsap_unit_costs?id=eq.' + id, {
     method: 'PATCH',
-    headers: { apikey:cfg.sbKey, Authorization:'Bearer '+cfg.sbKey, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    headers: sbHeaders(cfg.sbKey, {'Content-Type':'application/json', Prefer:'return=minimal'}),
     body: JSON.stringify(patch)
   })
   await loadUnitCosts()
@@ -335,7 +335,7 @@ async function syncUCToINR() {
       var patch = { value_inr: row.value_inr, updated_at: new Date().toISOString() }
       await fetch(cfg.sbUrl + '/rest/v1/tsap_unit_costs?id=eq.' + row.id, {
         method: 'PATCH',
-        headers: { apikey:cfg.sbKey, Authorization:'Bearer '+cfg.sbKey, 'Content-Type':'application/json', Prefer:'return=minimal' },
+        headers: sbHeaders(cfg.sbKey, {'Content-Type':'application/json', Prefer:'return=minimal'}),
         body: JSON.stringify(patch)
       })
     }
@@ -434,6 +434,16 @@ async function loadUsageDashboard() {
 }
 function getCfg(){ try{ return JSON.parse(localStorage.getItem('atlas_global_cfg')||'{}') }catch(e){ return {} } }
 function setCfg(obj){ localStorage.setItem('atlas_global_cfg', JSON.stringify(obj)) }
+
+// Supabase key format detection — legacy JWT keys (eyJ...) need Authorization: Bearer.
+// New-format keys (sb_publishable_/sb_secret_) must NOT be sent in Authorization header
+// or Supabase rejects with HTTP 401 ("not a JWT").
+function sbHeaders(key, extra){
+  var h = { apikey: key }
+  if (/^eyJ/.test(key||'')) h['Authorization'] = 'Bearer ' + key
+  if (extra) Object.assign(h, extra)
+  return h
+}
 
 // \u2500\u2500 Render providers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function render(){
@@ -566,7 +576,7 @@ async function testSupabase(){
   document.getElementById('sbTestResult').textContent = 'Testing...'
   document.getElementById('testSbBtn').disabled = true
   try{
-    var r = await fetch(url+'/rest/v1/intelligence_items?limit=1&select=id',{headers:{'apikey':key,'Authorization':'Bearer '+key}})
+    var r = await fetch(url+'/rest/v1/intelligence_items?limit=1&select=id',{headers: sbHeaders(key)})
     if(r.ok){
       document.getElementById('sbTestResult').innerHTML = '<span style="color:var(--teal)">\u2705 Connected</span>'
     } else {

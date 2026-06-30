@@ -112,12 +112,30 @@
     }
   }
 
+  /**
+   * Supabase key format detection.
+   * Legacy JWT keys (anon/service_role) start with 'eyJ' and must be sent
+   * in BOTH apikey and Authorization: Bearer headers.
+   * New-format keys (sb_publishable_..., sb_secret_...) are NOT JWTs —
+   * Supabase rejects them if sent in Authorization: Bearer. They must be
+   * sent in the apikey header ONLY.
+   * Reference: https://supabase.com/docs/guides/api/api-keys
+   */
+  function _isLegacyJwtKey(key) {
+    return /^eyJ/.test(key || '')
+  }
+
   function _headers(extra) {
     var h = {
-      'apikey':        _key,
-      'Authorization': 'Bearer ' + _key,
-      'Content-Type':  'application/json'
+      'apikey':       _key,
+      'Content-Type': 'application/json'
     }
+    if (_isLegacyJwtKey(_key)) {
+      // Legacy anon/service_role JWT — required in Authorization header too
+      h['Authorization'] = 'Bearer ' + _key
+    }
+    // New-format sb_publishable_/sb_secret_ keys: apikey header only.
+    // Sending them in Authorization: Bearer causes HTTP 401 (not a valid JWT).
     if (extra) Object.assign(h, extra)
     return h
   }
