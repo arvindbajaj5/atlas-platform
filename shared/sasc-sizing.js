@@ -767,37 +767,74 @@
     /**
      * sizeMaaS(config, gpuConfigId)
      *
-     * Size a MaaS usage type. Profile A — throughput-driven, high concurrency.
+     * Size a single Model offered via MaaS. Profile A — throughput-driven,
+     * high concurrency, shared/dedicated pool per tenant attribution.
+     *
+     * CHANGED 30 June 2026: model_id is now the primary required input.
+     * archetype_id is OPTIONAL — used only as a one-time preset to pre-fill
+     * demand-shape fields (requests/day, tokens, context) when a row is
+     * first created. It is never required and never stored as a dependency
+     * — matches the principle that nobody buys "an archetype" from an API
+     * provider, they pick a specific model. Demand-shape defaults now
+     * resolve from model_catalogue first, with safe hardcoded fallbacks.
      *
      * config: {
-     *   archetype_id:     string  (requirement_archetypes.id — provides all defaults)
-     *   model_id:         string  (model_catalogue.id — selected tier)
-     *   dau:              number  total DAU for this usage type
-     *   sla_tier:         string  standard|enterprise
-     *   precision:        string  (optional — inferred from model)
-     *   derating_pct:     number  (optional, default 80)
+     *   model_id:          string  (model_catalogue.id — REQUIRED)
+     *   archetype_id:      string  (OPTIONAL — preset only, never required)
+     *   dau:               number  total DAU for this model's pool
+     *   requests_per_day:  number  (optional — model default else fallback)
+     *   avg_input_tokens:  number  (optional — model default else fallback)
+     *   avg_output_tokens: number  (optional — model default else fallback)
+     *   context_window_k:  number  (optional — model default else fallback)
+     *   peak_concurrent_pct: number (optional, default 5)
+     *   sla_tier:          string  standard|enterprise
+     *   pool_type:         string  reserved|open (Tenant block — open default)
+     *   precision:         string  (optional — inferred from model)
+     *   derating_pct:      number  (optional, default 80)
      * }
      */
     sizeMaaS: function (config, gpuConfigId) {
-      var gpu       = getGPU(gpuConfigId)
-      var model     = getModel(config.model_id)
-      var archetype = getArchetype(config.archetype_id)
+      var gpu   = getGPU(gpuConfigId)
+      var model = getModel(config.model_id)
 
-      if (!gpu)       return { error: 'GPU config not found: ' + gpuConfigId }
-      if (!archetype) return { error: 'Archetype not found: ' + config.archetype_id }
+      if (!gpu)   return { error: 'GPU config not found: ' + gpuConfigId }
+      if (!model) return { error: 'Model not found: ' + config.model_id }
 
-      var cfg = archetype.config || {}
+      // Optional archetype preset — used only if explicitly passed AND
+      // config fields are not already set. Never required, never the
+      // primary source. Falls through cleanly if no archetype given.
+      var archetype = config.archetype_id ? getArchetype(config.archetype_id) : null
+      var presetCfg = (archetype && archetype.config) || {}
+
       var dau        = config.dau || 1000
       var slaTier    = config.sla_tier || 'standard'
+      var poolType   = config.pool_type || 'open'   // Tenant block — drives SLA tier
       var precision  = config.precision || 'INT4'
       var derating   = config.derating_pct || 80
 
-      // Resolve from archetype
-      var reqPerDay   = cfg.requests_per_user_per_day || 5
-      var inputTok    = cfg.avg_input_tokens  || 300
-      var outputTok   = cfg.avg_output_tokens || 500
-      var contextLen  = (cfg.avg_context_window_k || 8) * 1000
-      var peakConcPct = cfg.peak_concurrent_pct || 5
+      // Resolve demand-shape: explicit config → model_catalogue defaults
+      // → optional archetype preset → hardcoded safe fallback (in that order)
+      var reqPerDay   = config.requests_per_day
+        || model.default_requests_per_day
+        || presetCfg.requests_per_user_per_day
+        || 5
+      var inputTok    = config.avg_input_tokens
+        || model.default_avg_input_tokens
+        || presetCfg.avg_input_tokens
+        || 300
+      var outputTok   = config.avg_output_tokens
+        || model.default_avg_output_tokens
+        || presetCfg.avg_output_tokens
+        || 500
+      var contextLen  = (config.context_window_k
+        || model.default_context_window_k
+        || presetCfg.avg_context_window_k
+        || 8) * 1000
+      var peakConcPct = config.peak_concurrent_pct || presetCfg.peak_concurrent_pct || 5
+
+      // Pool type drives SLA tier — Reserved = Enterprise, Open = Standard
+      // (matches Tenant block design — see Solution Builder Spec Section 10)
+      if (poolType === 'reserved' && config.sla_tier === undefined) slaTier = 'enterprise'
       var params_b    = model ? model.params_b : 7
 
       // Peak concurrent users at any moment
@@ -816,10 +853,11 @@
       var baseGPUs = Math.max(gpusForFit, gpusForThroughput, 1)
       var bindingConstraint = gpusForFit >= gpusForThroughput ? 'memory_fit' : 'throughput'
 
-      // MaaS buffers — all three layers applied
-      var headroomPct    = slaTier === 'enterprise' ? (cfg.peak_headroom_pct_enterprise || 30) : (cfg.peak_headroom_pct_standard || 25)
-      var failoverPct    = slaTier === 'enterprise' ? (cfg.failover_pct_enterprise || 30)      : (cfg.failover_pct_standard || 15)
-      var multiTenPct    = cfg.multi_tenancy_overhead_pct || 12
+      // MaaS buffers — all three layers applied. Buffer % is a property of
+      // SLA tier (derived from Tenant pool_type), not of model or archetype.
+      var headroomPct    = slaTier === 'enterprise' ? (presetCfg.peak_headroom_pct_enterprise || 30) : (presetCfg.peak_headroom_pct_standard || 25)
+      var failoverPct    = slaTier === 'enterprise' ? (presetCfg.failover_pct_enterprise || 30)      : (presetCfg.failover_pct_standard || 15)
+      var multiTenPct    = presetCfg.multi_tenancy_overhead_pct || 12
 
       var peakBuffer      = Math.ceil(baseGPUs * headroomPct  / 100)
       var failoverReserve = Math.ceil(baseGPUs * failoverPct  / 100)
@@ -839,7 +877,9 @@
 
       return {
         // Demand
-        usage_type:            cfg.usage_type,
+        model_id:              config.model_id,
+        model_name:             model.name || config.model_id,
+        pool_type:              poolType,
         dau:                   dau,
         peak_concurrent:       peakConcurrent,
         peak_rps:              peakRPS,
@@ -961,7 +1001,7 @@
       ;(maasResults || []).forEach(function (r) {
         if (r && !r.error) {
           alloc.push({
-            label: 'MaaS — ' + (r.usage_type || 'API'),
+            label: 'MaaS — ' + (r.model_name || r.model_id || 'API') + (r.pool_type === 'reserved' ? ' (Reserved)' : ' (Open)'),
             gpus:  r.actual_gpus || r.total_gpus,
             kw:    r.power_kw || 0,
             type:  'revenue'
