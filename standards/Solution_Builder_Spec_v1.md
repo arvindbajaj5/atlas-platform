@@ -863,7 +863,144 @@ updated (`model_id`/`model_name`/`pool_type` replace `usage_type`),
 prototype (v4) updated to match: Model dropdown replaces Archetype and
 Model Tier, Self-hosted/Pass-through toggle removed entirely.
 
-**Next step: wire Controllers — replace all DUMMY data and placeholder
-sizing math in the Workload Profiler prototype with real `atlasDB` calls
-and real `SizingEngine.sizeUC()`/`sizeMaaS()` calls, per the same V→M→C
-sequence used for the Docket.**
+**Section 11 status update (same day, later): see Section 12 — the SLA
+model in this section's engine change was further refined from a
+collapsed Standard/Enterprise mapping to the correct Bronze/Silver/Gold
+three-tier model, once original MaaS architecture discussion notes were
+recovered and reviewed.**
+
+---
+
+## 12. MaaS — Original Architecture Recovered & Reconciled (30 June 2026)
+
+### Source
+
+A substantial prior design conversation (pre-dating this spec) was
+recovered and reviewed in full: bottom-up/top-down/crossover sizing
+methodology, complete model catalogue with licensing rationale, GPU
+catalogue, pricing model evolution (subscription bundles considered and
+explicitly rejected), free trial spec, and chatbot/harness infrastructure
+scope (considered and explicitly rejected). This section reconciles that
+recovered design against everything built today.
+
+### Confirmed unchanged — already aligned with today's work
+
+**API/consumption-only pricing** — locked in the original discussion
+after explicitly weighing subscription bundles against pure consumption.
+Subscription was rejected because it forces ownership of a chatbot UI,
+intent classifier, and usage-specific harnesses (RAG, code sandbox, audio
+pipeline) — a SaaS product build outside the OEM's infrastructure lane,
+6-12 months of extra engineering, and weakens the sovereignty pitch
+("customer's application, not ours" — confirmed, matches today's pass-
+through rejection in Section 11 for the same underlying reason).
+
+**No harness/chatbot infrastructure costs** — confirmed explicitly out
+of scope. Customer brings their own application and harness; we expose
+clean metered API endpoints only. Confirmed again 30 June 2026 — no
+intent classifier, RAG infrastructure, or per-request overhead cost
+modelling anywhere in `sizeMaaS()`.
+
+**GPU catalogue** — 9 NVIDIA (H200 through Vera Rubin NVL72) + 3 AMD
+(MI355X, MI400X placeholder, Instinct Helios placeholder) = 12 total.
+Matches what is already seeded in `gpu_configs` (confirmed earlier this
+engagement). No change needed.
+
+### Confirmed superseded — explicit decision, not silent override
+
+**SLA tiers — Bronze / Silver / Gold confirmed correct (30 June 2026),
+supersedes the original discussion's "Standard and Enterprise only, don't
+make it too complex" instruction.** The original instruction predates the
+discovery that `model_catalogue` already has dedicated
+`sla_bronze/silver/gold_ttft_ms` and `sla_bronze/silver/gold_uptime_pct`
+columns — real schema, not invented. Explicitly reconfirmed today rather
+than silently picked.
+
+```
+Commercial SLA (customer-facing, what we sell):
+  Bronze  — default for Open pool tenants, best-effort
+  Silver  — available to Reserved tenants, mid-tier guarantee
+  Gold    — available to Reserved tenants, highest guarantee
+  (sourced directly from the selected model's own sla_<tier>_ttft_ms
+   and sla_<tier>_uptime_pct columns — varies per model, not a flat
+   platform-wide constant)
+
+Internal buffer tier (implementation detail, NOT shown to customer):
+  standard  — bronze/silver tenants, lighter peak/failover buffers
+  enterprise — gold tenants, dedicated failover block, heavier buffers
+  (this is the ORIGINAL standard/enterprise concept — repurposed as
+   an internal sizing parameter rather than the customer-facing tier
+   name, resolving the apparent conflict without losing either concept)
+```
+
+**Free trial — confirmed dropped, not implemented.** Fully specified in
+the original discussion (15 days, 1M tokens, Bronze/Standard only, hard
+stop, one per organisation) but explicitly removed from scope 30 June
+2026. Not present in Tenant block Pool Type options (only Reserved/Open).
+If reinstated later, the original spec is preserved here for reference —
+no need to redesign from scratch.
+
+### Model catalogue — real list now in prototype
+
+Workload Profiler's placeholder `MODELS` object replaced with the
+confirmed catalogue from the original discussion, organised by usage
+type, n/n-2 versioning, clean-licence-only rule (Apache 2.0 / MIT /
+Qwen licence; Llama community licence clean at sovereign scale; Sarvam
+commercial terms to be verified before customer-facing use):
+
+| Usage Type | Models |
+|---|---|
+| Coding | DeepSeek-Coder-V2 Lite 16B / 236B, Qwen2.5-Coder 32B / 72B |
+| Text/Chat | Llama 3.1 8B / 3.3 70B / 3.1 405B, Mistral Small 3.1 24B / Large 2 123B |
+| Document | Qwen2.5 7B / 32B / 72B |
+| Audio | Sarvam Whisper S / M / Large, Whisper Large-v3 (MIT, on-prem OK) |
+| Indic/Regional | Sarvam-2B, Sarvam-M |
+| Generic | Same Llama/Mistral families as Text/Chat, different deployment context |
+
+### Bottom-up / Top-down / Crossover — reframing Sections 8 and the
+### deferred What-If layer
+
+The original discussion's bottom-up (supply→capacity) and top-down
+(demand→infrastructure) framework, with crossover as the headline
+insight, is recognised as the **same underlying methodology** already
+present in two places in this spec, not a third competing design:
+
+- **Make vs Buy (Section 8)** is the crossover applied to *cost*: our
+  on-prem cost curve vs market API price, crossing at a breakeven
+  utilisation point.
+- **What-If GPU Architecture Comparison** (raised, not yet built — see
+  `SASC-Requirements-Modelling-Gap-Analysis.md` Three-Layer Simulation,
+  Layers 1-3) is the crossover applied to *capacity*: supply curve (GPU
+  architecture → users supportable) vs demand curve (users → throughput
+  needed), per architecture.
+
+Both are legitimate, complementary lenses on the same crossover idea —
+cost-crossover and capacity-crossover — not duplicated effort. The
+Three-Layer Simulation (architecture comparison, usage-heatmap,
+mix-optimiser) remains a real, valuable, partially-built capability from
+prior work, paused for explicit reconciliation before building — status:
+**paused, not designed into this spec yet, pending a dedicated session.**
+
+### Engine changes applied (30 June 2026, this session)
+
+`shared/sasc-sizing.js` `sizeMaaS()`: `commercial_sla` parameter
+(bronze|silver|gold) replaces the earlier collapsed `sla_tier`
+(standard|enterprise) as the customer-facing field; sourced from the
+selected model's own SLA columns. Internal `slaTier` variable retained
+but now derived (bronze/silver→standard buffers, gold→enterprise
+buffers) rather than directly set. Demand-shape fallback chain corrected
+to use real `model_catalogue` columns (`max_input_tokens`,
+`max_output_tokens`, `context_length_k`) — the previous version
+referenced invented `default_*` columns that do not exist in the schema.
+
+Workload Profiler prototype (v5): real model catalogue replaces
+placeholder list; MaaS form's SLA Tier dropdown replaced with a
+derived-from-Pool-Type display (Bronze shown read-only for Open pool;
+Silver/Gold selectable for Reserved tenants); Tenant block's SLA line
+updated to show Bronze/Gold instead of Standard/Enterprise.
+
+**Next step unchanged: wire Controllers — replace all DUMMY data and
+placeholder sizing math in the Workload Profiler prototype with real
+`atlasDB` calls and real `SizingEngine.sizeUC()`/`sizeMaaS()` calls, per
+the same V→M→C sequence used for the Docket. The Three-Layer Simulation
+(What-If) remains explicitly paused, to be designed in a dedicated
+session before being added to this build scope.**

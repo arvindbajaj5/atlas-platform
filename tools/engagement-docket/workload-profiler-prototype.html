@@ -188,13 +188,13 @@ var M = {
   maas: [
     {
       id:'maas1', name:'Llama-3.3-70B — Open Pool', model:'llama-3.3-70b', gpu:'b200',
-      precision:'int4', dau:50000, slaTier:'standard',
+      precision:'int4', dau:50000, commercialSla:'bronze',
       tenant:null, poolType:'open', tenure:null,
       mvbView:'maas'
     },
     {
       id:'maas2', name:'Llama-3.3-70B — State IT Reservation', model:'llama-3.3-70b', gpu:'b200',
-      precision:'int4', dau:8000, slaTier:'enterprise',
+      precision:'int4', dau:8000, commercialSla:'gold',
       tenant:'state-it-dept', poolType:'reserved', tenure:'24',
       mvbView:'maas'
     }
@@ -215,11 +215,34 @@ var ARCHETYPES = { text_chat:'Text / Chat', coding:'Coding', document:'Document'
 var MODEL_TIERS = { basic:'Basic (1-14B)', mid:'Mid (14-70B)', advanced:'Advanced (70B+)' }
 
 var DOMAINS = { geospatial:'Geospatial', agriculture:'Agriculture', health:'Health', governance:'Governance', education:'Education', finance:'Finance', defence:'Defence' }
+// Confirmed MaaS model catalogue — clean licensing, n/n-2 versioning.
+// Organised by usage type. Source: original MaaS architecture discussion.
 var MODELS = {
-  'sarvam-2b':'Sarvam-2B (Indic, sovereign)', 'sarvam-m':'Sarvam-M (Indic, sovereign)',
-  'llama-3.1-8b':'Llama-3.1-8B', 'llama-3.3-70b':'Llama-3.3-70B', 'llama-3.1-405b':'Llama-3.1-405B',
-  'deepseek-coder-32b':'DeepSeek-Coder-V2 32B', 'qwen2.5-coder-32b':'Qwen2.5-Coder-32B',
-  'mistral-large':'Mistral Large 2 123B'
+  // Coding — price/performance choice, 2-3 shown per family
+  'deepseek-coder-v2-lite-16b':'DeepSeek-Coder-V2 Lite 16B',
+  'deepseek-coder-v2-236b':'DeepSeek-Coder-V2 236B',
+  'qwen2.5-coder-32b':'Qwen2.5-Coder 32B',
+  'qwen2.5-coder-72b':'Qwen2.5-Coder 72B',
+  // Text/Chat — Llama + Mistral families
+  'llama-3.1-8b':'Llama 3.1 8B',
+  'llama-3.3-70b':'Llama 3.3 70B',
+  'llama-3.1-405b':'Llama 3.1 405B',
+  'mistral-small-3.1-24b':'Mistral Small 3.1 24B',
+  'mistral-large-2-123b':'Mistral Large 2 123B',
+  // Document — Qwen, strong long-context
+  'qwen2.5-7b':'Qwen2.5 7B',
+  'qwen2.5-32b':'Qwen2.5 32B',
+  'qwen2.5-72b':'Qwen2.5 72B',
+  // Audio — Sarvam Whisper + Whisper v3 fallback
+  'sarvam-whisper-s':'Sarvam Whisper S',
+  'sarvam-whisper-m':'Sarvam Whisper M',
+  'sarvam-whisper-l':'Sarvam Whisper Large',
+  'whisper-large-v3':'Whisper Large-v3 (MIT)',
+  // Indic/Regional — Sarvam family only
+  'sarvam-2b':'Sarvam-2B',
+  'sarvam-m':'Sarvam-M',
+  // Generic — same Llama/Mistral families, different deployment context
+  // (already listed above under Text/Chat — reused here)
 }
 var UC_TYPES = {
   chatbot:'Chatbot / Conversational', text:'Text Processing', rag:'RAG / Knowledge Retrieval',
@@ -553,10 +576,18 @@ var V = {
     h += '<div class="fg"><label>DAU</label><div class="sliderwrap">'
       + '<input type="range" min="100" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" oninput="C.updMaasSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
       + '<span class="slider-val" id="madauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div></div>'
-    h += '<div class="fg"><label>SLA Tier</label><select onchange="C.updMaas(\''+wl.id+'\',\'slaTier\',this.value)">'
-    h += '<option value="standard"'+(wl.slaTier==='standard'?' selected':'')+'>Standard</option>'
-    h += '<option value="enterprise"'+(wl.slaTier==='enterprise'?' selected':'')+'>Enterprise</option>'
-    h += '</select></div>'
+    // Commercial SLA (Bronze/Silver/Gold) is DERIVED from Tenant Pool Type below,
+    // not a separate input here. Reserved tenants may choose Silver or Gold.
+    h += '<div class="fg"><label>Commercial SLA</label><div class="fg-hint" style="padding-top:8px">'
+    if (wl.poolType === 'reserved') {
+      h += '<select onchange="C.updMaas(\''+wl.id+'\',\'commercialSla\',this.value)" style="font-size:11px;padding:4px 6px">'
+      h += '<option value="silver"'+(wl.commercialSla==='silver'?' selected':'')+'>Silver</option>'
+      h += '<option value="gold"'+((wl.commercialSla||'gold')==='gold'?' selected':'')+'>Gold</option>'
+      h += '</select>'
+    } else {
+      h += 'Bronze <span style="color:var(--mid)">(Open pool default)</span>'
+    }
+    h += '</div></div>'
     h += '</div>'
 
     h += V.renderTenantBlock(wl, 'maas')
@@ -611,7 +642,8 @@ var V = {
       h += '<div style="display:flex;gap:10px;margin-top:10px;font-size:11px;color:var(--mid)">'
       h += 'Security tier: <b style="color:var(--dark)">'+t.secTier+'</b>'
       h += '&nbsp;&middot;&nbsp; Chargeout: <b style="color:var(--dark)">'+CHARGEOUT_LABELS[t.chargeout]+'</b>'
-      h += '&nbsp;&middot;&nbsp; SLA: <b style="color:var(--dark)">'+(wl.poolType==='reserved'?'Enterprise':'Standard')+'</b>'
+      h += '&nbsp;&middot;&nbsp; SLA: <b style="color:var(--dark)">'+(wl.poolType==='reserved'?'Gold':'Bronze')+'</b>'
+      h += ' <span style="font-size:9px;color:var(--mid)">(Bronze/Silver/Gold — Reserved tenants may choose Silver or Gold)</span>'
       h += '</div>'
     }
 
@@ -753,7 +785,7 @@ var C = {
   addMaas: function() {
     var id = 'maas' + (M.maas.length + 1) + '-' + Date.now()
     M.maas.push({ id:id, name:'New MaaS Pool', archetype:'text_chat', gpu:M.defaultGpu,
-      model:'llama-3.1-8b', precision:'int4', dau:10000, slaTier:'standard', mvbView:'maas' })
+      model:'llama-3.1-8b', precision:'int4', dau:10000, commercialSla:'bronze', mvbView:'maas' })
     M.openRows[id] = true
     V.renderTabs(); V.renderTabBody()
   },

@@ -442,3 +442,39 @@ Suggested phase: Phase A polish — populate these columns for at least the
              ~15-20 most commonly used models (Llama family, Qwen-Coder,
              DeepSeek-Coder, Sarvam family, Mistral) before MaaS Controller
              wiring goes live, so defaults are genuinely useful per model.
+
+---
+
+## ADDITIONS FROM 30 JUNE 2026 (continued) — recovered architecture reconciliation
+
+**[2026-06-30] — Free trial (MaaS)**
+Fully specified in original MaaS architecture discussion: 15 days, 1M
+tokens, Bronze/Standard SLA only, API access, hard stop at quota, one
+trial per organisation (email domain/GST/entity verification), converts
+to consumption contract. Explicitly confirmed DROPPED from scope 30 June
+2026 — not implemented in Tenant block (only Reserved/Open Pool Type
+options exist).
+Why deferred: explicit scope decision, not a technical gap.
+Suggested phase: Revisit only if a specific go-to-market need arises.
+             Full spec preserved in Solution Builder Spec Section 12 —
+             no redesign needed if reinstated later.
+
+**[2026-06-30] — Three-Layer Simulation / What-If GPU Architecture Comparison**
+Real, substantial prior design recovered from
+standards/SASC-Requirements-Modelling-Gap-Analysis.md and original MaaS
+architecture discussion: Layer 1 (GPU architecture comparison curves,
+supply vs demand, crossover point), Layer 2 (usage-type performance
+heatmap across GPUs), Layer 3 (usage mix optimiser, single vs mixed
+architecture recommendation). Partially built in old SASC (confirmed
+"partially working" per gap-analysis doc). Recognised as the same
+underlying crossover methodology already used in Section 8 (Make vs Buy)
+applied to capacity instead of cost.
+Why deferred: needs a dedicated session to properly design against the
+             current Workload Profiler architecture (per-model, Tenant-
+             aware) rather than the old per-usage-type SASC structure
+             it was originally designed against. Explicitly PAUSED, not
+             rejected — high confidence this gets built, just not today.
+Suggested phase: Dedicated design session before Phase 3 (post Controller
+             wiring). Lives at Fleet Aggregation level (Layers 2-3) and
+             per-Workload-Profiler-row level (Layer 1) — see Solution
+             Builder Spec Section 12.
