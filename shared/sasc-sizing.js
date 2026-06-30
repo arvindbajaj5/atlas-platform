@@ -782,12 +782,15 @@
      *   model_id:          string  (model_catalogue.id — REQUIRED)
      *   archetype_id:      string  (OPTIONAL — preset only, never required)
      *   dau:               number  total DAU for this model's pool
-     *   requests_per_day:  number  (optional — model default else fallback)
-     *   avg_input_tokens:  number  (optional — model default else fallback)
-     *   avg_output_tokens: number  (optional — model default else fallback)
-     *   context_window_k:  number  (optional — model default else fallback)
+     *   requests_per_day:  number  (optional — fallback default)
+     *   avg_input_tokens:  number  (optional — model max_input_tokens scaled, else fallback)
+     *   avg_output_tokens: number  (optional — model max_output_tokens scaled, else fallback)
+     *   context_window_k:  number  (optional — model context_length_k, else fallback)
      *   peak_concurrent_pct: number (optional, default 5)
-     *   sla_tier:          string  standard|enterprise
+     *   commercial_sla:    string  bronze|silver|gold (CUSTOMER-FACING — drives TTFT/uptime
+     *                       promise AND internal buffer tier. Confirmed 30 June 2026 —
+     *                       supersedes earlier standard/enterprise-only product decision.
+     *                       NO free trial tier — dropped from scope.)
      *   pool_type:         string  reserved|open (Tenant block — open default)
      *   precision:         string  (optional — inferred from model)
      *   derating_pct:      number  (optional, default 80)
@@ -807,34 +810,46 @@
       var presetCfg = (archetype && archetype.config) || {}
 
       var dau        = config.dau || 1000
-      var slaTier    = config.sla_tier || 'standard'
-      var poolType   = config.pool_type || 'open'   // Tenant block — drives SLA tier
+      var poolType   = config.pool_type || 'open'   // Tenant block
+
+      // ── Commercial SLA: Bronze / Silver / Gold ──────────────────────────
+      // Customer-facing product tier, sourced from model_catalogue's own
+      // sla_bronze/silver/gold_ttft_ms + uptime_pct columns. Pool type
+      // sets a sensible default — Reserved tenants typically choose
+      // Silver/Gold, Open pool defaults to Bronze — but is always
+      // explicitly overridable per row.
+      var commercialSla = config.commercial_sla
+        || (poolType === 'reserved' ? 'gold' : 'bronze')
+      var ttftTargetMs  = model['sla_' + commercialSla + '_ttft_ms']    || 2000
+      var uptimePct     = model['sla_' + commercialSla + '_uptime_pct'] || 99.5
+
+      // Internal buffer tier (peak headroom / failover / multi-tenancy %) —
+      // an IMPLEMENTATION detail, separate from the commercial SLA shown
+      // to the customer. Bronze/Silver -> standard buffers, Gold -> enterprise
+      // buffers (dedicated, highest assurance). See SLA_BUFFERS constant.
+      var slaTier = commercialSla === 'gold' ? 'enterprise' : 'standard'
+
       var precision  = config.precision || 'INT4'
       var derating   = config.derating_pct || 80
 
-      // Resolve demand-shape: explicit config → model_catalogue defaults
+      // Resolve demand-shape: explicit config → real model_catalogue columns
       // → optional archetype preset → hardcoded safe fallback (in that order)
       var reqPerDay   = config.requests_per_day
-        || model.default_requests_per_day
         || presetCfg.requests_per_user_per_day
         || 5
       var inputTok    = config.avg_input_tokens
-        || model.default_avg_input_tokens
+        || (model.max_input_tokens ? Math.round(model.max_input_tokens * 0.3) : null)
         || presetCfg.avg_input_tokens
         || 300
       var outputTok   = config.avg_output_tokens
-        || model.default_avg_output_tokens
+        || (model.max_output_tokens ? Math.round(model.max_output_tokens * 0.3) : null)
         || presetCfg.avg_output_tokens
         || 500
       var contextLen  = (config.context_window_k
-        || model.default_context_window_k
+        || model.context_length_k
         || presetCfg.avg_context_window_k
         || 8) * 1000
       var peakConcPct = config.peak_concurrent_pct || presetCfg.peak_concurrent_pct || 5
-
-      // Pool type drives SLA tier — Reserved = Enterprise, Open = Standard
-      // (matches Tenant block design — see Solution Builder Spec Section 10)
-      if (poolType === 'reserved' && config.sla_tier === undefined) slaTier = 'enterprise'
       var params_b    = model ? model.params_b : 7
 
       // Peak concurrent users at any moment
@@ -880,6 +895,10 @@
         model_id:              config.model_id,
         model_name:             model.name || config.model_id,
         pool_type:              poolType,
+        commercial_sla:         commercialSla,        // bronze|silver|gold — customer-facing
+        ttft_target_ms:         ttftTargetMs,          // from model's own sla_<tier>_ttft_ms
+        uptime_pct:             uptimePct,             // from model's own sla_<tier>_uptime_pct
+        internal_buffer_tier:   slaTier,               // standard|enterprise — implementation detail
         dau:                   dau,
         peak_concurrent:       peakConcurrent,
         peak_rps:              peakRPS,
@@ -915,6 +934,7 @@
         sizing_profile: 'A',
         notes: [
           'Profile A (MaaS API): compute-bound at batch 128+',
+          'SLA: ' + commercialSla.toUpperCase() + ' (TTFT ' + ttftTargetMs + 'ms, ' + uptimePct + '% uptime) — pool: ' + poolType,
           'DAU ' + dau + ' → ' + peakConcurrent + ' peak concurrent (' + peakConcPct + '%)',
           'Base: max(' + gpusForFit + ' fit, ' + gpusForThroughput + ' throughput) = ' + baseGPUs + ' (' + bindingConstraint + ')',
           'Buffers: +' + peakBuffer + ' peak(' + headroomPct + '%), +' + failoverReserve + ' failover(' + failoverPct + '%), +' + multiTenancy + ' multi-tenancy(' + multiTenPct + '%)',
