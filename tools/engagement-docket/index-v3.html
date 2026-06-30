@@ -90,7 +90,8 @@ table.wl td.name{font-weight:600;color:var(--dark)}
 .collapsible-body-pad{padding:var(--sp-3) 0 var(--sp-2)}
 
 .derived{background:var(--navy);color:#fff;border-radius:var(--r);padding:var(--sp-4);margin-top:var(--sp-2)}
-.derived-line{display:flex;gap:var(--sp-5);flex-wrap:wrap;font-size:11.5px;color:rgba(255,255,255,.85);margin-bottom:4px}
+.derived-line{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--sp-3) var(--sp-5);font-size:11.5px;color:rgba(255,255,255,.85);margin-bottom:8px}
+.derived-line span{display:block}
 .derived-line b{color:#fff}
 .sla-banner{margin-top:var(--sp-3);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-sm);font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:8px}
 .sla-met{background:rgba(0,178,144,.18);color:#5EEAD4}
@@ -248,6 +249,32 @@ table.wl td.name{font-weight:600;color:var(--dark)}
       <button class="btn btn-ghost" onclick="V.closeModal('modal-intel-run')">Cancel</button>
       <button class="btn btn-ghost" onclick="C.runIntel('stale')">Stale only (~$0.03)</button>
       <button class="btn btn-primary" onclick="C.runIntel('full')">Full refresh (~$0.07)</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-tenant-edit" style="display:none">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr"><div class="modal-title" id="tenant-edit-title">Edit Tenant</div></div>
+    <div class="modal-body">
+      <input type="hidden" id="tenant-edit-id">
+      <div class="fg" style="margin-bottom:12px"><label>Name</label><input type="text" id="tenant-edit-name" style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:5px"></div>
+      <div class="fg" style="margin-bottom:12px"><label>Security Tier</label><select id="tenant-edit-sectier" style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:5px">
+        <option value="S1">S1 — Standard isolation</option>
+        <option value="S2">S2 — Enhanced isolation</option>
+        <option value="S3">S3 — Sovereign / dedicated</option>
+        <option value="S4">S4 — Air-gapped / classified</option>
+      </select></div>
+      <div class="fg"><label>Chargeout Model</label><select id="tenant-edit-chargeout" style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:5px">
+        <option value="commercial">Commercial</option>
+        <option value="cost_recovery">Cost Recovery</option>
+        <option value="subsidised">Subsidised</option>
+        <option value="zero">Zero (free)</option>
+      </select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="V.closeModal('modal-tenant-edit')">Cancel</button>
+      <button class="btn btn-primary" onclick="C.saveTenantEdit()">Save</button>
     </div>
   </div>
 </div>
@@ -527,6 +554,12 @@ function loadDummy() {
 
 // ── Solution tab lookups (folded in from workload-profiler-prototype) ─────
 var GPU_LABELS = { h200:'H200 SXM', b200:'B200 SXM', gb200:'GB200 NVL72', l40s:'L40S' }
+// Relative throughput factors for the FALLBACK (non-engine) sizing path only.
+// Real SizingEngine.sizeUC()/sizeMaaS() uses actual gpu_configs specs —
+// this is only used when SizingEngine isn't ready/configured.
+var GPU_THROUGHPUT_FACTOR = { h200: 1.0, b200: 1.7, gb200: 4.5, l40s: 0.35 }
+var HA_GPU_FACTOR = { none: 1.0, n1: 1.15, n2: 2.0 }
+var DR_GPU_FACTOR = { none: 1.0, warm: 1.5, active_active: 2.0 }
 var UC_LIB = { glof:'GLOF Early Warning System (UC Library)', crop:'Crop Disease Detection (UC Library)', adhoc:'+ Define ad-hoc' }
 var DOMAINS = { geospatial:'Geospatial', agriculture:'Agriculture', health:'Health', governance:'Governance', education:'Education', finance:'Finance', defence:'Defence' }
 // Confirmed MaaS model catalogue — clean licensing, n/n-2 versioning.
@@ -583,30 +616,42 @@ function sizeUCWorkload(wl) {
       ttft_sla_ms: wl.ttftTarget, ha_required: wl.haTier !== 'none', dr_type: wl.drType
     }, gpuId)
     if (r && !r.error) {
+      var slaMetReal = (r.ttft_sla_ms || wl.ttftTarget) <= wl.ttftTarget
+      var marginReal  = wl.ttftTarget ? Math.round(Math.abs(((r.ttft_sla_ms||wl.ttftTarget) - wl.ttftTarget) / wl.ttftTarget) * 100) : 0
       return {
         gpu: gpuId, p95RPS: r.peak_rps, concurrent: r.peak_concurrent,
         baseGpus: r.base_gpus, buffers: r.total_gpus - r.base_gpus, total: r.total_gpus,
         powerKw: r.power_kw, racks: r.total_gpus <= 72 ? '1 rack (partial)' : Math.ceil(r.total_gpus/72) + ' racks',
-        ttftEstimate: r.ttft_sla_ms, slaMet: true, margin: 0, notes: r.notes
+        ttftEstimate: r.ttft_sla_ms || wl.ttftTarget, slaMet: slaMetReal, margin: marginReal, notes: r.notes
       }
     }
   }
   // REFACTOR-MARKER: fallback placeholder — only used if engine not yet
   // init()'d (no Supabase config) or returns an error. Keeps the V usable
-  // for visual inspection without a live DB connection.
+  // for visual inspection without a live DB connection. GPU/HA/DR choices
+  // now genuinely affect the result via GPU_THROUGHPUT_FACTOR/HA_GPU_FACTOR/
+  // DR_GPU_FACTOR — fixed 30 June 2026, previously these inputs were
+  // collected but silently ignored in the fallback path.
+  var throughputFactor = GPU_THROUGHPUT_FACTOR[gpuId] || 1.0
+  var haFactor = HA_GPU_FACTOR[wl.haTier] || 1.0
+  var drFactor = DR_GPU_FACTOR[wl.drType] || 1.0
   var avgRPS = (wl.dau * wl.reqPerDay) / 86400
   var p95RPS = avgRPS * wl.peakMult * 1.5
   var concurrent = Math.max(1, Math.ceil(p95RPS * (wl.ttftTarget/1000)))
   var tpI = wl.precision === 'int4' ? 2 : wl.precision === 'int8' ? 4 : 8
-  var baseGpus = Math.max(1, Math.ceil(concurrent / 4) * tpI)
-  var buffers = Math.ceil(baseGpus * 0.65)
+  var baseGpus = Math.max(1, Math.ceil((concurrent / 4) * tpI / throughputFactor))
+  var buffers = Math.ceil(baseGpus * 0.65 * haFactor * drFactor) - baseGpus
+  if (buffers < 0) buffers = Math.ceil(baseGpus * 0.65)
   var total = baseGpus + buffers
   var powerKw = Math.round(total * 0.7 * 10) / 10
-  var ttftEstimate = wl.ttftTarget
+  // TTFT estimate genuinely responds to GPU choice — faster GPU = lower TTFT
+  var ttftEstimate = Math.round(wl.ttftTarget / throughputFactor * 0.85)
+  var slaMet = ttftEstimate <= wl.ttftTarget
+  var margin = wl.ttftTarget ? Math.round(Math.abs((wl.ttftTarget - ttftEstimate) / wl.ttftTarget) * 100) : 0
   return { gpu: gpuId, p95RPS: Math.round(p95RPS*100)/100, concurrent: concurrent,
     baseGpus: baseGpus, buffers: buffers, total: total, powerKw: powerKw,
     racks: total <= 72 ? '1 rack (partial)' : Math.ceil(total/72) + ' racks',
-    ttftEstimate: ttftEstimate, slaMet: true, margin: 0 }
+    ttftEstimate: ttftEstimate, slaMet: slaMet, margin: margin }
 }
 function sizeMaasWorkload(wl) {
   var gpuId = wl.gpu || M.defaultGpu
@@ -1142,7 +1187,7 @@ var V = {
     h += '<div class="tenant-chip-list">'
     Object.keys(M.tenantsList).forEach(function(k){
       var t = M.tenantsList[k]
-      h += '<div class="tenant-chip"><b>'+t.name+'</b><span class="sec">'+t.secTier+'</span><span style="color:var(--mid)">'+CHARGEOUT_LABELS[t.chargeout]+'</span></div>'
+      h += '<div class="tenant-chip" style="cursor:pointer" onclick="C.editTenant(\''+k+'\')" title="Click to edit"><b>'+t.name+'</b><span class="sec">'+t.secTier+'</span><span style="color:var(--mid)">'+CHARGEOUT_LABELS[t.chargeout]+'</span></div>'
     })
     h += '</div></div>'
     return h
@@ -1184,7 +1229,7 @@ var V = {
     var rows = M.workloadConfigs.uc, totalGpus = 0, totalPower = 0
     var html = '<div class="tablewrap"><table class="wl"><thead><tr>'
       + '<th>Use Case</th><th>Domain</th><th>Tenant</th><th class="num">DAU</th><th>GPU</th><th class="num">GPUs</th>'
-      + '<th class="num">Power</th><th>SLA</th><th></th></tr></thead><tbody>'
+      + '<th class="num">Power</th><th>Latency</th><th></th></tr></thead><tbody>'
 
     rows.forEach(function(wl) {
       var sz = sizeUCWorkload(wl)
@@ -1268,13 +1313,16 @@ var V = {
     h += '</select></div>'
     h += '</div>'
 
-    h += '<div class="formgrid">'
+    h += '<div class="formgrid" style="grid-template-columns:1.3fr 1fr 1fr 1fr">'
     h += '<div class="fg"><label>DAU</label><div class="sliderwrap">'
-      + '<input type="range" min="100" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" '
+      + '<input type="range" min="2" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" '
       + 'oninput="C.updUCSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
-      + '<span class="slider-val" id="dauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div></div>'
+      + '<span class="slider-val" id="dauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div>'
+      + '<div class="fg-hint">Range: 100 – 1,000,000 (log scale)</div></div>'
 
-    h += '<div class="fg"><label>Requests / User / Day</label><input type="number" value="'+wl.reqPerDay+'" onchange="C.updUC(\''+wl.id+'\',\'reqPerDay\',+this.value)"></div>'
+    h += '<div class="fg"><label>Requests / User / Day</label><input type="number" min="1" value="'+wl.reqPerDay+'" onchange="C.updUC(\''+wl.id+'\',\'reqPerDay\',+this.value)"></div>'
+    h += '<div class="fg"><label>Peak concurrent (computed)</label><div style="padding:7px 0;font-size:16px;font-weight:900;color:var(--navy);font-family:var(--font-mono)">'+sz.concurrent.toLocaleString()+'</div>'
+      + '<div class="fg-hint">From DAU + req/day + peak mult</div></div>'
 
     h += '<div class="fg"><label>Peak Multiplier</label><div class="sliderwrap">'
       + '<input type="range" min="1" max="10" step="0.5" value="'+wl.peakMult+'" oninput="C.updUCSlider(\''+wl.id+'\',\'peakMult\',+this.value)">'
@@ -1282,17 +1330,17 @@ var V = {
     h += '</div>'
 
     h += '<div class="formgrid">'
-    h += '<div class="fg"><label>Avg Input Tokens</label><input type="number" value="'+wl.inputTok+'" onchange="C.updUC(\''+wl.id+'\',\'inputTok\',+this.value)"></div>'
-    h += '<div class="fg"><label>Avg Output Tokens</label><input type="number" value="'+wl.outputTok+'" onchange="C.updUC(\''+wl.id+'\',\'outputTok\',+this.value)"></div>'
+    h += '<div class="fg"><label>Avg Input Tokens</label><input type="number" step="100" min="0" value="'+wl.inputTok+'" onchange="C.updUC(\''+wl.id+'\',\'inputTok\',+this.value)"></div>'
+    h += '<div class="fg"><label>Avg Output Tokens</label><input type="number" step="100" min="0" value="'+wl.outputTok+'" onchange="C.updUC(\''+wl.id+'\',\'outputTok\',+this.value)"></div>'
     h += '<div class="fg"><label>Precision</label><select onchange="C.updUC(\''+wl.id+'\',\'precision\',this.value)">'
     ;['int4','int8','fp16','fp8'].forEach(function(p){ h += '<option value="'+p+'"'+(wl.precision===p?' selected':'')+'>'+p.toUpperCase()+'</option>' })
     h += '</select></div>'
     h += '</div>'
 
     h += '<div class="formgrid" style="grid-template-columns:1fr 1fr">'
-    h += '<div class="fg"><label>SLA Tier</label><select onchange="C.updUC(\''+wl.id+'\',\'slaTier\',this.value)">'
+    h += '<div class="fg"><label>Performance Tier</label><select onchange="C.updUC(\''+wl.id+'\',\'slaTier\',this.value)">'
     Object.keys(SLA_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.slaTier===k?' selected':'')+'>'+SLA_LABELS[k]+'</option>' })
-    h += '</select></div>'
+    h += '</select><div class="fg-hint">Latency class — not the same as commercial SLA (Bronze/Silver/Gold, set via Tenant block below)</div></div>'
     h += '<div class="fg"><label>TTFT Target (ms)</label><input type="number" value="'+wl.ttftTarget+'" onchange="C.updUC(\''+wl.id+'\',\'ttftTarget\',+this.value)"></div>'
     h += '</div>'
 
@@ -1304,13 +1352,20 @@ var V = {
     h += '<div class="fg"><label>Tool Wait (ms)</label><input type="number" value="'+wl.toolWait+'" onchange="C.updUC(\''+wl.id+'\',\'toolWait\',+this.value)"></div>'
     h += '</div></div></div></div>'
 
-    // Derived sizing
+    // Derived sizing — grid-aligned key/value pairs, not free-flowing text
     h += '<div class="derived">'
-    h += '<div class="derived-line">P95 RPS: <b>'+sz.p95RPS+'</b> &nbsp; Concurrent: <b>'+sz.concurrent+'</b> &nbsp; GPU: <b>'+GPU_LABELS[sz.gpu]+'</b></div>'
-    h += '<div class="derived-line">Base: <b>'+sz.baseGpus+'</b> GPUs &nbsp; +Buffers: <b>'+sz.buffers+'</b> &nbsp; Total: <b>'+sz.total+'</b> GPUs</div>'
-    h += '<div class="derived-line">= <b>'+sz.racks+'</b> &nbsp;&middot;&nbsp; <b>'+sz.powerKw+'kW</b></div>'
+    h += '<div class="derived-line">'
+      + '<span>P95 RPS<br><b>'+sz.p95RPS+'</b></span>'
+      + '<span>Concurrent<br><b>'+sz.concurrent.toLocaleString()+'</b></span>'
+      + '<span>GPU<br><b>'+GPU_LABELS[sz.gpu]+'</b></span>'
+      + '<span>Base GPUs<br><b>'+sz.baseGpus+'</b></span>'
+      + '<span>+Buffers<br><b>'+sz.buffers+'</b></span>'
+      + '<span>Total GPUs<br><b>'+sz.total+'</b></span>'
+      + '<span>Racks<br><b>'+sz.racks+'</b></span>'
+      + '<span>Power<br><b>'+sz.powerKw+'kW</b></span>'
+      + '</div>'
     h += '<div class="sla-banner '+(sz.slaMet?'sla-met':'sla-breach')+'">'
-      + (sz.slaMet ? '&#10003; SLA MET' : '&#10007; SLA BREACH') + ' — TTFT '+sz.ttftEstimate+'ms vs '+wl.ttftTarget+'ms target ('+sz.margin+'% '+(sz.slaMet?'margin':'over')+')'
+      + (sz.slaMet ? '&#10003; LATENCY TARGET MET' : '&#10007; LATENCY TARGET BREACHED') + ' — TTFT '+sz.ttftEstimate+'ms vs '+wl.ttftTarget+'ms target ('+sz.margin+'% '+(sz.slaMet?'margin':'over')+')'
       + (sz.slaMet ? '' : '<span class="sla-hint">Try: lower precision impact, add GPU, raise SLA tier</span>')
       + '</div>'
     h += '</div>'
@@ -1385,8 +1440,9 @@ var V = {
 
     h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr">'
     h += '<div class="fg"><label>DAU</label><div class="sliderwrap">'
-      + '<input type="range" min="100" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" oninput="C.updMaasSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
-      + '<span class="slider-val" id="madauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div></div>'
+      + '<input type="range" min="2" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" oninput="C.updMaasSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
+      + '<span class="slider-val" id="madauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div>'
+      + '<div class="fg-hint">Range: 100 – 1,000,000 (log scale)</div></div>'
     // Commercial SLA (Bronze/Silver/Gold) is DERIVED from Tenant Pool Type below,
     // not a separate input here. Reserved tenants may choose Silver or Gold.
     h += '<div class="fg"><label>Commercial SLA</label><div class="fg-hint" style="padding-top:8px">'
@@ -2088,11 +2144,36 @@ var C = {
   },
 
   addTenant: function() {
-    var name = prompt('New tenant name:')
-    if (!name) return
-    var id = name.toLowerCase().replace(/[^a-z0-9]+/g,'-')
-    M.tenantsList[id] = { name: name, secTier: 'S1', chargeout: 'commercial' }
+    document.getElementById('tenant-edit-id').value = ''
+    document.getElementById('tenant-edit-title').textContent = 'New Tenant'
+    document.getElementById('tenant-edit-name').value = ''
+    document.getElementById('tenant-edit-sectier').value = 'S1'
+    document.getElementById('tenant-edit-chargeout').value = 'commercial'
+    V.openModal('modal-tenant-edit')
+  },
+
+  editTenant: function(id) {
+    var t = M.tenantsList[id]
+    if (!t) return
+    document.getElementById('tenant-edit-id').value = id
+    document.getElementById('tenant-edit-title').textContent = 'Edit Tenant — ' + t.name
+    document.getElementById('tenant-edit-name').value = t.name
+    document.getElementById('tenant-edit-sectier').value = t.secTier
+    document.getElementById('tenant-edit-chargeout').value = t.chargeout
+    V.openModal('modal-tenant-edit')
+  },
+
+  saveTenantEdit: function() {
+    var id   = document.getElementById('tenant-edit-id').value
+    var name = (document.getElementById('tenant-edit-name').value||'').trim()
+    if (!name) { V.toast('Enter a tenant name','warning'); return }
+    var secTier   = document.getElementById('tenant-edit-sectier').value
+    var chargeout = document.getElementById('tenant-edit-chargeout').value
+    if (!id) id = name.toLowerCase().replace(/[^a-z0-9]+/g,'-')
+    M.tenantsList[id] = { name: name, secTier: secTier, chargeout: chargeout }
+    V.closeModal('modal-tenant-edit')
     V.renderSolTabBody()
+    V.toast('Tenant saved — ' + name)
   },
 }
 
