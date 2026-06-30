@@ -998,9 +998,144 @@ derived-from-Pool-Type display (Bronze shown read-only for Open pool;
 Silver/Gold selectable for Reserved tenants); Tenant block's SLA line
 updated to show Bronze/Gold instead of Standard/Enterprise.
 
-**Next step unchanged: wire Controllers — replace all DUMMY data and
-placeholder sizing math in the Workload Profiler prototype with real
-`atlasDB` calls and real `SizingEngine.sizeUC()`/`sizeMaaS()` calls, per
-the same V→M→C sequence used for the Docket. The Three-Layer Simulation
-(What-If) remains explicitly paused, to be designed in a dedicated
-session before being added to this build scope.**
+**Section 12 status update (same day, immediately after): see Section 13
+— What-If / Bottom-up-Top-down-Crossover is UN-PAUSED. Confirmed in
+scope for the current build, not deferred to a later session. Free
+trial remains dropped (unchanged from Section 12).**
+
+---
+
+## 13. What-If — Bottom-up / Top-down / Crossover (un-paused 30 June 2026)
+
+### Status change
+
+Section 12 paused the full Three-Layer Simulation pending a dedicated
+session. On reflection: the bottom-up/top-down/crossover methodology and
+GPU architecture comparison (Layers 1) are core to how MaaS/UC sizing
+should be presented — not an optional add-on — and are now **confirmed
+in scope for the current build**, not deferred. Layer 2 (usage heatmap)
+and Layer 3 (mix optimiser) remain fleet-level, scoped separately below.
+
+**Free trial: confirmed dropped, unchanged from Section 12. Not part of
+this un-pausing.**
+
+### Three pieces — scoped against what already exists
+
+```
+PIECE 1 — Bottom-up / Top-down / Crossover (per Workload Profiler row)
+  Lives inside EVERY UC and MaaS row, alongside Make vs Buy (Section 8).
+  Top-down (already built): DAU → GPU count (existing sizeUC/sizeMaaS)
+  Bottom-up (NEW): for the row's chosen GPU, what is the maximum
+    capacity (users/throughput) that configuration can serve?
+  Crossover: plot both on one chart, mark the intersection — the point
+    where demand exactly consumes available supply.
+
+PIECE 2 — What-If: GPU Architecture Comparison (per row)
+  Select 1-5 GPU architectures, show Piece 1's crossover for EACH,
+  side by side, in a comparison table. Answers: "which GPU is cheapest
+  for THIS workload's demand?"
+  Reuses SizingEngine.sizeUC()/sizeMaaS() called once per selected GPU
+  — no new engine math beyond Piece 1's bottom-up formula. Cheapest
+  piece to build once Piece 1 exists.
+
+PIECE 3 — What-If: Usage Heatmap + Mix Optimiser (Fleet Aggregation only)
+  Requires seeing the whole solution's model mix simultaneously — only
+  meaningful at S4 Fleet Aggregation, not per-row. Remains a separate,
+  later scope item (not part of this un-pausing) — genuinely needs the
+  full set of Workload Profiler rows populated first before a mix
+  hypothesis means anything.
+```
+
+### Piece 1 — bottom-up formula (the missing half of sizing)
+
+```
+TOP-DOWN (existing, already in sizeUC/sizeMaaS):
+  DAU → peak_concurrent → RPS → GPU count needed
+
+BOTTOM-UP (new — runs the same formula in reverse):
+  GPU architecture + GPU count → max throughput (tokens/sec)
+  → max concurrent sessions supportable → max DAU supportable
+
+CROSSOVER (the visualisation):
+  X-axis: concurrent users (0 to max)
+  Supply curve: flat/step line — max users this GPU configuration supports
+  Demand curve: linear — DAU × requests/day × tokens/request
+  Intersection: point where demand exactly consumes available supply
+  Below intersection: headroom (serving capacity to spare, or
+    over-provisioned — worth flagging either way)
+  Above intersection: SLA breach risk — demand exceeds what was sized
+```
+
+**New engine function required:** `shared/sasc-sizing.js` needs a
+reverse-calculation — given a GPU architecture and count (rather than a
+demand figure), return maximum supportable capacity. Proposed signature:
+
+```javascript
+SizingEngine.capacityForGPU(gpuConfigId, gpuCount, modelConfig)
+// modelConfig: same shape as sizeUC/sizeMaaS config (model_id, precision,
+// context, sla parameters) MINUS the demand fields (dau, requests_per_day)
+// Returns: { max_concurrent_sessions, max_throughput_tps, max_dau_estimate,
+//            ttft_at_max_load_ms, audit: {...} }
+```
+
+This is genuine new engine logic — not a UI-only change — and must be
+built before either the prototype crossover chart or the GPU comparison
+table can show real (not placeholder) numbers.
+
+### Piece 2 — GPU Architecture Comparison
+
+```
+Within the row's expanded form, alongside Make vs Buy (Section 8):
+
+▸ What-If — GPU Architecture Comparison
+  Select GPUs to compare (checkboxes, up to 5 of the 12 available):
+  ☑ H200  ☑ B200  ☐ GB200 NVL72  ☐ VR NVL72  ☐ MI355X  ...
+
+  Chart: same crossover pattern as Piece 1, one supply line per
+  selected GPU, demand line shared across all (same row's demand)
+
+  Table beneath chart:
+    GPU         | Max users @ demand | GPUs needed | Cost  | $/user
+    H200        | 850                 | 12          | $2.1M | $2,470
+    B200        | 1,400               | 8           | $2.8M | $2,000
+    GB200 NVL72 | 2,100               | 6           | $4.2M | $2,000
+  Cheapest configuration that meets demand highlighted automatically.
+```
+
+Implementation: call `SizingEngine.sizeUC()`/`sizeMaaS()` once per
+selected GPU with the row's existing demand config, varying only
+`gpuConfigId`. No new sizing math needed for this piece beyond Piece 1's
+bottom-up function (used to draw each GPU's supply curve).
+
+### Where this lives — extending the established UI pattern
+
+```
+Every UC and MaaS Workload Profiler row gains a THIRD collapsible
+section, alongside the two already specified in Section 9:
+
+  ▸ Make vs Buy — On-prem vs API                  [Section 8, built]
+  ▸ Capacity — Bottom-up vs Top-down Crossover     [NEW — Piece 1]
+  ▸ What-If — GPU Architecture Comparison          [NEW — Piece 2]
+
+Fleet Aggregation (S4) — Piece 3 remains separate future scope:
+  ▸ Make vs Buy — Combined Fleet                   [Section 8, built]
+  ▸ What-If — Usage Heatmap + Mix Optimiser         [Future, fleet-level]
+```
+
+### Build sequence for this section
+
+```
+1. Engine — shared/sasc-sizing.js: add capacityForGPU() reverse
+   calculation. Required before any chart shows real numbers.
+2. Prototype — Workload Profiler: add Capacity crossover chart
+   (reuses Make vs Buy's SVG curve rendering pattern) and What-If
+   GPU comparison table to every UC/MaaS row.
+3. Validate visually with dummy data first (same V-before-wiring
+   discipline as everywhere else in this build) — confirm the chart
+   and table layout read correctly before wiring to the real engine
+   function from step 1.
+```
+
+**Next step: build the engine's `capacityForGPU()` function first (Piece
+1's foundation), since both the Capacity crossover chart and the What-If
+comparison table depend on its output shape.**

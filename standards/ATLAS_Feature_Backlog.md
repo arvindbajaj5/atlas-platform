@@ -459,22 +459,22 @@ Suggested phase: Revisit only if a specific go-to-market need arises.
              Full spec preserved in Solution Builder Spec Section 12 —
              no redesign needed if reinstated later.
 
-**[2026-06-30] — Three-Layer Simulation / What-If GPU Architecture Comparison**
+**[2026-06-30] — UPDATED SAME DAY: Layer 1 un-paused, see Solution Builder
+Spec Section 13. Only Layers 2-3 (fleet-level) remain in this backlog
+entry below.**
+
+**[2026-06-30] — What-If Layer 2/3: Usage Heatmap + Mix Optimiser (fleet-level only)**
 Real, substantial prior design recovered from
 standards/SASC-Requirements-Modelling-Gap-Analysis.md and original MaaS
-architecture discussion: Layer 1 (GPU architecture comparison curves,
-supply vs demand, crossover point), Layer 2 (usage-type performance
-heatmap across GPUs), Layer 3 (usage mix optimiser, single vs mixed
-architecture recommendation). Partially built in old SASC (confirmed
-"partially working" per gap-analysis doc). Recognised as the same
-underlying crossover methodology already used in Section 8 (Make vs Buy)
-applied to capacity instead of cost.
-Why deferred: needs a dedicated session to properly design against the
-             current Workload Profiler architecture (per-model, Tenant-
-             aware) rather than the old per-usage-type SASC structure
-             it was originally designed against. Explicitly PAUSED, not
-             rejected — high confidence this gets built, just not today.
-Suggested phase: Dedicated design session before Phase 3 (post Controller
-             wiring). Lives at Fleet Aggregation level (Layers 2-3) and
-             per-Workload-Profiler-row level (Layer 1) — see Solution
-             Builder Spec Section 12.
+architecture discussion: Layer 2 (usage-type performance heatmap across
+GPUs), Layer 3 (usage mix optimiser, single vs mixed architecture
+recommendation). Partially built in old SASC (confirmed "partially
+working" per gap-analysis doc).
+Why deferred: requires seeing the WHOLE solution's model mix
+             simultaneously — only meaningful at S4 Fleet Aggregation
+             once a full set of Workload Profiler rows exists. Bottom-up/
+             Top-down/Crossover and per-row GPU comparison (Layer 1) are
+             NOT deferred — confirmed in scope, see Spec Section 13.
+Suggested phase: After Fleet Aggregation has real populated rows to
+             analyse — natural fit once Controller wiring (Phase A) is
+             further along. See Solution Builder Spec Section 13.
