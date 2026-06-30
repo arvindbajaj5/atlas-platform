@@ -1316,12 +1316,21 @@ var C = {
   },
 
   viewFullBOM: function() {
-    V.toast('Full BOM view — coming in Solution Builder L2','info')
+    if (!M.currentEng) { V.toast('Open an engagement first','warning'); return }
+    var url = CFG.baseUrl + 'tools/engagement-docket/workload-profiler-prototype.html'
+      + '?eng=' + encodeURIComponent(M.currentEng.id)
+      + '&docket=' + encodeURIComponent(M.currentDocketId)
+    window.open(url, '_blank')
   },
 
   generateL2: function() {
-    V.toast('L2 Detailed Sizing — launching Solution Builder','info')
-    // WHEN C WIRED: open Solution Builder with this engagement pre-loaded
+    if (!M.currentEng) { V.toast('Open an engagement first','warning'); return }
+    var url = CFG.baseUrl + 'tools/engagement-docket/workload-profiler-prototype.html'
+      + '?eng=' + encodeURIComponent(M.currentEng.id)
+      + '&docket=' + encodeURIComponent(M.currentDocketId)
+    window.open(url, '_blank')
+    // WHEN C WIRED: Workload Profiler reads ?eng=/&docket= params to
+    // pre-load this engagement's portfolio selection and requirements
   },
 
   exportROM: function() {
