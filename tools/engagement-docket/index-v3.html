@@ -16,18 +16,124 @@
     .src-btn.explicit  { border-color:var(--navy);  color:var(--navy);  background:rgba(0,40,112,.07);  }
     .src-btn.implicit  { border-color:var(--blue);  color:var(--blue);  background:rgba(28,56,245,.07); }
     .src-btn.suggested { border-color:var(--teal);  color:var(--teal);  background:rgba(0,178,144,.07); }
-    .agent-frag { border:1px solid var(--border); border-radius:var(--r); margin-bottom:var(--sp-3); overflow:hidden; }
-    .agent-hdr  { display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-3) var(--sp-4); background:var(--light); border-bottom:1px solid var(--border); }
-    .agent-name { font-weight:var(--fw-semi); font-size:var(--text-sm); flex:1; }
-    .agent-body { padding:var(--sp-3) var(--sp-4); }
-    .agent-status-running  { color:var(--amber); font-size:var(--text-xs); display:flex; align-items:center; gap:4px; }
-    .agent-status-done     { color:var(--teal);  font-size:var(--text-xs); }
-    .agent-status-waiting  { color:var(--mid);   font-size:var(--text-xs); }
     .pulse-item { padding:var(--sp-3); border:1px solid var(--border); border-radius:var(--r-sm); margin-bottom:var(--sp-2); }
     .val-map-cell { padding:var(--sp-2); border-radius:var(--r-sm); text-align:center; font-size:10px; font-weight:var(--fw-semi); }
     .val-map-high { background:rgba(0,178,144,.15); color:#065f46; }
     .val-map-med  { background:rgba(255,182,0,.15);  color:#92400e; }
     .val-map-low  { background:rgba(107,114,128,.1); color:var(--mid); }
+
+    /* ── Solution tab CSS (folded in from workload-profiler-prototype) ── */
+
+/* Header */
+.hdr{background:var(--navy);color:#fff;padding:var(--sp-4) var(--sp-6);display:flex;align-items:center;gap:var(--sp-3)}
+.hdr .brand{font-weight:900;letter-spacing:3px;font-size:18px}
+.hdr .brand span{color:var(--orange)}
+.hdr .crumb{font-size:12px;color:rgba(255,255,255,.65)}
+.hdr .crumb b{color:#fff;font-weight:600}
+
+/* Tabs */
+.tabbar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:var(--sp-5);background:#fff;border-radius:var(--r) var(--r) 0 0;padding:0 var(--sp-4)}
+.tabbtn{padding:var(--sp-3) var(--sp-4);font-size:13px;font-weight:600;color:var(--mid);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;font-family:var(--font);margin-bottom:-2px;transition:color .15s}
+.tabbtn.active{color:var(--navy);border-bottom-color:var(--orange)}
+.tabbtn .cnt{background:var(--light);color:var(--mid);font-size:10px;padding:1px 6px;border-radius:var(--r-full);margin-left:6px}
+.tabbtn.active .cnt{background:rgba(255,85,57,.12);color:var(--orange)}
+
+/* GPU default bar */
+.gpu-default{display:flex;align-items:center;gap:var(--sp-3);background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-4);font-size:12px}
+.gpu-default label{font-weight:700;color:var(--mid);text-transform:uppercase;font-size:10px;letter-spacing:.4px}
+.gpu-default select{padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:var(--font);font-size:12px}
+
+/* Table */
+.tablewrap{background:#fff;border-radius:var(--r);border:1px solid var(--border);overflow:hidden;margin-bottom:var(--sp-4)}
+table.wl{width:100%;border-collapse:collapse}
+table.wl thead th{background:var(--navy);color:#fff;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding:var(--sp-2) var(--sp-3);font-weight:700}
+table.wl thead th.num{text-align:right}
+table.wl tbody tr.row-main{cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s}
+table.wl tbody tr.row-main:hover{background:var(--light)}
+table.wl tbody tr.row-main.open{background:rgba(0,40,112,.03)}
+table.wl td{padding:var(--sp-2) var(--sp-3);font-size:12.5px}
+table.wl td.num{text-align:right;font-family:var(--font-mono);font-size:12px}
+table.wl td.name{font-weight:600;color:var(--dark)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--r-full);font-size:10px;font-weight:700}
+.badge-met{background:rgba(0,178,144,.12);color:var(--teal)}
+.badge-breach{background:rgba(255,85,57,.12);color:var(--orange)}
+.arrow{display:inline-block;transition:transform .25s;font-size:10px;color:var(--mid)}
+.row-main.open .arrow{transform:rotate(90deg)}
+.totals-row td{background:var(--light);font-weight:700;border-top:2px solid var(--border);padding:var(--sp-2) var(--sp-3)}
+
+/* Expand panel */
+.expand-row td{padding:0;border-bottom:1px solid var(--border)}
+.expand-inner{max-height:0;overflow:hidden;transition:max-height .35s ease}
+.expand-inner.open{max-height:2200px;transition:max-height .45s ease}
+.expand-pad{padding:var(--sp-5);background:#FAFBFC}
+
+.formgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-4);margin-bottom:var(--sp-4)}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px}
+.fg select,.fg input[type=number],.fg input[type=text]{padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:var(--font);font-size:12.5px;background:#fff}
+.fg select:focus,.fg input:focus{outline:none;border-color:var(--blue)}
+.fg-hint{font-size:10px;color:var(--mid)}
+
+.radiorow{display:flex;flex-direction:column;gap:6px}
+.radio-opt{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}
+.radio-opt input{accent-color:var(--navy)}
+
+.sliderwrap{display:flex;align-items:center;gap:var(--sp-3)}
+.sliderwrap input[type=range]{flex:1;accent-color:var(--navy);height:4px}
+.slider-val{font-size:16px;font-weight:900;color:var(--navy);min-width:64px;text-align:right;font-family:var(--font-mono)}
+
+.collapsible{margin-bottom:var(--sp-3)}
+.collapsible-hdr{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--navy);padding:6px 0;user-select:none}
+.collapsible-hdr .arrow{color:var(--navy)}
+.collapsible-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.collapsible-body.open{max-height:600px}
+.collapsible-body-pad{padding:var(--sp-3) 0 var(--sp-2)}
+
+.derived{background:var(--navy);color:#fff;border-radius:var(--r);padding:var(--sp-4);margin-top:var(--sp-2)}
+.derived-line{display:flex;gap:var(--sp-5);flex-wrap:wrap;font-size:11.5px;color:rgba(255,255,255,.85);margin-bottom:4px}
+.derived-line b{color:#fff}
+.sla-banner{margin-top:var(--sp-3);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-sm);font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:8px}
+.sla-met{background:rgba(0,178,144,.18);color:#5EEAD4}
+.sla-breach{background:rgba(255,85,57,.2);color:#FCA5A5}
+.sla-hint{font-weight:400;font-size:11px;opacity:.85;margin-left:auto}
+
+.rag-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(28,56,245,.1);color:var(--blue);padding:3px 10px;border-radius:var(--r-full);font-size:10px;font-weight:700;margin-left:8px}
+.tenant-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(0,178,144,.1);color:var(--teal);padding:2px 8px;border-radius:var(--r-full);font-size:10px;font-weight:600}
+.pool-badge-reserved{display:inline-flex;align-items:center;gap:3px;background:rgba(0,40,112,.1);color:var(--navy);padding:2px 7px;border-radius:var(--r-full);font-size:9px;font-weight:700}
+.pool-badge-open{display:inline-flex;align-items:center;gap:3px;background:rgba(255,182,0,.12);color:#92400E;padding:2px 7px;border-radius:var(--r-full);font-size:9px;font-weight:700}
+
+/* Tenant management panel */
+.tenant-mgmt{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:var(--sp-4);margin-bottom:var(--sp-4)}
+.tenant-mgmt-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-3)}
+.tenant-mgmt-title{font-size:13px;font-weight:700;color:var(--navy)}
+.tenant-chip-list{display:flex;flex-wrap:wrap;gap:8px}
+.tenant-chip{display:flex;align-items:center;gap:8px;padding:6px 12px;border:1.5px solid var(--border);border-radius:var(--r);font-size:11.5px;background:var(--light)}
+.tenant-chip b{color:var(--dark)}
+.tenant-chip .sec{font-size:9px;color:#fff;background:var(--navy);padding:1px 6px;border-radius:var(--r-full)}
+.add-tenant-btn{padding:5px 12px;border-radius:var(--r-sm);font-size:11px;font-weight:700;border:1.5px dashed var(--teal);background:rgba(0,178,144,.05);color:var(--teal);cursor:pointer;font-family:var(--font)}
+
+/* Reusable tenant block (within any expanded row) */
+.tenant-block{background:rgba(0,178,144,.04);border:1px solid rgba(0,178,144,.25);border-radius:var(--r);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-4)}
+.tenant-block-hdr{font-size:10px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
+.pool-toggle{display:flex;gap:0;margin-top:4px}
+.pool-btn{padding:6px 14px;font-size:11px;font-weight:600;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:var(--font)}
+.pool-btn:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm)}
+.pool-btn:last-child{border-radius:0 var(--r-sm) var(--r-sm) 0;border-left:none}
+.pool-btn.active-reserved{background:var(--navy);color:#fff;border-color:var(--navy)}
+.pool-btn.active-open{background:var(--amber);color:#78350F;border-color:var(--amber)}
+.mvb-toggle{display:flex;gap:0;margin-bottom:var(--sp-3)}
+.mvb-btn{padding:5px 14px;font-size:11px;font-weight:600;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:var(--font)}
+.mvb-btn:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm)}
+.mvb-btn:last-child{border-radius:0 var(--r-sm) var(--r-sm) 0}
+.mvb-btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.mvb-chart{background:#fff;border:1px solid var(--border);border-radius:var(--r-sm);padding:var(--sp-4);font-size:11px;color:var(--mid)}
+
+.actions-row{display:flex;justify-content:space-between;align-items:center;margin-top:var(--sp-4)}
+.btn{padding:7px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:var(--font)}
+.btn-ghost{background:var(--light);color:var(--dark)}
+.btn-danger-text{background:none;color:var(--orange);border:1.5px solid var(--orange)}
+.add-row{padding:var(--sp-3) var(--sp-4)}
+.add-btn{padding:8px 18px;border-radius:var(--r-sm);font-size:12px;font-weight:700;border:1.5px dashed var(--navy);background:rgba(0,40,112,.03);color:var(--navy);cursor:pointer;font-family:var(--font)}
   </style>
 </head>
 <body>
@@ -220,7 +326,14 @@ var M = {
   filterSidebar: function(q) {
     M.sidebarFilter = (q||'').toLowerCase()
     V.renderSidebar()
-  }
+  },
+
+  // ── Solution tab state (folded in from workload-profiler-prototype) ─────
+  defaultGpu:      'h200',
+  activeSolTab:    'uc',
+  openWlRows:      {},
+  workloadConfigs: { uc: [], maas: [], gpuaas: [], bmaas: [] },
+  tenantsList:     {}
 }
 
 // ── PORTFOLIO DEPENDENCY GRAPH ───────────────────────────────────────
@@ -355,6 +468,37 @@ var DUMMY = {
     { uc_id:'UC-AGR-005', name:'Horticulture Yield Prediction', domain:'Agriculture', score:94, reason:'Requirement: "apple crop disease detection and yield prediction"' },
     { uc_id:'UC-HLT-003', name:'Remote Health Diagnostics',     domain:'Health',      score:71, reason:'TSAP archetype — typical health UC for state governments' },
   ],
+  workloadConfigs: {
+    'ENG-HP-001': {
+      uc: [
+        { id:'uc1', name:'GLOF Early Warning System', ucLib:'glof', gpu:null,
+          domain:'geospatial', model:'sarvam-2b', ucType:'rag', ragLatencyBudget:300,
+          deployMode:'production', dau:500, reqPerDay:12, peakMult:3,
+          inputTok:4096, outputTok:800, precision:'int4', slaTier:'tier1', ttftTarget:200,
+          haTier:'2n', drType:'active_active', agentic:false, steps:1, toolWait:0,
+          tenant:'state-it-dept', poolType:'reserved', tenure:'24', mvbView:'uc' },
+        { id:'uc2', name:'Crop Disease Detection', ucLib:'crop', gpu:null,
+          domain:'agriculture', model:'llama-3.1-8b', ucType:'vision', ragLatencyBudget:0,
+          deployMode:'production', dau:50000, reqPerDay:3, peakMult:4,
+          inputTok:1024, outputTok:300, precision:'int4', slaTier:'tier2', ttftTarget:2000,
+          haTier:'n1', drType:'none', agentic:false, steps:1, toolWait:0,
+          tenant:'agri-dept', poolType:'open', tenure:null, mvbView:'uc' }
+      ],
+      maas: [
+        { id:'maas1', name:'Llama-3.3-70B — Open Pool', model:'llama-3.3-70b', gpu:'b200',
+          precision:'int4', dau:50000, commercialSla:'bronze',
+          tenant:null, poolType:'open', tenure:null, mvbView:'maas' },
+        { id:'maas2', name:'Llama-3.3-70B — State IT Reservation', model:'llama-3.3-70b', gpu:'b200',
+          precision:'int4', dau:8000, commercialSla:'gold',
+          tenant:'state-it-dept', poolType:'reserved', tenure:'24', mvbView:'maas' }
+      ],
+      gpuaas: [
+        { id:'gpuaas1', name:'Dedicated GPU Block — Health Dept', gpu:'h200',
+          gpuCount:16, tenant:'health-dept', poolType:'reserved', tenure:'36', mvbView:'fleet' }
+      ],
+      bmaas: []
+    }
+  },
   intelRun: { lastRun:'2026-06-25T09:14:00Z', cost:0.072, items:47, stale:2, total:10 },
 
   // Solution agent fragments (dummy output — shows what agents will produce)
@@ -379,6 +523,121 @@ function loadDummy() {
 // VIEW — pure render. Reads M only. Never writes. Returns HTML strings.
 // REFACTOR-MARKER: extract to shared/atlas-components.js
 // ═══════════════════════════════════════════════════════════════════════
+
+
+// ── Solution tab lookups (folded in from workload-profiler-prototype) ─────
+var GPU_LABELS = { h200:'H200 SXM', b200:'B200 SXM', gb200:'GB200 NVL72', l40s:'L40S' }
+var UC_LIB = { glof:'GLOF Early Warning System (UC Library)', crop:'Crop Disease Detection (UC Library)', adhoc:'+ Define ad-hoc' }
+var DOMAINS = { geospatial:'Geospatial', agriculture:'Agriculture', health:'Health', governance:'Governance', education:'Education', finance:'Finance', defence:'Defence' }
+// Confirmed MaaS model catalogue — clean licensing, n/n-2 versioning.
+// REFACTOR-MARKER: Phase A polish — replace with full 103-row model_catalogue
+// via atlasDB, filtered/grouped by usage type, when Controller wiring lands.
+var MODELS = {
+  'deepseek-coder-v2-lite-16b':'DeepSeek-Coder-V2 Lite 16B',
+  'deepseek-coder-v2-236b':'DeepSeek-Coder-V2 236B',
+  'qwen2.5-coder-32b':'Qwen2.5-Coder 32B',
+  'qwen2.5-coder-72b':'Qwen2.5-Coder 72B',
+  'llama-3.1-8b':'Llama 3.1 8B',
+  'llama-3.3-70b':'Llama 3.3 70B',
+  'llama-3.1-405b':'Llama 3.1 405B',
+  'mistral-small-3.1-24b':'Mistral Small 3.1 24B',
+  'mistral-large-2-123b':'Mistral Large 2 123B',
+  'qwen2.5-7b':'Qwen2.5 7B',
+  'qwen2.5-32b':'Qwen2.5 32B',
+  'qwen2.5-72b':'Qwen2.5 72B',
+  'sarvam-whisper-s':'Sarvam Whisper S',
+  'sarvam-whisper-m':'Sarvam Whisper M',
+  'sarvam-whisper-l':'Sarvam Whisper Large',
+  'whisper-large-v3':'Whisper Large-v3 (MIT)',
+  'sarvam-2b':'Sarvam-2B',
+  'sarvam-m':'Sarvam-M',
+}
+var UC_TYPES = {
+  chatbot:'Chatbot / Conversational', text:'Text Processing', rag:'RAG / Knowledge Retrieval',
+  vision:'Vision / Multimodal', agentic:'Agentic / Tool-use', batch:'Batch Processing', voice:'Voice / Audio'
+}
+var SLA_LABELS = { tier1:'Tier 1 — Interactive (<200ms)', tier2:'Tier 2 — Analytical (<2s)', tier3:'Tier 3 — Async Batch' }
+var HA_TIERS = { none:'None', n1:'N+1 (standard)', n2:'2N (mission-critical)' }
+var DR_TYPES = { none:'None', warm:'Warm Standby (+50% DR site)', active_active:'Active-Active (+100% DR site)' }
+var CHARGEOUT_LABELS = { commercial:'Commercial', cost_recovery:'Cost Recovery', subsidised:'Subsidised', zero:'Zero (free)' }
+var TENURE_LABELS = { '12':'12 months', '24':'24 months', '36':'36 months', 'custom':'Custom' }
+
+// Default tenant master data — seeds M.tenantsList on first engagement open
+var DEFAULT_TENANTS = {
+  'state-it-dept': { name:'State IT Department', secTier:'S2', chargeout:'cost_recovery' },
+  'agri-dept':     { name:'Agriculture Department', secTier:'S1', chargeout:'subsidised' },
+  'health-dept':   { name:'Health Department', secTier:'S2', chargeout:'cost_recovery' },
+  'public':        { name:'Public / Citizen-facing', secTier:'S1', chargeout:'zero' },
+}
+
+// ── Solution tab sizing — calls REAL SizingEngine, not dummy math ─────────
+// (workload-profiler-prototype.html had placeholder math here — replaced
+// during fold-in since shared/sasc-sizing.js + capacityForGPU() now exist)
+function sizeUCWorkload(wl) {
+  var gpuId = wl.gpu || M.defaultGpu
+  if (window.SizingEngine && SizingEngine.ready) {
+    var r = SizingEngine.sizeUC({
+      model_id: wl.model, dau: wl.dau, requests_per_day: wl.reqPerDay,
+      peak_multiplier: wl.peakMult, avg_input_tokens: wl.inputTok,
+      avg_output_tokens: wl.outputTok, precision: (wl.precision||'int4').toUpperCase(),
+      ttft_sla_ms: wl.ttftTarget, ha_required: wl.haTier !== 'none', dr_type: wl.drType
+    }, gpuId)
+    if (r && !r.error) {
+      return {
+        gpu: gpuId, p95RPS: r.peak_rps, concurrent: r.peak_concurrent,
+        baseGpus: r.base_gpus, buffers: r.total_gpus - r.base_gpus, total: r.total_gpus,
+        powerKw: r.power_kw, racks: r.total_gpus <= 72 ? '1 rack (partial)' : Math.ceil(r.total_gpus/72) + ' racks',
+        ttftEstimate: r.ttft_sla_ms, slaMet: true, margin: 0, notes: r.notes
+      }
+    }
+  }
+  // REFACTOR-MARKER: fallback placeholder — only used if engine not yet
+  // init()'d (no Supabase config) or returns an error. Keeps the V usable
+  // for visual inspection without a live DB connection.
+  var avgRPS = (wl.dau * wl.reqPerDay) / 86400
+  var p95RPS = avgRPS * wl.peakMult * 1.5
+  var concurrent = Math.max(1, Math.ceil(p95RPS * (wl.ttftTarget/1000)))
+  var tpI = wl.precision === 'int4' ? 2 : wl.precision === 'int8' ? 4 : 8
+  var baseGpus = Math.max(1, Math.ceil(concurrent / 4) * tpI)
+  var buffers = Math.ceil(baseGpus * 0.65)
+  var total = baseGpus + buffers
+  var powerKw = Math.round(total * 0.7 * 10) / 10
+  var ttftEstimate = wl.ttftTarget
+  return { gpu: gpuId, p95RPS: Math.round(p95RPS*100)/100, concurrent: concurrent,
+    baseGpus: baseGpus, buffers: buffers, total: total, powerKw: powerKw,
+    racks: total <= 72 ? '1 rack (partial)' : Math.ceil(total/72) + ' racks',
+    ttftEstimate: ttftEstimate, slaMet: true, margin: 0 }
+}
+function sizeMaasWorkload(wl) {
+  var gpuId = wl.gpu || M.defaultGpu
+  if (window.SizingEngine && SizingEngine.ready) {
+    var r = SizingEngine.sizeMaaS({
+      model_id: wl.model, dau: wl.dau, precision: (wl.precision||'int4').toUpperCase(),
+      pool_type: wl.poolType, commercial_sla: wl.commercialSla
+    }, gpuId)
+    if (r && !r.error) {
+      return {
+        gpu: gpuId, throughput: r.peak_rps ? Math.round(r.peak_rps * (wl.outputTok||500)) : 0,
+        instances: r.instances || 1, baseGpus: r.base_gpus, buffers: r.total_gpus - r.base_gpus,
+        total: r.total_gpus, powerKw: r.power_kw,
+        racks: r.total_gpus <= 72 ? '1 rack' : Math.ceil(r.total_gpus/72) + ' racks',
+        cpst: '0.0021', commercialSla: r.commercial_sla, notes: r.notes
+      }
+    }
+  }
+  // REFACTOR-MARKER: fallback placeholder — see sizeUCWorkload note above
+  var avgRPS = wl.dau / 86400 * 8
+  var throughput = Math.round(avgRPS * 4000)
+  var instances = Math.max(1, Math.ceil(throughput / 32000))
+  var modelSize = (wl.model||'').includes('405b') || (wl.model||'').includes('large') ? 'advanced'
+    : (wl.model||'').includes('70b') || (wl.model||'').includes('32b') ? 'mid' : 'basic'
+  var baseGpus = instances * (modelSize === 'advanced' ? 8 : modelSize === 'mid' ? 4 : 2)
+  var buffers = Math.ceil(baseGpus * 0.5)
+  var total = baseGpus + buffers
+  var powerKw = Math.round(total * 0.85 * 10) / 10
+  return { gpu: gpuId, throughput: throughput, instances: instances, baseGpus: baseGpus,
+    buffers: buffers, total: total, powerKw: powerKw, racks: total<=72?'1 rack':Math.ceil(total/72)+' racks', cpst: '0.0021' }
+}
 
 var V = {
 
@@ -744,87 +1003,34 @@ var V = {
 
   // ── TAB 4: SOLUTION (agent UX) ────────────────────────────────────────
   renderSolutionTab: function() {
-    var sel      = M.portfolioItems
-    var frags    = DUMMY.agentFragments
-    var html     = ''
+    var sel = M.portfolioItems
 
-    // Check if portfolio is selected
     if (!sel.length) {
-      html += '<div class="card"><div class="card-title">Solution Building</div>'
+      var html = '<div class="card"><div class="card-title">Solution Building</div>'
       html += '<div class="warn-panel"><div class="warn-title">⚠ No portfolio selected</div>'
-      html += '<div class="warn-body">Select items in the Portfolio tab first. The solution agents will then size and price each component.</div></div>'
+      html += '<div class="warn-body">Select items in the Portfolio tab first, then size each workload here.</div></div>'
       html += '<button class="btn btn-primary" onclick="C.switchTab(\'portfolio\')">Go to Portfolio &#8594;</button>'
       html += '</div>'
       return html
     }
 
-    // Agent progress header
-    var done    = Object.values(frags).filter(function(f){ return f.status==='done' }).length
-    var running = Object.values(frags).filter(function(f){ return f.status==='running' }).length
-    var total   = Object.keys(frags).length
-
-    html += '<div class="card">'
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-4)">'
-    html += '<div><div class="card-title" style="margin-bottom:4px">Solution Building — Agent Progress</div>'
-    html += '<div class="card-sub" style="margin:0">' + done + ' of ' + total + ' agents complete' + (running ? ' · ' + running + ' running…' : '') + '</div></div>'
-    html += '<div style="display:flex;gap:var(--sp-2)">'
-    html += '<button class="btn btn-ghost btn-sm" onclick="C.rerunAgents()">&#8635; Rebuild</button>'
-    html += '<button class="btn btn-primary btn-sm" onclick="C.viewFullBOM()">View Full BOM &#8594;</button>'
-    html += '</div></div>'
-
-    // Agent fragments
-    Object.keys(frags).forEach(function(agentName) {
-      var f = frags[agentName]
-      html += '<div class="agent-frag">'
-      html += '<div class="agent-hdr">'
-      html += '<div class="agent-name">' + agentName + ' Agent</div>'
-      if (f.status === 'done') {
-        html += '<span class="agent-status-done">✓ Complete · ' + f.bom_lines + ' BOM lines · [' + f.confidence + ']</span>'
-        html += '<button class="btn btn-ghost btn-sm" onclick="C.reviewFragment(\'' + agentName + '\')">Review</button>'
-        html += '<button class="btn btn-ghost btn-sm" onclick="C.overrideFragment(\'' + agentName + '\')">Override</button>'
-      } else if (f.status === 'running') {
-        html += '<span class="agent-status-running"><span class="spinner"></span>Running…</span>'
-      } else {
-        html += '<span class="agent-status-waiting">Waiting for dependencies</span>'
-      }
-      html += '</div>'
-      if (f.status !== 'waiting') {
-        html += '<div class="agent-body"><div style="font-size:var(--text-sm);color:var(--dark)">' + atlasDB.esc(f.summary) + '</div></div>'
-      }
-      html += '</div>'
-    })
+    // GPU default + tab shell — actual UC/MaaS/GPUaaS content renders into
+    // #soltabbar/#soltabbody by V.renderSolTabs()/renderSolTabBody(), called
+    // from C.switchTab() right after this HTML is inserted into the DOM
+    // (see Solution Builder Spec Section 5 — folded in from
+    // workload-profiler-prototype.html, single Docket M/V/C, no separate tool)
+    var html = '<div class="gpu-default" style="display:flex;align-items:center;gap:var(--sp-3);background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-4);font-size:12px">'
+    html += '<label style="font-weight:700;color:var(--mid);text-transform:uppercase;font-size:10px;letter-spacing:.4px">Engagement default GPU</label>'
+    html += '<select id="defaultGpu" onchange="C.setDefaultGpu(this.value)" style="padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:var(--font);font-size:12px">'
+    Object.keys(GPU_LABELS).forEach(function(k){ html += '<option value="'+k+'"'+(M.defaultGpu===k?' selected':'')+'>'+GPU_LABELS[k]+'</option>' })
+    html += '</select>'
+    html += '<span style="font-size:11px;color:var(--mid)">Pre-fills every new workload row — override per row anytime</span>'
     html += '</div>'
-
-    // Quick ROM summary
-    html += '<div class="card">'
-    html += '<div class="card-title">Early ROM (L1 — ±30-40%)</div>'
-    html += '<div class="card-sub">Rule-of-thumb estimates. Refine in L2 Detailed Solution.</div>'
-    var romLines = [
-      { cat:'Hardware',          val:'~$45-60M',   status:'E' },
-      { cat:'AI Platform',       val:'~$8-12M',    status:'E' },
-      { cat:'Civil works (MDC)', val:'~$15-25M',   status:'E' },
-      { cat:'Services delivery', val:'~$12-18M',   status:'E' },
-      { cat:'People',            val:'~$4-6M/yr',  status:'E' },
-      { cat:'Managed services',  val:'~$3-5M/yr',  status:'E' },
-    ]
-    html += '<table class="tbl"><thead><tr><th>Category</th><th>ROM Estimate</th><th>Status</th></tr></thead><tbody>'
-    romLines.forEach(function(r) {
-      html += '<tr><td>' + r.cat + '</td><td class="num" style="font-weight:var(--fw-semi)">' + r.val + '</td>'
-      html += '<td><span class="badge badge-bom-' + r.status + '">[' + r.status + '] Estimated</span></td></tr>'
-    })
-    html += '</tbody></table>'
-    html += '<div style="margin-top:var(--sp-3);display:flex;gap:var(--sp-3);align-items:center">'
-    html += '<div style="font-size:var(--text-lg);font-weight:var(--fw-black);color:var(--navy)">~$84-121M capex + ~$7-11M/yr opex</div>'
-    html += '<span class="badge badge-amber" style="font-size:10px">±35% ROM</span>'
-    html += '</div>'
-    html += '<div style="margin-top:var(--sp-3);display:flex;gap:var(--sp-2)">'
-    html += '<button class="btn btn-primary" onclick="C.generateL2()">Run L2 Detailed Sizing</button>'
-    html += '<button class="btn btn-outline" onclick="C.exportROM()">Export ROM Document</button>'
-    html += '</div>'
-    html += '</div>'
-
+    html += '<div id="soltabbar" style="display:flex;border-bottom:2px solid var(--border);margin-bottom:var(--sp-4);background:var(--white);border-radius:var(--r) var(--r) 0 0"></div>'
+    html += '<div id="soltabbody"></div>'
     return html
   },
+
 
   // ── TAB 5: ACTIONS ────────────────────────────────────────────────────
   renderActionsTab: function() {
@@ -902,6 +1108,399 @@ var V = {
     document.getElementById('toast-container').appendChild(el)
     setTimeout(function(){ el.remove() }, 3000)
   },
+
+  // ── Solution tab render functions (folded in from workload-profiler-prototype) ──
+  renderSolTabs: function() {
+    var tabs = [
+      {key:'uc', label:'UCs', count:M.workloadConfigs.uc.length},
+      {key:'maas', label:'MaaS', count:M.workloadConfigs.maas.length},
+      {key:'gpuaas', label:'GPUaaS', count:M.workloadConfigs.gpuaas.length},
+      {key:'bmaas', label:'BMaaS', count:0},
+    ]
+    var html = ''
+    tabs.forEach(function(t){
+      html += '<button class="tabbtn'+(M.activeSolTab===t.key?' active':'')+'" onclick="C.switchSolTab(\''+t.key+'\')">'
+        + t.label + '<span class="cnt">'+t.count+'</span></button>'
+    })
+    document.getElementById('soltabbar').innerHTML = html
+  },
+
+  renderSolTabBody: function() {
+    var el = document.getElementById('soltabbody')
+    el.innerHTML = V.renderTenantMgmt()
+    if (M.activeSolTab === 'uc')     { el.innerHTML += V.renderUCTab(); return }
+    if (M.activeSolTab === 'maas')   { el.innerHTML += V.renderMaasTab(); return }
+    if (M.activeSolTab === 'gpuaas') { el.innerHTML += V.renderGpuaasTab(); return }
+    el.innerHTML += '<div class="tablewrap"><div style="padding:40px;text-align:center;color:var(--mid)">'
+      + 'No items in this category yet. Select the corresponding portfolio item in the Portfolio tab first.</div></div>'
+  },
+
+  renderTenantMgmt: function() {
+    var h = '<div class="tenant-mgmt">'
+    h += '<div class="tenant-mgmt-hdr"><div class="tenant-mgmt-title">Tenants — defined once, used across UC / MaaS / GPUaaS / BMaaS</div>'
+    h += '<button class="add-tenant-btn" onclick="C.addTenant()">+ Define New Tenant</button></div>'
+    h += '<div class="tenant-chip-list">'
+    Object.keys(M.tenantsList).forEach(function(k){
+      var t = M.tenantsList[k]
+      h += '<div class="tenant-chip"><b>'+t.name+'</b><span class="sec">'+t.secTier+'</span><span style="color:var(--mid)">'+CHARGEOUT_LABELS[t.chargeout]+'</span></div>'
+    })
+    h += '</div></div>'
+    return h
+  },
+
+  renderGpuaasTab: function() {
+    var rows = M.workloadConfigs.gpuaas, totalGpus = 0
+    var html = '<div class="tablewrap"><table class="wl"><thead><tr>'
+      + '<th>Block</th><th>GPU</th><th class="num">GPUs</th><th>Tenant</th><th></th></tr></thead><tbody>'
+    rows.forEach(function(wl) {
+      totalGpus += wl.gpuCount
+      var isOpen = !!M.openWlRows[wl.id]
+      var t = wl.tenant ? M.tenantsList[wl.tenant] : null
+      html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
+        + '<td class="name">'+wl.name+'</td>'
+        + '<td>'+GPU_LABELS[wl.gpu]+'</td>'
+        + '<td class="num">'+wl.gpuCount+'</td>'
+        + '<td>'+(t?'<span class="tenant-badge">'+t.name+'</span> <span class="pool-badge-'+wl.poolType+'">'+(wl.poolType==='reserved'?'&#128274; Reserved':'&#9889; Open'):'—')+'</td>'
+        + '<td><span class="arrow">&#9654;</span></td></tr>'
+      html += '<tr class="expand-row"><td colspan="5"><div class="expand-inner'+(isOpen?' open':'')+'">'
+      if (isOpen) {
+        html += '<div class="expand-pad">'
+        html += '<div class="formgrid" style="grid-template-columns:1fr 1fr"><div class="fg"><label>GPU</label><select onchange="C.updGpuaas(\''+wl.id+'\',\'gpu\',this.value)">'
+        Object.keys(GPU_LABELS).forEach(function(k2){ html += '<option value="'+k2+'"'+(wl.gpu===k2?' selected':'')+'>'+GPU_LABELS[k2]+'</option>' })
+        html += '</select></div><div class="fg"><label>GPU Count</label><input type="number" value="'+wl.gpuCount+'" onchange="C.updGpuaas(\''+wl.id+'\',\'gpuCount\',+this.value)"></div></div>'
+        html += V.renderTenantBlock(wl, 'gpuaas')
+        html += '<div class="actions-row"><button class="btn btn-danger-text" onclick="C.removeGpuaas(\''+wl.id+'\')">Remove</button><button class="btn btn-ghost" onclick="C.toggleRow(\''+wl.id+'\')">&#9650; Collapse</button></div>'
+        html += '</div>'
+      }
+      html += '</div></td></tr>'
+    })
+    html += '<tr class="totals-row"><td>TOTALS</td><td></td><td class="num">'+totalGpus+'</td><td colspan="2"></td></tr>'
+    html += '</tbody></table></div>'
+    html += '<div class="tablewrap add-row"><button class="add-btn" onclick="C.addGpuaas()">+ Add GPUaaS Block</button></div>'
+    return html
+  },
+
+  renderUCTab: function() {
+    var rows = M.workloadConfigs.uc, totalGpus = 0, totalPower = 0
+    var html = '<div class="tablewrap"><table class="wl"><thead><tr>'
+      + '<th>Use Case</th><th>Domain</th><th>Tenant</th><th class="num">DAU</th><th>GPU</th><th class="num">GPUs</th>'
+      + '<th class="num">Power</th><th>SLA</th><th></th></tr></thead><tbody>'
+
+    rows.forEach(function(wl) {
+      var sz = sizeUCWorkload(wl)
+      totalGpus += sz.total; totalPower += sz.powerKw
+      var isOpen = !!M.openWlRows[wl.id]
+      html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
+        + '<td class="name">'+wl.name+(wl.ucType==='rag'?'<span class="rag-badge">&#128269; RAG</span>':'')+'</td>'
+        + '<td>'+(DOMAINS[wl.domain]||'—')+'</td>'
+        + '<td>'+(wl.tenant ? '<span class="tenant-badge">'+M.tenantsList[wl.tenant].name+'</span> <span class="pool-badge-'+wl.poolType+'">'+(wl.poolType==="reserved"?"&#128274; Reserved":"&#9889; Open")+'</span>' : '<span style="color:var(--mid);font-size:10px">Open Pool</span>') + '</td>'
+        + '<td class="num">'+wl.dau.toLocaleString()+'</td>'
+        + '<td>'+GPU_LABELS[sz.gpu]+'</td>'
+        + '<td class="num">'+sz.total+'</td>'
+        + '<td class="num">'+sz.powerKw+'kW</td>'
+        + '<td><span class="badge '+(sz.slaMet?'badge-met':'badge-breach')+'">'+(sz.slaMet?'✓ Met':'✗ Breach')+'</span></td>'
+        + '<td><span class="arrow">&#9654;</span></td>'
+        + '</tr>'
+      html += '<tr class="expand-row"><td colspan="9"><div class="expand-inner'+(isOpen?' open':'')+'" id="exp-'+wl.id+'">'
+        + (isOpen ? V.renderUCForm(wl, sz) : '') + '</div></td></tr>'
+    })
+
+    html += '<tr class="totals-row"><td>TOTALS</td><td></td><td></td><td></td>'
+      + '<td class="num">'+totalGpus+'</td><td class="num">'+Math.round(totalPower*10)/10+'kW</td><td colspan="2"></td></tr>'
+    html += '</tbody></table></div>'
+    html += '<div class="tablewrap add-row"><button class="add-btn" onclick="C.addUC()">+ Add UC Workload</button></div>'
+    return html
+  },
+
+  renderUCForm: function(wl, sz) {
+    var h = '<div class="expand-pad">'
+
+    // Row 0: UC Library, Domain, Tenant
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>UC Library Match</label><select onchange="C.updUC(\''+wl.id+'\',\'ucLib\',this.value)">'
+    Object.keys(UC_LIB).forEach(function(k){ h += '<option value="'+k+'"'+(wl.ucLib===k?' selected':'')+'>'+UC_LIB[k]+'</option>' })
+    h += '</select></div>'
+
+    h += '<div class="fg"><label>Domain</label><select onchange="C.updUC(\''+wl.id+'\',\'domain\',this.value)">'
+    Object.keys(DOMAINS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.domain===k?' selected':'')+'>'+DOMAINS[k]+'</option>' })
+    h += '</select></div>'
+    h += '<div></div>'
+    h += '</div>'
+
+    h += V.renderTenantBlock(wl, 'uc')
+
+    // Row 0b: AI Model, UC Type, GPU
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>AI Model</label><select onchange="C.updUC(\''+wl.id+'\',\'model\',this.value)">'
+    Object.keys(MODELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.model===k?' selected':'')+'>'+MODELS[k]+'</option>' })
+    h += '</select></div>'
+
+    h += '<div class="fg"><label>UC Type</label><select onchange="C.updUC(\''+wl.id+'\',\'ucType\',this.value)">'
+    Object.keys(UC_TYPES).forEach(function(k){ h += '<option value="'+k+'"'+(wl.ucType===k?' selected':'')+'>'+UC_TYPES[k]+'</option>' })
+    h += '</select></div>'
+
+    h += '<div class="fg"><label>GPU</label><select onchange="C.updUC(\''+wl.id+'\',\'gpu\',this.value)">'
+    h += '<option value="">(default: '+GPU_LABELS[M.defaultGpu]+')</option>'
+    Object.keys(GPU_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.gpu===k?' selected':'')+'>'+GPU_LABELS[k]+'</option>' })
+    h += '</select></div>'
+    h += '</div>'
+
+    // RAG latency budget — only shown when UC Type = rag
+    if (wl.ucType === 'rag') {
+      h += '<div class="formgrid" style="grid-template-columns:1fr 2fr;background:rgba(28,56,245,.04);padding:10px;border-radius:6px;margin-bottom:16px">'
+      h += '<div class="fg"><label>Retrieval Latency Budget (ms)</label><input type="number" value="'+wl.ragLatencyBudget+'" onchange="C.updUC(\''+wl.id+'\',\'ragLatencyBudget\',+this.value)"></div>'
+      h += '<div class="fg-hint" style="align-self:center">&#128269; RAG-enabled — this latency is subtracted from TTFT target before the generation budget is calculated, so the SLA banner reflects the true generation-only budget.</div>'
+      h += '</div>'
+    }
+
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>Deployment Mode</label><div class="radiorow">'
+    h += '<label class="radio-opt"><input type="radio" name="dm-'+wl.id+'" '+(wl.deployMode==='production'?'checked':'')+' onchange="C.updUC(\''+wl.id+'\',\'deployMode\',\'production\')"> Production (on-prem)</label>'
+    h += '<label class="radio-opt"><input type="radio" name="dm-'+wl.id+'" '+(wl.deployMode==='pilot'?'checked':'')+' onchange="C.updUC(\''+wl.id+'\',\'deployMode\',\'pilot\')"> Pilot/Validation (API)</label>'
+    h += '</div></div>'
+
+    h += '<div class="fg"><label>HA / Failover</label><select onchange="C.updUC(\''+wl.id+'\',\'haTier\',this.value)">'
+    Object.keys(HA_TIERS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.haTier===k?' selected':'')+'>'+HA_TIERS[k]+'</option>' })
+    h += '</select></div>'
+
+    h += '<div class="fg"><label>DR Type</label><select onchange="C.updUC(\''+wl.id+'\',\'drType\',this.value)">'
+    Object.keys(DR_TYPES).forEach(function(k){ h += '<option value="'+k+'"'+(wl.drType===k?' selected':'')+'>'+DR_TYPES[k]+'</option>' })
+    h += '</select></div>'
+    h += '</div>'
+
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>DAU</label><div class="sliderwrap">'
+      + '<input type="range" min="100" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" '
+      + 'oninput="C.updUCSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
+      + '<span class="slider-val" id="dauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div></div>'
+
+    h += '<div class="fg"><label>Requests / User / Day</label><input type="number" value="'+wl.reqPerDay+'" onchange="C.updUC(\''+wl.id+'\',\'reqPerDay\',+this.value)"></div>'
+
+    h += '<div class="fg"><label>Peak Multiplier</label><div class="sliderwrap">'
+      + '<input type="range" min="1" max="10" step="0.5" value="'+wl.peakMult+'" oninput="C.updUCSlider(\''+wl.id+'\',\'peakMult\',+this.value)">'
+      + '<span class="slider-val" id="pmval-'+wl.id+'">'+wl.peakMult+'x</span></div></div>'
+    h += '</div>'
+
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>Avg Input Tokens</label><input type="number" value="'+wl.inputTok+'" onchange="C.updUC(\''+wl.id+'\',\'inputTok\',+this.value)"></div>'
+    h += '<div class="fg"><label>Avg Output Tokens</label><input type="number" value="'+wl.outputTok+'" onchange="C.updUC(\''+wl.id+'\',\'outputTok\',+this.value)"></div>'
+    h += '<div class="fg"><label>Precision</label><select onchange="C.updUC(\''+wl.id+'\',\'precision\',this.value)">'
+    ;['int4','int8','fp16','fp8'].forEach(function(p){ h += '<option value="'+p+'"'+(wl.precision===p?' selected':'')+'>'+p.toUpperCase()+'</option>' })
+    h += '</select></div>'
+    h += '</div>'
+
+    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr">'
+    h += '<div class="fg"><label>SLA Tier</label><select onchange="C.updUC(\''+wl.id+'\',\'slaTier\',this.value)">'
+    Object.keys(SLA_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.slaTier===k?' selected':'')+'>'+SLA_LABELS[k]+'</option>' })
+    h += '</select></div>'
+    h += '<div class="fg"><label>TTFT Target (ms)</label><input type="number" value="'+wl.ttftTarget+'" onchange="C.updUC(\''+wl.id+'\',\'ttftTarget\',+this.value)"></div>'
+    h += '</div>'
+
+    // Agentic collapsible
+    h += '<div class="collapsible">'
+    h += '<div class="collapsible-hdr" onclick="C.toggleCollapsible(this)"><span class="arrow">&#9654;</span> Agentic workflow (optional)</div>'
+    h += '<div class="collapsible-body"><div class="collapsible-body-pad"><div class="formgrid" style="grid-template-columns:1fr 1fr">'
+    h += '<div class="fg"><label>Steps</label><input type="number" value="'+wl.steps+'" onchange="C.updUC(\''+wl.id+'\',\'steps\',+this.value)"></div>'
+    h += '<div class="fg"><label>Tool Wait (ms)</label><input type="number" value="'+wl.toolWait+'" onchange="C.updUC(\''+wl.id+'\',\'toolWait\',+this.value)"></div>'
+    h += '</div></div></div></div>'
+
+    // Derived sizing
+    h += '<div class="derived">'
+    h += '<div class="derived-line">P95 RPS: <b>'+sz.p95RPS+'</b> &nbsp; Concurrent: <b>'+sz.concurrent+'</b> &nbsp; GPU: <b>'+GPU_LABELS[sz.gpu]+'</b></div>'
+    h += '<div class="derived-line">Base: <b>'+sz.baseGpus+'</b> GPUs &nbsp; +Buffers: <b>'+sz.buffers+'</b> &nbsp; Total: <b>'+sz.total+'</b> GPUs</div>'
+    h += '<div class="derived-line">= <b>'+sz.racks+'</b> &nbsp;&middot;&nbsp; <b>'+sz.powerKw+'kW</b></div>'
+    h += '<div class="sla-banner '+(sz.slaMet?'sla-met':'sla-breach')+'">'
+      + (sz.slaMet ? '&#10003; SLA MET' : '&#10007; SLA BREACH') + ' — TTFT '+sz.ttftEstimate+'ms vs '+wl.ttftTarget+'ms target ('+sz.margin+'% '+(sz.slaMet?'margin':'over')+')'
+      + (sz.slaMet ? '' : '<span class="sla-hint">Try: lower precision impact, add GPU, raise SLA tier</span>')
+      + '</div>'
+    h += '</div>'
+
+    // Make vs Buy collapsible
+    h += '<div class="collapsible" style="margin-top:var(--sp-3)">'
+    h += '<div class="collapsible-hdr" onclick="C.toggleCollapsible(this)"><span class="arrow">&#9654;</span> Make vs Buy — On-prem vs API</div>'
+    h += '<div class="collapsible-body"><div class="collapsible-body-pad">'
+    h += V.renderMvBChart(wl, 'uc')
+    h += '</div></div></div>'
+
+    h += '<div class="actions-row">'
+    h += '<button class="btn btn-danger-text" onclick="C.removeUC(\''+wl.id+'\')">Remove</button>'
+    h += '<button class="btn btn-ghost" onclick="C.toggleRow(\''+wl.id+'\')">&#9650; Collapse</button>'
+    h += '</div>'
+
+    h += '</div>'
+    return h
+  },
+
+  renderMaasTab: function() {
+    var rows = M.workloadConfigs.maas, totalGpus = 0, totalPower = 0
+    var html = '<div class="tablewrap"><table class="wl"><thead><tr>'
+      + '<th>Pool</th><th>Model</th><th>Tenant</th><th class="num">DAU</th><th>GPU</th><th class="num">GPUs</th>'
+      + '<th class="num">Power</th><th class="num">CPST</th><th></th></tr></thead><tbody>'
+
+    rows.forEach(function(wl) {
+      var sz = sizeMaasWorkload(wl)
+      totalGpus += sz.total; totalPower += sz.powerKw
+      var isOpen = !!M.openWlRows[wl.id]
+      var t = wl.tenant ? M.tenantsList[wl.tenant] : null
+      html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
+        + '<td class="name">'+wl.name+'</td>'
+        + '<td>'+(MODELS[wl.model]||wl.model)+'</td>'
+        + '<td>'+(t ? '<span class="tenant-badge">'+t.name+'</span> <span class="pool-badge-'+wl.poolType+'">'+(wl.poolType==='reserved'?'&#128274; Reserved':'&#9889; Open'):'<span style="color:var(--mid);font-size:10px">Open Pool</span>')+'</td>'
+        + '<td class="num">'+wl.dau.toLocaleString()+'</td>'
+        + '<td>'+GPU_LABELS[sz.gpu]+'</td>'
+        + '<td class="num">'+sz.total+'</td>'
+        + '<td class="num">'+sz.powerKw+'kW</td>'
+        + '<td class="num">$'+sz.cpst+'</td>'
+        + '<td><span class="arrow">&#9654;</span></td>'
+        + '</tr>'
+      html += '<tr class="expand-row"><td colspan="9"><div class="expand-inner'+(isOpen?' open':'')+'">'
+        + (isOpen ? V.renderMaasForm(wl, sz) : '') + '</div></td></tr>'
+    })
+
+    html += '<tr class="totals-row"><td>TOTALS</td><td></td><td></td><td></td><td></td>'
+      + '<td class="num">'+totalGpus+'</td><td class="num">'+Math.round(totalPower*10)/10+'kW</td><td colspan="2"></td></tr>'
+    html += '</tbody></table></div>'
+    html += '<div class="tablewrap add-row"><button class="add-btn" onclick="C.addMaas()">+ Add MaaS Pool</button></div>'
+    return html
+  },
+
+  renderMaasForm: function(wl, sz) {
+    var h = '<div class="expand-pad">'
+
+    // Model is the primary selector — no archetype, no hosting toggle.
+    // Every MaaS row is self-hosted by definition (pass-through dropped
+    // 30 June 2026 — undermines sovereignty story, belongs in B5I
+    // Marketplace as a separate future capability, not MaaS sizing).
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>AI Model</label><select onchange="C.updMaas(\''+wl.id+'\',\'model\',this.value)">'
+    Object.keys(MODELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.model===k?' selected':'')+'>'+MODELS[k]+'</option>' })
+    h += '</select></div>'
+    h += '<div class="fg"><label>GPU</label><select onchange="C.updMaas(\''+wl.id+'\',\'gpu\',this.value)">'
+    Object.keys(GPU_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.gpu===k?' selected':'')+'>'+GPU_LABELS[k]+'</option>' })
+    h += '</select></div>'
+    h += '<div class="fg"><label>Precision</label><select onchange="C.updMaas(\''+wl.id+'\',\'precision\',this.value)">'
+    ;['int4','int8','fp16','fp8'].forEach(function(p){ h += '<option value="'+p+'"'+((wl.precision||'int4')===p?' selected':'')+'>'+p.toUpperCase()+'</option>' })
+    h += '</select></div>'
+    h += '</div>'
+
+    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr">'
+    h += '<div class="fg"><label>DAU</label><div class="sliderwrap">'
+      + '<input type="range" min="100" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" oninput="C.updMaasSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
+      + '<span class="slider-val" id="madauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div></div>'
+    // Commercial SLA (Bronze/Silver/Gold) is DERIVED from Tenant Pool Type below,
+    // not a separate input here. Reserved tenants may choose Silver or Gold.
+    h += '<div class="fg"><label>Commercial SLA</label><div class="fg-hint" style="padding-top:8px">'
+    if (wl.poolType === 'reserved') {
+      h += '<select onchange="C.updMaas(\''+wl.id+'\',\'commercialSla\',this.value)" style="font-size:11px;padding:4px 6px">'
+      h += '<option value="silver"'+(wl.commercialSla==='silver'?' selected':'')+'>Silver</option>'
+      h += '<option value="gold"'+((wl.commercialSla||'gold')==='gold'?' selected':'')+'>Gold</option>'
+      h += '</select>'
+    } else {
+      h += 'Bronze <span style="color:var(--mid)">(Open pool default)</span>'
+    }
+    h += '</div></div>'
+    h += '</div>'
+
+    h += V.renderTenantBlock(wl, 'maas')
+
+    h += '<div class="derived">'
+    h += '<div class="derived-line">Throughput: <b>'+sz.throughput.toLocaleString()+'</b> tok/s &nbsp; Instances: <b>'+sz.instances+'</b></div>'
+    h += '<div class="derived-line">Base: <b>'+sz.baseGpus+'</b> GPUs &nbsp; +Buffers: <b>'+sz.buffers+'</b> &nbsp; Total: <b>'+sz.total+'</b> GPUs</div>'
+    h += '<div class="derived-line">= <b>'+sz.racks+'</b> &nbsp;&middot;&nbsp; <b>'+sz.powerKw+'kW</b> &nbsp;&middot;&nbsp; CPST: <b>$'+sz.cpst+'</b></div>'
+    h += '</div>'
+
+    h += '<div class="collapsible" style="margin-top:var(--sp-3)">'
+    h += '<div class="collapsible-hdr" onclick="C.toggleCollapsible(this)"><span class="arrow">&#9654;</span> Make vs Buy — On-prem vs API</div>'
+    h += '<div class="collapsible-body"><div class="collapsible-body-pad">'
+    h += V.renderMvBChart(wl, 'maas')
+    h += '</div></div></div>'
+
+    h += '<div class="actions-row">'
+    h += '<button class="btn btn-danger-text" onclick="C.removeMaas(\''+wl.id+'\')">Remove</button>'
+    h += '<button class="btn btn-ghost" onclick="C.toggleRow(\''+wl.id+'\')">&#9650; Collapse</button>'
+    h += '</div>'
+    h += '</div>'
+    return h
+  },
+
+  // ── Reusable Tenant block — used identically in UC, MaaS, GPUaaS, BMaaS ──
+  renderTenantBlock: function(wl, contextLabel) {
+    var t = wl.tenant ? M.tenantsList[wl.tenant] : null
+    var h = '<div class="tenant-block">'
+    h += '<div class="tenant-block-hdr">Tenant Attribution</div>'
+
+    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0">'
+    h += '<div class="fg"><label>Tenant</label><select onchange="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'tenant\',this.value)">'
+    h += '<option value="">— Open Pool (no specific tenant) —</option>'
+    Object.keys(M.tenantsList).forEach(function(k){ h += '<option value="'+k+'"'+(wl.tenant===k?' selected':'')+'>'+M.tenantsList[k].name+'</option>' })
+    h += '</select></div>'
+
+    h += '<div class="fg"><label>Pool Type</label><div class="pool-toggle">'
+    h += '<button type="button" class="pool-btn'+(wl.poolType==='reserved'?' active-reserved':'')+'" onclick="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'poolType\',\'reserved\')">&#128274; Reserved</button>'
+    h += '<button type="button" class="pool-btn'+(wl.poolType==='open'?' active-open':'')+'" onclick="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'poolType\',\'open\')">&#9889; Open/Spot</button>'
+    h += '</div></div>'
+
+    if (wl.poolType === 'reserved') {
+      h += '<div class="fg"><label>Tenure</label><select onchange="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'tenure\',this.value)">'
+      Object.keys(TENURE_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.tenure===k?' selected':'')+'>'+TENURE_LABELS[k]+'</option>' })
+      h += '</select></div>'
+    } else {
+      h += '<div class="fg"><label>Tenure</label><div class="fg-hint" style="padding-top:8px">N/A — pay-as-you-go, no commitment</div></div>'
+    }
+    h += '</div>'
+
+    if (t) {
+      h += '<div style="display:flex;gap:10px;margin-top:10px;font-size:11px;color:var(--mid)">'
+      h += 'Security tier: <b style="color:var(--dark)">'+t.secTier+'</b>'
+      h += '&nbsp;&middot;&nbsp; Chargeout: <b style="color:var(--dark)">'+CHARGEOUT_LABELS[t.chargeout]+'</b>'
+      h += '&nbsp;&middot;&nbsp; SLA: <b style="color:var(--dark)">'+(wl.poolType==='reserved'?'Gold':'Bronze')+'</b>'
+      h += ' <span style="font-size:9px;color:var(--mid)">(Bronze/Silver/Gold — Reserved tenants may choose Silver or Gold)</span>'
+      h += '</div>'
+    }
+
+    h += '</div>'
+    return h
+  },
+
+  renderMvBChart: function(wl, defaultCtx) {
+    var ctx = wl.mvbView || defaultCtx
+    var h = '<div class="mvb-toggle">'
+    h += '<button class="mvb-btn'+(ctx==='uc'?' active':'')+'" onclick="C.setMvBView(\''+wl.id+'\',\'uc\')">Use Case</button>'
+    h += '<button class="mvb-btn'+(ctx==='maas'?' active':'')+'" onclick="C.setMvBView(\''+wl.id+'\',\'maas\')">MaaS Pool</button>'
+    h += '<button class="mvb-btn'+(ctx==='fleet'?' active':'')+'" onclick="C.setMvBView(\''+wl.id+'\',\'fleet\')">Combined Fleet</button>'
+    h += '</div>'
+    h += '<div class="mvb-chart">'
+    h += '<svg width="100%" height="220" viewBox="0 0 600 220" style="overflow:visible">'
+    // Axes
+    h += '<line x1="50" y1="190" x2="580" y2="190" stroke="#E5E7EB" stroke-width="1.5"/>'
+    h += '<line x1="50" y1="10" x2="50" y2="190" stroke="#E5E7EB" stroke-width="1.5"/>'
+    // On-prem curve (steep then flat)
+    h += '<path d="M 50,30 Q 150,50 250,120 T 580,165" fill="none" stroke="#002870" stroke-width="2.5"/>'
+    // Closed API line (linear, steep)
+    h += '<line x1="50" y1="190" x2="580" y2="20" stroke="#FF5539" stroke-width="2" stroke-dasharray="4,3"/>'
+    // Open API line (linear, less steep)
+    h += '<line x1="50" y1="190" x2="580" y2="80" stroke="#FFB600" stroke-width="2" stroke-dasharray="4,3"/>'
+    // Breakeven marker
+    h += '<circle cx="290" cy="115" r="4" fill="#00B290"/>'
+    h += '<line x1="290" y1="115" x2="290" y2="190" stroke="#00B290" stroke-width="1" stroke-dasharray="2,2"/>'
+    h += '<text x="295" y="108" font-size="10" fill="#00B290" font-weight="700">Breakeven ~48%</text>'
+    // Planned utilisation marker
+    h += '<line x1="180" y1="10" x2="180" y2="190" stroke="#6B7280" stroke-width="1" stroke-dasharray="3,3"/>'
+    h += '<text x="184" y="22" font-size="9" fill="#6B7280">Planned util. (assumption)</text>'
+    // Axis labels
+    h += '<text x="50" y="205" font-size="9" fill="#6B7280">0%</text>'
+    h += '<text x="555" y="205" font-size="9" fill="#6B7280">100%</text>'
+    h += '<text x="300" y="205" font-size="9" fill="#6B7280" text-anchor="middle">Fleet capacity utilisation</text>'
+    h += '</svg>'
+    h += '<div style="display:flex;gap:16px;margin-top:8px;font-size:10px">'
+    h += '<span><span style="display:inline-block;width:10px;height:2px;background:#002870;margin-right:4px;vertical-align:middle"></span>Our on-prem</span>'
+    h += '<span><span style="display:inline-block;width:10px;height:2px;background:#FF5539;margin-right:4px;vertical-align:middle"></span>API — Closed Weights</span>'
+    h += '<span><span style="display:inline-block;width:10px;height:2px;background:#FFB600;margin-right:4px;vertical-align:middle"></span>API — Open Weights</span>'
+    h += '</div>'
+    h += '<div style="margin-top:8px;font-size:10px;color:var(--mid)">Breakeven vs Closed: ~48% utilisation &middot; vs Open: ~71% utilisation &middot; 5yr amortisation</div>'
+    h += '</div>'
+    return h
+  },
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -964,6 +1563,17 @@ var C = {
       M.intelRun = DUMMY.intelRun
     }
 
+    // ── Solution tab state — engagement-scoped, reset on every open ──────
+    // REFACTOR-MARKER: real mode currently reuses DUMMY workload seed data
+    // since workload_configs/tenant_configs Supabase tables exist (per
+    // Solution Builder Spec Section 6/10) but no atlasDB read is wired yet.
+    // Wire this alongside other Controller wiring — see Spec Section 13.
+    M.workloadConfigs = (DUMMY.workloadConfigs && DUMMY.workloadConfigs[eng.id])
+      || { uc: [], maas: [], gpuaas: [], bmaas: [] }
+    M.tenantsList = Object.assign({}, DEFAULT_TENANTS)
+    M.openWlRows  = {}
+    M.activeSolTab = 'uc'
+
     V.renderSidebar()
     V.renderDocket()
   },
@@ -976,6 +1586,12 @@ var C = {
     document.querySelectorAll('.tab-btn').forEach(function(btn) {
       btn.classList.toggle('active', btn.getAttribute('onclick') && btn.getAttribute('onclick').includes("'" + tab + "'"))
     })
+    // Solution tab has its own UC/MaaS/GPUaaS/BMaaS sub-tabs — render them
+    // into the shell once the shell HTML above is actually in the DOM
+    if (tab === 'solution' && M.portfolioItems.length) {
+      V.renderSolTabs()
+      V.renderSolTabBody()
+    }
   },
 
   newEngagement: function(custId) {
@@ -1351,6 +1967,132 @@ var C = {
   generateVisionDoc: function() {
     V.toast('Vision document generation — coming soon','info')
     // WHEN C WIRED: await atlasExport.generateVisionDoc(M.currentEng.id)
+  },
+
+  // ── Solution tab controller functions (folded in from workload-profiler-prototype) ──
+  switchSolTab: function(tab) {
+    M.activeSolTab = tab
+    V.renderSolTabs()
+    V.renderSolTabBody()
+  },
+
+  toggleRow: function(id) {
+    M.openWlRows[id] = !M.openWlRows[id]
+    V.renderSolTabBody()
+    // Trigger animation after render by toggling class on next frame
+    requestAnimationFrame(function(){
+      var el = document.getElementById('exp-'+id)
+      if (el) el.classList.toggle('open', M.openWlRows[id])
+    })
+  },
+
+  toggleCollapsible: function(hdrEl) {
+    var body = hdrEl.nextElementSibling
+    var arrow = hdrEl.querySelector('.arrow')
+    body.classList.toggle('open')
+    arrow.style.transform = body.classList.contains('open') ? 'rotate(90deg)' : 'rotate(0deg)'
+  },
+
+  setDefaultGpu: function(val) {
+    M.defaultGpu = val
+    V.renderSolTabBody()
+  },
+
+  updUC: function(id, field, val) {
+    var wl = M.workloadConfigs.uc.find(function(w){ return w.id === id })
+    if (wl) wl[field] = val
+    V.renderSolTabBody()
+  },
+  updUCSlider: function(id, field, val) {
+    var wl = M.workloadConfigs.uc.find(function(w){ return w.id === id })
+    if (!wl) return
+    wl[field] = val
+    // Update only the value labels + derived panel, avoid full re-render jank while dragging
+    if (field === 'dau') document.getElementById('dauval-'+id).textContent = val.toLocaleString()
+    if (field === 'peakMult') document.getElementById('pmval-'+id).textContent = val + 'x'
+    clearTimeout(C._sliderDebounce)
+    C._sliderDebounce = setTimeout(function(){ V.renderSolTabBody() }, 150)
+  },
+
+  updMaas: function(id, field, val) {
+    var wl = M.workloadConfigs.maas.find(function(w){ return w.id === id })
+    if (wl) wl[field] = val
+    V.renderSolTabBody()
+  },
+  updMaasSlider: function(id, field, val) {
+    var wl = M.workloadConfigs.maas.find(function(w){ return w.id === id })
+    if (!wl) return
+    wl[field] = val
+    if (field === 'dau') document.getElementById('madauval-'+id).textContent = val.toLocaleString()
+    clearTimeout(C._sliderDebounce)
+    C._sliderDebounce = setTimeout(function(){ V.renderSolTabBody() }, 150)
+  },
+
+  // ── Tenant block controller — works identically across UC/MaaS/GPUaaS ──
+  updTenant: function(id, context, field, val) {
+    var arr = context === 'uc' ? M.workloadConfigs.uc : context === 'maas' ? M.workloadConfigs.maas : M.workloadConfigs.gpuaas
+    var wl = arr.find(function(w){ return w.id === id })
+    if (!wl) return
+    wl[field] = val
+    if (field === 'tenant' && !val) { wl.poolType = 'open'; wl.tenure = null }
+    if (field === 'poolType' && val === 'open') wl.tenure = null
+    if (field === 'poolType' && val === 'reserved' && !wl.tenure) wl.tenure = '12'
+    V.renderSolTabBody()
+  },
+
+    setMvBView: function(id, ctx) {
+    var wl = M.workloadConfigs.uc.find(function(w){ return w.id === id }) || M.workloadConfigs.maas.find(function(w){ return w.id === id })
+    if (wl) wl.mvbView = ctx
+    V.renderSolTabBody()
+  },
+
+  addUC: function() {
+    var id = 'uc' + (M.workloadConfigs.uc.length + 1) + '-' + Date.now()
+    M.workloadConfigs.uc.push({ id:id, name:'New Use Case', ucLib:'adhoc', gpu:null, deployMode:'production',
+      dau:1000, reqPerDay:5, peakMult:3, inputTok:2048, outputTok:500, precision:'int4',
+      slaTier:'tier2', ttftTarget:2000, agentic:false, steps:1, toolWait:0, mvbView:'uc' })
+    M.openWlRows[id] = true
+    V.renderSolTabs(); V.renderSolTabBody()
+  },
+  removeUC: function(id) {
+    M.workloadConfigs.uc = M.workloadConfigs.uc.filter(function(w){ return w.id !== id })
+    V.renderSolTabs(); V.renderSolTabBody()
+  },
+  addMaas: function() {
+    var id = 'maas' + (M.workloadConfigs.maas.length + 1) + '-' + Date.now()
+    M.workloadConfigs.maas.push({ id:id, name:'New MaaS Pool', archetype:'text_chat', gpu:M.defaultGpu,
+      model:'llama-3.1-8b', precision:'int4', dau:10000, commercialSla:'bronze', mvbView:'maas' })
+    M.openWlRows[id] = true
+    V.renderSolTabs(); V.renderSolTabBody()
+  },
+  removeMaas: function(id) {
+    M.workloadConfigs.maas = M.workloadConfigs.maas.filter(function(w){ return w.id !== id })
+    V.renderSolTabs(); V.renderSolTabBody()
+  },
+
+  addGpuaas: function() {
+    var id = 'gpuaas' + (M.workloadConfigs.gpuaas.length + 1) + '-' + Date.now()
+    M.workloadConfigs.gpuaas.push({ id:id, name:'New GPU Block', gpu:M.defaultGpu, gpuCount:8,
+      tenant:null, poolType:'open', tenure:null, mvbView:'fleet' })
+    M.openWlRows[id] = true
+    V.renderSolTabs(); V.renderSolTabBody()
+  },
+  updGpuaas: function(id, field, val) {
+    var wl = M.workloadConfigs.gpuaas.find(function(w){ return w.id === id })
+    if (wl) wl[field] = val
+    V.renderSolTabBody()
+  },
+  removeGpuaas: function(id) {
+    M.workloadConfigs.gpuaas = M.workloadConfigs.gpuaas.filter(function(w){ return w.id !== id })
+    V.renderSolTabs(); V.renderSolTabBody()
+  },
+
+  addTenant: function() {
+    var name = prompt('New tenant name:')
+    if (!name) return
+    var id = name.toLowerCase().replace(/[^a-z0-9]+/g,'-')
+    M.tenantsList[id] = { name: name, secTier: 'S1', chargeout: 'commercial' }
+    V.renderSolTabBody()
   },
 }
 
