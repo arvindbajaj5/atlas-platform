@@ -412,7 +412,71 @@
    * Apply SLA + resilience buffers to base GPU count
    * Returns breakdown object for full transparency
    */
-  function applyBuffers (baseGPUs, slaTier, haRequired, drType, growthHeadroomPct) {
+  /**
+   * capacityForGPU(gpu, model, params_b, precision, gpuCount, demandShape, profile)
+   *
+   * BOTTOM-UP — reverse of calcGPUsForThroughput(). Given a GPU architecture
+   * and a GPU count (rather than a demand figure), returns the maximum
+   * demand that configuration can support before breaching SLA/derating.
+   *
+   * Mirrors the exact same constants and chain as the top-down path
+   * (calcPeakRPS -> calcPeakTokenThroughput -> calcGPUsForThroughput) so
+   * the two are always consistent — same derating, same throughput
+   * formula, same profile logic. Solving in the opposite direction.
+   *
+   * demandShape: { requests_per_user_per_day, peak_multiplier, avg_output_tokens }
+   *   (the SHAPE of one user's demand — everything except DAU itself,
+   *    since DAU is exactly what this function solves for)
+   *
+   * Returns: {
+   *   max_dau,                  // maximum DAU this GPU count can serve
+   *   max_concurrent_sessions,  // at peak, derived from max_dau
+   *   max_throughput_tps,       // total derated throughput available
+   *   throughput_per_unit_tps,  // same calcGPUThroughput() value used
+   *                             // by the top-down path, for transparency
+   *   derating_pct,
+   *   audit: { formula, chain }
+   * }
+   */
+  function capacityForGPU (gpu, model, params_b, precision, gpuCount, demandShape, profile, deratingPct) {
+    var reqPerDay  = (demandShape && demandShape.requests_per_user_per_day) || 5
+    var peakMult   = (demandShape && demandShape.peak_multiplier) || 3
+    var outputTok  = (demandShape && demandShape.avg_output_tokens) || 500
+    var derate     = (deratingPct || 80) / 100
+
+    // Same per-unit throughput formula the top-down path uses — benchmark
+    // first, formula fallback. Identical function call, zero divergence risk.
+    var throughputPerUnit = calcGPUThroughput(gpu, model, params_b, precision, profile || 'A')
+    var maxThroughputTps  = throughputPerUnit * gpuCount * derate
+
+    // Reverse calcPeakTokenThroughput(): tokens/sec -> peak RPS
+    var maxPeakRPS = outputTok > 0 ? maxThroughputTps / outputTok : 0
+
+    // Reverse calcPeakRPS(): peak RPS -> avg RPS -> DAU
+    var maxAvgRPS = peakMult > 0 ? maxPeakRPS / peakMult : 0
+    var maxDau    = reqPerDay > 0 ? Math.floor((maxAvgRPS * 86400) / reqPerDay) : 0
+
+    // Max concurrent sessions at that DAU, for display alongside the
+    // top-down path's own concurrent-session figure
+    var maxConcurrentSessions = Math.max(1, Math.ceil(maxPeakRPS * 1))  // ~1s avg hold, rough
+
+    return {
+      max_dau:                  Math.max(0, maxDau),
+      max_concurrent_sessions:  maxConcurrentSessions,
+      max_throughput_tps:       Math.round(maxThroughputTps),
+      throughput_per_unit_tps:  Math.round(throughputPerUnit),
+      gpu_count:                gpuCount,
+      derating_pct:             deratingPct || 80,
+      audit: {
+        formula: 'max_dau = (max_throughput_tps / avg_output_tokens / peak_multiplier) × 86400 / requests_per_day',
+        chain: 'GPUs(' + gpuCount + ') × throughput/GPU(' + Math.round(throughputPerUnit) + ') × derate(' + (derate*100) + '%) '
+             + '= ' + Math.round(maxThroughputTps) + ' tok/s → ÷' + outputTok + ' tok/req = ' + Math.round(maxPeakRPS*100)/100 + ' peak RPS '
+             + '→ ÷' + peakMult + 'x peak mult = ' + Math.round(maxAvgRPS*100)/100 + ' avg RPS → ×86400 ÷' + reqPerDay + ' req/day = ' + Math.max(0,maxDau) + ' max DAU'
+      }
+    }
+  }
+
+    function applyBuffers (baseGPUs, slaTier, haRequired, drType, growthHeadroomPct) {
     var sla = SLA_BUFFERS[slaTier] || SLA_BUFFERS.standard
 
     var peakBuffer       = Math.ceil(baseGPUs * sla.peak_headroom_pct / 100)
@@ -526,6 +590,49 @@
      *   derating_pct:        number  (optional, default 80)
      * }
      */
+    /**
+     * capacityForGPU(gpuConfigId, config)
+     *
+     * BOTTOM-UP — public wrapper. Given a GPU architecture + count, returns
+     * maximum demand (DAU) that configuration can support. Reverse of
+     * sizeUC()/sizeMaaS() — same underlying formulas, opposite direction.
+     * See Solution Builder Spec Section 13 for full design rationale.
+     *
+     * config: {
+     *   model_id:            string  (model_catalogue.id — REQUIRED)
+     *   gpu_count:           number  (REQUIRED — the GPU count to test)
+     *   precision:           string  (optional — default INT4)
+     *   profile:             string  A|B (optional, default 'A' — MaaS/throughput.
+     *                         Use 'B' for UC/latency-bound capacity testing)
+     *   requests_per_day:    number  (optional, default 5)
+     *   peak_multiplier:     number  (optional, default 3)
+     *   avg_output_tokens:   number  (optional, default 500)
+     *   derating_pct:        number  (optional, default 80)
+     * }
+     */
+    capacityForGPU: function (gpuConfigId, config) {
+      var gpu   = getGPU(gpuConfigId)
+      var model = getModel(config.model_id)
+      if (!gpu)   return { error: 'GPU config not found: ' + gpuConfigId }
+      if (!model) return { error: 'Model not found: ' + config.model_id }
+      if (!config.gpu_count || config.gpu_count < 1) return { error: 'gpu_count required and must be >= 1' }
+
+      var precision = config.precision || 'INT4'
+      var profile   = config.profile || 'A'
+      var params_b  = model.params_b || 7
+
+      return capacityForGPU(
+        gpu, model, params_b, precision, config.gpu_count,
+        {
+          requests_per_user_per_day: config.requests_per_day,
+          peak_multiplier:           config.peak_multiplier,
+          avg_output_tokens:         config.avg_output_tokens
+        },
+        profile,
+        config.derating_pct
+      )
+    },
+
     sizeUC: function (config, gpuConfigId) {
       var gpu    = getGPU(gpuConfigId)
       var model  = getModel(config.model_id)
