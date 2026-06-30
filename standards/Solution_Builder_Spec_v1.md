@@ -1,0 +1,869 @@
+# ATLAS Solution / Sizing Tab — Combined Specification v1.0
+**Date:** 30 June 2026
+**Merges:** tools/sasc (5,354 lines) + tools/inferencing-factory (3,793 lines)
+**Status:** Spec for review — prototype to follow after sign-off
+
+---
+
+## 0. Why this document exists
+
+SASC and Inferencing Factory were built independently and overlap heavily, but
+each has genuinely good ideas the other lacks. Rather than pick one and lose
+the other's strengths, this spec merges them into a single Solution tab inside
+the Docket — replacing both standalone tools.
+
+Confirmed Supabase reference data available today (checked 30 June 2026):
+
+| Table | Rows |
+|---|---|
+| gpu_configs | 12 |
+| model_catalogue | 103 |
+| uc_interaction_types | 12 |
+| requirement_archetypes | 8 |
+| uc_library | 69 |
+| benchmark_results | 0 (empty — formula fallback path used) |
+
+`shared/sasc-sizing.js` (SizingEngine v4) is confirmed complete and callable:
+`init(sbUrl, sbKey)`, `sizeUC(config, gpuConfigId)`, `sizeMaaS(config, gpuConfigId)`,
+`fleetTotal(...)`. Pure functions, full audit trail in return value, no DOM,
+no AI calls. Nothing new needs to be built in the engine itself for Phase A.
+
+---
+
+## 1. The scoping vs sizing distinction (decided 30 June 2026)
+
+Two genuinely separate jobs were being conflated under "agent-based solution
+building." Separating them changes what gets built and when.
+
+**Job 1 — Scoping (defaults + judgment).** Given a requirement and portfolio
+selection, propose a *starting* configuration: DAU, model tier, SLA tier.
+This is pattern-matching against `uc_interaction_types` defaults and similar
+past engagements. It does not invent facts — it suggests sensible starting
+points a human reviews and overrides. This is where AI/agent framing
+honestly applies, and it is **deferred to Phase B** (backlog).
+
+**Job 2 — Sizing (pure formula).** Given a *fully specified* config, compute
+GPU count, power, cost. Zero AI, zero agent — `SizingEngine.sizeUC()` is a
+deterministic function. This is **Phase A — build now.**
+
+The earlier "agent fragment" UX (progress indicators, done/running/waiting
+states) was designed for Job 2, where it doesn't belong — sizing is instant,
+pretending it takes time is dishonest UX. That framing is correctly applied
+to Job 1 instead, once Phase B exists.
+
+**Phase A ships with manual config forms, not simulated agent delay.**
+
+---
+
+## 2. What SASC contributes (keep, adapt)
+
+### 2.1 The proven step flow
+Confirmed working structure from `getActiveSteps()`:
+
+```
+S1 — Scope & Stack        (DC type, hardware base, layer toggles)
+S2 — UC Workloads         (shown if UC development is in scope)
+S3 — Tenant Services      (shown if MaaS/GPUaaS/BMaaS/PTaaS or infra layer on)
+S4 — Fleet Allocation     (aggregates S2+S3 into total fleet)
+S5 — BOM / ROM            (final output, document generation)
+```
+
+Steps are **conditionally shown** based on what's toggled on — not a fixed
+linear wizard. This maps directly onto the Docket's portfolio selection:
+if B5A (UCs) is selected → S2 shows. If B5E/B5F/B5G/B5H selected → S3 shows.
+**Reuse this conditional-step pattern exactly.**
+
+### 2.2 calcSizing() / calcUsageTypeGpus() / calcMaasTotalGpus()
+These exist in SASC as wrapper functions around what should be direct
+`SizingEngine` calls. Confirmed (Section 28 of blueprint, code salvage map):
+SizingEngine is currently **inlined** in SASC rather than referenced as
+`shared/sasc-sizing.js`. **Action: de-inline. Every sizing call in the new
+Solution tab goes directly to `SizingEngine.sizeUC()`/`sizeMaaS()` — no
+wrapper duplication.**
+
+### 2.3 renderFleetAllocation / calcFleetInventory
+S4's job — aggregate all S2 (UC) and S3 (MaaS/GPUaaS/BMaaS) sizing results
+into one fleet total, by GPU type, with buffers applied once at fleet level
+(not per-workload, which double-counts HA/failover). **Reuse this
+aggregation logic — it's the `fleetTotal()` SizingEngine call already
+designed for this.**
+
+### 2.4 renderROMSummary / calculateBOM
+S5's BOM assembly — turns fleet totals into priced line items. Currently
+reads from in-memory unit costs (`tsap_unit_costs` table, confirmed to exist
+with 50 rows from earlier audit). **Reuse the BOM line structure, but read
+unit costs from `tsap_unit_costs` via `atlasDB`, not inline objects.**
+
+### 2.5 People cost (calcPeopleCost) and renderPeopleTab
+SASC has a people-cost model (OPERATE team sizing) that Inferencing Factory
+lacks entirely. **Keep as-is, wire to `people_params` table (confirmed to
+exist from earlier audit).**
+
+---
+
+## 3. What Inferencing Factory contributes (new, not in SASC)
+
+### 3.1 Data Source Registry — genuinely new capability
+`renderScope()` includes a registry of data sources feeding workloads via
+RAG/fine-tuning/ingestion: name, modality, volume (GB), format
+(clean/semi/unstructured/mixed), connection type, refresh cadence, cleanup
+needs, labelling needs, PII flag. This feeds `calcServices()` — implementation
+services effort estimation (data engineering hours).
+
+**This maps to PREPARE block (P03 — Data Estate Planning) and feeds the
+services BOM. SASC has no equivalent. Add as a new sub-section, shown when
+P03 or any B5x (UC/MaaS) requiring data ingestion is selected.**
+
+New table needed: `data_sources` (engagement-scoped, not global) —
+`id, engagement_id, name, modality, volume_gb, format, connectivity,
+refresh_cadence, cleanup_needed, labelling_needed, pii_flag, notes`.
+
+### 3.2 Benchmark matrix — editable measured performance
+`renderParams()` builds an editable table of GPU×Model×Engine×Quantization×
+Batch combinations with measured TPS/TTFT/TBT. This is exactly the
+`benchmark_results` table SizingEngine already checks (and prefers over
+formula estimates) — but no UI exists today to populate it. Inferencing
+Factory has that UI; SASC doesn't.
+
+**Action: adapt this UI into a "Benchmark Override" panel in the Solution
+tab, writing to `benchmark_results`. Default: empty (formula-based sizing).
+Power users can add measured data points which SizingEngine then prefers
+automatically — no other code changes needed since SizingEngine already
+has this preference logic built in.**
+
+### 3.3 Tokenomics / API-equivalent savings comparison
+`renderTok()` computes, per workload: on-prem $/month, $ per million tokens,
+equivalent API cost (using market rates), and % savings. This is the CPST
+concept from blueprint Section 30, partially pre-built.
+
+**Action: adapt into the Solution tab's summary view — show savings vs API
+per L5 item, contributing to the proposal narrative ("This on-prem deployment
+saves 64% vs equivalent API spend over 3 years"). Genuinely persuasive
+commercial content, currently dormant in a tool nobody opens day to day.**
+
+### 3.4 Source toggle: on-prem / API / hybrid per workload
+Inferencing Factory lets each workload independently be sized as on-prem
+GPU, pure API consumption, or hybrid. SASC assumes everything is on-prem.
+
+**Action: add this toggle to each UC/MaaS config card. When 'api' or
+'hybrid' selected, skip GPU sizing for that portion, show API cost estimate
+instead (reuses 3.3's cost model). Relevant for CSP/Consumer archetypes
+that don't want full sovereign infra for every workload.**
+
+---
+
+## 4. What gets dropped (deliberately, not by oversight)
+
+| From | What | Why dropped |
+|---|---|---|
+| Inferencing Factory | Own GPU sizing formulas (`sizing()`, `calcUsageTypeGpus` duplicates) | Replaced entirely by SizingEngine — no parallel sizing math allowed (blueprint Section 13, non-negotiable rule) |
+| Inferencing Factory | Standalone tool shell, own nav, own CSS | Retired per blueprint Section 13 — functionality merges into Docket Solution tab |
+| SASC | Own AI call wrapper | Replaced by atlas-ai.js (when wired) |
+| SASC | Own Supabase fetch patterns | Replaced by atlas-db.js (already wired in Docket) |
+| Both | Standalone-tool CSS, headers, navigation | Replaced by shared atlas.css, single Docket shell |
+
+---
+
+## 5. Phase A build scope — what we prototype next
+
+```
+Solution tab, four conditional tabs based on Portfolio selection
+(see Section 9 for full UI layer — table-first, expand-in-place,
+NOT individually collapsible cards):
+
+  ALWAYS SHOWN
+    Engagement-level default GPU (set once; pre-fills every new
+      Workload Profiler row; override per-row always available —
+      see Section 6a, heterogeneous fleet decision)
+
+  TABS — only shown if their portfolio item is selected
+    UCs tab      (if B5A selected)
+    MaaS tab     (if B5E selected)
+    GPUaaS tab   (if B5F selected)
+    BMaaS tab    (if B5G/B5H selected)
+
+  EACH TAB — summary table (always full, no truncation) + totals row
+    Click any row → expands in place (animated) → full Workload
+    Profiler form for that row (see Section 9 field layout)
+
+  UCs tab fields
+    Pick UC from uc_library (69 available) OR define ad-hoc
+    Inputs: DAU (slider), requests/user/day, peak multiplier (slider),
+            avg input/output tokens, model (from 103 in
+            model_catalogue), precision, SLA tier, TTFT target,
+            GPU (defaults to engagement default, override available),
+            Deployment mode (Production on-prem / Pilot-Validation API)
+    Quick-start: complexity tier dropdown pre-fills the explicit
+            fields above — never the only input mode
+    Live call to SizingEngine.sizeUC() on every input change
+    Live SLA-met/breach banner (Section 9) — not buried in a sub-line
+    Shows: total_gpus, power_kw, notes (audit trail), CPST/savings
+
+  MaaS/GPUaaS/BMaaS tabs fields
+    Pick archetype (from 8 requirement_archetypes)
+    Inputs: DAU, model tier, SLA tier, GPU (defaults to engagement
+            default, override available), Model hosting (Self-hosted /
+            Pass-through resell)
+    Live call to SizingEngine.sizeMaaS()
+
+  IF P03 (Data Estate Planning) or any data-dependent B5x selected
+    Data Source Registry (from Inferencing Factory, adapted)
+
+  FLEET AGGREGATION (always shown once any workload exists)
+    SizingEngine.fleetTotal() across all UC + MaaS results
+    Excludes rows marked Pilot-Validation / Pass-through — those
+      consume zero GPUs from our fleet (see Section 6a)
+    Real GPU count, rack count, power — not fake numbers
+    Heterogeneous fleet shown clearly: "3 racks H200, 1 rack B200"
+      when rows used different GPU overrides (see Q1 decision)
+    Make vs Buy chart — Combined Fleet context (Section 8)
+
+  BOM / ROM (always shown once fleet is sized)
+    Line items from tsap_unit_costs + fleet totals
+    People cost from people_params
+    Save as solution_versions row (level = 'L1-rom')
+
+  BENCHMARK DATA — lives in Settings, NOT the Solution tab (per Q2 decision)
+    Adapted from Inferencing Factory's editable matrix
+    ATLAS-seeded starting values (vendor-published throughput) +
+      user-added measurements
+    Qualifier fields distinguish entries: source_type, measured_by,
+      engagement_id (null = global/reusable), measured_date, confidence
+    SizingEngine preference order: user_measured (engagement-specific)
+      → user_measured (global) → vendor/atlas_seed → formula fallback
+```
+
+**Explicitly NOT in Phase A:** agent progress UX, yield-adjusted sizing
+(yield_pct=100 default, "coming soon" label per backlog), Financing Model
+step, L2 Detailed/Priced distinction, full 6-simulation suite, AI-suggested
+defaults (Job 1). All logged in `ATLAS_Feature_Backlog.md` already.
+
+---
+
+## 6. New database objects needed for Phase A
+
+```sql
+-- data_sources (new, from Inferencing Factory adaptation)
+CREATE TABLE data_sources (
+  id              text PRIMARY KEY,
+  engagement_id   text NOT NULL,
+  name            text,
+  modality        text,
+  volume_gb       float,
+  format          text,
+  connectivity    text,
+  refresh_cadence text,
+  cleanup_needed  boolean DEFAULT false,
+  labelling_needed boolean DEFAULT false,
+  pii_flag        boolean DEFAULT false,
+  notes           text,
+  created_at      timestamptz DEFAULT now()
+);
+
+-- benchmark_results — extend with qualifier fields (table exists, 0 rows today)
+ALTER TABLE benchmark_results
+  ADD COLUMN IF NOT EXISTS source_type   text DEFAULT 'atlas_seed'
+    CHECK (source_type IN ('atlas_seed','vendor_published','user_measured')),
+  ADD COLUMN IF NOT EXISTS measured_by   text,
+  ADD COLUMN IF NOT EXISTS engagement_id text,  -- null = global/reusable
+  ADD COLUMN IF NOT EXISTS measured_date date DEFAULT current_date,
+  ADD COLUMN IF NOT EXISTS confidence    text DEFAULT 'medium'
+    CHECK (confidence IN ('high','medium','low'));
+
+-- workload_configs (new — stores UC/MaaS Workload Profiler state per engagement,
+-- separate from solution_versions which stores the FINAL frozen snapshot)
+CREATE TABLE workload_configs (
+  id              text PRIMARY KEY,
+  engagement_id   text NOT NULL,
+  workload_type   text CHECK (workload_type IN ('uc','maas','gpuaas','bmaas','ptaas')),
+  uc_library_id   text,              -- FK to uc_library, null if ad-hoc
+  archetype_id    text,              -- FK to requirement_archetypes, for maas/gpuaas/bmaas
+  gpu_config_id   text,              -- override; null = use engagement default
+  source_mode     text DEFAULT 'on_prem'
+    CHECK (source_mode IN ('on_prem','pilot_api','self_hosted','pass_through')),
+  config          jsonb,             -- full config object passed to SizingEngine
+  last_sizing_result jsonb,          -- cached SizingEngine output
+  created_at      timestamptz DEFAULT now(),
+  updated_at      timestamptz DEFAULT now()
+);
+```
+
+No changes needed to `solution_versions`, `portfolio_items`, or any table
+already migrated — those are confirmed sufficient as-is.
+
+---
+
+## 6a. Workload Profiler — naming decision and SASC vs Inferencing Factory comparison
+
+**Decision: "Workload Profiler" is the name for the per-UC/per-MaaS input card.**
+Replaces "Workload card", "Config card" used loosely earlier in this spec.
+
+### Direct comparison — input field design
+
+SASC's UC input (`renderUCComplexityTier`) is **abstraction-driven**: the user
+picks a complexity tier (Simple/Medium/Complex button group), and SASC
+translates that internally toward a sizing call. This is fast for the user
+but loses precision — two "Medium complexity" UCs with very different real
+DAU end up sized identically unless the user also separately sets DAU
+elsewhere.
+
+Inferencing Factory's workload object (`mkWL`, `addWL`) is **field-driven**:
+explicit `dau`, `rpud` (requests/user/day), `pk` (peak multiplier), `ai`/`ao`
+(avg input/output tokens), `batch`, `sla`, `ttft`, `tbt`, `e2e`, plus agentic
+fields (`isAgentic`, `steps`, `toolWait`). This maps almost directly onto
+`SizingEngine.sizeUC()`'s actual config parameter shape — far less translation
+distance between what the user enters and what the engine consumes.
+
+**Decision: Workload Profiler is field-driven (Inferencing Factory's model),
+not tier-driven (SASC's model) — because direct fields are what SizingEngine
+actually needs, and tier abstraction was solving a UX problem (overwhelming
+forms) that the "expand for entry, defaults pre-filled, P50/P95 toggle"
+principles already established earlier in this build solve better.**
+
+However, SASC's tier buttons are kept as a **quick-start preset**, not the
+only way in: clicking "Medium complexity" pre-fills the explicit fields with
+sensible defaults (this is exactly `preset()` in Inferencing Factory, which
+does the same thing under a different name — confirms both tools converged
+on the same underlying need). The user then sees and can adjust the real
+fields, never locked into an opaque tier.
+
+### Workload Profiler — three contexts, three purposes (per your Q4 answer)
+
+The Profiler's actual fields stay constant, but its **purpose and the
+decisions it surfaces** differ by context — this directly answers "use these
+ideas and suggest" from Q4:
+
+| Context | Purpose | Profiler-specific UI |
+|---|---|---|
+| **Use Case (B5A)** | Right-size GPUs for ONE customer's specific workload, sovereign by default | Deployment mode toggle: Production (on-prem) / Pilot-Validation (API). Shows TTFT/SLA prominently — UCs are usually latency-sensitive (Tier 1/2). |
+| **MaaS (B5E)** | Right-size a SHARED multi-tenant pool, throughput-driven | Model hosting toggle: Self-hosted / Pass-through (resell upstream API). Shows throughput (tokens/sec) and CPST prominently — MaaS is Profile A (compute-bound at high batch), not latency-bound like UCs. |
+| **Fleet Aggregation (S4)** | Combine all Profiler outputs into one buildable, priced fleet | No new inputs — pure aggregation. Excludes any Profiler marked Pilot/Pass-through (those don't consume our GPUs). Shows GPU type breakdown when fleet is heterogeneous (per Q1 decision). |
+
+### What carries over from each tool into the new Workload Profiler
+
+| Feature | From | Verdict |
+|---|---|---|
+| Explicit DAU/tokens/SLA fields | Inferencing Factory | Keep — primary input mode |
+| Complexity tier quick-start buttons | SASC | Keep — as preset, not sole input |
+| Agentic fields (steps, toolWait) | Inferencing Factory | Keep — feeds blueprint Section 30 yield compounding (Phase B, but capture the fields now so Phase B doesn't need a schema change) |
+| GPU choice per workload | Neither (both assumed engagement-wide GPU) | New — per Q1 decision, default + override |
+| Deployment mode / hosting toggle | Neither (new synthesis) | New — per Q4 decision, context-specific labels |
+| Tokenomics/savings comparison | Inferencing Factory | Keep — shown per-Profiler and rolled up in Fleet view |
+| Benchmark override | Inferencing Factory | Keep — moved to Settings per Q2, not inline in Profiler |
+
+---
+
+## 7. Decisions confirmed (30 June 2026) — no longer open
+
+1. **GPU base selection** — Engagement-level default, override per Workload
+   Profiler. Heterogeneous fleets fully supported; Fleet Aggregation groups
+   automatically by actual GPU used, no manual reconciliation required.
+
+2. **Benchmark Data location** — Settings page, new "Benchmark Data" tab.
+   Not inline in the Solution tab. ATLAS-seeded starting values (vendor
+   published numbers) + user additions, qualified by source/engagement/date/
+   confidence to handle duplicate combos correctly.
+
+3. **Data Source Registry scope** — Engagement-level only for Phase A.
+   Cross-engagement reuse logged to `ATLAS_Feature_Backlog.md` as a Phase B
+   item, revisit once real reuse patterns are observed across a few
+   engagements.
+
+4. **Source/deployment mode** — Three distinct contexts, three distinct
+   labels and defaults (see Section 6a): UC defaults to Production/on-prem
+   with a Pilot-Validation/API option; MaaS defaults to Self-hosted with a
+   Pass-through/resell option; Fleet Aggregation simply excludes whichever
+   Profilers are marked non-GPU-consuming.
+
+**Next step: prototype the Workload Profiler V (UI shell, dummy data) for
+one UC and one MaaS card, validate visually, before wiring any Controller
+or running the two new table migrations.**
+
+---
+
+## 8. Make vs Buy — Tokenomics Curve (decided 30 June 2026)
+
+### Purpose
+
+Not a static "% saved" line item — a strategic capacity decision tool.
+Plots cost vs token volume across the full 0–100% range of fleet capacity,
+so the customer sees where on-prem becomes cheaper than buying from the
+market, not just a single snapshot number that's misleading at low volume.
+
+**Critical framing constraint:** actual token consumption per UC cannot be
+predicted at this stage — we don't know real usage patterns, prompt lengths,
+or adoption curves for a system that doesn't exist yet. The X-axis is
+**theoretical fleet capacity utilisation** (0–100% of what the provisioned
+GPUs CAN produce, from `SizingEngine`'s `throughput_tokens_per_sec`), never
+a fabricated "predicted consumption" number. The Workload Profiler's
+DAU/requests inputs are used only to mark a single "planned utilisation"
+reference point on the curve — explicitly labelled a planning assumption,
+not a forecast.
+
+### Chart structure — one per context, toggle-switched
+
+```
+TOGGLE: ⦿ Use Case   ○ MaaS Pool   ○ Combined Fleet
+
+  Y-axis: $ cost per month
+  X-axis: 0% to 100% of THIS context's fleet capacity
+
+  Lines:
+    1. Our on-prem cost curve (capex amortised + variable opex)
+    2. Market API — Closed Weights (linear $/token)
+    3. Market API — Open Weights (linear $/token)
+
+  Markers:
+    Breakeven point — separately marked vs line 2 and vs line 3
+    Planned utilisation — dotted vertical line from Workload
+      Profiler DAU/requests inputs, labelled "Planning assumption"
+```
+
+### Cost model
+
+```
+on_prem_cost_per_month(util%) =
+    (total_capex / 60)                          // 5-year amortisation
+  + monthly_fixed_opex                          // people, AMC, facility
+  + (power_kw_full_load × util% × power_tariff × hours_per_month)
+
+tokens_at_util% =
+    fleet_throughput_tokens_per_sec × seconds_per_month × util%
+
+api_cost_per_month(util%) =
+    tokens_at_util% × api_price_per_token        // pure linear, no fixed cost
+```
+
+**Amortisation period: 5 years (60 months) — confirmed default.**
+Matches typical DC capex accounting; GPU-specific refresh cycles handled
+separately via SUSTAIN block (S03 Hardware Refresh), not by shortening
+this amortisation assumption.
+
+### New database object
+
+```sql
+-- api_pricing_reference (new — small, periodically refreshed)
+CREATE TABLE api_pricing_reference (
+  id                    text PRIMARY KEY,
+  provider              text NOT NULL,
+  model_class           text NOT NULL,        -- e.g. 'gpt-4o-class', 'llama-3.1-405b-class'
+  weight_type           text NOT NULL CHECK (weight_type IN ('closed','open')),
+  input_price_per_mtok  float,
+  output_price_per_mtok float,
+  source_url            text,
+  last_updated          date DEFAULT current_date
+);
+```
+
+**Action: seed with current public pricing** for one representative Closed
+Weights model (e.g. GPT-4o or Claude class) and one representative Open
+Weights model (e.g. Llama-3.1-405B via Together/Groq/Fireworks, matching
+the market-ceiling check already referenced in blueprint Section 19) —
+done as part of Phase A migration, not left for manual entry.
+
+### Where it lives in the UI
+
+Embedded within each expanded Workload Profiler row (Section 9) as a
+sub-section, defaulting its toggle to the row's own context. Also shown
+at Fleet Aggregation level for the full combined-system strategic story —
+this is the version most likely to appear in the customer proposal.
+
+---
+
+## 9. UI Layer — Workload Profiler (decided 30 June 2026)
+
+### Structure: table-first, expand-in-place — not collapsible cards
+
+Earlier drafts of this spec proposed individually collapsible cards. Revised:
+**every workload is always visible in a summary table — full screen, no
+truncation, no hidden rows.** Clicking a row expands it in place (smooth
+animated height transition) to reveal the full Workload Profiler form.
+Multiple rows can be expanded simultaneously — no forced single-open
+accordion, since comparing two workloads side by side is a legitimate need.
+
+### Four tabs, one per workload type, conditionally shown
+
+```
+[ UCs ]   [ MaaS ]   [ GPUaaS ]   [ BMaaS ]
+
+Only tabs for portfolio-selected types appear:
+  B5A selected → UCs tab shown
+  B5E selected → MaaS tab shown
+  B5F selected → GPUaaS tab shown
+  B5G selected → BMaaS tab shown
+
+Each tab has its own summary table + its own expand-in-place detail —
+same mechanism, different field sets per type.
+```
+
+### Summary table (default view, every tab)
+
+```
+UCs Tab
+
+┌────────────────────────┬────────┬───────┬──────┬───────┬────────┬──────┐
+│ Use Case                │ DAU    │ GPU   │ GPUs │ Power │ SLA    │      │
+├────────────────────────┼────────┼───────┼──────┼───────┼────────┼──────┤
+│ GLOF Early Warning      │ 500    │ H200  │ 12   │ 3.2kW │ ✓ Met  │  ▸   │
+│ Crop Disease Detection  │ 50,000 │ H200  │ 3    │ 0.9kW │ ✓ Met  │  ▸   │
+└────────────────────────┴────────┴───────┴──────┴───────┴────────┴──────┘
+  TOTALS:                                    15      4.1kW
+
+  [+ Add UC Workload]
+```
+
+Every row, every key number, fully visible — never hidden behind a click.
+Totals row beneath the table, summing GPUs and power across all rows in
+that tab. Each workload type's table has its own relevant columns (MaaS
+shows Throughput/CPST instead of TTFT/SLA-met, matching Profile A vs
+Profile B distinction from Section 5).
+
+### Expand-in-place — full detail, nothing collapsed within it
+
+```
+┌────────────────────────┬────────┬───────┬──────┬───────┬────────┬──────┐
+│ GLOF Early Warning      │ 500    │ H200  │ 12   │ 3.2kW │ ✓ Met  │  ▾   │
+├────────────────────────┴────────┴───────┴──────┴───────┴────────┴──────┤
+│                                                                          │
+│  UC LIBRARY MATCH          GPU                    DEPLOYMENT MODE      │
+│  [GLOF Early Warning ▾]    [H200 SXM ▾]           ⦿ Production         │
+│   or + Define ad-hoc                               ○ Pilot (API)       │
+│                                                                          │
+│  DAU (slider, log scale)                            PEAK MULT (slider) │
+│  ●────────────────── 500          REQ/USER/DAY      ●──── 3x           │
+│                                    [12          ]                       │
+│                                                                          │
+│  AVG INPUT TOK              AVG OUTPUT TOK           PRECISION         │
+│  [4,096      ]             [800         ]           [INT4    ▾]       │
+│                                                                          │
+│  SLA TIER                   TTFT TARGET                                │
+│  [Tier 1 — Interactive ▾]  [<200ms              ]                     │
+│                                                                          │
+│  ▸ Agentic workflow (optional — collapsed unless UC is agentic)        │
+│                                                                          │
+│  ┌─── DERIVED SIZING ──────────────────────────────────────────────┐  │
+│  │  P95 RPS: 0.21   Concurrent: 1   TP_i: 4 GPUs                    │  │
+│  │  Base: 4 GPUs  +Buffers: 8  Total: 12 GPUs                       │  │
+│  │  = 1 rack (partial)  ·  3.2kW                                     │  │
+│  │                                                                    │  │
+│  │  ┌──────────────────────────────────────────────────────────┐  │  │
+│  │  │ ✓ SLA MET — TTFT 180ms vs 200ms target (10% margin)        │  │  │
+│  │  └──────────────────────────────────────────────────────────┘  │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                          │
+│  ▸ Make vs Buy — On-prem vs API (Section 8 chart, this UC's context)  │
+│                                                                          │
+│  [Remove]                                              [▴ Collapse]   │
+└──────────────────────────────────────────────────────────────────────┘
+│ Crop Disease Detection  │ 50,000 │ H200  │ 3    │ 0.9kW │ ✓ Met  │  ▸   │
+└────────────────────────┴────────┴───────┴──────┴───────┴────────┴──────┘
+```
+
+### Field type rules (slider vs dropdown vs number input)
+
+| Field | Type | Why |
+|---|---|---|
+| Domain | Dropdown | Categorical, drives UC library filtering + model recommendation |
+| UC Library Match | Dropdown (+ ad-hoc) | Pick existing UC or define new |
+| AI Model | Dropdown | Categorical (103 in model_catalogue), filtered by domain/precision |
+| UC Type | Dropdown | Categorical (Chatbot/Text/RAG/Vision/Agentic/Batch/Voice) — drives RAG field visibility and SLA defaults |
+| Tenant | Dropdown (+ new) | Which customer/department this workload serves — see Section 10 |
+| DAU | Slider (log scale) | Biggest single lever on sizing — seeing GPU count change while dragging is the point |
+| Peak multiplier | Slider (1x–10x) | Continuous range, impact-driven exploration |
+| Requests/user/day | Number input | User typically knows this precisely from UC library or direct knowledge |
+| Avg input/output tokens | Number input | Same — known value, not an exploratory range |
+| RAG retrieval latency budget | Number input (conditional) | Only shown when UC Type = RAG; subtracted from TTFT target before generation budget calculated |
+| GPU | Dropdown | Categorical (12 options) |
+| Precision | Dropdown | Categorical (FP16/INT8/INT4/FP4) |
+| SLA tier | Dropdown | Categorical (Tier 1/2/3) |
+| HA / Failover | Dropdown | None / N+1 / 2N — maps to SizingEngine's existing `ha_required` param, previously had no UI |
+| DR Type | Dropdown | None / Warm Standby / Active-Active — maps to existing `dr_type` param, previously had no UI |
+| Deployment mode / Model hosting | Radio toggle (2 options) | Binary choice, not a range |
+
+### RAG indicator — visual treatment (corrected 30 June 2026)
+
+Not a buried dropdown value — a visible badge on both the summary table row
+and inside the expanded form, since RAG genuinely changes sizing
+characteristics (retrieval latency adds to the TTFT budget before
+generation even starts):
+
+```
+Summary table:  GLOF Early Warning System  🔍 RAG    [other columns...]
+
+Expanded form, when UC Type = RAG, shows an additional highlighted field:
+  Retrieval Latency Budget (ms)
+  "RAG-enabled — this latency is subtracted from TTFT target before
+   the generation budget is calculated, so the SLA banner reflects
+   the true generation-only budget."
+```
+
+### Real-time SLA verification (live on every field change)
+
+Not a quiet line inside the sizing panel — a dedicated, colour-coded banner,
+impossible to miss, exactly matching the pattern from Inferencing Factory's
+`renderPerf`/TTFT display:
+
+```
+✓ SLA MET     — green banner, shows margin (e.g. "10% margin")
+✗ SLA BREACH  — red banner, shows overage % AND an actionable hint:
+                 "Try: lower precision, add GPU, raise SLA tier"
+```
+
+Updates instantly on every input change — same call to
+`SizingEngine.sizeUC()`/`sizeMaaS()` that updates the GPU count also
+re-evaluates this banner, no separate logic path.
+
+### Animation
+
+Row expansion: smooth height transition on click (measured-height JS
+transition, since dynamic form content makes pure CSS `max-height`
+unreliable). Arrow rotates 90° on expand. Table rows below the expanded
+one shift down smoothly rather than jumping. Collapse reverses the same
+transition. Multiple rows may be expanded at once.
+
+### Add-new flow
+
+```
+[+ Add UC Workload]   (shown only within the UCs tab)
+[+ Add MaaS Pool]     (shown only within the MaaS tab)
+[+ Add GPUaaS]        (shown only within the GPUaaS tab)
+[+ Add BMaaS]         (shown only within the BMaaS tab)
+```
+
+**Section 9 prototype status: UCs tab built and confirmed (30 June 2026)
+— Domain, AI Model, UC Type, RAG badge + conditional field, HA/Failover,
+DR Type, Tenant dropdown all implemented. MaaS/GPUaaS/BMaaS tabs deferred
+until Section 10 (Tenant modeling) is resolved, since they are coupled.**
+
+---
+
+## 10. Tenant Modeling (decided 30 June 2026)
+
+### What problem this solves
+
+Without tenant attribution, OPERATE is one undifferentiated cost bucket —
+nobody can answer "what did Department X actually cost/consume," which
+makes cost-recovery or chargeback commercially indefensible. It is also
+the literal mechanism that makes a real, already-captured requirement
+buildable: HAICE req-002 — *"Must serve all 50 government departments as
+tenants with separate billing per department"* — currently has no
+implementation path without this.
+
+### Two consumption patterns, now confirmed as one consistent mechanism
+
+A tenant can consume in either or both ways simultaneously:
+
+| Pattern | Description | Maps to |
+|---|---|---|
+| **Curated UCs** | We size and run specific applications for the tenant (chatbot, document processing, GLOF warning) — tenant thinks in outcomes, not GPUs | UC tab, `tenant` field (already added) |
+| **Raw capacity** | Tenant buys dedicated GPU/server capacity and runs their own workloads on it — tenant thinks in compute units, like a cloud VM | GPUaaS / BMaaS tabs |
+
+### Pool type — corrected to apply uniformly across ALL four tabs
+
+Initial framing treated GPUaaS/BMaaS as inherently "Reserved" by nature.
+**Corrected:** Reserved vs Open is a genuine commitment/pricing dimension
+that applies identically to all four consumption types — UC, MaaS,
+GPUaaS, and BMaaS — matching the familiar cloud-market pattern (AWS
+Reserved Instances vs Spot/On-Demand), which customers will recognise
+without new explanation.
+
+```
+RESERVED (committed term)
+  Tenure: 12mo / 24mo / 36mo / custom
+  SLA: Enterprise
+  Pricing: committed-use rate (lower $/unit)
+  Capacity: guaranteed, dedicated, never contended
+
+OPEN / SPOT (no commitment)
+  Tenure: none (pay-as-you-go) or short-term
+  SLA: Standard
+  Pricing: on-demand rate (higher $/unit)
+  Capacity: best-effort, shared pool, may be deprioritised at peak
+```
+
+This directly resolves the earlier MaaS confusion: **Standard vs
+Enterprise SLA**, already present in the MaaS model per usage type, was
+a property of the model offering with no tenant attached. Corrected
+model — per model offered:
+
+```
+Model: Llama-3.3-70B
+  OPEN POOL allocation       — X GPUs, Standard SLA, any tenant may call
+  TENANT-RESERVED allocations — zero or more, one per reserving tenant:
+      Tenant: State IT Dept   → Y1 GPUs reserved, Enterprise SLA, 24mo
+      Tenant: Health Dept     → Y2 GPUs reserved, Enterprise SLA, 12mo
+  TOTAL for this model = Open Pool (X) + Σ Tenant Reservations (Σ Yn)
+```
+
+GPUaaS/BMaaS gain the identical Reserved/Open toggle — a tenant buying
+raw GPU capacity can commit to a 24-month reservation (lower rate,
+guaranteed) or draw from an open/spot pool (higher rate, no commitment,
+best-effort).
+
+### Uniform Tenant block — same fields, all four tabs
+
+```
+TENANT
+  Tenant identity          [dropdown / + new]
+  Pool type                 ⦿ Reserved   ○ Open/Spot
+  IF Reserved: Tenure       [12mo / 24mo / 36mo / custom]
+  Chargeout model           [Commercial / Cost-recovery / Subsidised / Zero]
+  Security tier             [S1 / S2 / S3 / S4]
+```
+
+Matches `tenant_configs` table already defined in blueprint Section 25
+(`oversubscription_factor`, `chargeout_model`, `security_tier` fields
+anticipated there, never previously wired to a UI).
+
+### Value confirmed (30 June 2026 discussion)
+
+For the seller: per-tenant cost attribution is the foundation of any
+chargeback model, and is pure upside on the BOM/commercial side — same
+sizing work, richer output. For the buyer: defensible internal chargeback
+("here's exactly what Department X cost"), and genuine choice between
+curated low-complexity UCs vs raw capacity for their own data science
+teams, plus a familiar Reserved/Spot commitment trade-off they already
+understand from cloud experience.
+
+### Schema implication
+
+`tenant_configs` (blueprint Section 25) extended with:
+
+```sql
+ALTER TABLE tenant_configs
+  ADD COLUMN IF NOT EXISTS pool_type     text DEFAULT 'open'
+    CHECK (pool_type IN ('reserved','open')),
+  ADD COLUMN IF NOT EXISTS tenure_months int;  -- null if pool_type = 'open'
+```
+
+`workload_configs` (Section 6) extended with:
+
+```sql
+ALTER TABLE workload_configs
+  ADD COLUMN IF NOT EXISTS tenant_id text;  -- FK to tenant_configs, null = unattributed
+```
+
+**Tenant block prototype status (30 June 2026): built and confirmed working
+identically across UC, MaaS, and GPUaaS tabs — Tenant Management panel,
+Pool Type toggle (Reserved/Open), conditional Tenure dropdown, auto-derived
+SLA, security tier and chargeout display, all via one shared
+`renderTenantBlock()` function. See Section 11 for the MaaS-specific engine
+reconciliation that followed.**
+
+---
+
+## 11. MaaS Sizing — Model-Driven, Not Archetype-Driven (decided 30 June 2026)
+
+### Source of truth discovered
+
+`standards/MaaS_Sizing_Notes.md` — a detailed implementation log against an
+"Infrastructure Sizing Blueprint for Model-as-a-Service," last updated
+26 June 2026, predates this Workload Profiler prototype and contains the
+authoritative `sizeMaaS()` formula derivation (V_catalog, TP_i/B_max/I_i
+three-step sizing, three-layer buffer model, host-level RAM/NVMe sizing).
+This document is the formula source of truth — this spec section records
+how the Workload Profiler design reconciles with it.
+
+### The conflict found and resolved
+
+The live `sizeMaaS(config, gpuConfigId)` engine required `archetype_id`
+(one of 8 `requirement_archetypes` — Text/Chat, Coding, Document, Audio,
+Indic, Generic) as the **primary required input**, with `model_id` used
+only to read `params_b`. This directly conflicted with the Tenant/per-model
+redesign already underway in this spec, and with a direct objection:
+*"When I buy API from Gemini/Claude we don't buy for an archetype, no?"*
+— correct. No commercial API product is purchased by abstract usage-type
+category; a specific model is always the unit of purchase.
+
+**Resolved: `model_id` is now the primary required input. `archetype_id`
+is optional, preset-only — pre-fills demand-shape fields once when a row
+is first created, never required, never a stored dependency.**
+
+```javascript
+// Demand-shape resolution order (shared/sasc-sizing.js, sizeMaaS()):
+reqPerDay   = config.requests_per_day
+            || model.default_requests_per_day        // from model_catalogue
+            || presetCfg.requests_per_user_per_day    // optional archetype preset
+            || 5                                       // hardcoded fallback
+// avg_input_tokens, avg_output_tokens, context_window_k follow the same
+// explicit -> model default -> optional preset -> fallback order
+```
+
+`requirement_archetypes` is not deleted — it remains usable as a
+quick-start preset (same UX pattern as the UC tab's complexity-tier
+buttons), but the engine no longer requires it and never stores it as a
+dependency on the sized result.
+
+### Pool type now drives SLA tier directly
+
+The existing Standard/Enterprise SLA distinction in `sizeMaaS()`
+(TTFT 2000ms vs 1000ms, different buffer percentages) is preserved exactly
+as documented in `MaaS_Sizing_Notes.md` — but is now explicitly derived
+from the Tenant block's Pool Type (Section 10), closing the loop between
+the two design threads:
+
+```
+pool_type = 'reserved'  →  sla_tier = 'enterprise'  (unless explicitly overridden)
+pool_type = 'open'      →  sla_tier = 'standard'    (default)
+```
+
+### Pass-through / upstream API reselling — dropped from MaaS entirely
+
+Considered and rejected for Phase A (30 June 2026 discussion):
+
+**Against:** introduces a third-party billing/reselling relationship with
+real commercial complexity (upstream contracts, margin stacking, outage
+liability), and directly undermines the sovereignty pitch central to most
+archetypes (TSAP, Defence) — "your data stays on sovereign infrastructure"
+is incompatible with a MaaS catalogue entry that silently calls a US-based
+upstream API. It also does zero GPU sizing work, making it an architectural
+distraction inside a tool whose purpose is GPU sizing.
+
+**For (acknowledged, not pursued now):** real commercial pattern (Azure AI
+Foundry, AWS Bedrock model marketplaces), gives access to frontier
+closed-weight models without us needing GPU capacity for them.
+
+**Decision: every MaaS row is self-hosted by definition. The
+Self-hosted/Pass-through toggle is removed entirely from the Workload
+Profiler.** If wanted later, pass-through belongs in **B5I — AI API
+Marketplace** (already a distinct portfolio item from B5E MaaS in the
+blueprint), built as a clearly separate, clearly-labelled capability —
+logged to `ATLAS_Feature_Backlog.md`, not built now.
+
+### Model Tier dropdown also removed (same redundancy as Archetype)
+
+A separate "Model Tier" (Basic/Mid/Advanced) dropdown was also found
+redundant once Model is the primary selector — a specific model like
+Llama-3.3-70B already implies its tier. Tier is now derived from the
+selected model (by parameter count) for internal sizing logic only, never
+shown as a separate user-facing input.
+
+### What stays exactly as documented (no change needed)
+
+Confirmed correct, carried forward unchanged from `MaaS_Sizing_Notes.md`:
+the three-step formula (V_catalog → TP_i/B_max/I_i → buffer layers),
+75-80% derating guardrail, RAM 2-3× VRAM / NVMe 20TB-per-node host sizing,
+Multi-LoRA and shared-VRAM pooling correctly deferred (Phase 1 scope
+decision, independently matches this spec's Option A pooling deferral —
+see Section 7, item 1 backlog reference).
+
+### Known gap carried forward (not solved here, not forgotten)
+
+`host_sizing` (RAM/NVMe) is computed by `fleetTotal()` but explicitly
+flagged in the source document as **"Pending — not yet wired to
+calculateBOM()."** This predates this spec and remains open — logged to
+`ATLAS_Feature_Backlog.md` so it is not lost a second time.
+
+### Engine change applied (30 June 2026)
+
+`shared/sasc-sizing.js` `sizeMaaS()` rewritten and pushed to `main`:
+model-driven demand resolution, pool_type→SLA derivation, return shape
+updated (`model_id`/`model_name`/`pool_type` replace `usage_type`),
+`fleetTotal()` allocation label updated to match. Workload Profiler
+prototype (v4) updated to match: Model dropdown replaces Archetype and
+Model Tier, Self-hosted/Pass-through toggle removed entirely.
+
+**Next step: wire Controllers — replace all DUMMY data and placeholder
+sizing math in the Workload Profiler prototype with real `atlasDB` calls
+and real `SizingEngine.sizeUC()`/`sizeMaaS()` calls, per the same V→M→C
+sequence used for the Docket.**

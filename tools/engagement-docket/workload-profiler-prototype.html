@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — Workload Profiler Prototype</title>
+<style>
+/* ── Design tokens (subset of atlas.css for standalone preview) ──────────── */
+:root {
+  --navy:#002870; --orange:#FF5539; --teal:#00B290; --amber:#FFB600; --blue:#1C38F5;
+  --dark:#111827; --mid:#6B7280; --light:#F8F9FA; --border:#E5E7EB; --white:#fff; --bg:#F0F2F5;
+  --font:'Roboto',-apple-system,sans-serif; --font-mono:'Roboto Mono',monospace;
+  --r:8px; --r-sm:5px; --r-full:9999px;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-8:32px;
+}
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;900&family=Roboto+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--dark);font-size:13px;line-height:1.5}
+.wrap{max-width:1300px;margin:0 auto;padding:var(--sp-6)}
+
+/* Header */
+.hdr{background:var(--navy);color:#fff;padding:var(--sp-4) var(--sp-6);display:flex;align-items:center;gap:var(--sp-3)}
+.hdr .brand{font-weight:900;letter-spacing:3px;font-size:18px}
+.hdr .brand span{color:var(--orange)}
+.hdr .crumb{font-size:12px;color:rgba(255,255,255,.65)}
+.hdr .crumb b{color:#fff;font-weight:600}
+
+/* Tabs */
+.tabbar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:var(--sp-5);background:#fff;border-radius:var(--r) var(--r) 0 0;padding:0 var(--sp-4)}
+.tabbtn{padding:var(--sp-3) var(--sp-4);font-size:13px;font-weight:600;color:var(--mid);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;font-family:var(--font);margin-bottom:-2px;transition:color .15s}
+.tabbtn.active{color:var(--navy);border-bottom-color:var(--orange)}
+.tabbtn .cnt{background:var(--light);color:var(--mid);font-size:10px;padding:1px 6px;border-radius:var(--r-full);margin-left:6px}
+.tabbtn.active .cnt{background:rgba(255,85,57,.12);color:var(--orange)}
+
+/* GPU default bar */
+.gpu-default{display:flex;align-items:center;gap:var(--sp-3);background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-4);font-size:12px}
+.gpu-default label{font-weight:700;color:var(--mid);text-transform:uppercase;font-size:10px;letter-spacing:.4px}
+.gpu-default select{padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:var(--font);font-size:12px}
+
+/* Table */
+.tablewrap{background:#fff;border-radius:var(--r);border:1px solid var(--border);overflow:hidden;margin-bottom:var(--sp-4)}
+table.wl{width:100%;border-collapse:collapse}
+table.wl thead th{background:var(--navy);color:#fff;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding:var(--sp-2) var(--sp-3);font-weight:700}
+table.wl thead th.num{text-align:right}
+table.wl tbody tr.row-main{cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s}
+table.wl tbody tr.row-main:hover{background:var(--light)}
+table.wl tbody tr.row-main.open{background:rgba(0,40,112,.03)}
+table.wl td{padding:var(--sp-2) var(--sp-3);font-size:12.5px}
+table.wl td.num{text-align:right;font-family:var(--font-mono);font-size:12px}
+table.wl td.name{font-weight:600;color:var(--dark)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--r-full);font-size:10px;font-weight:700}
+.badge-met{background:rgba(0,178,144,.12);color:var(--teal)}
+.badge-breach{background:rgba(255,85,57,.12);color:var(--orange)}
+.arrow{display:inline-block;transition:transform .25s;font-size:10px;color:var(--mid)}
+.row-main.open .arrow{transform:rotate(90deg)}
+.totals-row td{background:var(--light);font-weight:700;border-top:2px solid var(--border);padding:var(--sp-2) var(--sp-3)}
+
+/* Expand panel */
+.expand-row td{padding:0;border-bottom:1px solid var(--border)}
+.expand-inner{max-height:0;overflow:hidden;transition:max-height .35s ease}
+.expand-inner.open{max-height:2200px;transition:max-height .45s ease}
+.expand-pad{padding:var(--sp-5);background:#FAFBFC}
+
+.formgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-4);margin-bottom:var(--sp-4)}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.4px}
+.fg select,.fg input[type=number],.fg input[type=text]{padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:var(--font);font-size:12.5px;background:#fff}
+.fg select:focus,.fg input:focus{outline:none;border-color:var(--blue)}
+.fg-hint{font-size:10px;color:var(--mid)}
+
+.radiorow{display:flex;flex-direction:column;gap:6px}
+.radio-opt{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}
+.radio-opt input{accent-color:var(--navy)}
+
+.sliderwrap{display:flex;align-items:center;gap:var(--sp-3)}
+.sliderwrap input[type=range]{flex:1;accent-color:var(--navy);height:4px}
+.slider-val{font-size:16px;font-weight:900;color:var(--navy);min-width:64px;text-align:right;font-family:var(--font-mono)}
+
+.collapsible{margin-bottom:var(--sp-3)}
+.collapsible-hdr{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--navy);padding:6px 0;user-select:none}
+.collapsible-hdr .arrow{color:var(--navy)}
+.collapsible-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.collapsible-body.open{max-height:600px}
+.collapsible-body-pad{padding:var(--sp-3) 0 var(--sp-2)}
+
+.derived{background:var(--navy);color:#fff;border-radius:var(--r);padding:var(--sp-4);margin-top:var(--sp-2)}
+.derived-line{display:flex;gap:var(--sp-5);flex-wrap:wrap;font-size:11.5px;color:rgba(255,255,255,.85);margin-bottom:4px}
+.derived-line b{color:#fff}
+.sla-banner{margin-top:var(--sp-3);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-sm);font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:8px}
+.sla-met{background:rgba(0,178,144,.18);color:#5EEAD4}
+.sla-breach{background:rgba(255,85,57,.2);color:#FCA5A5}
+.sla-hint{font-weight:400;font-size:11px;opacity:.85;margin-left:auto}
+
+.rag-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(28,56,245,.1);color:var(--blue);padding:3px 10px;border-radius:var(--r-full);font-size:10px;font-weight:700;margin-left:8px}
+.tenant-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(0,178,144,.1);color:var(--teal);padding:2px 8px;border-radius:var(--r-full);font-size:10px;font-weight:600}
+.pool-badge-reserved{display:inline-flex;align-items:center;gap:3px;background:rgba(0,40,112,.1);color:var(--navy);padding:2px 7px;border-radius:var(--r-full);font-size:9px;font-weight:700}
+.pool-badge-open{display:inline-flex;align-items:center;gap:3px;background:rgba(255,182,0,.12);color:#92400E;padding:2px 7px;border-radius:var(--r-full);font-size:9px;font-weight:700}
+
+/* Tenant management panel */
+.tenant-mgmt{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:var(--sp-4);margin-bottom:var(--sp-4)}
+.tenant-mgmt-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-3)}
+.tenant-mgmt-title{font-size:13px;font-weight:700;color:var(--navy)}
+.tenant-chip-list{display:flex;flex-wrap:wrap;gap:8px}
+.tenant-chip{display:flex;align-items:center;gap:8px;padding:6px 12px;border:1.5px solid var(--border);border-radius:var(--r);font-size:11.5px;background:var(--light)}
+.tenant-chip b{color:var(--dark)}
+.tenant-chip .sec{font-size:9px;color:#fff;background:var(--navy);padding:1px 6px;border-radius:var(--r-full)}
+.add-tenant-btn{padding:5px 12px;border-radius:var(--r-sm);font-size:11px;font-weight:700;border:1.5px dashed var(--teal);background:rgba(0,178,144,.05);color:var(--teal);cursor:pointer;font-family:var(--font)}
+
+/* Reusable tenant block (within any expanded row) */
+.tenant-block{background:rgba(0,178,144,.04);border:1px solid rgba(0,178,144,.25);border-radius:var(--r);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-4)}
+.tenant-block-hdr{font-size:10px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
+.pool-toggle{display:flex;gap:0;margin-top:4px}
+.pool-btn{padding:6px 14px;font-size:11px;font-weight:600;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:var(--font)}
+.pool-btn:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm)}
+.pool-btn:last-child{border-radius:0 var(--r-sm) var(--r-sm) 0;border-left:none}
+.pool-btn.active-reserved{background:var(--navy);color:#fff;border-color:var(--navy)}
+.pool-btn.active-open{background:var(--amber);color:#78350F;border-color:var(--amber)}
+.mvb-toggle{display:flex;gap:0;margin-bottom:var(--sp-3)}
+.mvb-btn{padding:5px 14px;font-size:11px;font-weight:600;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:var(--font)}
+.mvb-btn:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm)}
+.mvb-btn:last-child{border-radius:0 var(--r-sm) var(--r-sm) 0}
+.mvb-btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.mvb-chart{background:#fff;border:1px solid var(--border);border-radius:var(--r-sm);padding:var(--sp-4);font-size:11px;color:var(--mid)}
+
+.actions-row{display:flex;justify-content:space-between;align-items:center;margin-top:var(--sp-4)}
+.btn{padding:7px 16px;border-radius:var(--r-sm);font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:var(--font)}
+.btn-ghost{background:var(--light);color:var(--dark)}
+.btn-danger-text{background:none;color:var(--orange);border:1.5px solid var(--orange)}
+.add-row{padding:var(--sp-3) var(--sp-4)}
+.add-btn{padding:8px 18px;border-radius:var(--r-sm);font-size:12px;font-weight:700;border:1.5px dashed var(--navy);background:rgba(0,40,112,.03);color:var(--navy);cursor:pointer;font-family:var(--font)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="brand">ATL<span>A</span>S</div>
+  <div class="crumb">Docket &rsaquo; <b>HAICE</b> &rsaquo; Solution</div>
+</div>
+
+<div class="wrap">
+
+  <div class="gpu-default">
+    <label>Engagement default GPU</label>
+    <select id="defaultGpu" onchange="C.setDefaultGpu(this.value)">
+      <option value="h200">H200 SXM</option>
+      <option value="b200">B200 SXM</option>
+      <option value="gb200">GB200 NVL72</option>
+      <option value="l40s">L40S</option>
+    </select>
+    <span class="fg-hint">Pre-fills every new workload row — override per row anytime</span>
+  </div>
+
+  <div class="tabbar" id="tabbar"></div>
+  <div id="tabbody"></div>
+
+</div>
+
+<script>
+'use strict'
+
+// ═══════════════════ MODEL ═══════════════════
+var M = {
+  defaultGpu: 'h200',
+  activeTab: 'uc',
+  openRows: {},   // rowId -> bool
+  uc: [
+    {
+      id:'uc1', name:'GLOF Early Warning System', ucLib:'glof', gpu:null,
+      domain:'geospatial', model:'sarvam-2b', ucType:'rag', ragLatencyBudget:300,
+      deployMode:'production', dau:500, reqPerDay:12, peakMult:3,
+      inputTok:4096, outputTok:800, precision:'int4', slaTier:'tier1', ttftTarget:200,
+      haTier:'2n', drType:'active_active',
+      agentic:false, steps:1, toolWait:0,
+      tenant:'state-it-dept', poolType:'reserved', tenure:'24',
+      mvbView:'uc'
+    },
+    {
+      id:'uc2', name:'Crop Disease Detection', ucLib:'crop', gpu:null,
+      domain:'agriculture', model:'llama-3.1-8b', ucType:'vision', ragLatencyBudget:0,
+      deployMode:'production', dau:50000, reqPerDay:3, peakMult:4,
+      inputTok:1024, outputTok:300, precision:'int4', slaTier:'tier2', ttftTarget:2000,
+      haTier:'n1', drType:'none',
+      agentic:false, steps:1, toolWait:0,
+      tenant:'agri-dept', poolType:'open', tenure:null,
+      mvbView:'uc'
+    }
+  ],
+  maas: [
+    {
+      id:'maas1', name:'Llama-3.3-70B — Open Pool', model:'llama-3.3-70b', gpu:'b200',
+      precision:'int4', dau:50000, slaTier:'standard',
+      tenant:null, poolType:'open', tenure:null,
+      mvbView:'maas'
+    },
+    {
+      id:'maas2', name:'Llama-3.3-70B — State IT Reservation', model:'llama-3.3-70b', gpu:'b200',
+      precision:'int4', dau:8000, slaTier:'enterprise',
+      tenant:'state-it-dept', poolType:'reserved', tenure:'24',
+      mvbView:'maas'
+    }
+  ],
+  gpuaas: [
+    {
+      id:'gpuaas1', name:'Dedicated GPU Block — Health Dept', gpu:'h200',
+      gpuCount:16, tenant:'health-dept', poolType:'reserved', tenure:'36',
+      mvbView:'fleet'
+    }
+  ]
+}
+
+var GPU_LABELS = { h200:'H200 SXM', b200:'B200 SXM', gb200:'GB200 NVL72', l40s:'L40S' }
+var UC_LIB = { glof:'GLOF Early Warning System (UC Library)', crop:'Crop Disease Detection (UC Library)', adhoc:'+ Define ad-hoc' }
+var SLA_LABELS = { tier1:'Tier 1 — Interactive (<200ms)', tier2:'Tier 2 — Analytical (<2s)', tier3:'Tier 3 — Async Batch' }
+var ARCHETYPES = { text_chat:'Text / Chat', coding:'Coding', document:'Document', audio:'Audio / Speech', indic:'Indic / Regional', generic:'Generic / API' }
+var MODEL_TIERS = { basic:'Basic (1-14B)', mid:'Mid (14-70B)', advanced:'Advanced (70B+)' }
+
+var DOMAINS = { geospatial:'Geospatial', agriculture:'Agriculture', health:'Health', governance:'Governance', education:'Education', finance:'Finance', defence:'Defence' }
+var MODELS = {
+  'sarvam-2b':'Sarvam-2B (Indic, sovereign)', 'sarvam-m':'Sarvam-M (Indic, sovereign)',
+  'llama-3.1-8b':'Llama-3.1-8B', 'llama-3.3-70b':'Llama-3.3-70B', 'llama-3.1-405b':'Llama-3.1-405B',
+  'deepseek-coder-32b':'DeepSeek-Coder-V2 32B', 'qwen2.5-coder-32b':'Qwen2.5-Coder-32B',
+  'mistral-large':'Mistral Large 2 123B'
+}
+var UC_TYPES = {
+  chatbot:'Chatbot / Conversational', text:'Text Processing', rag:'RAG / Knowledge Retrieval',
+  vision:'Vision / Multimodal', agentic:'Agentic / Tool-use', batch:'Batch Processing', voice:'Voice / Audio'
+}
+var HA_TIERS = { none:'None', n1:'N+1 (standard)', n2:'2N (mission-critical)' }
+var DR_TYPES = { none:'None', warm:'Warm Standby (+50% DR site)', active_active:'Active-Active (+100% DR site)' }
+var TENANTS_LIST = {
+  'state-it-dept': { name:'State IT Department', secTier:'S2', chargeout:'cost_recovery' },
+  'agri-dept':     { name:'Agriculture Department', secTier:'S1', chargeout:'subsidised' },
+  'health-dept':   { name:'Health Department', secTier:'S2', chargeout:'cost_recovery' },
+  'public':        { name:'Public / Citizen-facing', secTier:'S1', chargeout:'zero' },
+}
+var CHARGEOUT_LABELS = { commercial:'Commercial', cost_recovery:'Cost Recovery', subsidised:'Subsidised', zero:'Zero (free)' }
+var TENURE_LABELS = { '12':'12 months', '24':'24 months', '36':'36 months', 'custom':'Custom' }
+
+// ═══════════════════ SIZING (calls real SizingEngine pattern — dummy math here) ═══════════════════
+// REFACTOR-MARKER: replace with real SizingEngine.sizeUC()/sizeMaaS() calls when C is wired
+function sizeUC(wl) {
+  var gpu = wl.gpu || M.defaultGpu
+  var avgRPS = (wl.dau * wl.reqPerDay) / 86400
+  var p95RPS = avgRPS * wl.peakMult * 1.5
+  var concurrent = Math.max(1, Math.ceil(p95RPS * (wl.ttftTarget/1000)))
+  var tpI = wl.precision === 'int4' ? 2 : wl.precision === 'int8' ? 4 : 8
+  var baseGpus = Math.max(1, Math.ceil(concurrent / 4) * tpI)
+  var buffers = Math.ceil(baseGpus * 0.65)
+  var total = baseGpus + buffers
+  var powerKw = Math.round(total * 0.7 * 10) / 10
+  var ttftEstimate = Math.round(wl.ttftTarget * (0.7 + Math.random()*0.25))
+  var slaMet = ttftEstimate <= wl.ttftTarget
+  var margin = Math.round(Math.abs((wl.ttftTarget - ttftEstimate) / wl.ttftTarget) * 100)
+  return {
+    gpu: gpu, p95RPS: Math.round(p95RPS*100)/100, concurrent: concurrent,
+    baseGpus: baseGpus, buffers: buffers, total: total, powerKw: powerKw,
+    racks: total <= 72 ? '1 rack (partial)' : Math.ceil(total/72) + ' racks',
+    ttftEstimate: ttftEstimate, slaMet: slaMet, margin: margin
+  }
+}
+function sizeMaaS(wl) {
+  var avgRPS = wl.dau / 86400 * 8
+  var throughput = Math.round(avgRPS * 4000)
+  var instances = Math.max(1, Math.ceil(throughput / 32000))
+  var modelSize = (wl.model||'').includes('405b') || (wl.model||'').includes('large') ? 'advanced'
+    : (wl.model||'').includes('70b') || (wl.model||'').includes('32b') ? 'mid' : 'basic'
+  var baseGpus = instances * (modelSize === 'advanced' ? 8 : modelSize === 'mid' ? 4 : 2)
+  var buffers = Math.ceil(baseGpus * 0.5)
+  var total = baseGpus + buffers
+  var powerKw = Math.round(total * 0.85 * 10) / 10
+  var cpst = (0.001 + Math.random()*0.003).toFixed(4)
+  return { gpu: wl.gpu, throughput: throughput, instances: instances, baseGpus: baseGpus,
+    buffers: buffers, total: total, powerKw: powerKw, racks: total<=72?'1 rack':Math.ceil(total/72)+' racks', cpst: cpst }
+}
+
+// ═══════════════════ VIEW ═══════════════════
+var V = {
+
+  renderTabs: function() {
+    var tabs = [
+      {key:'uc', label:'UCs', count:M.uc.length},
+      {key:'maas', label:'MaaS', count:M.maas.length},
+      {key:'gpuaas', label:'GPUaaS', count:M.gpuaas.length},
+      {key:'bmaas', label:'BMaaS', count:0},
+    ]
+    var html = ''
+    tabs.forEach(function(t){
+      html += '<button class="tabbtn'+(M.activeTab===t.key?' active':'')+'" onclick="C.switchTab(\''+t.key+'\')">'
+        + t.label + '<span class="cnt">'+t.count+'</span></button>'
+    })
+    document.getElementById('tabbar').innerHTML = html
+  },
+
+  renderTabBody: function() {
+    var el = document.getElementById('tabbody')
+    el.innerHTML = V.renderTenantMgmt()
+    if (M.activeTab === 'uc')     { el.innerHTML += V.renderUCTab(); return }
+    if (M.activeTab === 'maas')   { el.innerHTML += V.renderMaasTab(); return }
+    if (M.activeTab === 'gpuaas') { el.innerHTML += V.renderGpuaasTab(); return }
+    el.innerHTML += '<div class="tablewrap"><div style="padding:40px;text-align:center;color:var(--mid)">'
+      + 'No items in this category yet. Select the corresponding portfolio item in the Portfolio tab first.</div></div>'
+  },
+
+  renderTenantMgmt: function() {
+    var h = '<div class="tenant-mgmt">'
+    h += '<div class="tenant-mgmt-hdr"><div class="tenant-mgmt-title">Tenants — defined once, used across UC / MaaS / GPUaaS / BMaaS</div>'
+    h += '<button class="add-tenant-btn" onclick="C.addTenant()">+ Define New Tenant</button></div>'
+    h += '<div class="tenant-chip-list">'
+    Object.keys(TENANTS_LIST).forEach(function(k){
+      var t = TENANTS_LIST[k]
+      h += '<div class="tenant-chip"><b>'+t.name+'</b><span class="sec">'+t.secTier+'</span><span style="color:var(--mid)">'+CHARGEOUT_LABELS[t.chargeout]+'</span></div>'
+    })
+    h += '</div></div>'
+    return h
+  },
+
+  renderGpuaasTab: function() {
+    var rows = M.gpuaas, totalGpus = 0
+    var html = '<div class="tablewrap"><table class="wl"><thead><tr>'
+      + '<th>Block</th><th>GPU</th><th class="num">GPUs</th><th>Tenant</th><th></th></tr></thead><tbody>'
+    rows.forEach(function(wl) {
+      totalGpus += wl.gpuCount
+      var isOpen = !!M.openRows[wl.id]
+      var t = wl.tenant ? TENANTS_LIST[wl.tenant] : null
+      html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
+        + '<td class="name">'+wl.name+'</td>'
+        + '<td>'+GPU_LABELS[wl.gpu]+'</td>'
+        + '<td class="num">'+wl.gpuCount+'</td>'
+        + '<td>'+(t?'<span class="tenant-badge">'+t.name+'</span> <span class="pool-badge-'+wl.poolType+'">'+(wl.poolType==='reserved'?'&#128274; Reserved':'&#9889; Open'):'—')+'</td>'
+        + '<td><span class="arrow">&#9654;</span></td></tr>'
+      html += '<tr class="expand-row"><td colspan="5"><div class="expand-inner'+(isOpen?' open':'')+'">'
+      if (isOpen) {
+        html += '<div class="expand-pad">'
+        html += '<div class="formgrid" style="grid-template-columns:1fr 1fr"><div class="fg"><label>GPU</label><select onchange="C.updGpuaas(\''+wl.id+'\',\'gpu\',this.value)">'
+        Object.keys(GPU_LABELS).forEach(function(k2){ html += '<option value="'+k2+'"'+(wl.gpu===k2?' selected':'')+'>'+GPU_LABELS[k2]+'</option>' })
+        html += '</select></div><div class="fg"><label>GPU Count</label><input type="number" value="'+wl.gpuCount+'" onchange="C.updGpuaas(\''+wl.id+'\',\'gpuCount\',+this.value)"></div></div>'
+        html += V.renderTenantBlock(wl, 'gpuaas')
+        html += '<div class="actions-row"><button class="btn btn-danger-text" onclick="C.removeGpuaas(\''+wl.id+'\')">Remove</button><button class="btn btn-ghost" onclick="C.toggleRow(\''+wl.id+'\')">&#9650; Collapse</button></div>'
+        html += '</div>'
+      }
+      html += '</div></td></tr>'
+    })
+    html += '<tr class="totals-row"><td>TOTALS</td><td></td><td class="num">'+totalGpus+'</td><td colspan="2"></td></tr>'
+    html += '</tbody></table></div>'
+    html += '<div class="tablewrap add-row"><button class="add-btn" onclick="C.addGpuaas()">+ Add GPUaaS Block</button></div>'
+    return html
+  },
+
+  renderUCTab: function() {
+    var rows = M.uc, totalGpus = 0, totalPower = 0
+    var html = '<div class="tablewrap"><table class="wl"><thead><tr>'
+      + '<th>Use Case</th><th>Domain</th><th>Tenant</th><th class="num">DAU</th><th>GPU</th><th class="num">GPUs</th>'
+      + '<th class="num">Power</th><th>SLA</th><th></th></tr></thead><tbody>'
+
+    rows.forEach(function(wl) {
+      var sz = sizeUC(wl)
+      totalGpus += sz.total; totalPower += sz.powerKw
+      var isOpen = !!M.openRows[wl.id]
+      html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
+        + '<td class="name">'+wl.name+(wl.ucType==='rag'?'<span class="rag-badge">&#128269; RAG</span>':'')+'</td>'
+        + '<td>'+(DOMAINS[wl.domain]||'—')+'</td>'
+        + '<td>'+(wl.tenant ? '<span class="tenant-badge">'+TENANTS_LIST[wl.tenant].name+'</span> <span class="pool-badge-'+wl.poolType+'">'+(wl.poolType==="reserved"?"&#128274; Reserved":"&#9889; Open")+'</span>' : '<span style="color:var(--mid);font-size:10px">Open Pool</span>') + '</td>'
+        + '<td class="num">'+wl.dau.toLocaleString()+'</td>'
+        + '<td>'+GPU_LABELS[sz.gpu]+'</td>'
+        + '<td class="num">'+sz.total+'</td>'
+        + '<td class="num">'+sz.powerKw+'kW</td>'
+        + '<td><span class="badge '+(sz.slaMet?'badge-met':'badge-breach')+'">'+(sz.slaMet?'✓ Met':'✗ Breach')+'</span></td>'
+        + '<td><span class="arrow">&#9654;</span></td>'
+        + '</tr>'
+      html += '<tr class="expand-row"><td colspan="9"><div class="expand-inner'+(isOpen?' open':'')+'" id="exp-'+wl.id+'">'
+        + (isOpen ? V.renderUCForm(wl, sz) : '') + '</div></td></tr>'
+    })
+
+    html += '<tr class="totals-row"><td>TOTALS</td><td></td><td></td><td></td>'
+      + '<td class="num">'+totalGpus+'</td><td class="num">'+Math.round(totalPower*10)/10+'kW</td><td colspan="2"></td></tr>'
+    html += '</tbody></table></div>'
+    html += '<div class="tablewrap add-row"><button class="add-btn" onclick="C.addUC()">+ Add UC Workload</button></div>'
+    return html
+  },
+
+  renderUCForm: function(wl, sz) {
+    var h = '<div class="expand-pad">'
+
+    // Row 0: UC Library, Domain, Tenant
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>UC Library Match</label><select onchange="C.updUC(\''+wl.id+'\',\'ucLib\',this.value)">'
+    Object.keys(UC_LIB).forEach(function(k){ h += '<option value="'+k+'"'+(wl.ucLib===k?' selected':'')+'>'+UC_LIB[k]+'</option>' })
+    h += '</select></div>'
+
+    h += '<div class="fg"><label>Domain</label><select onchange="C.updUC(\''+wl.id+'\',\'domain\',this.value)">'
+    Object.keys(DOMAINS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.domain===k?' selected':'')+'>'+DOMAINS[k]+'</option>' })
+    h += '</select></div>'
+    h += '<div></div>'
+    h += '</div>'
+
+    h += V.renderTenantBlock(wl, 'uc')
+
+    // Row 0b: AI Model, UC Type, GPU
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>AI Model</label><select onchange="C.updUC(\''+wl.id+'\',\'model\',this.value)">'
+    Object.keys(MODELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.model===k?' selected':'')+'>'+MODELS[k]+'</option>' })
+    h += '</select></div>'
+
+    h += '<div class="fg"><label>UC Type</label><select onchange="C.updUC(\''+wl.id+'\',\'ucType\',this.value)">'
+    Object.keys(UC_TYPES).forEach(function(k){ h += '<option value="'+k+'"'+(wl.ucType===k?' selected':'')+'>'+UC_TYPES[k]+'</option>' })
+    h += '</select></div>'
+
+    h += '<div class="fg"><label>GPU</label><select onchange="C.updUC(\''+wl.id+'\',\'gpu\',this.value)">'
+    h += '<option value="">(default: '+GPU_LABELS[M.defaultGpu]+')</option>'
+    Object.keys(GPU_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.gpu===k?' selected':'')+'>'+GPU_LABELS[k]+'</option>' })
+    h += '</select></div>'
+    h += '</div>'
+
+    // RAG latency budget — only shown when UC Type = rag
+    if (wl.ucType === 'rag') {
+      h += '<div class="formgrid" style="grid-template-columns:1fr 2fr;background:rgba(28,56,245,.04);padding:10px;border-radius:6px;margin-bottom:16px">'
+      h += '<div class="fg"><label>Retrieval Latency Budget (ms)</label><input type="number" value="'+wl.ragLatencyBudget+'" onchange="C.updUC(\''+wl.id+'\',\'ragLatencyBudget\',+this.value)"></div>'
+      h += '<div class="fg-hint" style="align-self:center">&#128269; RAG-enabled — this latency is subtracted from TTFT target before the generation budget is calculated, so the SLA banner reflects the true generation-only budget.</div>'
+      h += '</div>'
+    }
+
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>Deployment Mode</label><div class="radiorow">'
+    h += '<label class="radio-opt"><input type="radio" name="dm-'+wl.id+'" '+(wl.deployMode==='production'?'checked':'')+' onchange="C.updUC(\''+wl.id+'\',\'deployMode\',\'production\')"> Production (on-prem)</label>'
+    h += '<label class="radio-opt"><input type="radio" name="dm-'+wl.id+'" '+(wl.deployMode==='pilot'?'checked':'')+' onchange="C.updUC(\''+wl.id+'\',\'deployMode\',\'pilot\')"> Pilot/Validation (API)</label>'
+    h += '</div></div>'
+
+    h += '<div class="fg"><label>HA / Failover</label><select onchange="C.updUC(\''+wl.id+'\',\'haTier\',this.value)">'
+    Object.keys(HA_TIERS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.haTier===k?' selected':'')+'>'+HA_TIERS[k]+'</option>' })
+    h += '</select></div>'
+
+    h += '<div class="fg"><label>DR Type</label><select onchange="C.updUC(\''+wl.id+'\',\'drType\',this.value)">'
+    Object.keys(DR_TYPES).forEach(function(k){ h += '<option value="'+k+'"'+(wl.drType===k?' selected':'')+'>'+DR_TYPES[k]+'</option>' })
+    h += '</select></div>'
+    h += '</div>'
+
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>DAU</label><div class="sliderwrap">'
+      + '<input type="range" min="100" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" '
+      + 'oninput="C.updUCSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
+      + '<span class="slider-val" id="dauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div></div>'
+
+    h += '<div class="fg"><label>Requests / User / Day</label><input type="number" value="'+wl.reqPerDay+'" onchange="C.updUC(\''+wl.id+'\',\'reqPerDay\',+this.value)"></div>'
+
+    h += '<div class="fg"><label>Peak Multiplier</label><div class="sliderwrap">'
+      + '<input type="range" min="1" max="10" step="0.5" value="'+wl.peakMult+'" oninput="C.updUCSlider(\''+wl.id+'\',\'peakMult\',+this.value)">'
+      + '<span class="slider-val" id="pmval-'+wl.id+'">'+wl.peakMult+'x</span></div></div>'
+    h += '</div>'
+
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>Avg Input Tokens</label><input type="number" value="'+wl.inputTok+'" onchange="C.updUC(\''+wl.id+'\',\'inputTok\',+this.value)"></div>'
+    h += '<div class="fg"><label>Avg Output Tokens</label><input type="number" value="'+wl.outputTok+'" onchange="C.updUC(\''+wl.id+'\',\'outputTok\',+this.value)"></div>'
+    h += '<div class="fg"><label>Precision</label><select onchange="C.updUC(\''+wl.id+'\',\'precision\',this.value)">'
+    ;['int4','int8','fp16','fp8'].forEach(function(p){ h += '<option value="'+p+'"'+(wl.precision===p?' selected':'')+'>'+p.toUpperCase()+'</option>' })
+    h += '</select></div>'
+    h += '</div>'
+
+    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr">'
+    h += '<div class="fg"><label>SLA Tier</label><select onchange="C.updUC(\''+wl.id+'\',\'slaTier\',this.value)">'
+    Object.keys(SLA_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.slaTier===k?' selected':'')+'>'+SLA_LABELS[k]+'</option>' })
+    h += '</select></div>'
+    h += '<div class="fg"><label>TTFT Target (ms)</label><input type="number" value="'+wl.ttftTarget+'" onchange="C.updUC(\''+wl.id+'\',\'ttftTarget\',+this.value)"></div>'
+    h += '</div>'
+
+    // Agentic collapsible
+    h += '<div class="collapsible">'
+    h += '<div class="collapsible-hdr" onclick="C.toggleCollapsible(this)"><span class="arrow">&#9654;</span> Agentic workflow (optional)</div>'
+    h += '<div class="collapsible-body"><div class="collapsible-body-pad"><div class="formgrid" style="grid-template-columns:1fr 1fr">'
+    h += '<div class="fg"><label>Steps</label><input type="number" value="'+wl.steps+'" onchange="C.updUC(\''+wl.id+'\',\'steps\',+this.value)"></div>'
+    h += '<div class="fg"><label>Tool Wait (ms)</label><input type="number" value="'+wl.toolWait+'" onchange="C.updUC(\''+wl.id+'\',\'toolWait\',+this.value)"></div>'
+    h += '</div></div></div></div>'
+
+    // Derived sizing
+    h += '<div class="derived">'
+    h += '<div class="derived-line">P95 RPS: <b>'+sz.p95RPS+'</b> &nbsp; Concurrent: <b>'+sz.concurrent+'</b> &nbsp; GPU: <b>'+GPU_LABELS[sz.gpu]+'</b></div>'
+    h += '<div class="derived-line">Base: <b>'+sz.baseGpus+'</b> GPUs &nbsp; +Buffers: <b>'+sz.buffers+'</b> &nbsp; Total: <b>'+sz.total+'</b> GPUs</div>'
+    h += '<div class="derived-line">= <b>'+sz.racks+'</b> &nbsp;&middot;&nbsp; <b>'+sz.powerKw+'kW</b></div>'
+    h += '<div class="sla-banner '+(sz.slaMet?'sla-met':'sla-breach')+'">'
+      + (sz.slaMet ? '&#10003; SLA MET' : '&#10007; SLA BREACH') + ' — TTFT '+sz.ttftEstimate+'ms vs '+wl.ttftTarget+'ms target ('+sz.margin+'% '+(sz.slaMet?'margin':'over')+')'
+      + (sz.slaMet ? '' : '<span class="sla-hint">Try: lower precision impact, add GPU, raise SLA tier</span>')
+      + '</div>'
+    h += '</div>'
+
+    // Make vs Buy collapsible
+    h += '<div class="collapsible" style="margin-top:var(--sp-3)">'
+    h += '<div class="collapsible-hdr" onclick="C.toggleCollapsible(this)"><span class="arrow">&#9654;</span> Make vs Buy — On-prem vs API</div>'
+    h += '<div class="collapsible-body"><div class="collapsible-body-pad">'
+    h += V.renderMvBChart(wl, 'uc')
+    h += '</div></div></div>'
+
+    h += '<div class="actions-row">'
+    h += '<button class="btn btn-danger-text" onclick="C.removeUC(\''+wl.id+'\')">Remove</button>'
+    h += '<button class="btn btn-ghost" onclick="C.toggleRow(\''+wl.id+'\')">&#9650; Collapse</button>'
+    h += '</div>'
+
+    h += '</div>'
+    return h
+  },
+
+  renderMaasTab: function() {
+    var rows = M.maas, totalGpus = 0, totalPower = 0
+    var html = '<div class="tablewrap"><table class="wl"><thead><tr>'
+      + '<th>Pool</th><th>Model</th><th>Tenant</th><th class="num">DAU</th><th>GPU</th><th class="num">GPUs</th>'
+      + '<th class="num">Power</th><th class="num">CPST</th><th></th></tr></thead><tbody>'
+
+    rows.forEach(function(wl) {
+      var sz = sizeMaaS(wl)
+      totalGpus += sz.total; totalPower += sz.powerKw
+      var isOpen = !!M.openRows[wl.id]
+      var t = wl.tenant ? TENANTS_LIST[wl.tenant] : null
+      html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
+        + '<td class="name">'+wl.name+'</td>'
+        + '<td>'+(MODELS[wl.model]||wl.model)+'</td>'
+        + '<td>'+(t ? '<span class="tenant-badge">'+t.name+'</span> <span class="pool-badge-'+wl.poolType+'">'+(wl.poolType==='reserved'?'&#128274; Reserved':'&#9889; Open'):'<span style="color:var(--mid);font-size:10px">Open Pool</span>')+'</td>'
+        + '<td class="num">'+wl.dau.toLocaleString()+'</td>'
+        + '<td>'+GPU_LABELS[sz.gpu]+'</td>'
+        + '<td class="num">'+sz.total+'</td>'
+        + '<td class="num">'+sz.powerKw+'kW</td>'
+        + '<td class="num">$'+sz.cpst+'</td>'
+        + '<td><span class="arrow">&#9654;</span></td>'
+        + '</tr>'
+      html += '<tr class="expand-row"><td colspan="9"><div class="expand-inner'+(isOpen?' open':'')+'">'
+        + (isOpen ? V.renderMaasForm(wl, sz) : '') + '</div></td></tr>'
+    })
+
+    html += '<tr class="totals-row"><td>TOTALS</td><td></td><td></td><td></td><td></td>'
+      + '<td class="num">'+totalGpus+'</td><td class="num">'+Math.round(totalPower*10)/10+'kW</td><td colspan="2"></td></tr>'
+    html += '</tbody></table></div>'
+    html += '<div class="tablewrap add-row"><button class="add-btn" onclick="C.addMaas()">+ Add MaaS Pool</button></div>'
+    return html
+  },
+
+  renderMaasForm: function(wl, sz) {
+    var h = '<div class="expand-pad">'
+
+    // Model is the primary selector — no archetype, no hosting toggle.
+    // Every MaaS row is self-hosted by definition (pass-through dropped
+    // 30 June 2026 — undermines sovereignty story, belongs in B5I
+    // Marketplace as a separate future capability, not MaaS sizing).
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>AI Model</label><select onchange="C.updMaas(\''+wl.id+'\',\'model\',this.value)">'
+    Object.keys(MODELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.model===k?' selected':'')+'>'+MODELS[k]+'</option>' })
+    h += '</select></div>'
+    h += '<div class="fg"><label>GPU</label><select onchange="C.updMaas(\''+wl.id+'\',\'gpu\',this.value)">'
+    Object.keys(GPU_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.gpu===k?' selected':'')+'>'+GPU_LABELS[k]+'</option>' })
+    h += '</select></div>'
+    h += '<div class="fg"><label>Precision</label><select onchange="C.updMaas(\''+wl.id+'\',\'precision\',this.value)">'
+    ;['int4','int8','fp16','fp8'].forEach(function(p){ h += '<option value="'+p+'"'+((wl.precision||'int4')===p?' selected':'')+'>'+p.toUpperCase()+'</option>' })
+    h += '</select></div>'
+    h += '</div>'
+
+    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr">'
+    h += '<div class="fg"><label>DAU</label><div class="sliderwrap">'
+      + '<input type="range" min="100" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" oninput="C.updMaasSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
+      + '<span class="slider-val" id="madauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div></div>'
+    h += '<div class="fg"><label>SLA Tier</label><select onchange="C.updMaas(\''+wl.id+'\',\'slaTier\',this.value)">'
+    h += '<option value="standard"'+(wl.slaTier==='standard'?' selected':'')+'>Standard</option>'
+    h += '<option value="enterprise"'+(wl.slaTier==='enterprise'?' selected':'')+'>Enterprise</option>'
+    h += '</select></div>'
+    h += '</div>'
+
+    h += V.renderTenantBlock(wl, 'maas')
+
+    h += '<div class="derived">'
+    h += '<div class="derived-line">Throughput: <b>'+sz.throughput.toLocaleString()+'</b> tok/s &nbsp; Instances: <b>'+sz.instances+'</b></div>'
+    h += '<div class="derived-line">Base: <b>'+sz.baseGpus+'</b> GPUs &nbsp; +Buffers: <b>'+sz.buffers+'</b> &nbsp; Total: <b>'+sz.total+'</b> GPUs</div>'
+    h += '<div class="derived-line">= <b>'+sz.racks+'</b> &nbsp;&middot;&nbsp; <b>'+sz.powerKw+'kW</b> &nbsp;&middot;&nbsp; CPST: <b>$'+sz.cpst+'</b></div>'
+    h += '</div>'
+
+    h += '<div class="collapsible" style="margin-top:var(--sp-3)">'
+    h += '<div class="collapsible-hdr" onclick="C.toggleCollapsible(this)"><span class="arrow">&#9654;</span> Make vs Buy — On-prem vs API</div>'
+    h += '<div class="collapsible-body"><div class="collapsible-body-pad">'
+    h += V.renderMvBChart(wl, 'maas')
+    h += '</div></div></div>'
+
+    h += '<div class="actions-row">'
+    h += '<button class="btn btn-danger-text" onclick="C.removeMaas(\''+wl.id+'\')">Remove</button>'
+    h += '<button class="btn btn-ghost" onclick="C.toggleRow(\''+wl.id+'\')">&#9650; Collapse</button>'
+    h += '</div>'
+    h += '</div>'
+    return h
+  },
+
+  // ── Reusable Tenant block — used identically in UC, MaaS, GPUaaS, BMaaS ──
+  renderTenantBlock: function(wl, contextLabel) {
+    var t = wl.tenant ? TENANTS_LIST[wl.tenant] : null
+    var h = '<div class="tenant-block">'
+    h += '<div class="tenant-block-hdr">Tenant Attribution</div>'
+
+    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0">'
+    h += '<div class="fg"><label>Tenant</label><select onchange="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'tenant\',this.value)">'
+    h += '<option value="">— Open Pool (no specific tenant) —</option>'
+    Object.keys(TENANTS_LIST).forEach(function(k){ h += '<option value="'+k+'"'+(wl.tenant===k?' selected':'')+'>'+TENANTS_LIST[k].name+'</option>' })
+    h += '</select></div>'
+
+    h += '<div class="fg"><label>Pool Type</label><div class="pool-toggle">'
+    h += '<button type="button" class="pool-btn'+(wl.poolType==='reserved'?' active-reserved':'')+'" onclick="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'poolType\',\'reserved\')">&#128274; Reserved</button>'
+    h += '<button type="button" class="pool-btn'+(wl.poolType==='open'?' active-open':'')+'" onclick="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'poolType\',\'open\')">&#9889; Open/Spot</button>'
+    h += '</div></div>'
+
+    if (wl.poolType === 'reserved') {
+      h += '<div class="fg"><label>Tenure</label><select onchange="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'tenure\',this.value)">'
+      Object.keys(TENURE_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.tenure===k?' selected':'')+'>'+TENURE_LABELS[k]+'</option>' })
+      h += '</select></div>'
+    } else {
+      h += '<div class="fg"><label>Tenure</label><div class="fg-hint" style="padding-top:8px">N/A — pay-as-you-go, no commitment</div></div>'
+    }
+    h += '</div>'
+
+    if (t) {
+      h += '<div style="display:flex;gap:10px;margin-top:10px;font-size:11px;color:var(--mid)">'
+      h += 'Security tier: <b style="color:var(--dark)">'+t.secTier+'</b>'
+      h += '&nbsp;&middot;&nbsp; Chargeout: <b style="color:var(--dark)">'+CHARGEOUT_LABELS[t.chargeout]+'</b>'
+      h += '&nbsp;&middot;&nbsp; SLA: <b style="color:var(--dark)">'+(wl.poolType==='reserved'?'Enterprise':'Standard')+'</b>'
+      h += '</div>'
+    }
+
+    h += '</div>'
+    return h
+  },
+
+  renderMvBChart: function(wl, defaultCtx) {
+    var ctx = wl.mvbView || defaultCtx
+    var h = '<div class="mvb-toggle">'
+    h += '<button class="mvb-btn'+(ctx==='uc'?' active':'')+'" onclick="C.setMvBView(\''+wl.id+'\',\'uc\')">Use Case</button>'
+    h += '<button class="mvb-btn'+(ctx==='maas'?' active':'')+'" onclick="C.setMvBView(\''+wl.id+'\',\'maas\')">MaaS Pool</button>'
+    h += '<button class="mvb-btn'+(ctx==='fleet'?' active':'')+'" onclick="C.setMvBView(\''+wl.id+'\',\'fleet\')">Combined Fleet</button>'
+    h += '</div>'
+    h += '<div class="mvb-chart">'
+    h += '<svg width="100%" height="220" viewBox="0 0 600 220" style="overflow:visible">'
+    // Axes
+    h += '<line x1="50" y1="190" x2="580" y2="190" stroke="#E5E7EB" stroke-width="1.5"/>'
+    h += '<line x1="50" y1="10" x2="50" y2="190" stroke="#E5E7EB" stroke-width="1.5"/>'
+    // On-prem curve (steep then flat)
+    h += '<path d="M 50,30 Q 150,50 250,120 T 580,165" fill="none" stroke="#002870" stroke-width="2.5"/>'
+    // Closed API line (linear, steep)
+    h += '<line x1="50" y1="190" x2="580" y2="20" stroke="#FF5539" stroke-width="2" stroke-dasharray="4,3"/>'
+    // Open API line (linear, less steep)
+    h += '<line x1="50" y1="190" x2="580" y2="80" stroke="#FFB600" stroke-width="2" stroke-dasharray="4,3"/>'
+    // Breakeven marker
+    h += '<circle cx="290" cy="115" r="4" fill="#00B290"/>'
+    h += '<line x1="290" y1="115" x2="290" y2="190" stroke="#00B290" stroke-width="1" stroke-dasharray="2,2"/>'
+    h += '<text x="295" y="108" font-size="10" fill="#00B290" font-weight="700">Breakeven ~48%</text>'
+    // Planned utilisation marker
+    h += '<line x1="180" y1="10" x2="180" y2="190" stroke="#6B7280" stroke-width="1" stroke-dasharray="3,3"/>'
+    h += '<text x="184" y="22" font-size="9" fill="#6B7280">Planned util. (assumption)</text>'
+    // Axis labels
+    h += '<text x="50" y="205" font-size="9" fill="#6B7280">0%</text>'
+    h += '<text x="555" y="205" font-size="9" fill="#6B7280">100%</text>'
+    h += '<text x="300" y="205" font-size="9" fill="#6B7280" text-anchor="middle">Fleet capacity utilisation</text>'
+    h += '</svg>'
+    h += '<div style="display:flex;gap:16px;margin-top:8px;font-size:10px">'
+    h += '<span><span style="display:inline-block;width:10px;height:2px;background:#002870;margin-right:4px;vertical-align:middle"></span>Our on-prem</span>'
+    h += '<span><span style="display:inline-block;width:10px;height:2px;background:#FF5539;margin-right:4px;vertical-align:middle"></span>API — Closed Weights</span>'
+    h += '<span><span style="display:inline-block;width:10px;height:2px;background:#FFB600;margin-right:4px;vertical-align:middle"></span>API — Open Weights</span>'
+    h += '</div>'
+    h += '<div style="margin-top:8px;font-size:10px;color:var(--mid)">Breakeven vs Closed: ~48% utilisation &middot; vs Open: ~71% utilisation &middot; 5yr amortisation</div>'
+    h += '</div>'
+    return h
+  },
+}
+
+// ═══════════════════ CONTROLLER ═══════════════════
+var C = {
+  switchTab: function(tab) {
+    M.activeTab = tab
+    V.renderTabs()
+    V.renderTabBody()
+  },
+
+  toggleRow: function(id) {
+    M.openRows[id] = !M.openRows[id]
+    V.renderTabBody()
+    // Trigger animation after render by toggling class on next frame
+    requestAnimationFrame(function(){
+      var el = document.getElementById('exp-'+id)
+      if (el) el.classList.toggle('open', M.openRows[id])
+    })
+  },
+
+  toggleCollapsible: function(hdrEl) {
+    var body = hdrEl.nextElementSibling
+    var arrow = hdrEl.querySelector('.arrow')
+    body.classList.toggle('open')
+    arrow.style.transform = body.classList.contains('open') ? 'rotate(90deg)' : 'rotate(0deg)'
+  },
+
+  setDefaultGpu: function(val) {
+    M.defaultGpu = val
+    V.renderTabBody()
+  },
+
+  updUC: function(id, field, val) {
+    var wl = M.uc.find(function(w){ return w.id === id })
+    if (wl) wl[field] = val
+    V.renderTabBody()
+  },
+  updUCSlider: function(id, field, val) {
+    var wl = M.uc.find(function(w){ return w.id === id })
+    if (!wl) return
+    wl[field] = val
+    // Update only the value labels + derived panel, avoid full re-render jank while dragging
+    if (field === 'dau') document.getElementById('dauval-'+id).textContent = val.toLocaleString()
+    if (field === 'peakMult') document.getElementById('pmval-'+id).textContent = val + 'x'
+    clearTimeout(C._sliderDebounce)
+    C._sliderDebounce = setTimeout(function(){ V.renderTabBody() }, 150)
+  },
+
+  updMaas: function(id, field, val) {
+    var wl = M.maas.find(function(w){ return w.id === id })
+    if (wl) wl[field] = val
+    V.renderTabBody()
+  },
+  updMaasSlider: function(id, field, val) {
+    var wl = M.maas.find(function(w){ return w.id === id })
+    if (!wl) return
+    wl[field] = val
+    if (field === 'dau') document.getElementById('madauval-'+id).textContent = val.toLocaleString()
+    clearTimeout(C._sliderDebounce)
+    C._sliderDebounce = setTimeout(function(){ V.renderTabBody() }, 150)
+  },
+
+  // ── Tenant block controller — works identically across UC/MaaS/GPUaaS ──
+  updTenant: function(id, context, field, val) {
+    var arr = context === 'uc' ? M.uc : context === 'maas' ? M.maas : M.gpuaas
+    var wl = arr.find(function(w){ return w.id === id })
+    if (!wl) return
+    wl[field] = val
+    if (field === 'tenant' && !val) { wl.poolType = 'open'; wl.tenure = null }
+    if (field === 'poolType' && val === 'open') wl.tenure = null
+    if (field === 'poolType' && val === 'reserved' && !wl.tenure) wl.tenure = '12'
+    V.renderTabBody()
+  },
+
+    setMvBView: function(id, ctx) {
+    var wl = M.uc.find(function(w){ return w.id === id }) || M.maas.find(function(w){ return w.id === id })
+    if (wl) wl.mvbView = ctx
+    V.renderTabBody()
+  },
+
+  addUC: function() {
+    var id = 'uc' + (M.uc.length + 1) + '-' + Date.now()
+    M.uc.push({ id:id, name:'New Use Case', ucLib:'adhoc', gpu:null, deployMode:'production',
+      dau:1000, reqPerDay:5, peakMult:3, inputTok:2048, outputTok:500, precision:'int4',
+      slaTier:'tier2', ttftTarget:2000, agentic:false, steps:1, toolWait:0, mvbView:'uc' })
+    M.openRows[id] = true
+    V.renderTabs(); V.renderTabBody()
+  },
+  removeUC: function(id) {
+    M.uc = M.uc.filter(function(w){ return w.id !== id })
+    V.renderTabs(); V.renderTabBody()
+  },
+  addMaas: function() {
+    var id = 'maas' + (M.maas.length + 1) + '-' + Date.now()
+    M.maas.push({ id:id, name:'New MaaS Pool', archetype:'text_chat', gpu:M.defaultGpu,
+      model:'llama-3.1-8b', precision:'int4', dau:10000, slaTier:'standard', mvbView:'maas' })
+    M.openRows[id] = true
+    V.renderTabs(); V.renderTabBody()
+  },
+  removeMaas: function(id) {
+    M.maas = M.maas.filter(function(w){ return w.id !== id })
+    V.renderTabs(); V.renderTabBody()
+  },
+
+  addGpuaas: function() {
+    var id = 'gpuaas' + (M.gpuaas.length + 1) + '-' + Date.now()
+    M.gpuaas.push({ id:id, name:'New GPU Block', gpu:M.defaultGpu, gpuCount:8,
+      tenant:null, poolType:'open', tenure:null, mvbView:'fleet' })
+    M.openRows[id] = true
+    V.renderTabs(); V.renderTabBody()
+  },
+  updGpuaas: function(id, field, val) {
+    var wl = M.gpuaas.find(function(w){ return w.id === id })
+    if (wl) wl[field] = val
+    V.renderTabBody()
+  },
+  removeGpuaas: function(id) {
+    M.gpuaas = M.gpuaas.filter(function(w){ return w.id !== id })
+    V.renderTabs(); V.renderTabBody()
+  },
+
+  addTenant: function() {
+    var name = prompt('New tenant name:')
+    if (!name) return
+    var id = name.toLowerCase().replace(/[^a-z0-9]+/g,'-')
+    TENANTS_LIST[id] = { name: name, secTier: 'S1', chargeout: 'commercial' }
+    V.renderTabBody()
+  },
+}
+
+// ═══════════════════ INIT ═══════════════════
+M.openRows['uc1'] = true       // UC row open — Reserved tenant example
+M.openRows['maas2'] = true     // MaaS row open — Reserved tenant example
+M.openRows['gpuaas1'] = true   // GPUaaS row open — Reserved tenant example
+V.renderTabs()
+V.renderTabBody()
+</script>
+</body>
+</html>

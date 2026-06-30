@@ -277,3 +277,168 @@ Suggested phase: Assess during Phase 0 foundation week.
 |------|-------|---------------|----------------|---------------|----------|
 | 2026-06-28 | Pre-Phase 0 | 0 | 0 | 0 | AB |
 
+
+
+---
+
+## ADDITIONS FROM 28 JUNE 2026 — ARCHITECTURAL DECISIONS SESSION
+
+### PROMOTED TO CURRENT BUILD (not backlog)
+**[2026-06-28] — No hardcoded GitHub/hosting paths**
+All shared asset URLs (atlas.css, atlas-tokens.js, atlas-db.js etc.) must come from 
+a config constant, not hardcoded strings. Apply as we build — not a separate task.
+Implementation: define BASE_URL in atlas-tokens.js, all shared script/link tags use it.
+Status: IMPLEMENT NOW as discipline rule.
+
+### NEW ARCHITECTURAL DECISIONS (affect current build)
+
+**[2026-06-28] — Docket tab structure revised**
+Pipeline/RAC removed from Docket entirely — it is an independent sales support process.
+New Docket tabs:
+  1. Customer (PEI + TSAP profile merged + value map)
+  2. Requirements (freeform → AI tags → portfolio suggestions)
+  3. Portfolio (4 blocks + coupling rules + agent triggers)
+  4. Solution (agents build fragments, human reviews each)
+  5. Actions (sales/pre-sales team tasks)
+  6. Outputs (documents, BOM versions, proposals)
+  7. History (full audit trail)
+Note: Intelligence is a capability across tabs, not a separate tab.
+      Intel items surface contextually in Customer, Requirements, and Solution tabs.
+
+**[2026-06-28] — Portfolio coupling rules**
+Portfolio items have relationships that must be enforced/suggested:
+  Requires:    B2A/B2B → B2C auto-included (bundled, never separate)
+  Enables:     B4A required before B5A-B5I can be selected
+  Conflicts:   B1A and B1B/B1C/B1D — select one DC type only
+  Suggests:    B5E (MaaS) → auto-suggest B3G (multi-tenancy isolation)
+  Scales with: O01 (OPERATE) scope grows with BUILD selections
+Implementation: coupling_rules[] per portfolio_item in DB.
+Status: Add to portfolio_items table schema. Enforce in portfolio selection UI.
+
+**[2026-06-28] — Solution building is demand-driven (L5 → L1)**
+The build ORDER follows the dependency graph, not the layer numbering:
+  L5 UCs + aaS (what customer wants) → drives everything below
+  L4 AI Platform ← sized from UC count + model requirements
+  L3 Orchestration ← sized from tenant count + security tier
+  L2 Hardware ← sized from L3/L4/L5 requirements
+  L1 DC/Facility ← sized from L2 power + space requirements
+  L6 Governance ← cross-cutting, scoped from overall
+  L7 Capability ← independent, sized from headcount
+  OPERATE ← scoped from BUILD
+  SUSTAIN ← scoped from BUILD + OPERATE
+Implementation: dependency_graph in building_blocks catalogue.
+Status: Capture in Supabase building_blocks.sizing_driver field.
+
+**[2026-06-28] — Agent-based solution building (UX now, real agents later)**
+Solution building UX mimics agents even though Phase 1 uses synchronous SizingEngine calls.
+Each portfolio group has an "agent" that builds its BOM fragment.
+UX shows: progress indicators, fragment-by-fragment results, human review per fragment.
+When real agents are available, swap in without changing UX.
+Implementation: 
+  Master C coordinates sub-C functions per portfolio group
+  Each sub-C returns a BOM fragment + confidence level
+  UI shows "Sizing hardware..." → result → "Review ✓/Override"
+  SizingEngine.sizeUC() etc. called synchronously for now
+Status: IMPLEMENT THIS UX IN SOLUTION TAB.
+
+### BACKLOG ITEMS (from this session)
+
+**[2026-06-28] — Value Map Generator**
+Between customer profile and vision document.
+Shows: AI maturity position, UC heat map by domain (High/Medium/Low fit),
+what to sell NOW vs NEXT 12-18 months, deal enlargement opportunities.
+Powerful pre-sales tool. Requires customer profile + UC library.
+Suggested phase: Phase 2 extension — after Requirements and Portfolio tabs are working.
+
+**[2026-06-28] — Composite Customer Profile (PEI + TSAP merged)**
+One profile document per customer: org background, AI maturity, existing initiatives,
+key contacts, political/budget signals, competitive landscape.
+Currently split between PEI tool and TSAP territory profile.
+Merge into Customer tab of Docket.
+Suggested phase: Phase 2 (Docket redesign) — Customer tab.
+
+**[2026-06-28] — Model Usage Table**
+Track every AI call: task, model, provider, tokens, cost, quality rating (user 1-5),
+latency, engagement_id.
+Settings page shows model per task with cost/quality tradeoff.
+User can change model per task and immediately see impact.
+Suggested phase: Phase 1 extension — add to atlas-ai.js logging + Settings UI.
+
+**[2026-06-28] — Real Agent Architecture (async)**
+Replace synchronous SizingEngine calls with real async agents per portfolio group.
+Master agent orchestrates, fires parallel agents where dependencies allow.
+Each agent: knows portfolio codes, dependencies, sizing formula, returns BOM fragment.
+Suggested phase: Phase 3+ — after Solution tab UX is confirmed working.
+
+---
+
+## ADDITIONS FROM 30 JUNE 2026 — MaaS pooling & UC tab corrections
+
+**[2026-06-30] — MaaS cross-model statistical pooling**
+SizingEngine.fleetTotal() currently sums each MaaS model's sizing
+independently (no shared-capacity benefit modelled). Real MaaS platforms
+benefit from pooling: peak demand for different Standard-tier models rarely
+coincides, so combined capacity can be less than the naive sum.
+Why deferred: requires genuine sizing-engine math extension (statistical
+             multiplexing factor across models), not a UI change. Option A
+             (independent sizing, summed, labelled "conservative — no
+             pooling assumed") ships in Phase A instead.
+Suggested phase: Phase 3 extension, once MaaS is live and real demand
+             correlation data exists to calibrate the multiplexing factor.
+Reference: Solution Builder Spec, MaaS section (30 June 2026 discussion).
+
+**[2026-06-30] — UC tab missing fields, corrected in prototype v2**
+Domain, AI Model selection, UC Type (chatbot/RAG/agentic/etc), RAG
+indicator badge, Failover/HA dropdown, DR Type dropdown — all added.
+These map to existing SizingEngine.sizeUC() params (ha_required, dr_type)
+that had no UI exposure. Logged here only as a record of the correction —
+not deferred, already fixed in the next prototype iteration.
+
+---
+
+## ADDITIONS FROM 30 JUNE 2026 (continued) — MaaS reconciliation outcomes
+
+**[2026-06-30] — B5I AI API Marketplace: pass-through/upstream API reselling**
+Considered for MaaS, deliberately rejected for Phase A. Real commercial
+pattern (Azure AI Foundry, AWS Bedrock model marketplace style) but
+undermines sovereignty pitch for TSAP/Defence archetypes and adds real
+commercial complexity (upstream contracts, margin stacking, outage
+liability) with zero GPU sizing work — architectural distraction inside
+a sizing tool.
+Why deferred: belongs in B5I (AI API Marketplace), already a distinct
+             portfolio item from B5E (MaaS) in the blueprint. Build as
+             a separate, clearly-labelled capability, not a quiet toggle
+             inside MaaS sizing.
+Suggested phase: Future/unphased — revisit if a specific engagement
+             requires frontier closed-weight model access without
+             dedicated GPU capacity.
+Reference: Solution Builder Spec Section 11 (30 June 2026).
+
+**[2026-06-30] — host_sizing → calculateBOM() wiring gap**
+SizingEngine's fleetTotal() computes host_sizing (RAM 2-3x VRAM, NVMe
+20TB/node) but this was already flagged in standards/MaaS_Sizing_Notes.md
+(26 June 2026) as "Pending — not yet wired to calculateBOM()." Carried
+forward here so it is not lost a second time across document handoffs.
+Why deferred: pre-existing gap, not introduced by this session's changes.
+             BOM assembly step (Solution Builder Spec Section 5) needs
+             this wiring before L1 ROM line items can include host-level
+             RAM/NVMe costs.
+Suggested phase: Phase A, BOM assembly task — should be picked up
+             alongside Controller wiring, not deferred further than that.
+
+**[2026-06-30] — model_catalogue schema extension for per-model demand defaults**
+sizeMaaS() engine change (30 June 2026) references model.default_requests_per_day,
+model.default_avg_input_tokens, model.default_avg_output_tokens,
+model.default_context_window_k — these columns likely do not yet exist on
+model_catalogue (103 rows, schema not fully audited for these specific
+columns in this session).
+Why deferred: engine has safe fallback chain (explicit config -> model
+             default -> optional archetype preset -> hardcoded fallback)
+             so absence of these columns does not break sizing — it just
+             means model-specific demand shape defaults aren't yet
+             differentiated (everything falls through to generic defaults
+             or archetype presets).
+Suggested phase: Phase A polish — populate these columns for at least the
+             ~15-20 most commonly used models (Llama family, Qwen-Coder,
+             DeepSeek-Coder, Sarvam family, Mistral) before MaaS Controller
+             wiring goes live, so defaults are genuinely useful per model.
