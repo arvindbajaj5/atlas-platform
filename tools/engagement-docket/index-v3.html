@@ -1095,21 +1095,24 @@ var V = {
 
   renderSolTabBody: function() {
     var el = document.getElementById('soltabbody')
-    el.innerHTML = V.renderTenantMgmt()
-    if (M.activeSolTab === 'uc')         { el.innerHTML += V.renderUCTab();       return }
-    if (M.activeSolTab === 'maas')        { el.innerHTML += V.renderMaasTab();     return }
-    if (M.activeSolTab === 'gpuaas')      { el.innerHTML += V.renderGpuaasTab();   return }
-    if (M.activeSolTab === 'bmaas')       { el.innerHTML += V.renderComingSoon('bmaas'); return }
-    if (M.activeSolTab === 'whatif')      { el.innerHTML += V.renderComingSoon('whatif'); return }
-    if (M.activeSolTab === 'makeorbuy')   { el.innerHTML += V.renderComingSoon('makeorbuy'); return }
-    if (M.activeSolTab === 'gateway')     { el.innerHTML += V.renderComingSoon('gateway'); return }
-    if (M.activeSolTab === 'metering')    { el.innerHTML += V.renderComingSoon('metering'); return }
-    if (M.activeSolTab === 'slamonitor')  { el.innerHTML += V.renderComingSoon('slamonitor'); return }
-    if (M.activeSolTab === 'benchmarks')  { el.innerHTML += V.renderComingSoon('benchmarks'); return }
-    if (M.activeSolTab === 'margin')      { el.innerHTML += V.renderComingSoon('margin'); return }
-    if (M.activeSolTab === 'diagnostics') { el.innerHTML += V.renderComingSoon('diagnostics'); return }
-    if (M.activeSolTab === 'bom')         { el.innerHTML += V.renderComingSoon('bom'); return }
-    el.innerHTML += V.renderComingSoon('unknown')
+    // Build full HTML in one string then set once — avoids innerHTML +=
+    // which causes browser to re-parse DOM (destroying expanded row state)
+    var tabContent = ''
+    if (M.activeSolTab === 'uc')         tabContent = V.renderUCTab()
+    else if (M.activeSolTab === 'maas')   tabContent = V.renderMaasTab()
+    else if (M.activeSolTab === 'gpuaas') tabContent = V.renderGpuaasTab()
+    else if (M.activeSolTab === 'bmaas')  tabContent = V.renderComingSoon('bmaas')
+    else if (M.activeSolTab === 'whatif') tabContent = V.renderComingSoon('whatif')
+    else if (M.activeSolTab === 'makeorbuy') tabContent = V.renderComingSoon('makeorbuy')
+    else if (M.activeSolTab === 'gateway')   tabContent = V.renderComingSoon('gateway')
+    else if (M.activeSolTab === 'metering')  tabContent = V.renderComingSoon('metering')
+    else if (M.activeSolTab === 'slamonitor') tabContent = V.renderComingSoon('slamonitor')
+    else if (M.activeSolTab === 'benchmarks') tabContent = V.renderComingSoon('benchmarks')
+    else if (M.activeSolTab === 'margin')     tabContent = V.renderComingSoon('margin')
+    else if (M.activeSolTab === 'diagnostics') tabContent = V.renderComingSoon('diagnostics')
+    else if (M.activeSolTab === 'bom')        tabContent = V.renderComingSoon('bom')
+    else tabContent = V.renderComingSoon('unknown')
+    el.innerHTML = V.renderTenantMgmt() + tabContent
   },
 
   renderComingSoon: function(key) {
@@ -1404,7 +1407,7 @@ var V = {
         + '<td>'+gpuLabel(sz.gpu)+'</td>'
         + '<td class="num">'+sz.total+'</td>'
         + '<td class="num">'+sz.powerKw+'kW</td>'
-        + '<td class="num">$'+sz.cpst+'</td>'
+        + '<td class="num">'+(sz.total?'$'+(sz.powerKw*0.08/sz.total).toFixed(4):'—')+'</td>'
         + '<td><span class="arrow">&#9654;</span></td>'
         + '</tr>'
       html += '<tr class="expand-row"><td colspan="9"><div class="expand-inner'+(isOpen?' open':'')+'">'
