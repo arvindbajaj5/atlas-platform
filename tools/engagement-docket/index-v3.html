@@ -35,6 +35,14 @@
 .tabbar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:var(--sp-5);background:#fff;border-radius:var(--r) var(--r) 0 0;padding:0 var(--sp-4)}
 .tabbtn{padding:var(--sp-3) var(--sp-4);font-size:13px;font-weight:600;color:var(--mid);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;font-family:var(--font);margin-bottom:-2px;transition:color .15s}
 .tabbtn.active{color:var(--navy);border-bottom-color:var(--orange)}
+.tabbtn-soon{color:var(--mid);border-bottom:2px solid transparent;font-style:italic;opacity:.65}
+.tabbtn-soon:hover{opacity:1;color:var(--navy)}
+.coming-soon-panel{padding:40px 32px;text-align:center;background:#fff;border-radius:var(--r);border:1.5px dashed var(--border);margin:var(--sp-4)}
+.coming-soon-icon{font-size:36px;margin-bottom:12px}
+.coming-soon-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:8px}
+.coming-soon-desc{font-size:13px;color:var(--mid);line-height:1.7;max-width:540px;margin:0 auto 16px}
+.coming-soon-deps{font-size:11px;color:var(--mid);background:var(--light);padding:10px 16px;border-radius:var(--r-sm);text-align:left;max-width:540px;margin:0 auto;line-height:1.8}
+.coming-soon-deps b{color:var(--dark)}
 .tabbtn .cnt{background:var(--light);color:var(--mid);font-size:10px;padding:1px 6px;border-radius:var(--r-full);margin-left:6px}
 .tabbtn.active .cnt{background:rgba(255,85,57,.12);color:var(--orange)}
 
@@ -321,7 +329,7 @@ document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css
   s.onload  = function() { loadShared(files, i+1) }
   s.onerror = function() { console.error('[ATLAS] Failed to load:', files[i]); loadShared(files, i+1) }
   document.head.appendChild(s)
-})(['shared/atlas-tokens.js', 'shared/atlas-db.js'], 0)
+})(['shared/atlas-tokens.js', 'shared/atlas-db.js', 'shared/sasc-sizing.js', 'shared/atlas-solution.js'], 0)
 </script>
 
 <script>
@@ -372,7 +380,13 @@ var M = {
   activeSolTab:    'uc',
   openWlRows:      {},
   workloadConfigs: { uc: [], maas: [], gpuaas: [], bmaas: [] },
-  tenantsList:     {}
+  tenantsList:     {},
+  // Loaded by AtlasSolution.loadRefData() on openEngagement()
+  // Never hardcoded — always from Supabase model_catalogue + gpu_configs
+  modelCatalogue:  [],
+  gpuConfigs:      [],
+  modelMap:        {},
+  gpuMap:          {}
 }
 
 // ── PORTFOLIO DEPENDENCY GRAPH ───────────────────────────────────────
@@ -564,247 +578,22 @@ function loadDummy() {
 // ═══════════════════════════════════════════════════════════════════════
 
 
-// ── Solution tab lookups (folded in from workload-profiler-prototype) ─────
-// Full GPU catalogue — matches gpu_configs seed data (12 architectures).
-// REFACTOR-MARKER: replace with live atlasDB.get('gpu_configs') during Controller wiring.
-var GPU_LABELS = {
-  h200:     'H200 SXM 141GB',
-  b200:     'B200 SXM 192GB',
-  b200nvl72:'B200 NVL72',
-  b300:     'B300 SXM 288GB',
-  b300nvl72:'B300 NVL72',
-  gb200nvl72:'GB200 NVL72',
-  gb300nvl72:'GB300 NVL72',
-  vr:       'Vera Rubin SXM',
-  vrnvl72:  'Vera Rubin NVL72',
-  mi355x:   'AMD MI355X 288GB',
-  mi400x:   'AMD MI400X (2027)',
-  helios:   'AMD Instinct Helios'
-}
-// Fallback throughput factors (tokens/sec, INT4, relative to H200=1.0).
-// Based on published BF16 TFlops scaled to INT4 inference efficiency.
-// Real SizingEngine uses measured benchmark_results from Supabase — these
-// are only used when SizingEngine isn't configured/connected.
-//
-// Key specs driving these factors:
-//   H200:       989 BF16 TFlops, 141GB HBM3e → baseline 1.0
-//   B200:       2,250 BF16 TFlops, 192GB HBM3e → ~2.3x
-//   B200 NVL72: 2,250 × 72 GPUs, NVLink scale-up → ~2.5x per "unit"
-//   B300:       2,800 BF16 TFlops → ~2.8x
-//   GB200/300:  rack-scale, Grace CPU + Blackwell → ~3.0x
-//   VR SXM:     ~4,000 TFlops (est.), HBM4 → ~4.0x
-//   VR NVL72:   rack-scale Vera Rubin → ~5.0x
-//   MI355X:     ~1,800 BF16 TFlops, 288GB HBM3e → ~1.8x
-//   MI400X:     ~3,000 TFlops (2027 est.) → ~3.0x
-//   Helios:     rack-scale AMD → ~3.5x
-var GPU_THROUGHPUT_FACTOR = {
-  h200: 1.0, b200: 2.3, 'b200nvl72': 2.5, b300: 2.8,
-  'b300nvl72': 3.0, 'gb200nvl72': 3.0, 'gb300nvl72': 3.2,
-  vr: 4.0, 'vrnvl72': 5.0,
-  mi355x: 1.8, mi400x: 3.0, helios: 3.5
-}
-// Effective VRAM per GPU (GB) — used to compute memory-bound sizing
-var GPU_VRAM_GB = {
-  h200: 141, b200: 192, 'b200nvl72': 192, b300: 288,
-  'b300nvl72': 288, 'gb200nvl72': 96, 'gb300nvl72': 192,
-  vr: 288, 'vrnvl72': 288,
-  mi355x: 288, mi400x: 384, helios: 288
-}
-// For NVL72 rack-scale units, 1 "unit" = 72 GPUs
-var GPU_GPUS_PER_UNIT = {
-  'b200nvl72': 72, 'b300nvl72': 72, 'gb200nvl72': 72,
-  'gb300nvl72': 72, 'vrnvl72': 72, helios: 72
-}
-var HA_GPU_FACTOR = { none: 1.0, n1: 1.15, n2: 2.0 }
-var DR_GPU_FACTOR = { none: 1.0, warm: 1.5, active_active: 2.0 }
+// ── Solution tab — all logic delegated to shared/atlas-solution.js ─────────
+// No hardcoded GPU lists, model lists, or sizing math here.
+// Fix anything in AtlasSolution → fixed for UC, MaaS, GPUaaS, BMaaS simultaneously.
+// Shims below keep existing V/C render code working without a full rewrite now.
+
+// Label shims — delegate to AtlasSolution (populated after script loads)
+function _asl (key) { return window.AtlasSolution ? AtlasSolution[key] : {} }
 var UC_LIB = { glof:'GLOF Early Warning System (UC Library)', crop:'Crop Disease Detection (UC Library)', adhoc:'+ Define ad-hoc' }
-var DOMAINS = { geospatial:'Geospatial', agriculture:'Agriculture', health:'Health', governance:'Governance', education:'Education', finance:'Finance', defence:'Defence' }
-// Confirmed MaaS model catalogue — clean licensing, n/n-2 versioning.
-// REFACTOR-MARKER: Phase A polish — replace with full 103-row model_catalogue
-// via atlasDB, filtered/grouped by usage type, when Controller wiring lands.
-// Full confirmed MaaS model catalogue — clean licensing, n/n-2 versioning.
-// Grouped by domain/usage for easier filtering in the dropdown.
-// REFACTOR-MARKER: Phase A polish — replace with live atlasDB read from
-// model_catalogue (103 rows) during Controller wiring.
-var MODELS = {
-  // ── Coding ─────────────────────────────────────────────────
-  'deepseek-coder-v2-lite-16b': 'DeepSeek-Coder-V2 Lite 16B',
-  'deepseek-coder-v2-236b':     'DeepSeek-Coder-V2 236B',
-  'qwen2.5-coder-7b':           'Qwen2.5-Coder 7B',
-  'qwen2.5-coder-32b':          'Qwen2.5-Coder 32B',
-  'qwen2.5-coder-72b':          'Qwen2.5-Coder 72B',
-  // ── Text / Chat ─────────────────────────────────────────────
-  'llama-3.2-3b':               'Llama 3.2 3B',
-  'llama-3.1-8b':               'Llama 3.1 8B',
-  'llama-3.3-70b':              'Llama 3.3 70B',
-  'llama-3.1-405b':             'Llama 3.1 405B',
-  'mistral-7b':                  'Mistral 7B',
-  'mistral-small-3.1-24b':      'Mistral Small 3.1 24B',
-  'mistral-large-2-123b':       'Mistral Large 2 123B',
-  // ── Document / Long-context ─────────────────────────────────
-  'qwen2.5-7b':                  'Qwen2.5 7B',
-  'qwen2.5-32b':                 'Qwen2.5 32B',
-  'qwen2.5-72b':                 'Qwen2.5 72B',
-  'qwen2-72b':                   'Qwen2 72B (n-2)',
-  // ── Audio / Speech ──────────────────────────────────────────
-  'sarvam-whisper-s':            'Sarvam Whisper S',
-  'sarvam-whisper-m':            'Sarvam Whisper M',
-  'sarvam-whisper-l':            'Sarvam Whisper Large',
-  'whisper-large-v3':            'Whisper Large-v3 (MIT, on-prem OK)',
-  'whisper-large-v2':            'Whisper Large-v2 (MIT, n-2)',
-  // ── Indic / Regional ────────────────────────────────────────
-  'sarvam-2b':                   'Sarvam-2B',
-  'sarvam-m':                    'Sarvam-M',
-  // ── Reasoning / Thinking ────────────────────────────────────
-  'deepseek-r1-7b':              'DeepSeek-R1 7B (distilled)',
-  'deepseek-r1-70b':             'DeepSeek-R1 70B (distilled)',
-  'qwq-32b':                     'QwQ-32B (Qwen reasoning)',
-  // ── Generic / Multipurpose ──────────────────────────────────
-  'phi-3.5-mini-3.8b':           'Phi-3.5 Mini 3.8B (Microsoft)',
-  'phi-3.5-moe-42b':             'Phi-3.5 MoE 42B (Microsoft)',
-  'gemma-2-9b':                  'Gemma 2 9B (Google, Apache 2.0)',
-  'gemma-2-27b':                 'Gemma 2 27B (Google, Apache 2.0)',
-}
-var UC_TYPES = {
-  chatbot:'Chatbot / Conversational', text:'Text Processing', rag:'RAG / Knowledge Retrieval',
-  vision:'Vision / Multimodal', agentic:'Agentic / Tool-use', batch:'Batch Processing', voice:'Voice / Audio'
-}
-var SLA_LABELS = { tier1:'Tier 1 — Interactive (<200ms)', tier2:'Tier 2 — Analytical (<2s)', tier3:'Tier 3 — Async Batch' }
-var HA_TIERS = { none:'None', n1:'N+1 (standard)', n2:'2N (mission-critical)' }
-var DR_TYPES = { none:'None', warm:'Warm Standby (+50% DR site)', active_active:'Active-Active (+100% DR site)' }
-var CHARGEOUT_LABELS = { commercial:'Commercial', cost_recovery:'Cost Recovery', subsidised:'Subsidised', zero:'Zero (free)' }
-var TENURE_LABELS = { '12':'12 months', '24':'24 months', '36':'36 months', 'custom':'Custom' }
 
-// Default tenant master data — seeds M.tenantsList on first engagement open
-var DEFAULT_TENANTS = {
-  'state-it-dept': { name:'State IT Department', secTier:'S2', chargeout:'cost_recovery' },
-  'agri-dept':     { name:'Agriculture Department', secTier:'S1', chargeout:'subsidised' },
-  'health-dept':   { name:'Health Department', secTier:'S2', chargeout:'cost_recovery' },
-  'public':        { name:'Public / Citizen-facing', secTier:'S1', chargeout:'zero' },
-}
+// Sizing — single function for all workload types, delegates to AtlasSolution
+function sizeUCWorkload(wl)   { return AtlasSolution.sizeWorkload(wl, 'uc',   window.M) }
+function sizeMaasWorkload(wl) { return AtlasSolution.sizeWorkload(wl, 'maas', window.M) }
 
-// ── Solution tab sizing — calls REAL SizingEngine, not dummy math ─────────
-// (workload-profiler-prototype.html had placeholder math here — replaced
-// during fold-in since shared/sasc-sizing.js + capacityForGPU() now exist)
-function sizeUCWorkload(wl) {
-  var gpuId = wl.gpu || M.defaultGpu
-  if (window.SizingEngine && SizingEngine.ready) {
-    var r = SizingEngine.sizeUC({
-      model_id: wl.model, dau: wl.dau, requests_per_day: wl.reqPerDay,
-      peak_multiplier: wl.peakMult, avg_input_tokens: wl.inputTok,
-      avg_output_tokens: wl.outputTok, precision: (wl.precision||'int4').toUpperCase(),
-      ttft_sla_ms: wl.ttftTarget, ha_required: wl.haTier !== 'none', dr_type: wl.drType
-    }, gpuId)
-    if (r && !r.error) {
-      var slaMetReal = (r.ttft_sla_ms || wl.ttftTarget) <= wl.ttftTarget
-      var marginReal  = wl.ttftTarget ? Math.round(Math.abs(((r.ttft_sla_ms||wl.ttftTarget) - wl.ttftTarget) / wl.ttftTarget) * 100) : 0
-      return {
-        gpu: gpuId, p95RPS: r.peak_rps, concurrent: r.peak_concurrent,
-        baseGpus: r.base_gpus, buffers: r.total_gpus - r.base_gpus, total: r.total_gpus,
-        powerKw: r.power_kw, racks: r.total_gpus <= 72 ? '1 rack (partial)' : Math.ceil(r.total_gpus/72) + ' racks',
-        ttftEstimate: r.ttft_sla_ms || wl.ttftTarget, slaMet: slaMetReal, margin: marginReal, notes: r.notes,
-        peakConcPct: wl.peakConcPct || 5,
-        formula: r.notes || ('SizingEngine.sizeUC() — see audit trail in r.notes')
-      }
-    }
-  }
-  // REFACTOR-MARKER: fallback placeholder — only used if engine not yet
-  // init()'d (no Supabase config) or returns an error. Keeps the V usable
-  // for visual inspection without a live DB connection.
-  //
-  // FIXED 30 June 2026: concurrent users was computed as
-  // p95RPS x (ttftTarget/1000) -- WRONG, treats TTFT (first-token
-  // latency) as if it were session hold time. For DAU=1M this gave
-  // only 125 concurrent, clearly wrong. Now matches the real
-  // SizingEngine's approach: concurrent = DAU x peak_concurrent_pct,
-  var throughputFactor = GPU_THROUGHPUT_FACTOR[gpuId] || 1.0
-  var haFactor  = HA_GPU_FACTOR[wl.haTier] || 1.0
-  var drFactor  = DR_GPU_FACTOR[wl.drType] || 1.0
-  var peakConcPct = wl.peakConcPct || 5
-
-  // P50/P95/P99 — adjusts token counts used for sizing.
-  // P50=typical session, P95=design point (default), P99=stress test.
-  var ctxMult   = wl.contextPct === 'p50' ? 0.6 : wl.contextPct === 'p99' ? 1.4 : 1.0
-  var inputTok  = Math.round((wl.inputTok  || 2048) * ctxMult)
-  var outputTok = Math.round((wl.outputTok || 500)  * ctxMult)
-
-  // CORRECTED THROUGHPUT-BASED FORMULA (fixed 1 Jul 2026)
-  // CORRECTED FORMULA (fixed 1 Jul 2026)
-  // Previous versions had two errors:
-  //   1. "sessions per GPU" (concurrent/4 × tpI) — arbitrary, not throughput-based
-  //   2. "concurrent × outputTok / genTime" — treats EVERY concurrent user as
-  //      simultaneously generating, which is not how continuous batching works
-  //
-  // Correct approach: peak_rps (arrivals/sec) → throughput needed → GPUs
-  //   Users are CONCURRENT but not all generating simultaneously — they submit
-  //   a request, wait for the response, then submit another. Peak RPS ≪ concurrent.
-  //
-  // Step 1: peak concurrent users = DAU × peak%
-  var concurrent = Math.max(1, Math.ceil(wl.dau * peakConcPct / 100))
-  // Step 2: peak requests/sec = concurrent users × requests/user/day / 86400 × peak mult
-  var avgRPS     = (wl.dau * (wl.reqPerDay || 12)) / 86400
-  var peakRPS    = Math.ceil(avgRPS * (wl.peakMult || 3))
-  // Step 3: requests/sec a single GPU can handle = throughput (tok/s) / output tokens/request
-  //   H200 INT4 baseline: ~8,000 tok/s (conservative, continuous batching, small-medium models)
-  var tokPerGpuBase = 8000
-  var precMult  = wl.precision === 'int8' ? 0.55 : wl.precision === 'fp16' ? 0.35 : wl.precision === 'fp8' ? 0.8 : 1.0
-  var tokPerGpu = Math.round(tokPerGpuBase * throughputFactor * precMult)
-  var reqPerGpu = Math.max(1, Math.round(tokPerGpu / outputTok))
-  // Step 4: base GPUs = ceil(peak_rps / req_per_gpu)
-  var baseGpus  = Math.max(1, Math.ceil(peakRPS / reqPerGpu))
-  // Step 5: buffers — headroom + HA + DR
-  var buffers   = Math.max(1, Math.ceil(baseGpus * 0.3 * haFactor * drFactor))
-  var total     = baseGpus + buffers
-  var powerKw   = Math.round(total * 0.7 * 10) / 10
-
-  var ttftEstimate = Math.round(wl.ttftTarget / throughputFactor * 0.85)
-  var slaMet  = ttftEstimate <= wl.ttftTarget
-  var margin  = wl.ttftTarget ? Math.round(Math.abs((wl.ttftTarget - ttftEstimate) / wl.ttftTarget) * 100) : 0
-  var gpusPerUnit = GPU_GPUS_PER_UNIT[gpuId] || 8
-  return {
-    gpu: gpuId, concurrent: concurrent, peakRPS: peakRPS, baseGpus: baseGpus,
-    buffers: buffers, total: total, powerKw: powerKw,
-    racks: Math.ceil(total / gpusPerUnit) + ' rack(s) / ' + total + ' GPUs',
-    p95RPS: peakRPS, ttftEstimate: ttftEstimate, slaMet: slaMet, margin: margin,
-    peakConcPct: peakConcPct,
-    formula: 'Step 1: Concurrent = DAU(' + wl.dau.toLocaleString() + ') × ' + peakConcPct + '% = ' + concurrent.toLocaleString()
-      + ' | Ctx: ' + (wl.contextPct||'p95').toUpperCase() + ' (' + ctxMult + 'x) → output=' + outputTok + ' tok'
-      + ' | Step 2: Peak RPS = DAU × req/day(' + (wl.reqPerDay||12) + ') ÷ 86400 × peakMult(' + (wl.peakMult||3) + ') = ' + peakRPS + ' req/s'
-      + ' | Step 3: GPU=' + (GPU_LABELS[gpuId]||gpuId) + ' → ' + tokPerGpu + ' tok/s ÷ ' + outputTok + ' tok/req = ' + reqPerGpu + ' req/s/GPU'
-      + ' | Step 4: Base GPUs = ceil(' + peakRPS + ' ÷ ' + reqPerGpu + ') = ' + baseGpus
-      + ' | Step 5: +Buffers (HA=' + haFactor + 'x DR=' + drFactor + 'x × 30%) = ' + buffers + ' → Total = ' + total
-  }
-}
-function sizeMaasWorkload(wl) {
-  var gpuId = wl.gpu || M.defaultGpu
-  if (window.SizingEngine && SizingEngine.ready) {
-    var r = SizingEngine.sizeMaaS({
-      model_id: wl.model, dau: wl.dau, precision: (wl.precision||'int4').toUpperCase(),
-      pool_type: wl.poolType, commercial_sla: wl.commercialSla
-    }, gpuId)
-    if (r && !r.error) {
-      return {
-        gpu: gpuId, throughput: r.peak_rps ? Math.round(r.peak_rps * (wl.outputTok||500)) : 0,
-        instances: r.instances || 1, baseGpus: r.base_gpus, buffers: r.total_gpus - r.base_gpus,
-        total: r.total_gpus, powerKw: r.power_kw,
-        racks: r.total_gpus <= 72 ? '1 rack' : Math.ceil(r.total_gpus/72) + ' racks',
-        cpst: '0.0021', commercialSla: r.commercial_sla, notes: r.notes
-      }
-    }
-  }
-  // REFACTOR-MARKER: fallback placeholder — see sizeUCWorkload note above
-  var avgRPS = wl.dau / 86400 * 8
-  var throughput = Math.round(avgRPS * 4000)
-  var instances = Math.max(1, Math.ceil(throughput / 32000))
-  var modelSize = (wl.model||'').includes('405b') || (wl.model||'').includes('large') ? 'advanced'
-    : (wl.model||'').includes('70b') || (wl.model||'').includes('32b') ? 'mid' : 'basic'
-  var baseGpus = instances * (modelSize === 'advanced' ? 8 : modelSize === 'mid' ? 4 : 2)
-  var buffers = Math.ceil(baseGpus * 0.5)
-  var total = baseGpus + buffers
-  var powerKw = Math.round(total * 0.85 * 10) / 10
-  return { gpu: gpuId, throughput: throughput, instances: instances, baseGpus: baseGpus,
-    buffers: buffers, total: total, powerKw: powerKw, racks: total<=72?'1 rack':Math.ceil(total/72)+' racks', cpst: '0.0021' }
-}
+// Label accessors — always read from AtlasSolution, never hardcoded
+function gpuLabel(id)    { var m = window.M; return (m && m.gpuMap && m.gpuMap[id] && m.gpuMap[id].name) || id || '—' }
+function modelLabel(id)  { var m = window.M; return (m && m.modelMap && m.modelMap[id] && m.modelMap[id].name) || id || '—' }
 
 var V = {
 
@@ -1189,7 +978,7 @@ var V = {
     var html = '<div class="gpu-default" style="display:flex;align-items:center;gap:var(--sp-3);background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-4);font-size:12px">'
     html += '<label style="font-weight:700;color:var(--mid);text-transform:uppercase;font-size:10px;letter-spacing:.4px">Engagement default GPU</label>'
     html += '<select id="defaultGpu" onchange="C.setDefaultGpu(this.value)" style="padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:var(--font);font-size:12px">'
-    Object.keys(GPU_LABELS).forEach(function(k){ html += '<option value="'+k+'"'+(M.defaultGpu===k?' selected':'')+'>'+GPU_LABELS[k]+'</option>' })
+    (window.M&&M.gpuConfigs||[]).map(function(g){return g.id}).forEach(function(k){ html += '<option value="'+k+'"'+(M.defaultGpu===k?' selected':'')+'>'+gpuLabel(k)+'</option>' })
     html += '</select>'
     html += '<span style="font-size:11px;color:var(--mid)">Pre-fills every new workload row — override per row anytime</span>'
     html += '</div>'
@@ -1279,15 +1068,28 @@ var V = {
   // ── Solution tab render functions (folded in from workload-profiler-prototype) ──
   renderSolTabs: function() {
     var tabs = [
-      {key:'uc', label:'UCs', count:M.workloadConfigs.uc.length},
-      {key:'maas', label:'MaaS', count:M.workloadConfigs.maas.length},
-      {key:'gpuaas', label:'GPUaaS', count:M.workloadConfigs.gpuaas.length},
-      {key:'bmaas', label:'BMaaS', count:0},
+      {key:'uc',         label:'UCs',           count:M.workloadConfigs.uc.length},
+      {key:'maas',       label:'MaaS',           count:M.workloadConfigs.maas.length},
+      {key:'gpuaas',     label:'GPUaaS',         count:M.workloadConfigs.gpuaas.length},
+      {key:'bmaas',      label:'BMaaS',          count:0},
+      {key:'whatif',     label:'What-If ⚡',      count:0, soon:true},
+      {key:'makeorbuy',  label:'Make vs Buy',    count:0, soon:true},
+      {key:'gateway',    label:'Gateway',        count:0, soon:true},
+      {key:'metering',   label:'Metering',       count:0, soon:true},
+      {key:'slamonitor', label:'SLA Monitor',    count:0, soon:true},
+      {key:'benchmarks', label:'Benchmarks',     count:0, soon:true},
+      {key:'margin',     label:'Margin',         count:0, soon:true},
+      {key:'diagnostics',label:'Diagnostics',    count:0, soon:true},
+      {key:'bom',        label:'BOM Complete',   count:0, soon:true},
     ]
     var html = ''
     tabs.forEach(function(t){
-      html += '<button class="tabbtn'+(M.activeSolTab===t.key?' active':'')+'" onclick="C.switchSolTab(\''+t.key+'\')">'
-        + t.label + '<span class="cnt">'+t.count+'</span></button>'
+      if (t.soon) {
+        html += '<button class="tabbtn tabbtn-soon" onclick="C.switchSolTab(\''+t.key+'\')">'+t.label+'</button>'
+      } else {
+        html += '<button class="tabbtn'+(M.activeSolTab===t.key?' active':'')+'" onclick="C.switchSolTab(\''+t.key+'\')">'
+          + t.label + (t.count !== undefined ? '<span class="cnt">'+t.count+'</span>' : '') + '</button>'
+      }
     })
     document.getElementById('soltabbar').innerHTML = html
   },
@@ -1295,25 +1097,103 @@ var V = {
   renderSolTabBody: function() {
     var el = document.getElementById('soltabbody')
     el.innerHTML = V.renderTenantMgmt()
-    if (M.activeSolTab === 'uc')     { el.innerHTML += V.renderUCTab(); return }
-    if (M.activeSolTab === 'maas')   { el.innerHTML += V.renderMaasTab(); return }
-    if (M.activeSolTab === 'gpuaas') { el.innerHTML += V.renderGpuaasTab(); return }
-    el.innerHTML += '<div class="tablewrap"><div style="padding:40px;text-align:center;color:var(--mid)">'
-      + 'No items in this category yet. Select the corresponding portfolio item in the Portfolio tab first.</div></div>'
+    if (M.activeSolTab === 'uc')         { el.innerHTML += V.renderUCTab();       return }
+    if (M.activeSolTab === 'maas')        { el.innerHTML += V.renderMaasTab();     return }
+    if (M.activeSolTab === 'gpuaas')      { el.innerHTML += V.renderGpuaasTab();   return }
+    if (M.activeSolTab === 'bmaas')       { el.innerHTML += V.renderComingSoon('bmaas'); return }
+    if (M.activeSolTab === 'whatif')      { el.innerHTML += V.renderComingSoon('whatif'); return }
+    if (M.activeSolTab === 'makeorbuy')   { el.innerHTML += V.renderComingSoon('makeorbuy'); return }
+    if (M.activeSolTab === 'gateway')     { el.innerHTML += V.renderComingSoon('gateway'); return }
+    if (M.activeSolTab === 'metering')    { el.innerHTML += V.renderComingSoon('metering'); return }
+    if (M.activeSolTab === 'slamonitor')  { el.innerHTML += V.renderComingSoon('slamonitor'); return }
+    if (M.activeSolTab === 'benchmarks')  { el.innerHTML += V.renderComingSoon('benchmarks'); return }
+    if (M.activeSolTab === 'margin')      { el.innerHTML += V.renderComingSoon('margin'); return }
+    if (M.activeSolTab === 'diagnostics') { el.innerHTML += V.renderComingSoon('diagnostics'); return }
+    if (M.activeSolTab === 'bom')         { el.innerHTML += V.renderComingSoon('bom'); return }
+    el.innerHTML += V.renderComingSoon('unknown')
+  },
+
+  renderComingSoon: function(key) {
+    var SOON = {
+      bmaas: {
+        icon: '&#127970;',
+        title: 'BMaaS — Bare Metal as a Service',
+        desc: 'Dedicated server capacity — full server(s) reserved for a tenant, no GPU sharing. Tenant runs their own OS, drivers, and workloads directly on hardware. Same Tenant block and sizing principles as GPUaaS but at bare-metal granularity.',
+        deps: ['GPUaaS tab complete', 'Tenant configs in Supabase wired', 'server_configs table seeded (equivalent to gpu_configs)']
+      },
+      whatif: {
+        icon: '&#9889;',
+        title: 'What-If — GPU Architecture Comparison',
+        desc: 'Select 1-5 GPU architectures and compare them side by side for this workload. Supply curve (capacity) vs demand curve (your DAU/RPS) per architecture. Crossover point = minimum viable deployment. Engine function capacityForGPU() already built in shared/sasc-sizing.js.',
+        deps: ['capacityForGPU() engine function: DONE (shared/sasc-sizing.js)', 'UI chart: not yet built', 'Fleet-level heatmap (Layer 2) and mix optimiser (Layer 3): separate future scope — needs full fleet populated first']
+      },
+      makeorbuy: {
+        icon: '&#9878;',
+        title: 'Make vs Buy — On-prem vs API',
+        desc: 'At what utilisation does our on-prem cost beat market API pricing? Shows cost curves for on-prem (capex amortised + opex) vs market API price (from model_catalogue.price_input_per_1m), with the crossover/breakeven point marked. Our sell price = cost + margin% (margin set in Settings).',
+        deps: ['model_catalogue.price_input_per_1m populated (market reference)', 'margin_pct in Settings (global default + per-engagement override)', 'capex/opex inputs from BOM Complete tab']
+      },
+      gateway: {
+        icon: '&#127760;',
+        title: 'Model Gateway — API Routing & Versioning',
+        desc: 'Single API endpoint per model family (not per version). Customers call /v1/chat/completions with a model parameter — the gateway routes to the right inference backend, handles load balancing, queuing, and SLA-tier prioritisation. One API, all models.',
+        deps: ['Recommended stack: vLLM (inference backend) + LiteLLM (gateway/router)', 'Model versioning policy: n and n-2 always available, older versions sunset on new config', 'BOM impact: 2× gateway/management CPU nodes (separate from GPU nodes)', 'Open source: vLLM (Apache 2.0), LiteLLM (MIT)']
+      },
+      metering: {
+        icon: '&#128200;',
+        title: 'Metering & Accounting — Per Tenant/User/SLA',
+        desc: 'Every API request metered: tenant_id, user_id, model_id, SLA tier, input tokens, output tokens, latency_ms, request_id. Token counts feed into billing (Bronze/Silver/Gold per-million rates). Budget limits enforceable per tenant/key. Aggregated daily/monthly for billing reports.',
+        deps: ['Recommended stack: LiteLLM spend tracking → Supabase (metering events)', 'At scale: ClickHouse for raw event store (high write rate)', 'BOM impact: metering storage on gateway nodes (or dedicated at high volume)', 'Open source: LiteLLM (MIT), OpenMeter, ClickHouse (Apache 2.0)']
+      },
+      slamonitor: {
+        icon: '&#128338;',
+        title: 'SLA Compliance Monitor — TTFT Actuals vs Committed',
+        desc: 'For each Bronze/Silver/Gold committed TTFT and uptime target: actual P50/P95/P99 latency measured at the gateway per model per SLA tier. Rolling windows (1min, 5min, 1hr, 24hr). Breach alerts. SLA credit calculation for billing adjustments. Are we over-committing or under-committing?',
+        deps: ['Prometheus + Grafana (vLLM exports metrics natively)', 'Alertmanager for breach notifications', 'benchmark_results table must be populated with measured (not estimated) throughput', 'BOM impact: Prometheus/Grafana on gateway nodes (included in gateway BOM)']
+      },
+      benchmarks: {
+        icon: '&#128202;',
+        title: 'Performance Benchmarks — Measured Throughput per Model × GPU',
+        desc: 'Current sizing uses H200 INT4 baseline = 8,000 tok/s (conservative estimate). Real pricing requires measured throughput per model × GPU × precision combination. Benchmarks feed into benchmark_results in Supabase, which sasc-sizing.js already reads — it just needs the data populated.',
+        deps: ['benchmark_results table: SEEDED (structure exists, data missing)', 'Benchmark harness: vLLM built-in benchmarking tools (run once per new model/GPU)', 'Must include: batch sizes 1/4/8/16/32/64/128, TTFT at each, memory footprint, power draw', 'Embedding models (BGE, Nomic, MXBai): different formula — batch throughput, not TTFT', 'This is pre-deployment work, not a runtime screen']
+      },
+      margin: {
+        icon: '&#128181;',
+        title: 'Margin Analysis — Leaks and Opportunities',
+        desc: 'Known margin leak sources not yet in BOM: KV cache overhead for long-context models (40-60% VRAM at 128K context), cold start dead GPU time, large model networking (InfiniBand for 671B models), speculative decoding overhead. Also: embedding models (BGE, Nomic) sized differently from generation models — current formula overstates their GPU needs.',
+        deps: ['Pricing: model_catalogue.price_input_per_1m = market reference (confirmed)', 'Our sell price: cost-plus, needs margin_pct in Settings', 'KV cache sizing: needs context_length_k per model (already in model_catalogue)', 'Embedding model sizing: needs inference_type column on model_catalogue (generation vs embedding vs audio vs vision)', 'Large model networking: InfiniBand line items missing from current BOM']
+      },
+      diagnostics: {
+        icon: '&#128269;',
+        title: 'Diagnostics — Runtime Bottleneck Identification',
+        desc: 'Where is time being lost at runtime? GPU compute bound (utilisation >90%), memory bandwidth bound (large models at low batch), KV cache bound (long contexts filling VRAM), network bound (multi-GPU inter-GPU comms), CPU preprocessing bound (tokenization at high RPS), queue depth (SLA breach early warning).',
+        deps: ['DCGM (NVIDIA Data Center GPU Manager) — GPU-level metrics, our OEM stack likely includes this', 'Prometheus node_exporter — CPU/memory/network on inference nodes', 'OpenTelemetry — distributed tracing for end-to-end latency breakdown', 'nsight Systems — deep profiling when root cause unknown', 'BOM impact: monitoring stack on gateway nodes (included); DCGM licence (check OEM entitlement)']
+      },
+      bom: {
+        icon: '&#128221;',
+        title: 'BOM Complete — All Infrastructure Line Items',
+        desc: 'Current BOM only covers GPU racks and power. Missing: management/gateway CPU nodes (2× per deployment), InfiniBand networking for large models (671B models need 8+ GPUs with high-speed interconnect), monitoring storage (Prometheus time-series), out-of-band management. Estimated 5-10% of total deployment cost currently unaccounted.',
+        deps: ['Gateway nodes: 2× CPU servers (32 cores, 256GB RAM, 10GbE, 4TB NVMe)', 'InfiniBand HDR/NDR: required for DeepSeek R1 671B, DeepSeek V3 671B, GLM 5.2 744B', 'Monitoring storage: NVMe on gateway nodes or dedicated ClickHouse node', 'These items should appear as line items in the ROM output alongside GPU racks']
+      }
+    }
+    var s = SOON[key] || { icon: '&#128679;', title: 'Coming Soon', desc: 'This section is planned but not yet built.', deps: [] }
+    var h = '<div class="coming-soon-panel">'
+    h += '<div class="coming-soon-icon">' + s.icon + '</div>'
+    h += '<div class="coming-soon-title">' + s.title + '</div>'
+    h += '<div class="coming-soon-desc">' + s.desc + '</div>'
+    if (s.deps && s.deps.length) {
+      h += '<div class="coming-soon-deps"><b>Dependencies / what needs to exist before this is built:</b><br>'
+      s.deps.forEach(function(d){ h += '· ' + d + '<br>' })
+      h += '</div>'
+    }
+    h += '</div>'
+    return h
   },
 
   renderTenantMgmt: function() {
-    var h = '<div class="tenant-mgmt">'
-    h += '<div class="tenant-mgmt-hdr"><div class="tenant-mgmt-title">Tenants — defined once, used across UC / MaaS / GPUaaS / BMaaS</div>'
-    h += '<button class="add-tenant-btn" onclick="C.addTenant()">+ Define New Tenant</button></div>'
-    h += '<div class="tenant-chip-list">'
-    Object.keys(M.tenantsList).forEach(function(k){
-      var t = M.tenantsList[k]
-      h += '<div class="tenant-chip" style="cursor:pointer" onclick="C.editTenant(\''+k+'\')" title="Click to edit"><b>'+t.name+'</b><span class="sec">'+t.secTier+'</span><span style="color:var(--mid)">'+CHARGEOUT_LABELS[t.chargeout]+'</span></div>'
-    })
-    h += '</div></div>'
-    return h
+    return AtlasSolution.renderTenantMgmt(M)
   },
+
 
   renderGpuaasTab: function() {
     var rows = M.workloadConfigs.gpuaas, totalGpus = 0
@@ -1325,7 +1205,7 @@ var V = {
       var t = wl.tenant ? M.tenantsList[wl.tenant] : null
       html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
         + '<td class="name">'+wl.name+'</td>'
-        + '<td>'+GPU_LABELS[wl.gpu]+'</td>'
+        + '<td>'+gpuLabel(wl.gpu)+'</td>'
         + '<td class="num">'+wl.gpuCount+'</td>'
         + '<td>'+(t?'<span class="tenant-badge">'+t.name+'</span> <span class="pool-badge-'+wl.poolType+'">'+(wl.poolType==='reserved'?'&#128274; Reserved':'&#9889; Open'):'—')+'</td>'
         + '<td><span class="arrow">&#9654;</span></td></tr>'
@@ -1333,7 +1213,7 @@ var V = {
       if (isOpen) {
         html += '<div class="expand-pad">'
         html += '<div class="formgrid" style="grid-template-columns:1fr 1fr"><div class="fg"><label>GPU</label><select onchange="C.updGpuaas(\''+wl.id+'\',\'gpu\',this.value)">'
-        Object.keys(GPU_LABELS).forEach(function(k2){ html += '<option value="'+k2+'"'+(wl.gpu===k2?' selected':'')+'>'+GPU_LABELS[k2]+'</option>' })
+        (window.M&&M.gpuConfigs||[]).map(function(g){return g.id}).forEach(function(k2){ html += '<option value="'+k2+'"'+(wl.gpu===k2?' selected':'')+'>'+gpuLabel(k2)+'</option>' })
         html += '</select></div><div class="fg"><label>GPU Count</label><input type="number" value="'+wl.gpuCount+'" onchange="C.updGpuaas(\''+wl.id+'\',\'gpuCount\',+this.value)"></div></div>'
         html += V.renderTenantBlock(wl, 'gpuaas')
         html += '<div class="actions-row"><button class="btn btn-danger-text" onclick="C.removeGpuaas(\''+wl.id+'\')">Remove</button><button class="btn btn-ghost" onclick="C.toggleRow(\''+wl.id+'\')">&#9650; Collapse</button></div>'
@@ -1360,10 +1240,10 @@ var V = {
       var isOpen = !!M.openWlRows[wl.id]
       html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
         + '<td class="name">'+wl.name+(wl.ucType==='rag'?'<span class="rag-badge">&#128269; RAG</span>':'')+'</td>'
-        + '<td>'+(DOMAINS[wl.domain]||'—')+'</td>'
+        + '<td>'+(AtlasSolution.DOMAINS[wl.domain]||'—')+'</td>'
         + '<td>'+(wl.tenant ? '<span class="tenant-badge">'+M.tenantsList[wl.tenant].name+'</span> <span class="pool-badge-'+wl.poolType+'">'+(wl.poolType==="reserved"?"&#128274; Reserved":"&#9889; Open")+'</span>' : '<span style="color:var(--mid);font-size:10px">Open Pool</span>') + '</td>'
         + '<td class="num">'+wl.dau.toLocaleString()+'</td>'
-        + '<td>'+GPU_LABELS[sz.gpu]+'</td>'
+        + '<td>'+gpuLabel(sz.gpu)+'</td>'
         + '<td class="num">'+sz.total+'</td>'
         + '<td class="num">'+sz.powerKw+'kW</td>'
         + '<td><span class="badge '+(sz.slaMet?'badge-met':'badge-breach')+'">'+(sz.slaMet?'✓ Met':'✗ Breach')+'</span></td>'
@@ -1390,7 +1270,7 @@ var V = {
     h += '</select></div>'
 
     h += '<div class="fg"><label>Domain</label><select onchange="C.updUC(\''+wl.id+'\',\'domain\',this.value)">'
-    Object.keys(DOMAINS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.domain===k?' selected':'')+'>'+DOMAINS[k]+'</option>' })
+    Object.keys(AtlasSolution.DOMAINS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.domain===k?' selected':'')+'>'+AtlasSolution.DOMAINS[k]+'</option>' })
     h += '</select></div>'
     h += '<div></div>'
     h += '</div>'
@@ -1399,18 +1279,17 @@ var V = {
 
     // Row 0b: AI Model, UC Type, GPU
     h += '<div class="formgrid">'
-    h += '<div class="fg"><label>AI Model</label><select onchange="C.updUC(\''+wl.id+'\',\'model\',this.value)">'
-    Object.keys(MODELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.model===k?' selected':'')+'>'+MODELS[k]+'</option>' })
-    h += '</select></div>'
+    h += '<div class="fg"><label>AI Model</label>'
+      + AtlasSolution.renderModelDropdown(wl.model, M, "C.updUC('"+wl.id+"','model',this.value)")
+      + '</div>'
 
     h += '<div class="fg"><label>UC Type</label><select onchange="C.updUC(\''+wl.id+'\',\'ucType\',this.value)">'
-    Object.keys(UC_TYPES).forEach(function(k){ h += '<option value="'+k+'"'+(wl.ucType===k?' selected':'')+'>'+UC_TYPES[k]+'</option>' })
+    Object.keys(AtlasSolution.UC_TYPES).forEach(function(k){ h += '<option value="'+k+'"'+(wl.ucType===k?' selected':'')+'>'+AtlasSolution.UC_TYPES[k]+'</option>' })
     h += '</select></div>'
 
-    h += '<div class="fg"><label>GPU</label><select onchange="C.updUC(\''+wl.id+'\',\'gpu\',this.value)">'
-    h += '<option value="">(default: '+GPU_LABELS[M.defaultGpu]+')</option>'
-    Object.keys(GPU_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.gpu===k?' selected':'')+'>'+GPU_LABELS[k]+'</option>' })
-    h += '</select></div>'
+    h += '<div class="fg"><label>GPU</label>'
+      + AtlasSolution.renderGpuDropdown(wl.gpu, M, "C.updUC('"+wl.id+"','gpu',this.value)")
+      + '</div>'
     h += '</div>'
 
     // RAG latency budget — only shown when UC Type = rag
@@ -1428,11 +1307,11 @@ var V = {
     h += '</div></div>'
 
     h += '<div class="fg"><label>HA / Failover</label><select onchange="C.updUC(\''+wl.id+'\',\'haTier\',this.value)">'
-    Object.keys(HA_TIERS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.haTier===k?' selected':'')+'>'+HA_TIERS[k]+'</option>' })
+    Object.keys(AtlasSolution.HA_TIERS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.haTier===k?' selected':'')+'>'+AtlasSolution.HA_TIERS[k]+'</option>' })
     h += '</select></div>'
 
     h += '<div class="fg"><label>DR Type</label><select onchange="C.updUC(\''+wl.id+'\',\'drType\',this.value)">'
-    Object.keys(DR_TYPES).forEach(function(k){ h += '<option value="'+k+'"'+(wl.drType===k?' selected':'')+'>'+DR_TYPES[k]+'</option>' })
+    Object.keys(AtlasSolution.DR_TYPES).forEach(function(k){ h += '<option value="'+k+'"'+(wl.drType===k?' selected':'')+'>'+AtlasSolution.DR_TYPES[k]+'</option>' })
     h += '</select></div>'
     h += '</div>'
 
@@ -1474,7 +1353,7 @@ var V = {
 
     h += '<div class="formgrid" style="grid-template-columns:1fr 1fr">'
     h += '<div class="fg"><label>Performance Tier</label><select onchange="C.updUC(\''+wl.id+'\',\'slaTier\',this.value)">'
-    Object.keys(SLA_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.slaTier===k?' selected':'')+'>'+SLA_LABELS[k]+'</option>' })
+    Object.keys(AtlasSolution.PERF_TIER_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.slaTier===k?' selected':'')+'>'+AtlasSolution.PERF_TIER_LABELS[k]+'</option>' })
     h += '</select><div class="fg-hint">Latency class — not the same as commercial SLA (Bronze/Silver/Gold, set via Tenant block below)</div></div>'
     h += '<div class="fg"><label>TTFT Target (ms)</label><input type="number" value="'+wl.ttftTarget+'" onchange="C.updUC(\''+wl.id+'\',\'ttftTarget\',+this.value)"></div>'
     h += '</div>'
@@ -1487,25 +1366,7 @@ var V = {
     h += '<div class="fg"><label>Tool Wait (ms)</label><input type="number" value="'+wl.toolWait+'" onchange="C.updUC(\''+wl.id+'\',\'toolWait\',+this.value)"></div>'
     h += '</div></div></div></div>'
 
-    // Derived sizing — grid-aligned key/value pairs, not free-flowing text
-    h += '<div class="derived">'
-    h += '<div class="derived-line">'
-      + '<span>P95 RPS<br><b>'+sz.p95RPS+'</b></span>'
-      + '<span>Concurrent<br><b>'+sz.concurrent.toLocaleString()+'</b></span>'
-      + '<span>GPU<br><b>'+GPU_LABELS[sz.gpu]+'</b></span>'
-      + '<span>Base GPUs<br><b>'+sz.baseGpus+'</b></span>'
-      + '<span>+Buffers<br><b>'+sz.buffers+'</b></span>'
-      + '<span>Total GPUs<br><b>'+sz.total+'</b></span>'
-      + '<span>Racks<br><b>'+sz.racks+'</b></span>'
-      + '<span>Power<br><b>'+sz.powerKw+'kW</b></span>'
-      + '</div>'
-    h += '<div style="display:flex;justify-content:flex-end;margin-bottom:6px">'
-      + '<button type="button" onclick="C.showCalcDetail(\''+wl.id+'\')" style="font-size:10px;padding:3px 10px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;border-radius:4px;cursor:pointer">&#128269; How was this calculated?</button>'
-      + '</div>'
-    h += '<div class="sla-banner '+(sz.slaMet?'sla-met':'sla-breach')+'">'
-      + (sz.slaMet ? '&#10003; LATENCY TARGET MET' : '&#10007; LATENCY TARGET BREACHED') + ' — TTFT '+sz.ttftEstimate+'ms vs '+wl.ttftTarget+'ms target ('+sz.margin+'% '+(sz.slaMet?'margin':'over')+')'
-      + (sz.slaMet ? '' : '<span class="sla-hint">Try: lower precision impact, add GPU, raise SLA tier</span>')
-      + '</div>'
+    h += AtlasSolution.renderDerivedPanel(sz, wl)
     h += '</div>'
 
     // Make vs Buy collapsible
@@ -1538,10 +1399,10 @@ var V = {
       var t = wl.tenant ? M.tenantsList[wl.tenant] : null
       html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
         + '<td class="name">'+wl.name+'</td>'
-        + '<td>'+(MODELS[wl.model]||wl.model)+'</td>'
+        + '<td>'+(modelLabel(wl.model)||wl.model)+'</td>'
         + '<td>'+(t ? '<span class="tenant-badge">'+t.name+'</span> <span class="pool-badge-'+wl.poolType+'">'+(wl.poolType==='reserved'?'&#128274; Reserved':'&#9889; Open'):'<span style="color:var(--mid);font-size:10px">Open Pool</span>')+'</td>'
         + '<td class="num">'+wl.dau.toLocaleString()+'</td>'
-        + '<td>'+GPU_LABELS[sz.gpu]+'</td>'
+        + '<td>'+gpuLabel(sz.gpu)+'</td>'
         + '<td class="num">'+sz.total+'</td>'
         + '<td class="num">'+sz.powerKw+'kW</td>'
         + '<td class="num">$'+sz.cpst+'</td>'
@@ -1566,24 +1427,26 @@ var V = {
     // 30 June 2026 — undermines sovereignty story, belongs in B5I
     // Marketplace as a separate future capability, not MaaS sizing).
     h += '<div class="formgrid">'
-    h += '<div class="fg"><label>AI Model</label><select onchange="C.updMaas(\''+wl.id+'\',\'model\',this.value)">'
-    Object.keys(MODELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.model===k?' selected':'')+'>'+MODELS[k]+'</option>' })
-    h += '</select></div>'
-    h += '<div class="fg"><label>GPU</label><select onchange="C.updMaas(\''+wl.id+'\',\'gpu\',this.value)">'
-    Object.keys(GPU_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.gpu===k?' selected':'')+'>'+GPU_LABELS[k]+'</option>' })
-    h += '</select></div>'
+    h += '<div class="fg"><label>AI Model</label>'
+      + AtlasSolution.renderModelDropdown(wl.model, M, "C.updMaas('"+wl.id+"','model',this.value)")
+      + '</div>'
+    h += '<div class="fg"><label>GPU</label>'
+      + AtlasSolution.renderGpuDropdown(wl.gpu, M, "C.updMaas('"+wl.id+"','gpu',this.value)")
+      + '</div>'
     h += '<div class="fg"><label>Precision</label><select onchange="C.updMaas(\''+wl.id+'\',\'precision\',this.value)">'
     ;['int4','int8','fp16','fp8'].forEach(function(p){ h += '<option value="'+p+'"'+((wl.precision||'int4')===p?' selected':'')+'>'+p.toUpperCase()+'</option>' })
     h += '</select></div>'
     h += '</div>'
 
-    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr">'
+    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr 1fr">'
     h += '<div class="fg"><label>DAU</label><div class="sliderwrap">'
       + '<input type="range" min="2" max="9" step="0.01" value="'+Math.log10(wl.dau)+'" oninput="C.updMaasSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
       + '<span class="slider-val" id="madauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div>'
       + '<div style="display:flex;gap:6px;align-items:center;margin-top:4px">'
       + '<input type="number" min="1" step="1000" value="'+wl.dau+'" placeholder="exact DAU" style="flex:1;font-size:11px;padding:4px 6px" onchange="C.updMaas(\''+wl.id+'\',\'dau\',Math.max(1,+this.value))">'
       + '<span class="fg-hint" style="margin:0">100 – 1bn</span></div></div>'
+    h += '<div class="fg"><label>Peak Concurrent %</label><input type="number" min="0.1" max="100" step="0.5" value="'+(wl.peakConcPct||5)+'" onchange="C.updMaas(\''+wl.id+'\',\'peakConcPct\',+this.value)"><div class="fg-hint">% of DAU concurrently active at peak</div></div>'
+    h += AtlasSolution.renderContextPctToggle(wl, "C.updMaas('"+wl.id+"','contextPct',arguments[0])")
     // Commercial SLA (Bronze/Silver/Gold) is DERIVED from Tenant Pool Type below,
     // not a separate input here. Reserved tenants may choose Silver or Gold.
     h += '<div class="fg"><label>Commercial SLA</label><div class="fg-hint" style="padding-top:8px">'
@@ -1600,11 +1463,7 @@ var V = {
 
     h += V.renderTenantBlock(wl, 'maas')
 
-    h += '<div class="derived">'
-    h += '<div class="derived-line">Throughput: <b>'+sz.throughput.toLocaleString()+'</b> tok/s &nbsp; Instances: <b>'+sz.instances+'</b></div>'
-    h += '<div class="derived-line">Base: <b>'+sz.baseGpus+'</b> GPUs &nbsp; +Buffers: <b>'+sz.buffers+'</b> &nbsp; Total: <b>'+sz.total+'</b> GPUs</div>'
-    h += '<div class="derived-line">= <b>'+sz.racks+'</b> &nbsp;&middot;&nbsp; <b>'+sz.powerKw+'kW</b> &nbsp;&middot;&nbsp; CPST: <b>$'+sz.cpst+'</b></div>'
-    h += '</div>'
+    h += AtlasSolution.renderDerivedPanel(sz, wl)
 
     h += '<div class="collapsible" style="margin-top:var(--sp-3)">'
     h += '<div class="collapsible-hdr" onclick="C.toggleCollapsible(this)"><span class="arrow">&#9654;</span> Make vs Buy — On-prem vs API</div>'
@@ -1622,42 +1481,9 @@ var V = {
 
   // ── Reusable Tenant block — used identically in UC, MaaS, GPUaaS, BMaaS ──
   renderTenantBlock: function(wl, contextLabel) {
-    var t = wl.tenant ? M.tenantsList[wl.tenant] : null
-    var h = '<div class="tenant-block">'
-    h += '<div class="tenant-block-hdr">Tenant Attribution</div>'
-
-    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0">'
-    h += '<div class="fg"><label>Tenant</label><select onchange="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'tenant\',this.value)">'
-    h += '<option value="">— Open Pool (no specific tenant) —</option>'
-    Object.keys(M.tenantsList).forEach(function(k){ h += '<option value="'+k+'"'+(wl.tenant===k?' selected':'')+'>'+M.tenantsList[k].name+'</option>' })
-    h += '</select></div>'
-
-    h += '<div class="fg"><label>Pool Type</label><div class="pool-toggle">'
-    h += '<button type="button" class="pool-btn'+(wl.poolType==='reserved'?' active-reserved':'')+'" onclick="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'poolType\',\'reserved\')">&#128274; Reserved</button>'
-    h += '<button type="button" class="pool-btn'+(wl.poolType==='open'?' active-open':'')+'" onclick="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'poolType\',\'open\')">&#9889; Open/Spot</button>'
-    h += '</div></div>'
-
-    if (wl.poolType === 'reserved') {
-      h += '<div class="fg"><label>Tenure</label><select onchange="C.updTenant(\''+wl.id+'\',\''+contextLabel+'\',\'tenure\',this.value)">'
-      Object.keys(TENURE_LABELS).forEach(function(k){ h += '<option value="'+k+'"'+(wl.tenure===k?' selected':'')+'>'+TENURE_LABELS[k]+'</option>' })
-      h += '</select></div>'
-    } else {
-      h += '<div class="fg"><label>Tenure</label><div class="fg-hint" style="padding-top:8px">N/A — pay-as-you-go, no commitment</div></div>'
-    }
-    h += '</div>'
-
-    if (t) {
-      h += '<div style="display:flex;gap:10px;margin-top:10px;font-size:11px;color:var(--mid)">'
-      h += 'Security tier: <b style="color:var(--dark)">'+t.secTier+'</b>'
-      h += '&nbsp;&middot;&nbsp; Chargeout: <b style="color:var(--dark)">'+CHARGEOUT_LABELS[t.chargeout]+'</b>'
-      h += '&nbsp;&middot;&nbsp; SLA: <b style="color:var(--dark)">'+(wl.poolType==='reserved'?'Gold':'Bronze')+'</b>'
-      h += ' <span style="font-size:9px;color:var(--mid)">(Bronze/Silver/Gold — Reserved tenants may choose Silver or Gold)</span>'
-      h += '</div>'
-    }
-
-    h += '</div>'
-    return h
+    return AtlasSolution.renderTenantBlock(wl, contextLabel, M)
   },
+
 
   renderMvBChart: function(wl, defaultCtx) {
     var ctx = wl.mvbView || defaultCtx
@@ -1767,9 +1593,15 @@ var C = {
     // Wire this alongside other Controller wiring — see Spec Section 13.
     M.workloadConfigs = (DUMMY.workloadConfigs && DUMMY.workloadConfigs[eng.id])
       || { uc: [], maas: [], gpuaas: [], bmaas: [] }
-    M.tenantsList = Object.assign({}, DEFAULT_TENANTS)
+    M.tenantsList = Object.assign({}, AtlasSolution.defaultTenants)
     M.openWlRows  = {}
     M.activeSolTab = 'uc'
+
+    // Load model_catalogue + gpu_configs from Supabase into M
+    // Non-blocking — dropdowns re-render once data arrives if Solution tab is active
+    AtlasSolution.loadRefData(M).then(function() {
+      if (M.activeTab === 'solution') { V.renderSolTabs(); V.renderSolTabBody() }
+    }).catch(function(e) { console.warn('atlas-solution loadRefData:', e) })
 
     V.renderSidebar()
     V.renderDocket()
@@ -2294,29 +2126,9 @@ var C = {
   },
 
   showCalcDetail: function(id) {
-    var wl = M.workloadConfigs.uc.find(function(w){ return w.id === id })
-      || M.workloadConfigs.maas.find(function(w){ return w.id === id })
-    if (!wl || !wl._lastSizing) { V.toast('Run sizing first','info'); return }
-    var sz = wl._lastSizing
-    var formula = sz.formula || sz.notes || 'No detailed formula — wire SizingEngine for full audit trail.'
-    var NL = '\n'
-    var text = '=== GPU Count Derivation ===' + NL + NL
-      + 'Workload: ' + wl.name + NL
-      + 'GPU: ' + (GPU_LABELS[sz.gpu]||sz.gpu) + NL
-      + 'DAU: ' + (wl.dau||0).toLocaleString() + NL
-      + 'Peak concurrent %: ' + (wl.peakConcPct||5) + '%' + NL
-      + 'Context percentile: ' + (wl.contextPct||'p95').toUpperCase() + NL + NL
-      + formula.split(' | ').join(NL) + NL + NL
-      + '=== Result ===' + NL
-      + 'Base GPUs:   ' + sz.baseGpus + NL
-      + '+Buffers:    ' + sz.buffers + NL
-      + 'Total GPUs:  ' + sz.total + NL
-      + 'Power:       ' + sz.powerKw + 'kW' + NL
-      + 'Racks:       ' + sz.racks + NL
-      + (sz.notes ? NL + '=== Engine Audit Trail ===' + NL + sz.notes : '')
-    document.getElementById('calc-detail-content').textContent = text
-    V.openModal('modal-calc-detail')
+    AtlasSolution.openCalcDetail(id)
   },
+
   editTenant: function(id) {
     var t = M.tenantsList[id]
     if (!t) return
