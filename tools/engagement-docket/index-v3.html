@@ -1085,14 +1085,15 @@ var V = {
       {key:'gpuaas',     label:'GPUaaS',         count:M.workloadConfigs.gpuaas.length},
       {key:'bmaas',      label:'BMaaS',          count:0},
       {key:'whatif',     label:'What-If ⚡',      count:0},
-      {key:'makeorbuy',  label:'Make vs Buy',    count:0, soon:true},
+      {key:'makeorbuy',  label:'Make vs Buy',    count:0},
       {key:'gateway',    label:'Gateway',        count:0, soon:true},
       {key:'metering',   label:'Metering',       count:0, soon:true},
       {key:'slamonitor', label:'SLA Monitor',    count:0, soon:true},
-      {key:'benchmarks', label:'Benchmarks',     count:0, soon:true},
-      {key:'margin',     label:'Margin',         count:0, soon:true},
+      {key:'benchmarks', label:'Benchmarks',     count:0},
+      {key:'margin',     label:'Margin',         count:0},
       {key:'diagnostics',label:'Diagnostics',    count:0, soon:true},
-      {key:'bom',        label:'BOM Complete',   count:0, soon:true},
+      {key:'bom',        label:'BOM Complete',   count:0},
+      {key:'fleetyield',  label:'Fleet Yield',     count:0},
     ]
     var html = ''
     tabs.forEach(function(t){
@@ -1115,6 +1116,11 @@ var V = {
     else if (t === 'maas')        body = V.renderMaasTab()
     else if (t === 'gpuaas')      body = V.renderGpuaasTab()
     else if (t === 'whatif')       body = V.renderWhatIfTab()
+    else if (t === 'makeorbuy')    body = V.renderMakeOrBuyTab()
+    else if (t === 'bom')          body = V.renderBomTab()
+    else if (t === 'margin')       body = V.renderMarginTab()
+    else if (t === 'benchmarks')   body = V.renderBenchmarksTab()
+    else if (t === 'fleetyield')   body = V.renderFleetYieldTab()
     else                          body = V.renderComingSoon(t)
     el.innerHTML = tm + body
   },
@@ -1342,6 +1348,348 @@ var V = {
 
     svg += '</svg>'
     return svg
+  },
+
+    // ── Make vs Buy ────────────────────────────────────────────────────────
+  renderMakeOrBuyTab: function() {
+    var wls = (M.workloadConfigs.uc||[]).concat(M.workloadConfigs.maas||[])
+    if (!wls.length) return '<div class="coming-soon-panel"><div class="coming-soon-icon">&#9878;</div><div class="coming-soon-title">Make vs Buy</div><div class="coming-soon-desc">Add UC or MaaS workloads first.</div></div>'
+
+    var h = '<div class="card"><div class="card-title">Make vs Buy — On-prem vs API Market Price</div>'
+    h += '<p style="font-size:12px;color:var(--mid);margin-bottom:var(--sp-4)">Compares our on-prem cost per million tokens vs market API reference prices from model_catalogue. Breakeven = utilisation% where on-prem becomes cheaper.</p>'
+    h += '<table class="tbl"><thead><tr><th>Workload / Model</th><th class="num">GPUs</th><th class="num">Est. cost/Mtok (on-prem)</th><th class="num">Market ref price/Mtok</th><th class="num">Breakeven util%</th><th>Verdict</th></tr></thead><tbody>'
+
+    wls.forEach(function(wl) {
+      var model = M.modelMap && M.modelMap[wl.model]
+      var sz = AtlasSolution.sizeWorkload(wl, wl.mvbView==='maas'?'maas':'uc', M)
+      // On-prem cost estimate: power cost + capex amortised
+      // Power: sz.powerKw × 0.08 $/kWh × 730 hrs/month = monthly power cost
+      // Capex: ~$30k/GPU × sz.total / 60 months = monthly capex
+      var monthlyPower = sz.powerKw * 0.08 * 730
+      var monthlyCapex = sz.total * 30000 / 60
+      var totalMonthly = monthlyPower + monthlyCapex
+      // Tokens per month at 75% utilisation
+      var tokPerSec = sz.total * 8000  // H200 INT4 baseline
+      var tokPerMonth75 = tokPerSec * 0.75 * 3600 * 730 / 1e6  // in millions
+      var onPremCostPerMtok = tokPerMonth75 > 0 ? (totalMonthly / tokPerMonth75).toFixed(4) : '—'
+      // Market ref price
+      var mktIn  = model && model.price_input_per_1m  ? '$'+model.price_input_per_1m.toFixed(4)  : '—'
+      var mktOut = model && model.price_output_per_1m ? '$'+model.price_output_per_1m.toFixed(4) : '—'
+      var mktAvg = model && model.price_input_per_1m && model.price_output_per_1m
+        ? (model.price_input_per_1m + model.price_output_per_1m) / 2 : null
+      // Breakeven: at what utilisation does on-prem = market?
+      var breakeven = mktAvg && onPremCostPerMtok !== '—'
+        ? Math.round((totalMonthly / (mktAvg * tokPerSec * 3600 * 730 / 1e6)) * 100)
+        : null
+      var verdict = breakeven === null ? '—'
+        : breakeven <= 40 ? '&#9733; On-prem wins at low utilisation'
+        : breakeven <= 70 ? 'Breakeven at ' + breakeven + '% — manageable'
+        : '&#9888; Need ' + breakeven + '% utilisation to beat market'
+      h += '<tr>'
+        + '<td>' + wl.name + (model ? '<br><span style="font-size:10px;color:var(--mid)">' + model.name + '</span>' : '') + '</td>'
+        + '<td class="num">' + sz.total + '</td>'
+        + '<td class="num">$' + onPremCostPerMtok + '</td>'
+        + '<td class="num">' + (mktAvg ? '$' + mktAvg.toFixed(4) : '—') + '</td>'
+        + '<td class="num" style="color:' + (breakeven && breakeven > 70 ? 'var(--orange)' : 'var(--teal)') + '">' + (breakeven || '—') + (breakeven ? '%' : '') + '</td>'
+        + '<td style="font-size:11px">' + verdict + '</td>'
+        + '</tr>'
+    })
+    h += '</tbody></table>'
+    h += '<div style="margin-top:12px;font-size:11px;color:var(--mid)">Assumptions: $0.08/kWh power, $30k/GPU capex, 60-month amortisation, 8,000 tok/s/GPU (H200 INT4 baseline). Market prices from model_catalogue.price_input/output_per_1m.</div>'
+    h += '</div>'
+    return h
+  },
+
+  // ── BOM Complete ────────────────────────────────────────────────────────
+  renderBomTab: function() {
+    var wls = (M.workloadConfigs.uc||[]).concat(M.workloadConfigs.maas||[]).concat(M.workloadConfigs.gpuaas||[])
+    if (!wls.length) return '<div class="coming-soon-panel"><div class="coming-soon-icon">&#128221;</div><div class="coming-soon-title">BOM Complete</div><div class="coming-soon-desc">Add workloads first.</div></div>'
+
+    // Aggregate fleet
+    var totalGpus = 0, totalPowerKw = 0, totalByGpu = {}
+    wls.forEach(function(wl) {
+      var type = M.workloadConfigs.gpuaas && M.workloadConfigs.gpuaas.indexOf(wl) >= 0 ? 'gpuaas'
+               : M.workloadConfigs.maas   && M.workloadConfigs.maas.indexOf(wl)   >= 0 ? 'maas' : 'uc'
+      var sz = type === 'gpuaas'
+        ? { total: wl.gpuCount || 0, gpu: wl.gpu, powerKw: Math.round((wl.gpuCount||0)*0.7*10)/10 }
+        : AtlasSolution.sizeWorkload(wl, type, M)
+      totalGpus += sz.total
+      totalPowerKw += sz.powerKw || 0
+      var gpuId = sz.gpu || wl.gpu || M.defaultGpu
+      if (!totalByGpu[gpuId]) totalByGpu[gpuId] = {count:0, powerKw:0, name: (M.gpuMap&&M.gpuMap[gpuId]&&M.gpuMap[gpuId].name)||gpuId}
+      totalByGpu[gpuId].count += sz.total
+      totalByGpu[gpuId].powerKw += sz.powerKw || 0
+    })
+
+    // Rack estimate
+    var totalRacks = Math.ceil(totalGpus / 8)
+    var totalPowerRounded = Math.round(totalPowerKw * 10) / 10
+
+    // Cost estimates
+    var gpuCapexEst = totalGpus * 30000
+    var gatewayNodes = 2, gatewayCapex = gatewayNodes * 25000
+    var networkingCapex = totalGpus >= 8 ? Math.ceil(totalGpus/8) * 15000 : 0
+    var totalCapex = gpuCapexEst + gatewayCapex + networkingCapex
+
+    var h = '<div class="card"><div class="card-title">BOM Complete — Full Infrastructure Line Items</div>'
+
+    // GPU fleet
+    h += '<div style="margin-bottom:var(--sp-4)"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">GPU Fleet</div>'
+    h += '<table class="tbl"><thead><tr><th>GPU Architecture</th><th class="num">Count</th><th class="num">Power</th><th class="num">Racks (est)</th><th class="num">Capex est. ($)</th></tr></thead><tbody>'
+    Object.keys(totalByGpu).forEach(function(gpuId) {
+      var g = totalByGpu[gpuId]
+      h += '<tr><td>' + g.name + '</td>'
+        + '<td class="num">' + g.count + '</td>'
+        + '<td class="num">' + Math.round(g.powerKw*10)/10 + 'kW</td>'
+        + '<td class="num">' + Math.ceil(g.count/8) + '</td>'
+        + '<td class="num">$' + (g.count*30000).toLocaleString() + '</td></tr>'
+    })
+    h += '<tr style="font-weight:700;background:var(--light)"><td>TOTAL GPU fleet</td><td class="num">' + totalGpus + '</td><td class="num">' + totalPowerRounded + 'kW</td><td class="num">' + totalRacks + '</td><td class="num">$' + gpuCapexEst.toLocaleString() + '</td></tr>'
+    h += '</tbody></table></div>'
+
+    // Management/gateway nodes
+    h += '<div style="margin-bottom:var(--sp-4)"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Management &amp; Gateway (currently missing from most BOMs)</div>'
+    h += '<table class="tbl"><thead><tr><th>Item</th><th>Spec</th><th class="num">Qty</th><th class="num">Capex est. ($)</th><th>Notes</th></tr></thead><tbody>'
+    h += '<tr><td>Gateway / Management nodes</td><td>32-core CPU, 256GB RAM, 10GbE, 4TB NVMe</td><td class="num">2</td><td class="num">$' + gatewayCapex.toLocaleString() + '</td><td style="font-size:10px">vLLM + LiteLLM + Prometheus + Grafana</td></tr>'
+    h += '<tr><td>Monitoring storage</td><td>NVMe on gateway nodes</td><td class="num">—</td><td class="num">Included</td><td style="font-size:10px">Prometheus TSDB + metering events</td></tr>'
+    h += '</tbody></table></div>'
+
+    // Networking
+    if (networkingCapex > 0) {
+      h += '<div style="margin-bottom:var(--sp-4)"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Networking</div>'
+      h += '<table class="tbl"><thead><tr><th>Item</th><th>Spec</th><th class="num">Qty</th><th class="num">Capex est. ($)</th><th>Notes</th></tr></thead><tbody>'
+      h += '<tr><td>InfiniBand switch + cabling</td><td>HDR/NDR per rack</td><td class="num">' + totalRacks + '</td><td class="num">$' + networkingCapex.toLocaleString() + '</td><td style="font-size:10px">Required for 671B+ models across nodes</td></tr>'
+      h += '</tbody></table></div>'
+    }
+
+    // Summary
+    h += '<div style="background:var(--navy);color:#fff;border-radius:var(--r);padding:var(--sp-4)">'
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center">'
+    var items = [
+      ['Total GPUs', totalGpus],
+      ['Total Power', totalPowerRounded + 'kW'],
+      ['Total Racks', totalRacks],
+      ['Total Capex', '$' + (totalCapex/1e6).toFixed(1) + 'M']
+    ]
+    items.forEach(function(item) {
+      h += '<div><div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:4px">' + item[0] + '</div>'
+        + '<div style="font-size:20px;font-weight:900">' + item[1] + '</div></div>'
+    })
+    h += '</div></div>'
+    h += '<div style="margin-top:8px;font-size:11px;color:var(--mid)">Estimates: $30k/GPU, $25k/gateway node, $15k/rack networking. Actual prices from Settings when wired.</div>'
+    h += '</div>'
+    return h
+  },
+
+  // ── Margin Analysis ────────────────────────────────────────────────────
+  renderMarginTab: function() {
+    var wls = (M.workloadConfigs.uc||[]).concat(M.workloadConfigs.maas||[])
+    if (!wls.length) return '<div class="coming-soon-panel"><div class="coming-soon-icon">&#128181;</div><div class="coming-soon-title">Margin Analysis</div><div class="coming-soon-desc">Add workloads first.</div></div>'
+
+    var h = '<div class="card"><div class="card-title">Margin Analysis — Known Leak Sources</div>'
+    h += '<p style="font-size:12px;color:var(--mid);margin-bottom:var(--sp-4)">Items not yet reflected in sizing that reduce actual margin vs estimated.</p>'
+
+    // Per-workload margin flags
+    h += '<table class="tbl"><thead><tr><th>Workload</th><th>Model</th><th class="num">Sized GPUs</th><th>Margin risks</th></tr></thead><tbody>'
+    wls.forEach(function(wl) {
+      var model = M.modelMap && M.modelMap[wl.model]
+      var sz = AtlasSolution.sizeWorkload(wl, wl.mvbView==='maas'?'maas':'uc', M)
+      var risks = []
+      if (model) {
+        var pb = model.params_b || 0
+        if (pb >= 100) risks.push('Large model ('+pb+'B) — requires InfiniBand across nodes, not costed')
+        if (model.context_length_k >= 64) risks.push('Long context ('+model.context_length_k+'K) — KV cache consumes 40-60% VRAM at max context')
+        if (model.is_reasoning) risks.push('Reasoning model — higher compute per token, TTFT estimates may be optimistic')
+        if (model.is_multimodal) risks.push('Multimodal — vision preprocessing overhead not in sizing')
+        var domain = model.domain
+        if (domain === 'code') risks.push('Coding model — typically larger output sequences, higher GPU time per request')
+      }
+      if (!risks.length) risks.push('No major risks identified with current data')
+      h += '<tr><td>' + wl.name + '</td>'
+        + '<td>' + (model ? model.name : wl.model || '—') + '</td>'
+        + '<td class="num">' + sz.total + '</td>'
+        + '<td style="font-size:11px">' + risks.map(function(r){ return '⚠ '+r }).join('<br>') + '</td>'
+        + '</tr>'
+    })
+    h += '</tbody></table>'
+
+    // Global margin leak items
+    h += '<div style="margin-top:var(--sp-4);font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Global margin risks (apply to all workloads)</div>'
+    var globalRisks = [
+      ['Cold start latency', 'GPU idle time when loading infrequently-used models — not costed. Mitigation: keep-warm allocation (~5% buffer).'],
+      ['Embedding models in catalogue', 'BGE-M3, Nomic, MXBai, jina — batch-throughput sizing, not TTFT-based. Current formula overstates GPU needs for these.'],
+      ['Speculative decoding', 'Draft model overhead (~10-15% extra GPU) if enabled — reduces latency but adds cost.'],
+      ['Quantisation quality', 'INT4 is cheapest but may increase re-requests for quality-sensitive tasks — effective token consumption higher than sized.'],
+      ['Network overhead', 'Inter-GPU bandwidth for 671B+ models — InfiniBand cost not yet in BOM.'],
+    ]
+    h += '<table class="tbl"><thead><tr><th>Risk</th><th>Description</th></tr></thead><tbody>'
+    globalRisks.forEach(function(r) {
+      h += '<tr><td style="font-weight:600;white-space:nowrap">⚠ ' + r[0] + '</td><td style="font-size:11px">' + r[1] + '</td></tr>'
+    })
+    h += '</tbody></table></div>'
+    return h
+  },
+
+  // ── Benchmarks ─────────────────────────────────────────────────────────
+  renderBenchmarksTab: function() {
+    var models = M.modelCatalogue || []
+    var gpus   = M.gpuConfigs || []
+
+    var h = '<div class="card"><div class="card-title">Performance Benchmarks</div>'
+    h += '<p style="font-size:12px;color:var(--mid);margin-bottom:var(--sp-4)">Measured throughput per model × GPU × precision. Currently sizing uses H200 INT4 baseline = 8,000 tok/s (estimate). Real pricing requires measured values in benchmark_results. Green = data exists, amber = estimated, red = missing.</p>'
+
+    if (!models.length) {
+      h += '<div class="warn-panel"><div class="warn-body">model_catalogue not loaded yet — open an engagement first.</div></div>'
+      h += '</div>'
+      return h
+    }
+
+    // GPU specs table
+    h += '<div style="margin-bottom:var(--sp-4)"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">GPU Catalogue — Specs</div>'
+    h += '<table class="tbl"><thead><tr><th>GPU</th><th>Vendor</th><th class="num">HBM (GB)</th><th class="num">FP8 TFlops</th><th class="num">TDP (W)</th><th>Status</th></tr></thead><tbody>'
+    gpus.forEach(function(g) {
+      var hasSpecs = g.fp8_tflops || g.hbm_size_gb
+      h += '<tr>'
+        + '<td style="font-weight:600">' + g.name + '</td>'
+        + '<td>' + (g.vendor || '—') + '</td>'
+        + '<td class="num">' + (g.hbm_size_gb || '—') + '</td>'
+        + '<td class="num">' + (g.fp8_tflops || '—') + '</td>'
+        + '<td class="num">' + (g.tdp_w || '—') + '</td>'
+        + '<td><span style="color:' + (hasSpecs?'var(--teal)':'var(--orange)') + '">' + (hasSpecs?'✓ Specs present':'⚠ Incomplete') + '</span></td>'
+        + '</tr>'
+    })
+    h += '</tbody></table></div>'
+
+    // Model catalogue summary
+    h += '<div style="margin-bottom:var(--sp-4)"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Model Catalogue — ' + models.length + ' models</div>'
+    // Group by domain
+    var byDomain = {}
+    models.forEach(function(m) {
+      var d = m.domain || 'general'
+      if (!byDomain[d]) byDomain[d] = []
+      byDomain[d].push(m)
+    })
+    h += '<table class="tbl"><thead><tr><th>Domain</th><th class="num">Models</th><th class="num">Avg params (B)</th><th>Benchmark status</th></tr></thead><tbody>'
+    Object.keys(byDomain).sort().forEach(function(d) {
+      var mods = byDomain[d]
+      var avgP = mods.filter(function(m){ return m.params_b }).reduce(function(a,m){ return a+m.params_b },0) / mods.filter(function(m){ return m.params_b }).length
+      h += '<tr><td>' + d + '</td><td class="num">' + mods.length + '</td>'
+        + '<td class="num">' + (isNaN(avgP)?'—':avgP.toFixed(0)) + '</td>'
+        + '<td style="font-size:10px;color:var(--orange)">⚠ benchmark_results needs populating — run vLLM benchmark harness per GPU</td></tr>'
+    })
+    h += '</tbody></table></div>'
+
+    h += '<div style="padding:12px;background:var(--light);border-radius:var(--r);font-size:11px;color:var(--mid)">'
+    h += '<b style="color:var(--dark)">Next action:</b> Run vLLM built-in benchmark tools for each model × GPU × precision combination. '
+    h += 'Write results to <code>benchmark_results</code> table in Supabase. '
+    h += 'sasc-sizing.js already reads from this table — once populated, all sizing calculations use measured values automatically.'
+    h += '</div>'
+    h += '</div>'
+    return h
+  },
+
+  // ── Fleet Yield ─────────────────────────────────────────────────────────
+  renderFleetYieldTab: function() {
+    var wls = (M.workloadConfigs.uc||[]).concat(M.workloadConfigs.maas||[]).concat(M.workloadConfigs.gpuaas||[])
+
+    // Compute fleet totals
+    var commitedGpus = 0
+    wls.forEach(function(wl) {
+      var type = M.workloadConfigs.gpuaas && M.workloadConfigs.gpuaas.indexOf(wl) >= 0 ? 'gpuaas'
+               : M.workloadConfigs.maas   && M.workloadConfigs.maas.indexOf(wl)   >= 0 ? 'maas' : 'uc'
+      var sz = type === 'gpuaas'
+        ? { total: wl.gpuCount || 0 }
+        : AtlasSolution.sizeWorkload(wl, type, M)
+      commitedGpus += sz.total
+    })
+
+    // Assume 20% failover reserve
+    var failoverReserve = Math.ceil(commitedGpus * 0.2)
+    var totalFleet = commitedGpus + failoverReserve
+    var availableMaas = Math.max(0, totalFleet - commitedGpus - failoverReserve)
+
+    // Fleet yield inputs (editable)
+    var fy = M.fleetYield || { totalFleet: totalFleet, discountPct: 20, targetUtil: 70,
+      avgTokensPerCustomerM: 10, inputOutputRatio: 0.5 }
+    M.fleetYield = fy
+    fy.totalFleet = fy.totalFleet || totalFleet
+
+    var tokPerSec = fy.totalFleet * 8000
+    var tokPerMonthM = tokPerSec * (fy.targetUtil/100) * 3600 * 730 / 1e6
+    var monthlyPower = fy.totalFleet * 0.7 * 0.08 * 730
+    var monthlyCapex = fy.totalFleet * 30000 / 60
+    var costPerMtok = tokPerMonthM > 0 ? (monthlyPower + monthlyCapex) / tokPerMonthM : 0
+
+    var models = M.modelCatalogue || []
+    var priceableModels = models.filter(function(m){ return m.price_input_per_1m || m.price_output_per_1m })
+
+    var h = '<div class="card"><div class="card-title">Fleet Yield — Commercial Planning</div>'
+
+    // Scenario 1 — Top-down
+    h += '<div style="margin-bottom:var(--sp-4)">'
+    h += '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Scenario 1 — Top-down: What volume do we need to sell?</div>'
+    h += '<div class="formgrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">'
+    h += '<div class="fg"><label>Total fleet GPUs</label><input type="number" value="'+fy.totalFleet+'" onchange="M.fleetYield.totalFleet=+this.value;V.renderSolTabBody()"></div>'
+    h += '<div class="fg"><label>Target utilisation %</label><input type="number" min="1" max="100" value="'+fy.targetUtil+'" onchange="M.fleetYield.targetUtil=+this.value;V.renderSolTabBody()"></div>'
+    h += '<div class="fg"><label>Discount vs market %</label><input type="number" min="0" max="80" value="'+fy.discountPct+'" onchange="M.fleetYield.discountPct=+this.value;V.renderSolTabBody()"></div>'
+    h += '<div class="fg"><label>Avg tokens/customer/month (M)</label><input type="number" min="0.1" step="0.1" value="'+fy.avgTokensPerCustomerM+'" onchange="M.fleetYield.avgTokensPerCustomerM=+this.value;V.renderSolTabBody()"></div>'
+    h += '</div>'
+
+    h += '<div class="derived" style="margin-bottom:12px">'
+    h += '<div class="derived-line">'
+    h += '<span>Fleet size<br><b>'+fy.totalFleet+' GPUs</b></span>'
+    h += '<span>Throughput<br><b>'+(tokPerSec/1000).toFixed(0)+'K tok/s</b></span>'
+    h += '<span>Tokens/month @'+fy.targetUtil+'%<br><b>'+tokPerMonthM.toFixed(0)+'M</b></span>'
+    h += '<span>Cost/Mtok<br><b>$'+costPerMtok.toFixed(4)+'</b></span>'
+    h += '</div></div>'
+
+    if (priceableModels.length) {
+      h += '<table class="tbl"><thead><tr><th>Model</th><th class="num">Market $/Mtok (avg)</th><th class="num">Our price ('+fy.discountPct+'% disc.)</th><th class="num">Margin%</th><th class="num">Customers needed</th></tr></thead><tbody>'
+      priceableModels.slice(0,10).forEach(function(m) {
+        var mktAvg = ((m.price_input_per_1m||0) + (m.price_output_per_1m||0)) / 2
+        var ourPrice = mktAvg * (1 - fy.discountPct/100)
+        var margin = ourPrice > 0 ? Math.round(((ourPrice - costPerMtok) / ourPrice) * 100) : null
+        var customersNeeded = fy.avgTokensPerCustomerM > 0 ? Math.ceil(tokPerMonthM / fy.avgTokensPerCustomerM) : '—'
+        h += '<tr>'
+          + '<td style="font-size:11px">' + m.name + '</td>'
+          + '<td class="num">$' + mktAvg.toFixed(4) + '</td>'
+          + '<td class="num">$' + ourPrice.toFixed(4) + '</td>'
+          + '<td class="num" style="color:' + (margin>20?'var(--teal)':margin>0?'var(--amber)':'var(--orange)') + '">' + (margin!==null?margin+'%':'—') + '</td>'
+          + '<td class="num">' + customersNeeded + '</td>'
+          + '</tr>'
+      })
+      h += '</tbody></table>'
+    } else {
+      h += '<div class="warn-panel"><div class="warn-body">No market reference prices in model_catalogue yet. Populate price_input_per_1m and price_output_per_1m to see pricing analysis.</div></div>'
+    }
+    h += '</div>'
+
+    // Scenario 2 — Inventory yield
+    h += '<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Scenario 2 — Inventory yield: Committed vs headroom</div>'
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:12px">'
+    var segments = [
+      {label:'Committed (UC/GPUaaS)', gpus: commitedGpus, color:'var(--navy)'},
+      {label:'Failover reserve (20%)', gpus: failoverReserve, color:'var(--amber)'},
+      {label:'Available for MaaS', gpus: Math.max(0, fy.totalFleet - commitedGpus - failoverReserve), color:'var(--teal)'},
+    ]
+    segments.forEach(function(s) {
+      var pct = fy.totalFleet > 0 ? Math.round(s.gpus/fy.totalFleet*100) : 0
+      h += '<div style="background:var(--light);border-radius:var(--r);padding:12px;text-align:center">'
+        + '<div style="font-size:20px;font-weight:900;color:'+s.color+'">'+s.gpus+'</div>'
+        + '<div style="font-size:11px;color:var(--mid)">'+s.label+'</div>'
+        + '<div style="font-size:11px;color:var(--mid)">'+pct+'% of fleet</div>'
+        + '</div>'
+    })
+    h += '</div>'
+    var headroomPct = fy.totalFleet > 0 ? Math.round(Math.max(0, fy.totalFleet - commitedGpus - failoverReserve)/fy.totalFleet*100) : 0
+    if (headroomPct < 20) {
+      h += '<div class="sla-banner sla-breach">&#9888; Low headroom ('+headroomPct+'%) — consider promotional pricing or defer new MaaS commitments</div>'
+    } else {
+      h += '<div class="sla-banner sla-met">&#10003; Sufficient headroom ('+headroomPct+'%) for MaaS growth — consider seasonal push to fill idle capacity</div>'
+    }
+    h += '</div>'
+    h += '</div>'
+    return h
   },
 
     renderComingSoon: function(key) {
