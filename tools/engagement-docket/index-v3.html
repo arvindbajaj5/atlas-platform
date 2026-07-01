@@ -382,6 +382,7 @@ var M = {
   openWlRows:      {},
   workloadConfigs: { uc: [], maas: [], gpuaas: [], bmaas: [] },
   tenantsList:     {},
+  currentSolutionVersionId: null,
   // Loaded by AtlasSolution.loadRefData() on openEngagement()
   // Never hardcoded — always from Supabase model_catalogue + gpu_configs
   modelCatalogue:  [],
@@ -982,7 +983,10 @@ var V = {
     html += AtlasSolution.renderGpuDropdown(M.defaultGpu, M, 'C.setDefaultGpu(this.value)')
     html += '<span style="font-size:11px;color:var(--mid)">Pre-fills every new workload row — override per row anytime</span>'
     html += '</div>'
-    html += '<div id="soltabbar" style="display:flex;border-bottom:2px solid var(--border);margin-bottom:var(--sp-4);background:var(--white);border-radius:var(--r) var(--r) 0 0"></div>'
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">'
+      + '<div id="soltabbar" style="display:flex;border-bottom:2px solid var(--border);flex:1;background:var(--white);border-radius:var(--r) var(--r) 0 0"></div>'
+      + '<button onclick="C.saveSolution(true)" class="btn btn-primary btn-sm" style="margin-left:12px;white-space:nowrap">&#128190; Save Solution</button>'
+      + '</div>'
     html += '<div id="soltabbody"></div>'
     return html
   },
@@ -1073,7 +1077,6 @@ var V = {
       {key:'gpuaas',     label:'GPUaaS',         count:M.workloadConfigs.gpuaas.length},
       {key:'bmaas',      label:'BMaaS',          count:0},
       {key:'whatif',     label:'What-If ⚡',      count:0, soon:true},
-      {key:'fleetyield',  label:'Fleet Yield',     count:0, soon:true},
       {key:'makeorbuy',  label:'Make vs Buy',    count:0, soon:true},
       {key:'gateway',    label:'Gateway',        count:0, soon:true},
       {key:'metering',   label:'Metering',       count:0, soon:true},
@@ -1109,20 +1112,6 @@ var V = {
 
   renderComingSoon: function(key) {
     var SOON = {
-      fleetyield: {
-        icon: '&#128200;',
-        title: 'Fleet Commercial Yield — MaaS Catalogue Planning',
-        desc: 'Two scenarios in one tool. Scenario 1 (Top-down planning): Given a planned fleet, target margin, and market reference prices — what MaaS model catalogue, at what discount levels, needs what customer volume to commercially justify the deployment? Feeds into board/investor conversations and bid pricing. Scenario 2 (Inventory yield management): Given actual or estimated fleet utilisation — which models are underutilised, what discount level would attract enough incremental demand to fill the gap, and is a seasonal/promotional push worth it at X% discount? Underutilisation is the mirror image of SLA breach risk — same fleet data, opposite direction.',
-        deps: [
-          'Fleet headroom calculation: fleetTotal() already exists in sasc-sizing.js — needs to be called from Solution tab and exposed as M.fleetHeadroom',
-          'UC + GPUaaS workloads wired to real Supabase data (Controller wiring phase)',
-          'model_catalogue.price_input_per_1m / price_output_per_1m confirmed as market reference prices (done)',
-          'margin_pct / discount_pct in Settings (global default + per-engagement + per-model override)',
-          'Customer consumption model: average tokens/month per customer segment (light/medium/heavy)',
-          'benchmark_results populated with real throughput numbers (otherwise headroom is estimated)',
-          'Scenario 2 links to SLA Monitor: utilisation alerts trigger yield analysis automatically'
-        ]
-      },
       bmaas: {
         icon: '&#127970;',
         title: 'BMaaS — Bare Metal as a Service',
@@ -1629,16 +1618,42 @@ var C = {
       M.intelRun = DUMMY.intelRun
     }
 
-    // ── Solution tab state — engagement-scoped, reset on every open ──────
-    // REFACTOR-MARKER: real mode currently reuses DUMMY workload seed data
-    // since workload_configs/tenant_configs Supabase tables exist (per
-    // Solution Builder Spec Section 6/10) but no atlasDB read is wired yet.
-    // Wire this alongside other Controller wiring — see Spec Section 13.
-    M.workloadConfigs = (DUMMY.workloadConfigs && DUMMY.workloadConfigs[eng.id])
-      || { uc: [], maas: [], gpuaas: [], bmaas: [] }
-    M.tenantsList = Object.assign({}, AtlasSolution.defaultTenants)
+    // ── Solution tab state — load from solution_versions (Supabase) ────────
+    // workload_configs stored in bom_snapshot JSONB, tenants in assumptions JSONB
+    // Fallback to DUMMY data if no saved version exists yet
     M.openWlRows  = {}
     M.activeSolTab = 'uc'
+    M.tenantsList = Object.assign({}, AtlasSolution.defaultTenants)
+    M.workloadConfigs = { uc: [], maas: [], gpuaas: [], bmaas: [] }
+    M.currentSolutionVersionId = null
+
+    if (atlasDB.isConfigured()) {
+      try {
+        var svResult = await atlasDB.get('solution_versions',
+          'engagement_id=eq.' + eng.id + '&order=version_number.desc', 1)
+        if (svResult && svResult.length) {
+          var sv = svResult[0]
+          M.currentSolutionVersionId = sv.id
+          if (sv.bom_snapshot && sv.bom_snapshot.workload_configs) {
+            M.workloadConfigs = sv.bom_snapshot.workload_configs
+          }
+          if (sv.assumptions && sv.assumptions.tenants) {
+            M.tenantsList = Object.assign({}, AtlasSolution.defaultTenants, sv.assumptions.tenants)
+          }
+        } else {
+          // No saved version — seed from DUMMY if available for demo engagements
+          var dummySeed = DUMMY.workloadConfigs && DUMMY.workloadConfigs[eng.id]
+          if (dummySeed) M.workloadConfigs = dummySeed
+        }
+      } catch(e) {
+        console.warn('[ATLAS] solution_versions load failed:', e)
+        var dummySeed2 = DUMMY.workloadConfigs && DUMMY.workloadConfigs[eng.id]
+        if (dummySeed2) M.workloadConfigs = dummySeed2
+      }
+    } else {
+      var dummySeed3 = DUMMY.workloadConfigs && DUMMY.workloadConfigs[eng.id]
+      if (dummySeed3) M.workloadConfigs = dummySeed3
+    }
 
     // Load model_catalogue + gpu_configs from Supabase into M
     // Non-blocking — dropdowns re-render once data arrives if Solution tab is active
@@ -2074,6 +2089,7 @@ var C = {
     var wl = M.workloadConfigs.uc.find(function(w){ return w.id === id })
     if (wl) wl[field] = val
     V.renderSolTabBody()
+    C.scheduleSolutionSave()
   },
   updUCSlider: function(id, field, val) {
     var wl = M.workloadConfigs.uc.find(function(w){ return w.id === id })
@@ -2090,6 +2106,7 @@ var C = {
     var wl = M.workloadConfigs.maas.find(function(w){ return w.id === id })
     if (wl) wl[field] = val
     V.renderSolTabBody()
+    C.scheduleSolutionSave()
   },
   updMaasSlider: function(id, field, val) {
     var wl = M.workloadConfigs.maas.find(function(w){ return w.id === id })
@@ -2125,10 +2142,12 @@ var C = {
       slaTier:'tier2', ttftTarget:2000, agentic:false, steps:1, toolWait:0, mvbView:'uc' })
     M.openWlRows[id] = true
     V.renderSolTabs(); V.renderSolTabBody()
+    C.scheduleSolutionSave()
   },
   removeUC: function(id) {
     M.workloadConfigs.uc = M.workloadConfigs.uc.filter(function(w){ return w.id !== id })
     V.renderSolTabs(); V.renderSolTabBody()
+    C.scheduleSolutionSave()
   },
   addMaas: function() {
     var id = 'maas' + (M.workloadConfigs.maas.length + 1) + '-' + Date.now()
@@ -2136,10 +2155,12 @@ var C = {
       model:'llama-3.1-8b', precision:'int4', dau:10000, commercialSla:'bronze', mvbView:'maas' })
     M.openWlRows[id] = true
     V.renderSolTabs(); V.renderSolTabBody()
+    C.scheduleSolutionSave()
   },
   removeMaas: function(id) {
     M.workloadConfigs.maas = M.workloadConfigs.maas.filter(function(w){ return w.id !== id })
     V.renderSolTabs(); V.renderSolTabBody()
+    C.scheduleSolutionSave()
   },
 
   addGpuaas: function() {
@@ -2151,15 +2172,74 @@ var C = {
     })
     M.openWlRows[id] = true
     V.renderSolTabs(); V.renderSolTabBody()
+    C.scheduleSolutionSave()
   },
   updGpuaas: function(id, field, val) {
     var wl = M.workloadConfigs.gpuaas.find(function(w){ return w.id === id })
     if (wl) wl[field] = val
     V.renderSolTabBody()
+    C.scheduleSolutionSave()
   },
   removeGpuaas: function(id) {
     M.workloadConfigs.gpuaas = M.workloadConfigs.gpuaas.filter(function(w){ return w.id !== id })
     V.renderSolTabs(); V.renderSolTabBody()
+    C.scheduleSolutionSave()
+  },
+
+  // ── Solution save — writes to solution_versions in Supabase ─────────────
+  // Auto-saves on every workload change (debounced 2s to avoid hammering DB)
+  // Also called explicitly by "Save Solution" button
+
+  _solutionSaveTimer: null,
+
+  scheduleSolutionSave: function() {
+    clearTimeout(C._solutionSaveTimer)
+    C._solutionSaveTimer = setTimeout(function() { C.saveSolution(false) }, 2000)
+  },
+
+  saveSolution: async function(explicit) {
+    if (!atlasDB.isConfigured() || !M.currentEng) return
+    var snapshot = {
+      workload_configs: M.workloadConfigs
+    }
+    var assumptions = {
+      tenants: M.tenantsList,
+      default_gpu: M.defaultGpu,
+      saved_at: new Date().toISOString()
+    }
+    try {
+      if (M.currentSolutionVersionId) {
+        // Update existing version
+        await atlasDB.upsert('solution_versions', {
+          id:            M.currentSolutionVersionId,
+          engagement_id: M.currentEng.id,
+          bom_snapshot:  snapshot,
+          assumptions:   assumptions,
+          status:        'draft'
+        }, 'id')
+      } else {
+        // Create first version for this engagement
+        var now = new Date().toISOString()
+        var newRow = {
+          id:             'sv-' + M.currentEng.id + '-' + Date.now(),
+          engagement_id:  M.currentEng.id,
+          version_number: 1,
+          version_label:  'Draft v1',
+          level:          'L1',
+          status:         'draft',
+          bom_snapshot:   snapshot,
+          assumptions:    assumptions,
+          created_by:     'atlas-docket',
+          created_at:     now
+        }
+        var result = await atlasDB.upsert('solution_versions', newRow, 'id')
+        if (result && result.ok) M.currentSolutionVersionId = newRow.id
+      }
+      if (explicit) V.toast('Solution saved', 'success')
+    } catch(e) {
+      console.warn('[ATLAS] solution save failed:', e)
+      if (explicit) V.toast('Save failed — ' + (e.message||e), 'error')
+    }
   },
 
   addTenant: function() {
@@ -2196,6 +2276,7 @@ var C = {
     M.tenantsList[id] = { name: name, secTier: secTier, chargeout: chargeout }
     V.closeModal('modal-tenant-edit')
     V.renderSolTabBody()
+    C.scheduleSolutionSave()
     V.toast('Tenant saved — ' + name)
   },
 }
