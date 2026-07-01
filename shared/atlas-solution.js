@@ -72,11 +72,11 @@
 
     var results = await Promise.all([
       global.atlasDB.get('model_catalogue', 'enabled=eq.true&order=family.asc,params_b.asc'),
-      global.atlasDB.get('gpu_configs',     'enabled=eq.true&order=vendor.asc,name.asc')
+      global.atlasDB.get('gpu_configs',     'order=name.asc')  // gpu_configs has no enabled column
     ])
 
     M.modelCatalogue = (results[0] || []).filter(function (m) { return m.enabled !== false })
-    M.gpuConfigs     = (results[1] || []).filter(function (g) { return g.enabled !== false })
+    M.gpuConfigs     = (results[1] || [])  // all gpu_configs rows are active by definition
 
     // Build fast-lookup maps keyed by id — used by sizeWorkload() and dropdown renderers
     M.modelMap = {}
