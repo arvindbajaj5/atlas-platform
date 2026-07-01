@@ -565,11 +565,56 @@ function loadDummy() {
 
 
 // ── Solution tab lookups (folded in from workload-profiler-prototype) ─────
-var GPU_LABELS = { h200:'H200 SXM', b200:'B200 SXM', gb200:'GB200 NVL72', l40s:'L40S' }
-// Relative throughput factors for the FALLBACK (non-engine) sizing path only.
-// Real SizingEngine.sizeUC()/sizeMaaS() uses actual gpu_configs specs —
-// this is only used when SizingEngine isn't ready/configured.
-var GPU_THROUGHPUT_FACTOR = { h200: 1.0, b200: 1.7, gb200: 4.5, l40s: 0.35 }
+// Full GPU catalogue — matches gpu_configs seed data (12 architectures).
+// REFACTOR-MARKER: replace with live atlasDB.get('gpu_configs') during Controller wiring.
+var GPU_LABELS = {
+  h200:     'H200 SXM 141GB',
+  b200:     'B200 SXM 192GB',
+  b200nvl72:'B200 NVL72',
+  b300:     'B300 SXM 288GB',
+  b300nvl72:'B300 NVL72',
+  gb200nvl72:'GB200 NVL72',
+  gb300nvl72:'GB300 NVL72',
+  vr:       'Vera Rubin SXM',
+  vrnvl72:  'Vera Rubin NVL72',
+  mi355x:   'AMD MI355X 288GB',
+  mi400x:   'AMD MI400X (2027)',
+  helios:   'AMD Instinct Helios'
+}
+// Fallback throughput factors (tokens/sec, INT4, relative to H200=1.0).
+// Based on published BF16 TFlops scaled to INT4 inference efficiency.
+// Real SizingEngine uses measured benchmark_results from Supabase — these
+// are only used when SizingEngine isn't configured/connected.
+//
+// Key specs driving these factors:
+//   H200:       989 BF16 TFlops, 141GB HBM3e → baseline 1.0
+//   B200:       2,250 BF16 TFlops, 192GB HBM3e → ~2.3x
+//   B200 NVL72: 2,250 × 72 GPUs, NVLink scale-up → ~2.5x per "unit"
+//   B300:       2,800 BF16 TFlops → ~2.8x
+//   GB200/300:  rack-scale, Grace CPU + Blackwell → ~3.0x
+//   VR SXM:     ~4,000 TFlops (est.), HBM4 → ~4.0x
+//   VR NVL72:   rack-scale Vera Rubin → ~5.0x
+//   MI355X:     ~1,800 BF16 TFlops, 288GB HBM3e → ~1.8x
+//   MI400X:     ~3,000 TFlops (2027 est.) → ~3.0x
+//   Helios:     rack-scale AMD → ~3.5x
+var GPU_THROUGHPUT_FACTOR = {
+  h200: 1.0, b200: 2.3, 'b200nvl72': 2.5, b300: 2.8,
+  'b300nvl72': 3.0, 'gb200nvl72': 3.0, 'gb300nvl72': 3.2,
+  vr: 4.0, 'vrnvl72': 5.0,
+  mi355x: 1.8, mi400x: 3.0, helios: 3.5
+}
+// Effective VRAM per GPU (GB) — used to compute memory-bound sizing
+var GPU_VRAM_GB = {
+  h200: 141, b200: 192, 'b200nvl72': 192, b300: 288,
+  'b300nvl72': 288, 'gb200nvl72': 96, 'gb300nvl72': 192,
+  vr: 288, 'vrnvl72': 288,
+  mi355x: 288, mi400x: 384, helios: 288
+}
+// For NVL72 rack-scale units, 1 "unit" = 72 GPUs
+var GPU_GPUS_PER_UNIT = {
+  'b200nvl72': 72, 'b300nvl72': 72, 'gb200nvl72': 72,
+  'gb300nvl72': 72, 'vrnvl72': 72, helios: 72
+}
 var HA_GPU_FACTOR = { none: 1.0, n1: 1.15, n2: 2.0 }
 var DR_GPU_FACTOR = { none: 1.0, warm: 1.5, active_active: 2.0 }
 var UC_LIB = { glof:'GLOF Early Warning System (UC Library)', crop:'Crop Disease Detection (UC Library)', adhoc:'+ Define ad-hoc' }
@@ -672,34 +717,63 @@ function sizeUCWorkload(wl) {
   // latency) as if it were session hold time. For DAU=1M this gave
   // only 125 concurrent, clearly wrong. Now matches the real
   // SizingEngine's approach: concurrent = DAU x peak_concurrent_pct,
-  // a direct percentage of daily active users (default 5%, same as
-  // shared/sasc-sizing.js calcPeakRPS/peakConcurrent).
   var throughputFactor = GPU_THROUGHPUT_FACTOR[gpuId] || 1.0
-  var haFactor = HA_GPU_FACTOR[wl.haTier] || 1.0
-  var drFactor = DR_GPU_FACTOR[wl.drType] || 1.0
-  var peakConcPct = wl.peakConcPct || 5  // % of DAU concurrently active at peak
-  var avgRPS = (wl.dau * wl.reqPerDay) / 86400
-  var p95RPS = avgRPS * wl.peakMult * 1.5
+  var haFactor  = HA_GPU_FACTOR[wl.haTier] || 1.0
+  var drFactor  = DR_GPU_FACTOR[wl.drType] || 1.0
+  var peakConcPct = wl.peakConcPct || 5
+
+  // P50/P95/P99 — adjusts token counts used for sizing.
+  // P50=typical session, P95=design point (default), P99=stress test.
+  var ctxMult   = wl.contextPct === 'p50' ? 0.6 : wl.contextPct === 'p99' ? 1.4 : 1.0
+  var inputTok  = Math.round((wl.inputTok  || 2048) * ctxMult)
+  var outputTok = Math.round((wl.outputTok || 500)  * ctxMult)
+
+  // CORRECTED THROUGHPUT-BASED FORMULA (fixed 1 Jul 2026)
+  // CORRECTED FORMULA (fixed 1 Jul 2026)
+  // Previous versions had two errors:
+  //   1. "sessions per GPU" (concurrent/4 × tpI) — arbitrary, not throughput-based
+  //   2. "concurrent × outputTok / genTime" — treats EVERY concurrent user as
+  //      simultaneously generating, which is not how continuous batching works
+  //
+  // Correct approach: peak_rps (arrivals/sec) → throughput needed → GPUs
+  //   Users are CONCURRENT but not all generating simultaneously — they submit
+  //   a request, wait for the response, then submit another. Peak RPS ≪ concurrent.
+  //
+  // Step 1: peak concurrent users = DAU × peak%
   var concurrent = Math.max(1, Math.ceil(wl.dau * peakConcPct / 100))
-  var tpI = wl.precision === 'int4' ? 2 : wl.precision === 'int8' ? 4 : 8
-  var baseGpus = Math.max(1, Math.ceil((concurrent / 4) * tpI / throughputFactor))
-  var buffers = Math.ceil(baseGpus * 0.65 * haFactor * drFactor) - baseGpus
-  if (buffers < 0) buffers = Math.ceil(baseGpus * 0.65)
-  var total = baseGpus + buffers
-  var powerKw = Math.round(total * 0.7 * 10) / 10
+  // Step 2: peak requests/sec = concurrent users × requests/user/day / 86400 × peak mult
+  var avgRPS     = (wl.dau * (wl.reqPerDay || 12)) / 86400
+  var peakRPS    = Math.ceil(avgRPS * (wl.peakMult || 3))
+  // Step 3: requests/sec a single GPU can handle = throughput (tok/s) / output tokens/request
+  //   H200 INT4 baseline: ~8,000 tok/s (conservative, continuous batching, small-medium models)
+  var tokPerGpuBase = 8000
+  var precMult  = wl.precision === 'int8' ? 0.55 : wl.precision === 'fp16' ? 0.35 : wl.precision === 'fp8' ? 0.8 : 1.0
+  var tokPerGpu = Math.round(tokPerGpuBase * throughputFactor * precMult)
+  var reqPerGpu = Math.max(1, Math.round(tokPerGpu / outputTok))
+  // Step 4: base GPUs = ceil(peak_rps / req_per_gpu)
+  var baseGpus  = Math.max(1, Math.ceil(peakRPS / reqPerGpu))
+  // Step 5: buffers — headroom + HA + DR
+  var buffers   = Math.max(1, Math.ceil(baseGpus * 0.3 * haFactor * drFactor))
+  var total     = baseGpus + buffers
+  var powerKw   = Math.round(total * 0.7 * 10) / 10
+
   var ttftEstimate = Math.round(wl.ttftTarget / throughputFactor * 0.85)
-  var slaMet = ttftEstimate <= wl.ttftTarget
-  var margin = wl.ttftTarget ? Math.round(Math.abs((wl.ttftTarget - ttftEstimate) / wl.ttftTarget) * 100) : 0
-  return { gpu: gpuId, p95RPS: Math.round(p95RPS*100)/100, concurrent: concurrent,
-    baseGpus: baseGpus, buffers: buffers, total: total, powerKw: powerKw,
-    racks: total <= 72 ? '1 rack (partial)' : Math.ceil(total/72) + ' racks',
-    ttftEstimate: ttftEstimate, slaMet: slaMet, margin: margin,
+  var slaMet  = ttftEstimate <= wl.ttftTarget
+  var margin  = wl.ttftTarget ? Math.round(Math.abs((wl.ttftTarget - ttftEstimate) / wl.ttftTarget) * 100) : 0
+  var gpusPerUnit = GPU_GPUS_PER_UNIT[gpuId] || 8
+  return {
+    gpu: gpuId, concurrent: concurrent, peakRPS: peakRPS, baseGpus: baseGpus,
+    buffers: buffers, total: total, powerKw: powerKw,
+    racks: Math.ceil(total / gpusPerUnit) + ' rack(s) / ' + total + ' GPUs',
+    p95RPS: peakRPS, ttftEstimate: ttftEstimate, slaMet: slaMet, margin: margin,
     peakConcPct: peakConcPct,
-    formula: 'Concurrent = DAU(' + wl.dau.toLocaleString() + ') × ' + peakConcPct + '% peak-concurrent = ' + concurrent.toLocaleString()
-      + ' | TP_per_GPU = ' + throughputFactor + 'x(' + gpuId + ') × precision-factor(' + tpI + ') '
-      + '| Base GPUs = ceil(concurrent ÷ 4 × ' + tpI + ' ÷ ' + throughputFactor + ') = ' + baseGpus
-      + ' | Buffers = base × 0.65 × HA(' + haFactor + 'x) × DR(' + drFactor + 'x) = ' + buffers
-      + ' | Total = ' + total + ' GPUs' }
+    formula: 'Step 1: Concurrent = DAU(' + wl.dau.toLocaleString() + ') × ' + peakConcPct + '% = ' + concurrent.toLocaleString()
+      + ' | Ctx: ' + (wl.contextPct||'p95').toUpperCase() + ' (' + ctxMult + 'x) → output=' + outputTok + ' tok'
+      + ' | Step 2: Peak RPS = DAU × req/day(' + (wl.reqPerDay||12) + ') ÷ 86400 × peakMult(' + (wl.peakMult||3) + ') = ' + peakRPS + ' req/s'
+      + ' | Step 3: GPU=' + (GPU_LABELS[gpuId]||gpuId) + ' → ' + tokPerGpu + ' tok/s ÷ ' + outputTok + ' tok/req = ' + reqPerGpu + ' req/s/GPU'
+      + ' | Step 4: Base GPUs = ceil(' + peakRPS + ' ÷ ' + reqPerGpu + ') = ' + baseGpus
+      + ' | Step 5: +Buffers (HA=' + haFactor + 'x DR=' + drFactor + 'x × 30%) = ' + buffers + ' → Total = ' + total
+  }
 }
 function sizeMaasWorkload(wl) {
   var gpuId = wl.gpu || M.defaultGpu
