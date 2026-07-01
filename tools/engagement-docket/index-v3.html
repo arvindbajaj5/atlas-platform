@@ -1353,7 +1353,12 @@ var V = {
     // ── Make vs Buy ────────────────────────────────────────────────────────
   renderMakeOrBuyTab: function() {
     var wls = (M.workloadConfigs.uc||[]).concat(M.workloadConfigs.maas||[])
-    if (!wls.length) return '<div class="coming-soon-panel"><div class="coming-soon-icon">&#9878;</div><div class="coming-soon-title">Make vs Buy</div><div class="coming-soon-desc">Add UC or MaaS workloads first.</div></div>'
+    if (!wls.length) {
+      return '<div class="card"><div class="card-title">Make vs Buy — On-prem vs API Market Price</div>'
+        + '<div class="warn-panel"><div class="warn-body">Add UC or MaaS workloads in the UCs/MaaS tabs to see the comparison. The analysis compares on-prem cost per million tokens (from your sized fleet) vs market API reference prices from model_catalogue.</div></div>'
+        + '<div style="padding:12px;font-size:11px;color:var(--mid)"><b>Formula preview:</b> On-prem cost/Mtok = (power + capex amortisation) / tokens served. Breakeven = utilisation% at which on-prem beats market price.</div>'
+        + '</div>'
+    }
 
     var h = '<div class="card"><div class="card-title">Make vs Buy — On-prem vs API Market Price</div>'
     h += '<p style="font-size:12px;color:var(--mid);margin-bottom:var(--sp-4)">Compares our on-prem cost per million tokens vs market API reference prices from model_catalogue. Breakeven = utilisation% where on-prem becomes cheaper.</p>'
@@ -1403,7 +1408,7 @@ var V = {
   // ── BOM Complete ────────────────────────────────────────────────────────
   renderBomTab: function() {
     var wls = (M.workloadConfigs.uc||[]).concat(M.workloadConfigs.maas||[]).concat(M.workloadConfigs.gpuaas||[])
-    if (!wls.length) return '<div class="coming-soon-panel"><div class="coming-soon-icon">&#128221;</div><div class="coming-soon-title">BOM Complete</div><div class="coming-soon-desc">Add workloads first.</div></div>'
+    // BOM can show GPU catalogue + fixed items even with no workloads
 
     // Aggregate fleet
     var totalGpus = 0, totalPowerKw = 0, totalByGpu = {}
@@ -1484,7 +1489,12 @@ var V = {
   // ── Margin Analysis ────────────────────────────────────────────────────
   renderMarginTab: function() {
     var wls = (M.workloadConfigs.uc||[]).concat(M.workloadConfigs.maas||[])
-    if (!wls.length) return '<div class="coming-soon-panel"><div class="coming-soon-icon">&#128181;</div><div class="coming-soon-title">Margin Analysis</div><div class="coming-soon-desc">Add workloads first.</div></div>'
+    if (!wls.length) {
+      return '<div class="card"><div class="card-title">Margin Analysis — Known Leak Sources</div>'
+        + '<div class="warn-panel"><div class="warn-body">Add UC or MaaS workloads to see per-workload margin risk analysis.</div></div>'
+        + V._renderGlobalMarginRisks()
+        + '</div>'
+    }
 
     var h = '<div class="card"><div class="card-title">Margin Analysis — Known Leak Sources</div>'
     h += '<p style="font-size:12px;color:var(--mid);margin-bottom:var(--sp-4)">Items not yet reflected in sizing that reduce actual margin vs estimated.</p>'
@@ -1513,20 +1523,7 @@ var V = {
     })
     h += '</tbody></table>'
 
-    // Global margin leak items
-    h += '<div style="margin-top:var(--sp-4);font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Global margin risks (apply to all workloads)</div>'
-    var globalRisks = [
-      ['Cold start latency', 'GPU idle time when loading infrequently-used models — not costed. Mitigation: keep-warm allocation (~5% buffer).'],
-      ['Embedding models in catalogue', 'BGE-M3, Nomic, MXBai, jina — batch-throughput sizing, not TTFT-based. Current formula overstates GPU needs for these.'],
-      ['Speculative decoding', 'Draft model overhead (~10-15% extra GPU) if enabled — reduces latency but adds cost.'],
-      ['Quantisation quality', 'INT4 is cheapest but may increase re-requests for quality-sensitive tasks — effective token consumption higher than sized.'],
-      ['Network overhead', 'Inter-GPU bandwidth for 671B+ models — InfiniBand cost not yet in BOM.'],
-    ]
-    h += '<table class="tbl"><thead><tr><th>Risk</th><th>Description</th></tr></thead><tbody>'
-    globalRisks.forEach(function(r) {
-      h += '<tr><td style="font-weight:600;white-space:nowrap">⚠ ' + r[0] + '</td><td style="font-size:11px">' + r[1] + '</td></tr>'
-    })
-    h += '</tbody></table></div>'
+    h += V._renderGlobalMarginRisks()
     return h
   },
 
@@ -1539,7 +1536,8 @@ var V = {
     h += '<p style="font-size:12px;color:var(--mid);margin-bottom:var(--sp-4)">Measured throughput per model × GPU × precision. Currently sizing uses H200 INT4 baseline = 8,000 tok/s (estimate). Real pricing requires measured values in benchmark_results. Green = data exists, amber = estimated, red = missing.</p>'
 
     if (!models.length) {
-      h += '<div class="warn-panel"><div class="warn-body">model_catalogue not loaded yet — open an engagement first.</div></div>'
+      h += '<div class="warn-panel"><div class="warn-body">model_catalogue not loaded — try refreshing. If this persists, open an engagement first so atlasDB loads the data.</div></div>'
+      h += '<div style="padding:12px;font-size:11px;color:var(--mid)">Note: Even without live data, the tab structure shows what benchmarks need to be collected.</div>'
       h += '</div>'
       return h
     }
@@ -1689,6 +1687,23 @@ var V = {
     }
     h += '</div>'
     h += '</div>'
+    return h
+  },
+
+    _renderGlobalMarginRisks: function() {
+    var globalRisks = [
+      ['Cold start latency', 'GPU idle time when loading infrequently-used models. Mitigation: keep-warm allocation (~5% buffer).'],
+      ['Embedding models', 'BGE-M3, Nomic, MXBai, jina need batch-throughput sizing, not TTFT. Current formula may overstate GPU needs.'],
+      ['Speculative decoding', 'Draft model overhead (~10-15% extra GPU) if enabled — reduces latency but adds cost.'],
+      ['INT4 quality loss', 'May increase re-requests for quality-sensitive tasks — effective token consumption higher than sized.'],
+      ['Large model networking', 'InfiniBand for 671B+ models (DeepSeek R1, V3, GLM 5.2) — not yet in BOM.'],
+    ]
+    var h = '<div style="margin-top:var(--sp-4)"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Global margin risks (apply to all workloads)</div>'
+    h += '<table class="tbl"><thead><tr><th>Risk</th><th>Description</th></tr></thead><tbody>'
+    globalRisks.forEach(function(r) {
+      h += '<tr><td style="font-weight:600;white-space:nowrap">⚠ ' + r[0] + '</td><td style="font-size:11px">' + r[1] + '</td></tr>'
+    })
+    h += '</tbody></table></div>'
     return h
   },
 
