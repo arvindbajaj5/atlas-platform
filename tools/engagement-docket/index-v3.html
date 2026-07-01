@@ -253,6 +253,18 @@ table.wl td.name{font-weight:600;color:var(--dark)}
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-calc-detail" style="display:none">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-hdr"><div class="modal-title">&#128269; How was this calculated?</div></div>
+    <div class="modal-body">
+      <div id="calc-detail-content" style="font-size:12.5px;line-height:1.8;font-family:var(--font-mono);white-space:pre-wrap;color:var(--dark)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="V.closeModal('modal-calc-detail')">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-tenant-edit" style="display:none">
   <div class="modal" style="max-width:420px">
     <div class="modal-hdr"><div class="modal-title" id="tenant-edit-title">Edit Tenant</div></div>
@@ -565,25 +577,48 @@ var DOMAINS = { geospatial:'Geospatial', agriculture:'Agriculture', health:'Heal
 // Confirmed MaaS model catalogue — clean licensing, n/n-2 versioning.
 // REFACTOR-MARKER: Phase A polish — replace with full 103-row model_catalogue
 // via atlasDB, filtered/grouped by usage type, when Controller wiring lands.
+// Full confirmed MaaS model catalogue — clean licensing, n/n-2 versioning.
+// Grouped by domain/usage for easier filtering in the dropdown.
+// REFACTOR-MARKER: Phase A polish — replace with live atlasDB read from
+// model_catalogue (103 rows) during Controller wiring.
 var MODELS = {
-  'deepseek-coder-v2-lite-16b':'DeepSeek-Coder-V2 Lite 16B',
-  'deepseek-coder-v2-236b':'DeepSeek-Coder-V2 236B',
-  'qwen2.5-coder-32b':'Qwen2.5-Coder 32B',
-  'qwen2.5-coder-72b':'Qwen2.5-Coder 72B',
-  'llama-3.1-8b':'Llama 3.1 8B',
-  'llama-3.3-70b':'Llama 3.3 70B',
-  'llama-3.1-405b':'Llama 3.1 405B',
-  'mistral-small-3.1-24b':'Mistral Small 3.1 24B',
-  'mistral-large-2-123b':'Mistral Large 2 123B',
-  'qwen2.5-7b':'Qwen2.5 7B',
-  'qwen2.5-32b':'Qwen2.5 32B',
-  'qwen2.5-72b':'Qwen2.5 72B',
-  'sarvam-whisper-s':'Sarvam Whisper S',
-  'sarvam-whisper-m':'Sarvam Whisper M',
-  'sarvam-whisper-l':'Sarvam Whisper Large',
-  'whisper-large-v3':'Whisper Large-v3 (MIT)',
-  'sarvam-2b':'Sarvam-2B',
-  'sarvam-m':'Sarvam-M',
+  // ── Coding ─────────────────────────────────────────────────
+  'deepseek-coder-v2-lite-16b': 'DeepSeek-Coder-V2 Lite 16B',
+  'deepseek-coder-v2-236b':     'DeepSeek-Coder-V2 236B',
+  'qwen2.5-coder-7b':           'Qwen2.5-Coder 7B',
+  'qwen2.5-coder-32b':          'Qwen2.5-Coder 32B',
+  'qwen2.5-coder-72b':          'Qwen2.5-Coder 72B',
+  // ── Text / Chat ─────────────────────────────────────────────
+  'llama-3.2-3b':               'Llama 3.2 3B',
+  'llama-3.1-8b':               'Llama 3.1 8B',
+  'llama-3.3-70b':              'Llama 3.3 70B',
+  'llama-3.1-405b':             'Llama 3.1 405B',
+  'mistral-7b':                  'Mistral 7B',
+  'mistral-small-3.1-24b':      'Mistral Small 3.1 24B',
+  'mistral-large-2-123b':       'Mistral Large 2 123B',
+  // ── Document / Long-context ─────────────────────────────────
+  'qwen2.5-7b':                  'Qwen2.5 7B',
+  'qwen2.5-32b':                 'Qwen2.5 32B',
+  'qwen2.5-72b':                 'Qwen2.5 72B',
+  'qwen2-72b':                   'Qwen2 72B (n-2)',
+  // ── Audio / Speech ──────────────────────────────────────────
+  'sarvam-whisper-s':            'Sarvam Whisper S',
+  'sarvam-whisper-m':            'Sarvam Whisper M',
+  'sarvam-whisper-l':            'Sarvam Whisper Large',
+  'whisper-large-v3':            'Whisper Large-v3 (MIT, on-prem OK)',
+  'whisper-large-v2':            'Whisper Large-v2 (MIT, n-2)',
+  // ── Indic / Regional ────────────────────────────────────────
+  'sarvam-2b':                   'Sarvam-2B',
+  'sarvam-m':                    'Sarvam-M',
+  // ── Reasoning / Thinking ────────────────────────────────────
+  'deepseek-r1-7b':              'DeepSeek-R1 7B (distilled)',
+  'deepseek-r1-70b':             'DeepSeek-R1 70B (distilled)',
+  'qwq-32b':                     'QwQ-32B (Qwen reasoning)',
+  // ── Generic / Multipurpose ──────────────────────────────────
+  'phi-3.5-mini-3.8b':           'Phi-3.5 Mini 3.8B (Microsoft)',
+  'phi-3.5-moe-42b':             'Phi-3.5 MoE 42B (Microsoft)',
+  'gemma-2-9b':                  'Gemma 2 9B (Google, Apache 2.0)',
+  'gemma-2-27b':                 'Gemma 2 27B (Google, Apache 2.0)',
 }
 var UC_TYPES = {
   chatbot:'Chatbot / Conversational', text:'Text Processing', rag:'RAG / Knowledge Retrieval',
@@ -622,36 +657,49 @@ function sizeUCWorkload(wl) {
         gpu: gpuId, p95RPS: r.peak_rps, concurrent: r.peak_concurrent,
         baseGpus: r.base_gpus, buffers: r.total_gpus - r.base_gpus, total: r.total_gpus,
         powerKw: r.power_kw, racks: r.total_gpus <= 72 ? '1 rack (partial)' : Math.ceil(r.total_gpus/72) + ' racks',
-        ttftEstimate: r.ttft_sla_ms || wl.ttftTarget, slaMet: slaMetReal, margin: marginReal, notes: r.notes
+        ttftEstimate: r.ttft_sla_ms || wl.ttftTarget, slaMet: slaMetReal, margin: marginReal, notes: r.notes,
+        peakConcPct: wl.peakConcPct || 5,
+        formula: r.notes || ('SizingEngine.sizeUC() — see audit trail in r.notes')
       }
     }
   }
   // REFACTOR-MARKER: fallback placeholder — only used if engine not yet
   // init()'d (no Supabase config) or returns an error. Keeps the V usable
-  // for visual inspection without a live DB connection. GPU/HA/DR choices
-  // now genuinely affect the result via GPU_THROUGHPUT_FACTOR/HA_GPU_FACTOR/
-  // DR_GPU_FACTOR — fixed 30 June 2026, previously these inputs were
-  // collected but silently ignored in the fallback path.
+  // for visual inspection without a live DB connection.
+  //
+  // FIXED 30 June 2026: concurrent users was computed as
+  // p95RPS x (ttftTarget/1000) -- WRONG, treats TTFT (first-token
+  // latency) as if it were session hold time. For DAU=1M this gave
+  // only 125 concurrent, clearly wrong. Now matches the real
+  // SizingEngine's approach: concurrent = DAU x peak_concurrent_pct,
+  // a direct percentage of daily active users (default 5%, same as
+  // shared/sasc-sizing.js calcPeakRPS/peakConcurrent).
   var throughputFactor = GPU_THROUGHPUT_FACTOR[gpuId] || 1.0
   var haFactor = HA_GPU_FACTOR[wl.haTier] || 1.0
   var drFactor = DR_GPU_FACTOR[wl.drType] || 1.0
+  var peakConcPct = wl.peakConcPct || 5  // % of DAU concurrently active at peak
   var avgRPS = (wl.dau * wl.reqPerDay) / 86400
   var p95RPS = avgRPS * wl.peakMult * 1.5
-  var concurrent = Math.max(1, Math.ceil(p95RPS * (wl.ttftTarget/1000)))
+  var concurrent = Math.max(1, Math.ceil(wl.dau * peakConcPct / 100))
   var tpI = wl.precision === 'int4' ? 2 : wl.precision === 'int8' ? 4 : 8
   var baseGpus = Math.max(1, Math.ceil((concurrent / 4) * tpI / throughputFactor))
   var buffers = Math.ceil(baseGpus * 0.65 * haFactor * drFactor) - baseGpus
   if (buffers < 0) buffers = Math.ceil(baseGpus * 0.65)
   var total = baseGpus + buffers
   var powerKw = Math.round(total * 0.7 * 10) / 10
-  // TTFT estimate genuinely responds to GPU choice — faster GPU = lower TTFT
   var ttftEstimate = Math.round(wl.ttftTarget / throughputFactor * 0.85)
   var slaMet = ttftEstimate <= wl.ttftTarget
   var margin = wl.ttftTarget ? Math.round(Math.abs((wl.ttftTarget - ttftEstimate) / wl.ttftTarget) * 100) : 0
   return { gpu: gpuId, p95RPS: Math.round(p95RPS*100)/100, concurrent: concurrent,
     baseGpus: baseGpus, buffers: buffers, total: total, powerKw: powerKw,
     racks: total <= 72 ? '1 rack (partial)' : Math.ceil(total/72) + ' racks',
-    ttftEstimate: ttftEstimate, slaMet: slaMet, margin: margin }
+    ttftEstimate: ttftEstimate, slaMet: slaMet, margin: margin,
+    peakConcPct: peakConcPct,
+    formula: 'Concurrent = DAU(' + wl.dau.toLocaleString() + ') × ' + peakConcPct + '% peak-concurrent = ' + concurrent.toLocaleString()
+      + ' | TP_per_GPU = ' + throughputFactor + 'x(' + gpuId + ') × precision-factor(' + tpI + ') '
+      + '| Base GPUs = ceil(concurrent ÷ 4 × ' + tpI + ' ÷ ' + throughputFactor + ') = ' + baseGpus
+      + ' | Buffers = base × 0.65 × HA(' + haFactor + 'x) × DR(' + drFactor + 'x) = ' + buffers
+      + ' | Total = ' + total + ' GPUs' }
 }
 function sizeMaasWorkload(wl) {
   var gpuId = wl.gpu || M.defaultGpu
@@ -1233,6 +1281,7 @@ var V = {
 
     rows.forEach(function(wl) {
       var sz = sizeUCWorkload(wl)
+      wl._lastSizing = sz  // cache for showCalcDetail transparency popup
       totalGpus += sz.total; totalPower += sz.powerKw
       var isOpen = !!M.openWlRows[wl.id]
       html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
@@ -1315,10 +1364,12 @@ var V = {
 
     h += '<div class="formgrid" style="grid-template-columns:1.3fr 1fr 1fr 1fr">'
     h += '<div class="fg"><label>DAU</label><div class="sliderwrap">'
-      + '<input type="range" min="2" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" '
+      + '<input type="range" min="2" max="9" step="0.01" value="'+Math.log10(wl.dau)+'" '
       + 'oninput="C.updUCSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
       + '<span class="slider-val" id="dauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div>'
-      + '<div class="fg-hint">Range: 100 – 1,000,000 (log scale)</div></div>'
+      + '<div style="display:flex;gap:6px;align-items:center;margin-top:4px">'
+      + '<input type="number" min="1" step="1000" value="'+wl.dau+'" placeholder="exact DAU" style="flex:1;font-size:11px;padding:4px 6px" onchange="C.updUC(\''+wl.id+'\',\'dau\',Math.max(1,+this.value))">'
+      + '<span class="fg-hint" style="margin:0">100 – 1bn (log slider or exact entry)</span></div></div>'
 
     h += '<div class="fg"><label>Requests / User / Day</label><input type="number" min="1" value="'+wl.reqPerDay+'" onchange="C.updUC(\''+wl.id+'\',\'reqPerDay\',+this.value)"></div>'
     h += '<div class="fg"><label>Peak concurrent (computed)</label><div style="padding:7px 0;font-size:16px;font-weight:900;color:var(--navy);font-family:var(--font-mono)">'+sz.concurrent.toLocaleString()+'</div>'
@@ -1329,9 +1380,19 @@ var V = {
       + '<span class="slider-val" id="pmval-'+wl.id+'">'+wl.peakMult+'x</span></div></div>'
     h += '</div>'
 
-    h += '<div class="formgrid">'
+    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr 1fr">'
+    h += '<div class="fg"><label>Context Percentile</label><div style="display:flex;gap:0;border:1.5px solid var(--border);border-radius:5px;overflow:hidden">'
+    ;['p50','p95','p99'].forEach(function(p){
+      var active = (wl.contextPct||'p95') === p
+      h += '<button type="button" onclick="C.updUC(\''+wl.id+'\',\'contextPct\',\''+p+'\')" style="flex:1;padding:6px 0;font-size:11px;font-weight:700;border:none;cursor:pointer;background:'+(active?'var(--navy)':'#fff')+';color:'+(active?'#fff':'var(--mid)')+'">'+p.toUpperCase()+'</button>'
+    })
+    h += '</div><div class="fg-hint">P50=typical · P95=design point · P99=stress test</div></div>'
+    h += '<div class="fg"><label>Peak Concurrent %</label><input type="number" min="0.1" max="100" step="0.5" value="'+(wl.peakConcPct||5)+'" onchange="C.updUC(\''+wl.id+'\',\'peakConcPct\',+this.value)"><div class="fg-hint">% of DAU concurrently active at peak — drives concurrent users</div></div>'
     h += '<div class="fg"><label>Avg Input Tokens</label><input type="number" step="100" min="0" value="'+wl.inputTok+'" onchange="C.updUC(\''+wl.id+'\',\'inputTok\',+this.value)"></div>'
     h += '<div class="fg"><label>Avg Output Tokens</label><input type="number" step="100" min="0" value="'+wl.outputTok+'" onchange="C.updUC(\''+wl.id+'\',\'outputTok\',+this.value)"></div>'
+    h += '</div>'
+
+    h += '<div class="formgrid">'
     h += '<div class="fg"><label>Precision</label><select onchange="C.updUC(\''+wl.id+'\',\'precision\',this.value)">'
     ;['int4','int8','fp16','fp8'].forEach(function(p){ h += '<option value="'+p+'"'+(wl.precision===p?' selected':'')+'>'+p.toUpperCase()+'</option>' })
     h += '</select></div>'
@@ -1364,6 +1425,9 @@ var V = {
       + '<span>Racks<br><b>'+sz.racks+'</b></span>'
       + '<span>Power<br><b>'+sz.powerKw+'kW</b></span>'
       + '</div>'
+    h += '<div style="display:flex;justify-content:flex-end;margin-bottom:6px">'
+      + '<button type="button" onclick="C.showCalcDetail(\''+wl.id+'\')" style="font-size:10px;padding:3px 10px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;border-radius:4px;cursor:pointer">&#128269; How was this calculated?</button>'
+      + '</div>'
     h += '<div class="sla-banner '+(sz.slaMet?'sla-met':'sla-breach')+'">'
       + (sz.slaMet ? '&#10003; LATENCY TARGET MET' : '&#10007; LATENCY TARGET BREACHED') + ' — TTFT '+sz.ttftEstimate+'ms vs '+wl.ttftTarget+'ms target ('+sz.margin+'% '+(sz.slaMet?'margin':'over')+')'
       + (sz.slaMet ? '' : '<span class="sla-hint">Try: lower precision impact, add GPU, raise SLA tier</span>')
@@ -1394,6 +1458,7 @@ var V = {
 
     rows.forEach(function(wl) {
       var sz = sizeMaasWorkload(wl)
+      wl._lastSizing = sz
       totalGpus += sz.total; totalPower += sz.powerKw
       var isOpen = !!M.openWlRows[wl.id]
       var t = wl.tenant ? M.tenantsList[wl.tenant] : null
@@ -1440,9 +1505,11 @@ var V = {
 
     h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr">'
     h += '<div class="fg"><label>DAU</label><div class="sliderwrap">'
-      + '<input type="range" min="2" max="6" step="0.01" value="'+Math.log10(wl.dau)+'" oninput="C.updMaasSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
+      + '<input type="range" min="2" max="9" step="0.01" value="'+Math.log10(wl.dau)+'" oninput="C.updMaasSlider(\''+wl.id+'\',\'dau\',Math.round(Math.pow(10,this.value)))">'
       + '<span class="slider-val" id="madauval-'+wl.id+'">'+wl.dau.toLocaleString()+'</span></div>'
-      + '<div class="fg-hint">Range: 100 – 1,000,000 (log scale)</div></div>'
+      + '<div style="display:flex;gap:6px;align-items:center;margin-top:4px">'
+      + '<input type="number" min="1" step="1000" value="'+wl.dau+'" placeholder="exact DAU" style="flex:1;font-size:11px;padding:4px 6px" onchange="C.updMaas(\''+wl.id+'\',\'dau\',Math.max(1,+this.value))">'
+      + '<span class="fg-hint" style="margin:0">100 – 1bn</span></div></div>'
     // Commercial SLA (Bronze/Silver/Gold) is DERIVED from Tenant Pool Type below,
     // not a separate input here. Reserved tenants may choose Silver or Gold.
     h += '<div class="fg"><label>Commercial SLA</label><div class="fg-hint" style="padding-top:8px">'
@@ -2152,6 +2219,30 @@ var C = {
     V.openModal('modal-tenant-edit')
   },
 
+  showCalcDetail: function(id) {
+    var wl = M.workloadConfigs.uc.find(function(w){ return w.id === id })
+      || M.workloadConfigs.maas.find(function(w){ return w.id === id })
+    if (!wl || !wl._lastSizing) { V.toast('Run sizing first','info'); return }
+    var sz = wl._lastSizing
+    var formula = sz.formula || sz.notes || 'No detailed formula — wire SizingEngine for full audit trail.'
+    var NL = '\n'
+    var text = '=== GPU Count Derivation ===' + NL + NL
+      + 'Workload: ' + wl.name + NL
+      + 'GPU: ' + (GPU_LABELS[sz.gpu]||sz.gpu) + NL
+      + 'DAU: ' + (wl.dau||0).toLocaleString() + NL
+      + 'Peak concurrent %: ' + (wl.peakConcPct||5) + '%' + NL
+      + 'Context percentile: ' + (wl.contextPct||'p95').toUpperCase() + NL + NL
+      + formula.split(' | ').join(NL) + NL + NL
+      + '=== Result ===' + NL
+      + 'Base GPUs:   ' + sz.baseGpus + NL
+      + '+Buffers:    ' + sz.buffers + NL
+      + 'Total GPUs:  ' + sz.total + NL
+      + 'Power:       ' + sz.powerKw + 'kW' + NL
+      + 'Racks:       ' + sz.racks + NL
+      + (sz.notes ? NL + '=== Engine Audit Trail ===' + NL + sz.notes : '')
+    document.getElementById('calc-detail-content').textContent = text
+    V.openModal('modal-calc-detail')
+  },
   editTenant: function(id) {
     var t = M.tenantsList[id]
     if (!t) return
