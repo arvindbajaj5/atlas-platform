@@ -513,7 +513,7 @@ var DUMMY = {
       { id:'uc-002', item_type:'uc', title:'Crop Disease Detection',     status:'proposed', content:{ uc_id:'UC-AGR-002', domain:'agriculture',  dau:50000 }, created_at:'2026-06-03T11:05:00Z' },
       // Actions
       { id:'act-001', item_type:'action', section:'action', title:'Send HAICE concept paper to Secretary IT', status:'done', assigned_to:'Arvind Bajaj', due_date:'2026-06-15', created_at:'2026-06-05T09:00:00Z' },
-      { id:'act-002', item_type:'action', section:'action', title:'Follow up on site visit approval',          status:'open', assigned_to:'Arvind Bajaj', due_date:'2026-07-05', created_at:'2026-06-20T09:00:00Z' },
+      { id:'act-002', item_type:'action', section:'action', title:'Follow up on site visit approval',          status:'pending', assigned_to:'Arvind Bajaj', due_date:'2026-07-05', created_at:'2026-06-20T09:00:00Z' },
       // Intel
       { id:'int-001', item_type:'intel', title:'HP announces ₹2000Cr AI budget 2026-27', content:{ summary:'HP government allocated ₹2000 crore for AI infrastructure in state budget June 2026. Strong political mandate.', confidence_score:0.92, domain_code:'GOV', scraped_at:'2026-06-15T00:00:00Z' }, created_at:'2026-06-15T06:00:00Z' },
       { id:'int-002', item_type:'intel', title:'NIT Hamirpur launches AI research centre with MeitY', content:{ summary:'NIT Hamirpur partnered with MeitY to establish AI research focused on mountain ecosystem monitoring.', confidence_score:0.78, domain_code:'EDU', scraped_at:'2026-06-10T00:00:00Z' }, created_at:'2026-06-10T06:00:00Z' },
@@ -1003,15 +1003,16 @@ var V = {
     html += '<button class="btn btn-primary" onclick="C.addAction()">Add</button>'
     html += '</div></div>'
 
-    ;['open','wip','done'].forEach(function(s) {
+    ;['pending','in_progress','done'].forEach(function(s) {
       var list = acts.filter(function(a){ return a.status === s })
       if (!list.length) return
-      html += '<div class="card"><div class="card-title">' + s.toUpperCase() + ' (' + list.length + ')</div>'
+      var sLabel = {pending:'Open',in_progress:'In Progress',done:'Done'}[s]||s.toUpperCase()
+      html += '<div class="card"><div class="card-title">' + sLabel + ' (' + list.length + ')</div>'
       html += '<table class="tbl"><thead><tr><th>Action</th><th>Owner</th><th>Due</th><th></th></tr></thead><tbody>'
       list.forEach(function(a) {
         html += '<tr><td>' + atlasDB.esc(a.title) + '</td><td>' + atlasDB.esc(a.assigned_to||'—') + '</td><td>' + (a.due_date||'—') + '</td><td style="white-space:nowrap">'
         if (s !== 'done') html += '<button class="btn btn-teal btn-sm" onclick="C.setActStatus(\'' + a.id + '\',\'done\')">✓</button> '
-        if (s === 'open') html += '<button class="btn btn-ghost btn-sm" onclick="C.setActStatus(\'' + a.id + '\',\'wip\')">Start</button>'
+        if (s === 'pending') html += '<button class="btn btn-ghost btn-sm" onclick="C.setActStatus(\'' + a.id + '\',\'in_progress\')">Start</button>'
         html += '</td></tr>'
       })
       html += '</tbody></table></div>'
@@ -1961,7 +1962,7 @@ var C = {
     if (!title) { V.toast('Enter action title','warning'); return }
     var act = {
       id: atlasDB.genId('act'), docket_id: M.currentDocketId,
-      item_type: 'action', section: 'action', title: title, status: 'open',
+      item_type: 'action', section: 'action', title: title, status: 'pending',
       assigned_to: 'Arvind Bajaj', due_date: document.getElementById('act-due').value || null,
       created_at: new Date().toISOString()
     }
@@ -2225,7 +2226,7 @@ var C = {
           engagement_id:  M.currentEng.id,
           version_number: 1,
           version_label:  'Draft v1',
-          level:          'L1-rom',
+          level:          'L1',
           status:         'draft',
           bom_snapshot:   snapshot,
           assumptions:    assumptions,
