@@ -1139,3 +1139,103 @@ Fleet Aggregation (S4) — Piece 3 remains separate future scope:
 **Next step: build the engine's `capacityForGPU()` function first (Piece
 1's foundation), since both the Capacity crossover chart and the What-If
 comparison table depend on its output shape.**
+
+---
+
+## 14. Fleet Commercial Yield — MaaS Catalogue Planning (decided 1 July 2026)
+
+### The insight
+
+Current sizing runs supply → demand: "given these use cases, size me a fleet."
+This section captures the reverse: "given a fleet (planned or deployed), what
+MaaS catalogue, pricing, and customer volume makes it commercially viable?"
+Two distinct scenarios, same underlying fleet headroom calculation.
+
+### Scenario 1 — Top-down commercial planning (pre-deployment)
+
+```
+Input:
+  Planned fleet size (GPU count, from BOM)
+  UC + GPUaaS committed allocations (sized workloads)
+  Failover/HA reserve % (typically 20-30%)
+  Target gross margin %
+  Market reference prices (model_catalogue.price_input/output_per_1m)
+  Proposed discount % per model (vs market)
+  Average customer consumption (tokens/month, by segment)
+
+Output:
+  Available MaaS GPU pool (fleet - committed - failover)
+  Token throughput available per model (from benchmark_results or estimate)
+  Our price per model = market × (1 - discount%)
+  Monthly token volume needed to hit margin target
+  Customer count needed = volume / avg_consumption
+  Suggested catalogue mix (which models, at what discounts)
+
+Use case:
+  Board / investor conversation, bid pricing, capacity planning
+  "Your 10MW sovereign AI platform needs N customers consuming
+   Y million tokens/month at Z pricing to reach target margin"
+  Runs once, feeds into the proposal document
+```
+
+### Scenario 2 — Inventory yield management (post-deployment)
+
+```
+Input:
+  Actual fleet utilisation (from SLA Monitor / observability stack)
+  Current pricing per model
+  Headroom = available_capacity - current_demand (live or estimated)
+
+Output:
+  Which models are underutilised and by how much?
+  At what discount level would incremental demand fill the gap?
+  Revenue impact of a seasonal/promotional push at X% discount
+  Break-even: does the incremental revenue at lower price exceed
+  the opportunity cost of idle GPU capacity?
+
+Use case:
+  Operator revenue management dashboard
+  "Model X is at 40% utilisation. A 25% seasonal discount would
+   attract N new customers and improve gross margin by Y% vs
+   leaving GPUs idle"
+  Runs continuously — triggered by utilisation falling below
+  a configurable threshold (e.g. <60% for 24hrs)
+```
+
+### Link to SLA Monitor
+
+Underutilisation (Scenario 2) is the mirror image of SLA breach risk
+(SLA Monitor). Same fleet utilisation data, opposite direction:
+- Utilisation too HIGH → SLA breach risk → scale up or throttle
+- Utilisation too LOW  → yield opportunity → promotional push or price cut
+
+The Fleet Yield tool should receive alerts from the SLA Monitor layer
+rather than polling independently.
+
+### Dependencies before building
+
+```
+Required (block build):
+  fleetTotal() in sasc-sizing.js: EXISTS — needs to be called from
+    Solution tab and exposed as M.fleetHeadroom
+  UC + GPUaaS workloads wired to real Supabase data (Controller wiring)
+  model_catalogue.price_input/output_per_1m confirmed as market
+    reference prices (confirmed 30 June 2026)
+  margin_pct / discount_pct in Settings (not yet built)
+  Customer consumption model: avg tokens/month per segment
+    (light/medium/heavy — new, no table yet)
+
+Preferred (improve accuracy):
+  benchmark_results populated with measured throughput
+    (otherwise headroom uses estimated tok/s baseline)
+  SLA Monitor operational (for Scenario 2 trigger)
+```
+
+### Placeholder V shell
+
+Tab key: `fleetyield` — visible in Solution tab bar as "Fleet Yield",
+opens `renderComingSoon('fleetyield')` showing both scenarios, their
+inputs/outputs, and all dependencies. Stage 2: fill in M + C.
+
+**This is a Stage 2 build item, not Phase A. Captured here so the
+design intent and both scenarios are not lost between sessions.**

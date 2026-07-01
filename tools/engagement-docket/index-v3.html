@@ -1073,6 +1073,7 @@ var V = {
       {key:'gpuaas',     label:'GPUaaS',         count:M.workloadConfigs.gpuaas.length},
       {key:'bmaas',      label:'BMaaS',          count:0},
       {key:'whatif',     label:'What-If ⚡',      count:0, soon:true},
+      {key:'fleetyield',  label:'Fleet Yield',     count:0, soon:true},
       {key:'makeorbuy',  label:'Make vs Buy',    count:0, soon:true},
       {key:'gateway',    label:'Gateway',        count:0, soon:true},
       {key:'metering',   label:'Metering',       count:0, soon:true},
@@ -1108,6 +1109,20 @@ var V = {
 
   renderComingSoon: function(key) {
     var SOON = {
+      fleetyield: {
+        icon: '&#128200;',
+        title: 'Fleet Commercial Yield — MaaS Catalogue Planning',
+        desc: 'Two scenarios in one tool. Scenario 1 (Top-down planning): Given a planned fleet, target margin, and market reference prices — what MaaS model catalogue, at what discount levels, needs what customer volume to commercially justify the deployment? Feeds into board/investor conversations and bid pricing. Scenario 2 (Inventory yield management): Given actual or estimated fleet utilisation — which models are underutilised, what discount level would attract enough incremental demand to fill the gap, and is a seasonal/promotional push worth it at X% discount? Underutilisation is the mirror image of SLA breach risk — same fleet data, opposite direction.',
+        deps: [
+          'Fleet headroom calculation: fleetTotal() already exists in sasc-sizing.js — needs to be called from Solution tab and exposed as M.fleetHeadroom',
+          'UC + GPUaaS workloads wired to real Supabase data (Controller wiring phase)',
+          'model_catalogue.price_input_per_1m / price_output_per_1m confirmed as market reference prices (done)',
+          'margin_pct / discount_pct in Settings (global default + per-engagement + per-model override)',
+          'Customer consumption model: average tokens/month per customer segment (light/medium/heavy)',
+          'benchmark_results populated with real throughput numbers (otherwise headroom is estimated)',
+          'Scenario 2 links to SLA Monitor: utilisation alerts trigger yield analysis automatically'
+        ]
+      },
       bmaas: {
         icon: '&#127970;',
         title: 'BMaaS — Bare Metal as a Service',
