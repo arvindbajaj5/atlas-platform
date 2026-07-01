@@ -383,6 +383,13 @@ var M = {
   workloadConfigs: { uc: [], maas: [], gpuaas: [], bmaas: [] },
   tenantsList:     {},
   currentSolutionVersionId: null,
+  // What-If state
+  whatif: {
+    selectedWorkloadId: null,
+    selectedWorkloadType: 'uc',
+    selectedGpus: [],
+    gpuCountOverride: null
+  },
   // Loaded by AtlasSolution.loadRefData() on openEngagement()
   // Never hardcoded — always from Supabase model_catalogue + gpu_configs
   modelCatalogue:  [],
@@ -1077,7 +1084,7 @@ var V = {
       {key:'maas',       label:'MaaS',           count:M.workloadConfigs.maas.length},
       {key:'gpuaas',     label:'GPUaaS',         count:M.workloadConfigs.gpuaas.length},
       {key:'bmaas',      label:'BMaaS',          count:0},
-      {key:'whatif',     label:'What-If ⚡',      count:0, soon:true},
+      {key:'whatif',     label:'What-If ⚡',      count:0},
       {key:'makeorbuy',  label:'Make vs Buy',    count:0, soon:true},
       {key:'gateway',    label:'Gateway',        count:0, soon:true},
       {key:'metering',   label:'Metering',       count:0, soon:true},
@@ -1107,11 +1114,237 @@ var V = {
     if      (t === 'uc')          body = V.renderUCTab()
     else if (t === 'maas')        body = V.renderMaasTab()
     else if (t === 'gpuaas')      body = V.renderGpuaasTab()
+    else if (t === 'whatif')       body = V.renderWhatIfTab()
     else                          body = V.renderComingSoon(t)
     el.innerHTML = tm + body
   },
 
-  renderComingSoon: function(key) {
+  renderWhatIfTab: function() {
+    var wi = M.whatif
+    var allWorkloads = []
+    ;(M.workloadConfigs.uc||[]).forEach(function(w){ allWorkloads.push({id:w.id,name:w.name,type:'uc',wl:w}) })
+    ;(M.workloadConfigs.maas||[]).forEach(function(w){ allWorkloads.push({id:w.id,name:w.name,type:'maas',wl:w}) })
+
+    if (!allWorkloads.length) {
+      return '<div class="coming-soon-panel"><div class="coming-soon-icon">&#9889;</div>'
+        + '<div class="coming-soon-title">What-If — GPU Architecture Comparison</div>'
+        + '<div class="coming-soon-desc">Add UC or MaaS workloads in the UCs and MaaS tabs first, then return here to compare GPU architectures for those workloads.</div></div>'
+    }
+
+    // Default: first workload
+    if (!wi.selectedWorkloadId || !allWorkloads.find(function(w){ return w.id === wi.selectedWorkloadId })) {
+      wi.selectedWorkloadId = allWorkloads[0].id
+      wi.selectedWorkloadType = allWorkloads[0].type
+    }
+    // Default: first 3 GPUs
+    var gpus = M.gpuConfigs || []
+    if (!wi.selectedGpus.length && gpus.length) {
+      wi.selectedGpus = gpus.slice(0,3).map(function(g){ return g.id })
+    }
+
+    var selectedWL = allWorkloads.find(function(w){ return w.id === wi.selectedWorkloadId })
+    var wl = selectedWL ? selectedWL.wl : null
+    var wlType = selectedWL ? selectedWL.type : 'uc'
+
+    // ── Compute sizing for each selected GPU ───────────────────────────
+    var results = []
+    wi.selectedGpus.forEach(function(gpuId) {
+      var gpuConf = M.gpuMap && M.gpuMap[gpuId]
+      // Top-down: how many GPUs needed for this workload's demand?
+      var wlCopy = Object.assign({}, wl, {gpu: gpuId})
+      var sz = AtlasSolution.sizeWorkload(wlCopy, wlType, M)
+      // Bottom-up: max DAU this GPU count can support?
+      var cap = null
+      if (window.SizingEngine && SizingEngine.ready && wl.model) {
+        cap = SizingEngine.capacityForGPU(gpuId, {
+          model_id:          wl.model,
+          gpu_count:         sz.total,
+          precision:         wl.precision || 'INT4',
+          profile:           wlType === 'maas' ? 'A' : 'B',
+          requests_per_day:  wl.reqPerDay || 12,
+          peak_multiplier:   wl.peakMult || 3,
+          avg_output_tokens: wl.outputTok || 500
+        })
+      }
+      // Fallback bottom-up using AtlasSolution throughput factors
+      var maxDau = cap && !cap.error ? cap.max_dau : Math.floor(sz.total * 8000 / ((wl.reqPerDay||12)/86400 * (wl.outputTok||500)))
+      var demandDau = wl.dau || 1000
+      results.push({
+        gpuId: gpuId,
+        gpuName: (gpuConf && gpuConf.name) || gpuId,
+        gpusNeeded: sz.total,
+        baseGpus: sz.baseGpus,
+        buffers: sz.buffers,
+        powerKw: sz.powerKw,
+        maxDau: Math.max(maxDau, demandDau),
+        demandDau: demandDau,
+        headroom: Math.round(((maxDau - demandDau) / demandDau) * 100),
+        meets: maxDau >= demandDau,
+        audit: cap && !cap.error ? cap.audit : null
+      })
+    })
+
+    // ── Build HTML ─────────────────────────────────────────────────────
+    var h = '<div style="padding:0">'
+
+    // Part 1 — Controls
+    h += '<div class="card" style="margin-bottom:var(--sp-4)">'
+    h += '<div class="card-title">What-If — GPU Architecture Comparison</div>'
+    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr">'
+
+    // Workload selector
+    h += '<div class="fg"><label>Workload to analyse</label><select onchange="C.updWhatIf(\'selectedWorkloadId\',this.value)" style="width:100%">'
+    allWorkloads.forEach(function(w) {
+      h += '<option value="'+w.id+'"'+(wi.selectedWorkloadId===w.id?' selected':'')+'>['
+        +w.type.toUpperCase()+'] '+w.name+'</option>'
+    })
+    h += '</select></div>'
+
+    // GPU count override
+    h += '<div class="fg"><label>GPU count to test (leave blank = use sized count)</label>'
+      + '<input type="number" min="1" placeholder="auto from sizing" value="'+(wi.gpuCountOverride||'')+'" '
+      + 'onchange="C.updWhatIf(\'gpuCountOverride\',this.value?+this.value:null)">'
+      + '<div class="fg-hint">Override the top-down GPU count for scenario testing</div></div>'
+    h += '</div>'
+
+    // GPU checkboxes
+    h += '<div class="fg" style="margin-top:8px"><label>GPU architectures to compare (up to 5)</label>'
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">'
+    gpus.forEach(function(g) {
+      var checked = wi.selectedGpus.indexOf(g.id) >= 0
+      var disabled = !checked && wi.selectedGpus.length >= 5
+      h += '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:'+(disabled?'not-allowed':'pointer')+';opacity:'+(disabled?'0.4':'1')+'">'
+        + '<input type="checkbox" '+(checked?'checked':'')+' '+(disabled?'disabled':'')
+        + ' onchange="C.toggleWhatIfGpu(\''+g.id+'\')">'  
+        + g.name + '</label>'
+    })
+    h += '</div></div>'
+    h += '</div>'
+
+    if (!results.length) {
+      h += '<div class="coming-soon-panel"><div class="coming-soon-desc">Select at least one GPU architecture above.</div></div>'
+      h += '</div>'
+      return h
+    }
+
+    // Part 2 — SVG Crossover Chart
+    h += '<div class="card" style="margin-bottom:var(--sp-4)">'
+    h += '<div class="card-title">Supply vs Demand — GPU Count by DAU</div>'
+    h += V.renderWhatIfChart(results, wl)
+    h += '</div>'
+
+    // Part 3 — Comparison Table
+    h += '<div class="card">'
+    h += '<div class="card-title">Architecture Comparison</div>'
+    h += '<table class="tbl"><thead><tr>'
+      + '<th>GPU</th><th class="num">GPUs needed</th><th class="num">Power</th>'
+      + '<th class="num">Max DAU</th><th class="num">Headroom</th><th>Verdict</th>'
+      + '</tr></thead><tbody>'
+
+    // Sort by GPUs needed (cheapest first)
+    var sorted = results.slice().sort(function(a,b){ return a.gpusNeeded - b.gpusNeeded })
+    var cheapestMeets = sorted.find(function(r){ return r.meets })
+
+    results.forEach(function(r) {
+      var isBest = cheapestMeets && r.gpuId === cheapestMeets.gpuId
+      var verdict = r.meets
+        ? (isBest ? '&#9733; Recommended — lowest GPU count that meets demand' : 'Meets demand')
+        : '&#9888; Insufficient — max DAU below target'
+      var rowStyle = isBest ? 'background:rgba(0,178,144,.06);font-weight:600' : ''
+      h += '<tr style="'+rowStyle+'">'
+        + '<td>'+r.gpuName+'</td>'
+        + '<td class="num">'+r.gpusNeeded+'</td>'
+        + '<td class="num">'+r.powerKw+'kW</td>'
+        + '<td class="num">'+r.maxDau.toLocaleString()+'</td>'
+        + '<td class="num" style="color:'+(r.headroom>=0?'var(--teal)':'var(--orange)')+'">'+r.headroom+'%</td>'
+        + '<td style="font-size:11px">'+verdict+'</td>'
+        + '</tr>'
+    })
+    h += '</tbody></table>'
+    h += '</div>'
+    h += '</div>'
+    return h
+  },
+
+  renderWhatIfChart: function(results, wl) {
+    var W = 680, H = 280, PL = 60, PR = 20, PT = 20, PB = 50
+    var cW = W - PL - PR, cH = H - PT - PB
+    var demandDau = (wl && wl.dau) || 1000
+    var maxDauAll = Math.max.apply(null, results.map(function(r){ return r.maxDau }))
+    var maxGpus   = Math.max.apply(null, results.map(function(r){ return r.gpusNeeded })) * 1.3
+    var xMax = Math.max(maxDauAll, demandDau) * 1.1
+    var xScale = function(d)  { return PL + (d / xMax) * cW }
+    var yScale = function(g)  { return PT + cH - (g / maxGpus) * cH }
+    var fmtN   = function(n)  { return n >= 1000000 ? Math.round(n/100000)/10+'M' : n >= 1000 ? Math.round(n/100)/10+'K' : n }
+
+    var COLORS = ['#002870','#FF5539','#00B290','#FFB600','#1C38F5']
+
+    var svg = '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:'+W+'px;font-family:var(--font)">'
+
+    // Grid lines
+    for (var gi = 0; gi <= 4; gi++) {
+      var gy = PT + (gi/4)*cH
+      svg += '<line x1="'+PL+'" y1="'+gy+'" x2="'+(PL+cW)+'" y2="'+gy+'" stroke="#E5E7EB" stroke-width="1"/>'
+      svg += '<text x="'+(PL-6)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#6B7280">'
+        + Math.round(maxGpus*(1-gi/4)) + '</text>'
+    }
+    for (var xi = 0; xi <= 5; xi++) {
+      var xv = (xi/5)*xMax
+      var xx = xScale(xv)
+      svg += '<line x1="'+xx+'" y1="'+PT+'" x2="'+xx+'" y2="'+(PT+cH)+'" stroke="#E5E7EB" stroke-width="1"/>'
+      svg += '<text x="'+xx+'" y="'+(PT+cH+16)+'" text-anchor="middle" font-size="10" fill="#6B7280">'+fmtN(Math.round(xv))+'</text>'
+    }
+
+    // Axes
+    svg += '<line x1="'+PL+'" y1="'+PT+'" x2="'+PL+'" y2="'+(PT+cH)+'" stroke="#374151" stroke-width="1.5"/>'
+    svg += '<line x1="'+PL+'" y1="'+(PT+cH)+'" x2="'+(PL+cW)+'" y2="'+(PT+cH)+'" stroke="#374151" stroke-width="1.5"/>'
+    svg += '<text x="'+(PL+cW/2)+'" y="'+(H-4)+'" text-anchor="middle" font-size="11" fill="#374151">DAU (Daily Active Users)</text>'
+    svg += '<text x="14" y="'+(PT+cH/2)+'" text-anchor="middle" font-size="11" fill="#374151" transform="rotate(-90,14,'+(PT+cH/2)+')">GPUs needed</text>'
+
+    // Demand line — linear top-down: GPUs = f(DAU), passes through origin
+    if (results.length) {
+      var ref = results[0]
+      var slope = ref.gpusNeeded / demandDau
+      var x0 = PL, y0 = yScale(0)
+      var x1 = xScale(xMax), y1 = yScale(slope * xMax)
+      svg += '<line x1="'+x0+'" y1="'+y0+'" x2="'+x1+'" y2="'+y1+'" stroke="#6B7280" stroke-width="1.5" stroke-dasharray="6,3"/>'
+      svg += '<text x="'+(x1-4)+'" y="'+(y1-6)+'" text-anchor="end" font-size="10" fill="#6B7280">Demand</text>'
+    }
+
+    // Supply lines — one per GPU (horizontal at gpusNeeded level, extending to maxDau)
+    results.forEach(function(r, i) {
+      var col = COLORS[i % COLORS.length]
+      var x0 = PL
+      var x1 = xScale(r.maxDau)
+      var yy = yScale(r.gpusNeeded)
+      // Horizontal supply line
+      svg += '<line x1="'+x0+'" y1="'+yy+'" x2="'+x1+'" y2="'+yy+'" stroke="'+col+'" stroke-width="2"/>'
+      // Vertical drop at maxDau (capacity limit)
+      svg += '<line x1="'+x1+'" y1="'+PT+'" x2="'+x1+'" y2="'+yy+'" stroke="'+col+'" stroke-width="1" stroke-dasharray="3,2" opacity="0.5"/>'
+      // Intersection with demand line
+      var xIntersect = xScale(r.maxDau)
+      svg += '<circle cx="'+x1+'" cy="'+yy+'" r="4" fill="'+col+'"/>'
+      // Label
+      svg += '<text x="'+(x0+4)+'" y="'+(yy-4)+'" font-size="10" fill="'+col+'" font-weight="600">'+r.gpuName+'</text>'
+    })
+
+    // Current DAU marker
+    var xDemand = xScale(demandDau)
+    svg += '<line x1="'+xDemand+'" y1="'+PT+'" x2="'+xDemand+'" y2="'+(PT+cH)+'" stroke="#FF5539" stroke-width="1.5" stroke-dasharray="4,2"/>'
+    svg += '<text x="'+xDemand+'" y="'+(PT-6)+'" text-anchor="middle" font-size="10" fill="#FF5539">Current DAU</text>'
+
+    // Legend
+    results.forEach(function(r, i) {
+      var lx = PL + i * 130, ly = PT + cH + 32
+      svg += '<rect x="'+lx+'" y="'+(ly-8)+'" width="12" height="3" fill="'+COLORS[i%COLORS.length]+'"/>'
+      svg += '<text x="'+(lx+16)+'" y="'+ly+'" font-size="10" fill="#374151">'+r.gpuName+'</text>'
+    })
+
+    svg += '</svg>'
+    return svg
+  },
+
+    renderComingSoon: function(key) {
     var SOON = {
       bmaas: {
         icon: '&#127970;',
@@ -2241,6 +2474,26 @@ var C = {
       console.warn('[ATLAS] solution save failed:', e)
       if (explicit) V.toast('Save failed — ' + (e.message||e), 'error')
     }
+  },
+
+  // ── What-If Controller ───────────────────────────────────────────────────
+  updWhatIf: function(field, val) {
+    M.whatif[field] = val
+    if (field === 'selectedWorkloadId') {
+      // Reset GPU selection when workload changes
+      M.whatif.selectedGpus = []
+    }
+    V.renderSolTabBody()
+  },
+
+  toggleWhatIfGpu: function(gpuId) {
+    var idx = M.whatif.selectedGpus.indexOf(gpuId)
+    if (idx >= 0) {
+      M.whatif.selectedGpus.splice(idx, 1)
+    } else if (M.whatif.selectedGpus.length < 5) {
+      M.whatif.selectedGpus.push(gpuId)
+    }
+    V.renderSolTabBody()
   },
 
   addTenant: function() {
