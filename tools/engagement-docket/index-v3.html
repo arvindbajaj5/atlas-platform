@@ -548,7 +548,8 @@ var DUMMY = {
       ],
       gpuaas: [
         { id:'gpuaas1', name:'Dedicated GPU Block — Health Dept', gpu:'h200',
-          gpuCount:16, tenant:'health-dept', poolType:'reserved', tenure:'36', mvbView:'fleet' }
+          gpuCount:16, commitment:'annual', dedicated:true, interconnect:'standalone',
+          tenant:'health-dept', poolType:'reserved', tenure:'36', mvbView:'fleet' }
       ],
       bmaas: []
     }
@@ -1095,24 +1096,14 @@ var V = {
 
   renderSolTabBody: function() {
     var el = document.getElementById('soltabbody')
-    // Build full HTML in one string then set once — avoids innerHTML +=
-    // which causes browser to re-parse DOM (destroying expanded row state)
-    var tabContent = ''
-    if (M.activeSolTab === 'uc')         tabContent = V.renderUCTab()
-    else if (M.activeSolTab === 'maas')   tabContent = V.renderMaasTab()
-    else if (M.activeSolTab === 'gpuaas') tabContent = V.renderGpuaasTab()
-    else if (M.activeSolTab === 'bmaas')  tabContent = V.renderComingSoon('bmaas')
-    else if (M.activeSolTab === 'whatif') tabContent = V.renderComingSoon('whatif')
-    else if (M.activeSolTab === 'makeorbuy') tabContent = V.renderComingSoon('makeorbuy')
-    else if (M.activeSolTab === 'gateway')   tabContent = V.renderComingSoon('gateway')
-    else if (M.activeSolTab === 'metering')  tabContent = V.renderComingSoon('metering')
-    else if (M.activeSolTab === 'slamonitor') tabContent = V.renderComingSoon('slamonitor')
-    else if (M.activeSolTab === 'benchmarks') tabContent = V.renderComingSoon('benchmarks')
-    else if (M.activeSolTab === 'margin')     tabContent = V.renderComingSoon('margin')
-    else if (M.activeSolTab === 'diagnostics') tabContent = V.renderComingSoon('diagnostics')
-    else if (M.activeSolTab === 'bom')        tabContent = V.renderComingSoon('bom')
-    else tabContent = V.renderComingSoon('unknown')
-    el.innerHTML = V.renderTenantMgmt() + tabContent
+    var tm = V.renderTenantMgmt()
+    var body = ''
+    var t = M.activeSolTab
+    if      (t === 'uc')          body = V.renderUCTab()
+    else if (t === 'maas')        body = V.renderMaasTab()
+    else if (t === 'gpuaas')      body = V.renderGpuaasTab()
+    else                          body = V.renderComingSoon(t)
+    el.innerHTML = tm + body
   },
 
   renderComingSoon: function(key) {
@@ -1198,32 +1189,67 @@ var V = {
 
 
   renderGpuaasTab: function() {
-    var rows = M.workloadConfigs.gpuaas, totalGpus = 0
+    var rows = M.workloadConfigs.gpuaas, totalGpus = 0, totalPowerKw = 0
     var html = '<div class="tablewrap"><table class="wl"><thead><tr>'
-      + '<th>Block</th><th>GPU</th><th class="num">GPUs</th><th>Tenant</th><th></th></tr></thead><tbody>'
+      + '<th>Block</th><th>GPU</th><th class="num">GPUs</th><th>Commitment</th><th>Tenant</th><th class="num">Power</th><th></th></tr></thead><tbody>'
     rows.forEach(function(wl) {
-      totalGpus += wl.gpuCount
+      var gpuConf = M.gpuMap && M.gpuMap[wl.gpu]
+      var powerPerGpu = (gpuConf && gpuConf.tdp_w) ? gpuConf.tdp_w / 1000 : 0.7
+      var powerKw = Math.round(wl.gpuCount * powerPerGpu * 10) / 10
+      totalGpus += wl.gpuCount; totalPowerKw += powerKw
       var isOpen = !!M.openWlRows[wl.id]
       var t = wl.tenant ? M.tenantsList[wl.tenant] : null
+      var commitLabel = { hourly:'Hourly', daily:'Daily', monthly:'Monthly', annual:'Annual' }[wl.commitment||'monthly'] || 'Monthly'
+      var dedicLabel  = wl.dedicated === false ? 'Shared pool' : 'Dedicated'
       html += '<tr class="row-main'+(isOpen?' open':'')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
         + '<td class="name">'+wl.name+'</td>'
         + '<td>'+gpuLabel(wl.gpu)+'</td>'
         + '<td class="num">'+wl.gpuCount+'</td>'
-        + '<td>'+(t?'<span class="tenant-badge">'+t.name+'</span> <span class="pool-badge-'+wl.poolType+'">'+(wl.poolType==='reserved'?'&#128274; Reserved':'&#9889; Open'):'—')+'</td>'
+        + '<td>'+commitLabel+' · '+dedicLabel+'</td>'
+        + '<td>'+(t?'<span class="tenant-badge">'+t.name+'</span> <span class="pool-badge-'+(wl.poolType||'open')+'">'+(wl.poolType==='reserved'?'&#128274; Reserved':'&#9889; Open')+'</span>':'<span style="color:var(--mid);font-size:10px">Open</span>')+'</td>'
+        + '<td class="num">'+powerKw+'kW</td>'
         + '<td><span class="arrow">&#9654;</span></td></tr>'
-      html += '<tr class="expand-row"><td colspan="5"><div class="expand-inner'+(isOpen?' open':'')+'">'
+      html += '<tr class="expand-row"><td colspan="7"><div class="expand-inner'+(isOpen?' open':'')+'">'
       if (isOpen) {
         html += '<div class="expand-pad">'
-        html += '<div class="formgrid" style="grid-template-columns:1fr 1fr"><div class="fg"><label>GPU</label><select onchange="C.updGpuaas(\''+wl.id+'\',\'gpu\',this.value)">'
-        (window.M&&M.gpuConfigs||[]).map(function(g){return g.id}).forEach(function(k2){ html += '<option value="'+k2+'"'+(wl.gpu===k2?' selected':'')+'>'+gpuLabel(k2)+'</option>' })
-        html += '</select></div><div class="fg"><label>GPU Count</label><input type="number" value="'+wl.gpuCount+'" onchange="C.updGpuaas(\''+wl.id+'\',\'gpuCount\',+this.value)"></div></div>'
+        // Row 1 — Name + GPU + GPU Count
+        html += '<div class="formgrid" style="grid-template-columns:1.5fr 1fr 1fr">'
+        html += '<div class="fg"><label>Block Name</label><input type="text" value="'+wl.name+'" onchange="C.updGpuaas(\''+wl.id+'\',\'name\',this.value)"></div>'
+        html += '<div class="fg"><label>GPU Architecture</label>'+AtlasSolution.renderGpuDropdown(wl.gpu, M, "C.updGpuaas('"+wl.id+"','gpu',this.value)")+'</div>'
+        html += '<div class="fg"><label>GPU Count</label><input type="number" min="1" step="1" value="'+wl.gpuCount+'" onchange="C.updGpuaas(\''+wl.id+'\',\'gpuCount\',+this.value)"></div>'
+        html += '</div>'
+        // Row 2 — Commitment + Dedication + Interconnect
+        html += '<div class="formgrid">'
+        html += '<div class="fg"><label>Commitment Period</label><select onchange="C.updGpuaas(\''+wl.id+'\',\'commitment\',this.value)">'
+        ;['hourly','daily','monthly','annual'].forEach(function(v){ html += '<option value="'+v+'"'+((wl.commitment||'monthly')===v?' selected':'')+'>'+{hourly:'Hourly',daily:'Daily',monthly:'Monthly',annual:'Annual (discount)'}[v]+'</option>' })
+        html += '</select></div>'
+        html += '<div class="fg"><label>Dedication Model</label><select onchange="C.updGpuaas(\''+wl.id+'\',\'dedicated\',this.value==\'true\')">'
+        html += '<option value="true"'+(wl.dedicated!==false?' selected':'')+'>Dedicated — exclusive access</option>'
+        html += '<option value="false"'+(wl.dedicated===false?' selected':'')+'>Shared — guaranteed allocation from pool</option>'
+        html += '</select></div>'
+        html += '<div class="fg"><label>Interconnect</label><select onchange="C.updGpuaas(\''+wl.id+'\',\'interconnect\',this.value)">'
+        ;['standalone','nvlink','infiniband'].forEach(function(v){ html += '<option value="'+v+'"'+((wl.interconnect||'standalone')===v?' selected':'')+'>'+{standalone:'Standalone GPUs',nvlink:'NVLink (same chassis)',infiniband:'InfiniBand (multi-node)'}[v]+'</option>' })
+        html += '</select><div class="fg-hint">InfiniBand required for 671B+ models across nodes</div></div>'
+        html += '</div>'
+        // Derived panel
+        html += '<div class="derived">'
+        html += '<div class="derived-line">'
+          + '<span>GPU<br><b>'+gpuLabel(wl.gpu)+'</b></span>'
+          + '<span>Count<br><b>'+wl.gpuCount+'</b></span>'
+          + '<span>VRAM<br><b>'+((gpuConf&&gpuConf.hbm_size_gb)?wl.gpuCount*gpuConf.hbm_size_gb+'GB':'—')+'</b></span>'
+          + '<span>Power<br><b>'+powerKw+'kW</b></span>'
+          + '<span>Racks<br><b>'+Math.ceil(wl.gpuCount/8)+' rack(s)</b></span>'
+          + '<span>Dedication<br><b>'+(wl.dedicated!==false?'Dedicated':'Shared')+'</b></span>'
+          + '</div>'
+        html += '</div>'
+        // Tenant block
         html += V.renderTenantBlock(wl, 'gpuaas')
         html += '<div class="actions-row"><button class="btn btn-danger-text" onclick="C.removeGpuaas(\''+wl.id+'\')">Remove</button><button class="btn btn-ghost" onclick="C.toggleRow(\''+wl.id+'\')">&#9650; Collapse</button></div>'
         html += '</div>'
       }
       html += '</div></td></tr>'
     })
-    html += '<tr class="totals-row"><td>TOTALS</td><td></td><td class="num">'+totalGpus+'</td><td colspan="2"></td></tr>'
+    html += '<tr class="totals-row"><td>TOTALS</td><td></td><td class="num">'+totalGpus+'</td><td></td><td></td><td class="num">'+Math.round(totalPowerKw*10)/10+'kW</td><td></td></tr>'
     html += '</tbody></table></div>'
     html += '<div class="tablewrap add-row"><button class="add-btn" onclick="C.addGpuaas()">+ Add GPUaaS Block</button></div>'
     return html
@@ -1407,7 +1433,7 @@ var V = {
         + '<td>'+gpuLabel(sz.gpu)+'</td>'
         + '<td class="num">'+sz.total+'</td>'
         + '<td class="num">'+sz.powerKw+'kW</td>'
-        + '<td class="num">'+(sz.total?'$'+(sz.powerKw*0.08/sz.total).toFixed(4):'—')+'</td>'
+        + '<td class="num">$'+sz.cpst+'</td>'
         + '<td><span class="arrow">&#9654;</span></td>'
         + '</tr>'
       html += '<tr class="expand-row"><td colspan="9"><div class="expand-inner'+(isOpen?' open':'')+'">'
@@ -2103,8 +2129,11 @@ var C = {
 
   addGpuaas: function() {
     var id = 'gpuaas' + (M.workloadConfigs.gpuaas.length + 1) + '-' + Date.now()
-    M.workloadConfigs.gpuaas.push({ id:id, name:'New GPU Block', gpu:M.defaultGpu, gpuCount:8,
-      tenant:null, poolType:'open', tenure:null, mvbView:'fleet' })
+    M.workloadConfigs.gpuaas.push({
+      id: id, name: 'New GPU Block', gpu: M.defaultGpu, gpuCount: 8,
+      commitment: 'monthly', dedicated: true, interconnect: 'standalone',
+      tenant: null, poolType: 'open', tenure: null, mvbView: 'fleet'
+    })
     M.openWlRows[id] = true
     V.renderSolTabs(); V.renderSolTabBody()
   },
