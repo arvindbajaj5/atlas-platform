@@ -84,6 +84,22 @@
 
     M.gpuMap = {}
     M.gpuConfigs.forEach(function (g) { M.gpuMap[g.id] = g })
+
+    // Load benchmark_results — estimated seed data now, replaced by real vLLM measurements later
+    // Key: gpu_config_id + '|' + ai_model_id + '|' + batch_size
+    // The formula path checks this map before falling back to estimated calculations
+    try {
+      var benchmarks = await global.atlasDB.get('benchmark_results', 'order=gpu_config_id.asc', 2000)
+      M.benchmarkResults = benchmarks || []
+      M.benchmarkMap = {}
+      M.benchmarkResults.forEach(function (b) {
+        var key = b.gpu_config_id + '|' + b.ai_model_id + '|' + (b.batch_size || 1)
+        M.benchmarkMap[key] = b
+      })
+    } catch (e) {
+      M.benchmarkResults = []
+      M.benchmarkMap = {}
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -187,13 +203,26 @@
     // Step 2
     var avgRPS  = ((wl.dau || 1000) * reqPerDay) / 86400
     var peakRPS = Math.ceil(avgRPS * peakMult)
-    // Step 3 — H200 INT4 baseline: ~8,000 tok/s (conservative, continuous batching)
+    // Step 3 — Throughput per GPU
+    // Priority 1: use tokens_per_sec from benchmark_results (estimated seed or real measured)
+    // Key: gpu_config_id | ai_model_id | batch_size (use batch_size=16 as production default)
+    // When real vLLM measurements replace the seed data, this path auto-uses them — zero code change.
+    var params_b = (model && model.params_b) ? model.params_b : 13  // default 13B
+    var benchTokPerGpu = null
+    if (M.benchmarkMap && gpuId && wl.model) {
+      var batchSize = 16  // production batch size — good balance of throughput vs latency
+      var bmKey = gpuId + '|' + wl.model + '|' + batchSize
+      var bm = M.benchmarkMap[bmKey]
+      if (bm && bm.tokens_per_sec) {
+        benchTokPerGpu = bm.tokens_per_sec
+      }
+    }
+
+    // H200 INT4 baseline: ~8,000 tok/s (conservative, continuous batching)
     // Model size scaling: larger models have lower throughput per GPU.
     // Baseline 8,000 tok/s assumes ~7-13B model. Scale down for larger models.
-    // Formula: tokBase = 8000 / (params_b / 10)^0.5 — larger model = fewer tok/s.
-    // Capped at 8000 (small models don't get faster, just fit more batches).
     // Source: approximate from published vLLM benchmarks across model sizes.
-    var params_b = (model && model.params_b) ? model.params_b : 13  // default 13B
+    // This is only used when no benchmark_results entry exists for this GPU × model combo.
     var modelSizeFactor = params_b <= 13 ? 1.0
       : params_b <= 30  ? 0.75
       : params_b <= 70  ? 0.55
@@ -203,7 +232,11 @@
       : 0.10  // 671B+ (DeepSeek R1/V3, GLM 5.2)
     var tokBase  = Math.round(8000 * modelSizeFactor)
     var precMult = wl.precision === 'int8' ? 0.55 : wl.precision === 'fp16' ? 0.35 : wl.precision === 'fp8' ? 0.8 : 1.0
-    var tokPerGpu = Math.round(tokBase * gpuFactor * precMult)
+    // Use benchmark data if available, otherwise use estimated formula
+    var tokPerGpu = benchTokPerGpu
+      ? Math.round(benchTokPerGpu * precMult)   // benchmark is INT4 baseline, scale for precision
+      : Math.round(tokBase * gpuFactor * precMult)  // estimated formula fallback
+    var usingBenchmark = !!benchTokPerGpu
     // Step 4 — requests per GPU per second
     // TTFT target affects batch size: tighter latency = smaller batches = fewer req/GPU
     // Tier 1 (<200ms): run at ~30% of max batch → 0.3x multiplier on reqPerGpu
@@ -253,7 +286,8 @@
       'Step 1: Concurrent = DAU(' + (wl.dau||1000).toLocaleString() + ') × ' + peakConcPct + '% = ' + concurrent.toLocaleString() + '\n'
     + 'Step 2: Peak RPS = DAU × req/day(' + reqPerDay + ') ÷ 86400 × peakMult(' + peakMult + ') = ' + peakRPS + ' req/s\n'
     + 'Ctx (' + (wl.contextPct||'p95').toUpperCase() + ' ' + ctxMult + 'x): output = ' + outputTok + ' tok/req\n'
-    + 'Step 3: Model ' + params_b + 'B → tokBase=' + tokBase + ' × GPU(' + gpuLabel + ' ' + gpuFactor + 'x) × prec(' + precMult + 'x) = ' + tokPerGpu + ' tok/s/GPU\n'
+    + 'Step 3: ' + (usingBenchmark ? '★ benchmark_results (source=' + (M.benchmarkMap && M.benchmarkMap[gpuId+'|'+wl.model+'|16'] ? M.benchmarkMap[gpuId+'|'+wl.model+'|16'].source : 'estimated') + ')' : '⚠ formula estimate (no benchmark row)') + '\n'
+    + '         tokPerGpu = ' + tokPerGpu + ' tok/s/GPU (Model ' + params_b + 'B, ' + (wl.precision||'int4').toUpperCase() + ', ' + gpuLabel + ')\n'
     + 'Step 4: TTFT ' + ttftMs + 'ms → batch factor ' + ttftBatchFactor + 'x → req/GPU = ' + reqPerGpu + ' req/s/GPU\n'
     + 'Step 5a compute: ceil(' + peakRPS + ' ÷ ' + reqPerGpu + ') = ' + Math.max(1, Math.ceil(peakRPS/reqPerGpu)) + ' GPUs\n'
     + 'Step 5b memory: ' + params_b + 'B × ' + bitsPerParam + 'bit = ' + Math.round(modelSizeGb) + 'GB ÷ ' + vramPerGpu + 'GB VRAM × 1.25 overhead = ' + minGpusMemory + ' GPUs min\n'
@@ -266,7 +300,8 @@
       baseGpus: baseGpus, buffers: buffers, total: total,
       powerKw: powerKw, racks: _racks(total, gpuConf),
       ttftEstimate: ttftEstimate, slaMet: slaMet, margin: margin,
-      commercialSla: commercialSla, formula: formula, notes: null
+      commercialSla: commercialSla, formula: formula,
+      notes: usingBenchmark ? 'benchmark_results (source=' + (M.benchmarkMap && M.benchmarkMap[gpuId+'|'+wl.model+'|16'] ? (M.benchmarkMap[gpuId+'|'+wl.model+'|16'].source||'estimated') : 'estimated') + ')' : 'formula estimate'
     }
   }
 

@@ -370,7 +370,7 @@
     // Try benchmark first (most accurate)
     if (model) {
       var bm = getBenchmark(gpu.id, model.id)
-      if (bm && bm.tokens_per_sec_p50) return bm.tokens_per_sec_p50
+      if (bm && (bm.tokens_per_sec || bm.tokens_per_sec_p50)) return bm.tokens_per_sec || bm.tokens_per_sec_p50
     }
 
     var modelSizeGB = calcModelVRAM(params_b, precision)

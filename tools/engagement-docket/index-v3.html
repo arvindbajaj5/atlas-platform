@@ -322,7 +322,7 @@ var CFG = {
 document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css'
 
 // Dynamically load shared scripts in order
-var ATLAS_BUILD_TS = '20260702c'
+var ATLAS_BUILD_TS = '20260702d'
 ;(function loadShared(files, i) {
   if (i >= files.length) { init(); return }
   var s = document.createElement('script')
@@ -392,10 +392,12 @@ var M = {
   },
   // Loaded by AtlasSolution.loadRefData() on openEngagement()
   // Never hardcoded — always from Supabase model_catalogue + gpu_configs
-  modelCatalogue:  [],
-  gpuConfigs:      [],
-  modelMap:        {},
-  gpuMap:          {}
+  modelCatalogue:   [],
+  gpuConfigs:       [],
+  modelMap:         {},
+  gpuMap:           {},
+  benchmarkResults: [],    // from benchmark_results table
+  benchmarkMap:     {}     // key: gpu_config_id + '|' + ai_model_id + '|' + batch_size
 }
 
 // ── PORTFOLIO DEPENDENCY GRAPH ───────────────────────────────────────
