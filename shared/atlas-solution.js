@@ -204,11 +204,29 @@
     var tokBase  = Math.round(8000 * modelSizeFactor)
     var precMult = wl.precision === 'int8' ? 0.55 : wl.precision === 'fp16' ? 0.35 : wl.precision === 'fp8' ? 0.8 : 1.0
     var tokPerGpu = Math.round(tokBase * gpuFactor * precMult)
-    // Step 4
-    var reqPerGpu = Math.max(1, Math.round(tokPerGpu / outputTok))
-    // Step 5
+    // Step 4 — requests per GPU per second
+    // TTFT target affects batch size: tighter latency = smaller batches = fewer req/GPU
+    // Tier 1 (<200ms): run at ~30% of max batch → 0.3x multiplier on reqPerGpu
+    // Tier 2 (<2000ms): run at ~70% of max batch → 0.7x multiplier
+    // Tier 3 (async/batch): run at 100% throughput → 1.0x multiplier
+    var ttftMs = wl.ttftTarget || (type === 'maas' ? 2000 : 500)
+    var ttftBatchFactor = ttftMs <= 200 ? 0.30
+      : ttftMs <= 500  ? 0.50
+      : ttftMs <= 2000 ? 0.70
+      : 1.0  // async batch — maximise throughput
+    var reqPerGpu = Math.max(1, Math.round(tokPerGpu / outputTok * ttftBatchFactor))
+    // Step 5 — compute-bound: GPUs needed to serve peak RPS
     var baseGpus  = Math.max(1, Math.ceil(peakRPS / reqPerGpu))
-    // Step 6
+    // Step 5b — memory-bound: minimum GPUs to hold model weights in VRAM
+    // A 671B INT4 model = 335GB. If GPU has 141GB VRAM, need ≥3 GPUs just to load.
+    // This is often the binding constraint at low DAU.
+    var vramPerGpu = (gpuConf && gpuConf.hbm_size_gb) ? gpuConf.hbm_size_gb : 141  // H200 default
+    var bitsPerParam = wl.precision === 'fp16' ? 16 : wl.precision === 'int8' ? 8 : wl.precision === 'fp8' ? 8 : 4
+    var modelSizeGb = params_b * bitsPerParam / 8  // GB (params_b in billions)
+    var kv_overhead = 1.25  // 25% overhead for KV cache and activations
+    var minGpusMemory = Math.ceil((modelSizeGb * kv_overhead) / vramPerGpu)
+    baseGpus = Math.max(baseGpus, minGpusMemory)
+    // Step 6 — buffers for HA/DR/headroom
     var buffers   = Math.max(1, Math.ceil(baseGpus * 0.3 * haFactor * drFactor))
     var total     = baseGpus + buffers
 
@@ -229,9 +247,11 @@
       'Step 1: Concurrent = DAU(' + (wl.dau||1000).toLocaleString() + ') × ' + peakConcPct + '% = ' + concurrent.toLocaleString() + '\n'
     + 'Step 2: Peak RPS = DAU × req/day(' + reqPerDay + ') ÷ 86400 × peakMult(' + peakMult + ') = ' + peakRPS + ' req/s\n'
     + 'Ctx (' + (wl.contextPct||'p95').toUpperCase() + ' ' + ctxMult + 'x): output = ' + outputTok + ' tok/req\n'
-    + 'Step 3: GPU(' + gpuLabel + ') → ' + tokPerGpu + ' tok/s (base ' + tokBase + ' × ' + gpuFactor + 'x × ' + precMult + 'x prec)\n'
-    + 'Step 4: Req/GPU = ' + tokPerGpu + ' ÷ ' + outputTok + ' tok = ' + reqPerGpu + ' req/s/GPU\n'
-    + 'Step 5: Base GPUs = ceil(' + peakRPS + ' ÷ ' + reqPerGpu + ') = ' + baseGpus + '\n'
+    + 'Step 3: Model ' + params_b + 'B → tokBase=' + tokBase + ' × GPU(' + gpuLabel + ' ' + gpuFactor + 'x) × prec(' + precMult + 'x) = ' + tokPerGpu + ' tok/s/GPU\n'
+    + 'Step 4: TTFT ' + ttftMs + 'ms → batch factor ' + ttftBatchFactor + 'x → req/GPU = ' + reqPerGpu + ' req/s/GPU\n'
+    + 'Step 5a compute: ceil(' + peakRPS + ' ÷ ' + reqPerGpu + ') = ' + Math.max(1, Math.ceil(peakRPS/reqPerGpu)) + ' GPUs\n'
+    + 'Step 5b memory: ' + params_b + 'B × ' + bitsPerParam + 'bit = ' + Math.round(modelSizeGb) + 'GB ÷ ' + vramPerGpu + 'GB VRAM × 1.25 overhead = ' + minGpusMemory + ' GPUs min\n'
+    + 'Step 5 (binding): max(compute, memory) = ' + baseGpus + ' GPUs\n'
     + 'Step 6: Buffers (HA ' + haFactor + 'x × DR ' + drFactor + 'x × 30%) = ' + buffers + '\n'
     + 'Total = ' + baseGpus + ' + ' + buffers + ' = ' + total + ' GPUs'
 
@@ -491,24 +511,49 @@
 
   /** GPU throughput factor — from live gpu_configs if available */
   function _gpuThroughputFactor (gpuId, gpuConf) {
-    // If we have real gpu_configs data, derive factor from FP8 TFlops
-    // relative to H200 baseline (989 BF16 → INT4 ~2x → 1,978 effective)
+    // Priority 1: use fp8_tflops from gpu_configs if present
+    // (H200 FP8 baseline = 1979 TFlops from published NVIDIA specs)
     if (gpuConf && gpuConf.fp8_tflops) {
-      var h200Baseline = 1979  // H200 FP8 TFlops (from published specs)
+      var h200Baseline = 1979
       return Math.round((gpuConf.fp8_tflops / h200Baseline) * 100) / 100
     }
-    // Fallback: estimated factors from known GPU families
+    // Priority 2: match on gpu_configs.name (NOT gpuId which is a UUID)
+    // gpuId from Supabase is a UUID like '2888d34a-...' which never matches
+    // the short name keys. Use gpuConf.name or gpuConf.gpu_model instead.
+    var nameToMatch = (gpuConf && (gpuConf.gpu_model || gpuConf.name)) || gpuId || ''
+    var key = nameToMatch.toLowerCase().replace(/[\s\-_\.]+/g, '')
     var known = {
-      h200: 1.0, h200sxm: 1.0,
-      b200: 2.3, b200sxm: 2.3, b200nvl72: 2.5,
-      b300: 2.8, b300nvl72: 3.0,
-      gb200: 3.0, gb200nvl72: 3.0, gb300nvl72: 3.2,
-      vr: 4.0, vrnvl72: 5.0, 'vera-rubin': 4.0,
-      mi355x: 1.8, mi400x: 3.0, helios: 3.5,
-      l40s: 0.35, a100: 0.5, h100: 0.85
+      // NVIDIA Hopper
+      h200: 1.0, h200sxm: 1.0, h200sxm141gb: 1.0,
+      // NVIDIA Blackwell SXM
+      b200: 2.3, b200sxm: 2.3, b200sxm192gb: 2.3,
+      b300: 2.8, b300sxm: 2.8, b300sxm288gb: 2.8,
+      // NVIDIA Blackwell NVL
+      b200nvl72: 2.5,
+      b300nvl72: 3.0,
+      // NVIDIA Grace Blackwell
+      gb200nvl72: 3.0,
+      gb300nvl72: 3.2,
+      // NVIDIA Vera Rubin
+      verarubinsxm: 4.0, verarubinnvl72: 5.0,
+      vrsxm: 4.0, vrnvl72: 5.0,
+      // AMD
+      mi355x: 1.8, mi355x288gb: 1.8,
+      mi400x: 3.0,
+      instincthelios: 3.5, helios: 3.5,
+      // Legacy (for fallback)
+      h100: 0.85, a100: 0.5, l40s: 0.35
     }
-    var key = (gpuId || '').toLowerCase().replace(/[\s\-_]+/g, '')
-    return known[key] || 1.0
+    // Try exact match first, then prefix match
+    if (known[key]) return known[key]
+    // Partial match — check if key starts with any known prefix
+    var keys = Object.keys(known)
+    for (var i = 0; i < keys.length; i++) {
+      if (key.indexOf(keys[i]) === 0 || keys[i].indexOf(key) === 0) {
+        return known[keys[i]]
+      }
+    }
+    return 1.0  // H200-equivalent default if nothing matches
   }
 
   /** Rack string from GPU count and gpu_configs unit size */
