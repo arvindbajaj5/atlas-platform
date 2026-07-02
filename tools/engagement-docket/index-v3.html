@@ -322,7 +322,7 @@ var CFG = {
 document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css'
 
 // Dynamically load shared scripts in order
-var ATLAS_BUILD_TS = '20260701c'
+var ATLAS_BUILD_TS = '20260702a'
 ;(function loadShared(files, i) {
   if (i >= files.length) { init(); return }
   var s = document.createElement('script')
@@ -548,11 +548,11 @@ var DUMMY = {
       ],
       maas: [
         { id:'maas1', name:'Llama-3.3-70B — Open Pool', model:'llama-3.3-70b', gpu:'b200',
-          precision:'int4', dau:50000, commercialSla:'bronze',
-          tenant:null, poolType:'open', tenure:null, mvbView:'maas' },
+          precision:'int4', dau:50000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95',
+          commercialSla:'bronze', tenant:null, poolType:'open', tenure:null, mvbView:'maas' },
         { id:'maas2', name:'Llama-3.3-70B — State IT Reservation', model:'llama-3.3-70b', gpu:'b200',
-          precision:'int4', dau:8000, commercialSla:'gold',
-          tenant:'state-it-dept', poolType:'reserved', tenure:'24', mvbView:'maas' }
+          precision:'int4', dau:8000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95',
+          commercialSla:'gold', tenant:'state-it-dept', poolType:'reserved', tenure:'24', mvbView:'maas' }
       ],
       gpuaas: [
         { id:'gpuaas1', name:'Dedicated GPU Block — Health Dept', gpu:'h200',
@@ -2749,7 +2749,7 @@ var C = {
   addMaas: function() {
     var id = 'maas' + (M.workloadConfigs.maas.length + 1) + '-' + Date.now()
     M.workloadConfigs.maas.push({ id:id, name:'New MaaS Pool', archetype:'text_chat', gpu:M.defaultGpu,
-      model:'llama-3.1-8b', precision:'int4', dau:10000, commercialSla:'bronze', mvbView:'maas' })
+      model:'llama-3.1-8b', precision:'int4', dau:10000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'bronze', mvbView:'maas' })
     M.openWlRows[id] = true
     V.renderSolTabs(); V.renderSolTabBody()
     C.scheduleSolutionSave()

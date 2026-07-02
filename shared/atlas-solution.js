@@ -188,7 +188,20 @@
     var avgRPS  = ((wl.dau || 1000) * reqPerDay) / 86400
     var peakRPS = Math.ceil(avgRPS * peakMult)
     // Step 3 — H200 INT4 baseline: ~8,000 tok/s (conservative, continuous batching)
-    var tokBase  = 8000
+    // Model size scaling: larger models have lower throughput per GPU.
+    // Baseline 8,000 tok/s assumes ~7-13B model. Scale down for larger models.
+    // Formula: tokBase = 8000 / (params_b / 10)^0.5 — larger model = fewer tok/s.
+    // Capped at 8000 (small models don't get faster, just fit more batches).
+    // Source: approximate from published vLLM benchmarks across model sizes.
+    var params_b = (model && model.params_b) ? model.params_b : 13  // default 13B
+    var modelSizeFactor = params_b <= 13 ? 1.0
+      : params_b <= 30  ? 0.75
+      : params_b <= 70  ? 0.55
+      : params_b <= 100 ? 0.40
+      : params_b <= 236 ? 0.25
+      : params_b <= 400 ? 0.18
+      : 0.10  // 671B+ (DeepSeek R1/V3, GLM 5.2)
+    var tokBase  = Math.round(8000 * modelSizeFactor)
     var precMult = wl.precision === 'int8' ? 0.55 : wl.precision === 'fp16' ? 0.35 : wl.precision === 'fp8' ? 0.8 : 1.0
     var tokPerGpu = Math.round(tokBase * gpuFactor * precMult)
     // Step 4
@@ -319,11 +332,38 @@
 
   /** P50/P95/P99 toggle — same for UC and MaaS */
   function renderContextPctToggle (wl, updFn) {
+    // updFn is either:
+    //   A) A full call with arguments[0] placeholder:
+    //      "C.updMaas('id','contextPct',arguments[0])"
+    //   B) A prefix up to and including the last comma:
+    //      "C.updMaas('id','contextPct',"
+    // Both were used in the codebase. We handle both by detecting and normalising.
+    //
+    // The CORRECT generated onclick is:
+    //   onclick="C.updMaas('id','contextPct','p50')"
+    // NOT:
+    //   onclick="C.updMaas('id','contextPct',arguments[0])('p50')"
+    //   ↑ This causes TypeError because arguments[0]=MouseEvent, not a value
+    //
+    // Fix: if updFn contains 'arguments[0]', replace it with the literal value.
+    // Otherwise treat updFn as a prefix and append value + closing paren.
     var h = '<div class="fg"><label>Context Percentile</label>'
       + '<div style="display:flex;gap:0;border:1.5px solid var(--border);border-radius:5px;overflow:hidden">'
     ;['p50', 'p95', 'p99'].forEach(function (p) {
       var active = (wl.contextPct || 'p95') === p
-      h += '<button type="button" onclick="' + updFn + '(\'' + p + '\')" '
+      // Build correct onclick by replacing arguments[0] with the literal value
+      var onclick
+      if (updFn.indexOf('arguments[0]') >= 0) {
+        // Pattern A: replace arguments[0] with literal string value
+        onclick = updFn.replace('arguments[0]', '\'' + p + '\'')
+      } else if (updFn.charAt(updFn.length - 1) === ',') {
+        // Pattern B: prefix ending with comma — append value and close paren
+        onclick = updFn + '\'' + p + '\')'
+      } else {
+        // Fallback: treat as prefix, append (value)
+        onclick = updFn + '(\'' + p + '\')'
+      }
+      h += '<button type="button" onclick="' + onclick + '" '
         + 'style="flex:1;padding:6px 0;font-size:11px;font-weight:700;border:none;cursor:pointer;'
         + 'background:' + (active ? 'var(--navy)' : '#fff') + ';'
         + 'color:' + (active ? '#fff' : 'var(--mid)') + '">'
@@ -430,7 +470,7 @@
       + 'Peak conc: ' + (wl.peakConcPct || 5) + '%' + NL
       + 'Context:   ' + (wl.contextPct || 'p95').toUpperCase() + NL
       + NL
-      + (sz.formula || 'No formula available').split('\\n').join(NL)
+      + (sz.formula || 'No formula available').replace(/\\n/g, NL).replace(/\n/g, NL)
       + NL + NL
       + '=== Result ===' + NL
       + 'Base GPUs: ' + sz.baseGpus + NL
