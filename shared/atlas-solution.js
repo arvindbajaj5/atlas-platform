@@ -220,7 +220,9 @@
     // Step 5b — memory-bound: minimum GPUs to hold model weights in VRAM
     // A 671B INT4 model = 335GB. If GPU has 141GB VRAM, need ≥3 GPUs just to load.
     // This is often the binding constraint at low DAU.
-    var vramPerGpu = (gpuConf && gpuConf.hbm_size_gb) ? gpuConf.hbm_size_gb : 141  // H200 default
+    // Use real VRAM from gpu_configs (vram_per_gpu_gb confirmed in schema)
+    var vramPerGpu = (gpuConf && gpuConf.vram_per_gpu_gb) ? gpuConf.vram_per_gpu_gb
+      : (gpuConf && gpuConf.hbm_size_gb) ? gpuConf.hbm_size_gb : 141  // H200 default
     var bitsPerParam = wl.precision === 'fp16' ? 16 : wl.precision === 'int8' ? 8 : wl.precision === 'fp8' ? 8 : 4
     var modelSizeGb = params_b * bitsPerParam / 8  // GB (params_b in billions)
     var kv_overhead = 1.25  // 25% overhead for KV cache and activations
@@ -235,7 +237,11 @@
     var ttftEstimate = Math.round(ttftTarget / gpuFactor * 0.85)
     var slaMet   = ttftEstimate <= ttftTarget
     var margin   = Math.round(Math.abs((ttftTarget - ttftEstimate) / ttftTarget) * 100)
-    var powerKw  = Math.round(total * 0.7 * 10) / 10
+    // Power: use real tdp_kw (per rack unit) or power_watts_tdp (per GPU) from gpu_configs
+    var powerPerGpu = gpuConf ? (gpuConf.tdp_kw ? gpuConf.tdp_kw * 1000 / (gpuConf.gpus_in_unit||1)
+      : gpuConf.power_watts_tdp ? gpuConf.power_watts_tdp / (gpuConf.gpus_in_unit||1)
+      : 700) : 700  // 700W H200 default
+    var powerKw  = Math.round(total * powerPerGpu / 1000 * 10) / 10
 
     // Commercial SLA from pool type (MaaS) or default Bronze
     var commercialSla = wl.commercialSla
@@ -511,11 +517,16 @@
 
   /** GPU throughput factor — from live gpu_configs if available */
   function _gpuThroughputFactor (gpuId, gpuConf) {
-    // Priority 1: use fp8_tflops from gpu_configs if present
-    // (H200 FP8 baseline = 1979 TFlops from published NVIDIA specs)
-    if (gpuConf && gpuConf.fp8_tflops) {
-      var h200Baseline = 1979
-      return Math.round((gpuConf.fp8_tflops / h200Baseline) * 100) / 100
+    // Priority 1: use int4_tflops from gpu_configs (confirmed present in schema)
+    // H200 INT4 baseline = 3958 TFlops (989 BF16 × 4 for INT4 efficiency)
+    if (gpuConf && gpuConf.int4_tflops) {
+      var h200Int4Baseline = 3958
+      return Math.round((gpuConf.int4_tflops / h200Int4Baseline) * 100) / 100
+    }
+    // Priority 2: fallback to bf16_tflops if int4 not present
+    if (gpuConf && gpuConf.bf16_tflops) {
+      var h200Bf16Baseline = 989
+      return Math.round((gpuConf.bf16_tflops / h200Bf16Baseline) * 100) / 100
     }
     // Priority 2: match on gpu_configs.name (NOT gpuId which is a UUID)
     // gpuId from Supabase is a UUID like '2888d34a-...' which never matches
@@ -558,7 +569,8 @@
 
   /** Rack string from GPU count and gpu_configs unit size */
   function _racks (total, gpuConf) {
-    var gpusPerUnit = (gpuConf && gpuConf.gpus_per_chassis) || 8
+    // gpus_in_unit confirmed in gpu_configs schema (72 for NVL72 units, 8 for SXM)
+    var gpusPerUnit = (gpuConf && gpuConf.gpus_in_unit) || (gpuConf && gpuConf.gpus_per_chassis) || 8
     return Math.ceil(total / gpusPerUnit) + ' rack(s) / ' + total + ' GPUs'
   }
 
