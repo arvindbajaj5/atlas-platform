@@ -322,7 +322,7 @@ var CFG = {
 document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css'
 
 // Dynamically load shared scripts in order
-var ATLAS_BUILD_TS = '20260706h'
+var ATLAS_BUILD_TS = '20260706i'
 ;(function loadShared(files, i) {
   if (i >= files.length) { init(); return }
   var s = document.createElement('script')
@@ -1061,10 +1061,17 @@ var V = {
     })
 
     var savedAt = M.currentSolutionVersionId ? 'Auto-saved' : 'Not yet saved'
-    var portfolio = M.docketItems ? M.docketItems.filter(function(i){
+    var portfolio = (M.docketItems||[]).filter(function(i){
       return i.item_type==='solution' && i.item_subtype==='portfolio_selection'
-    }) : []
-    var portCount = portfolio.length ? (JSON.parse(portfolio[0].content||'{}').selected||[]).length : 0
+    })
+    var portCount = 0
+    try {
+      if (portfolio.length) {
+        var portContent = portfolio[0].content
+        var portData = typeof portContent === 'string' ? JSON.parse(portContent||'{}') : (portContent||{})
+        portCount = (portData.selected||[]).length
+      }
+    } catch(e) { portCount = 0 }
 
     h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px">'
     ;[
@@ -1096,21 +1103,27 @@ var V = {
       // Build ROM table
       var rows = []
       ;(M.workloadConfigs.uc||[]).forEach(function(wl){
+        try {
         var sz = AtlasSolution.sizeWorkload(wl,'uc',M)
+        if (!sz||sz.error) return
         var gpuConf = M.gpuMap&&M.gpuMap[sz.gpu||M.defaultGpu]
         var gpuName = (gpuConf&&gpuConf.name)||'GPU'
         var capex = (sz.total||0)*30000
         rows.push({name:wl.name, type:'UC', gpus:sz.total||0, gpu:gpuName,
           powerKw:sz.powerKw||0, capex:capex, monthly:0, note:'On-prem UC'})
+        } catch(e) {}
       })
       ;(M.workloadConfigs.maas||[]).forEach(function(wl){
+        try {
         var sz = AtlasSolution.sizeWorkload(wl,'maas',M)
+        if (!sz||sz.error) return
         var gpuConf = M.gpuMap&&M.gpuMap[sz.gpu||M.defaultGpu]
         var gpuName = (gpuConf&&gpuConf.name)||'GPU'
         var capex = (sz.total||0)*30000
         var monthly = (sz.total||0)*8000*0.70*3600*730/1e6*(wl.pricePerMtok||0.75)
         rows.push({name:wl.name, type:'MaaS', gpus:sz.total||0, gpu:gpuName,
           powerKw:sz.powerKw||0, capex:capex, monthly:Math.round(monthly), note:'MaaS API'})
+        } catch(e) {}
       })
       ;(M.workloadConfigs.gpuaas||[]).forEach(function(wl){
         var gpuConf = M.gpuMap&&M.gpuMap[wl.gpu]
@@ -2072,7 +2085,7 @@ var V = {
     // Compute per-type committed GPU count
     var ucGpus=0, gpuaasGpus=0, bmaasGpus=0, maasGpus=0
     ;(M.workloadConfigs.uc||[]).forEach(function(wl){
-      var sz = AtlasSolution.sizeWorkload(wl,'uc',M); ucGpus += sz.total||0
+      try { var sz = AtlasSolution.sizeWorkload(wl,'uc',M); if (sz&&!sz.error) ucGpus += sz.total||0 } catch(e) {}
     })
     ;(M.workloadConfigs.gpuaas||[]).forEach(function(wl){ gpuaasGpus += wl.gpuCount||0 })
     ;(M.workloadConfigs.bmaas||[]).forEach(function(wl){
@@ -2127,10 +2140,10 @@ var V = {
       (list||[]).forEach(function(wl) {
         if (!wl.tenant) return
         if (!tenantGpus[wl.tenant]) tenantGpus[wl.tenant] = {uc:0,gpuaas:0,bmaas:0,maas:0}
-        if (type==='uc')     { var sz=AtlasSolution.sizeWorkload(wl,'uc',M); tenantGpus[wl.tenant].uc+=sz.total||0 }
+        if (type==='uc')     { try { var sz=AtlasSolution.sizeWorkload(wl,'uc',M); if(sz&&!sz.error) tenantGpus[wl.tenant].uc+=sz.total||0 } catch(e) {} }
         if (type==='gpuaas') { tenantGpus[wl.tenant].gpuaas+=wl.gpuCount||0 }
         if (type==='bmaas')  { var g=M.gpuMap&&M.gpuMap[wl.gpu]; tenantGpus[wl.tenant].bmaas+=wl.serverCount*(wl.gpusPerServer||(g&&g.gpus_in_unit)||8) }
-        if (type==='maas')   { var sz2=AtlasSolution.sizeWorkload(wl,'maas',M); tenantGpus[wl.tenant].maas+=sz2.total||0 }
+        if (type==='maas')   { try { var sz2=AtlasSolution.sizeWorkload(wl,'maas',M); if(sz2&&!sz2.error) tenantGpus[wl.tenant].maas+=sz2.total||0 } catch(e) {} }
       })
     }
     countWls(M.workloadConfigs.uc,'uc')
