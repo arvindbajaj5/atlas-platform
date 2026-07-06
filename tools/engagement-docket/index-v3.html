@@ -322,7 +322,7 @@ var CFG = {
 document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css'
 
 // Dynamically load shared scripts in order
-var ATLAS_BUILD_TS = '20260706f'
+var ATLAS_BUILD_TS = '20260706g'
 ;(function loadShared(files, i) {
   if (i >= files.length) { init(); return }
   var s = document.createElement('script')
@@ -1031,20 +1031,261 @@ var V = {
 
   // ── TAB 6: OUTPUTS ────────────────────────────────────────────────────
   renderOutputsTab: function() {
-    return '<div class="card"><div class="card-title">Solution Versions & Documents</div>'
-      + '<div class="coming-soon"><strong>Versioned BOM snapshots appear here</strong>When you finalise the Solution tab, each version is stored and linked to this engagement. Both internal (full BOM) and customer-facing (ROM summary) documents are generated.</div></div>'
-      + '<div class="card"><div class="card-title">Quick Documents</div>'
-      + '<div style="display:flex;gap:var(--sp-3);flex-wrap:wrap">'
-      + '<button class="btn btn-outline" onclick="C.generateVisionDoc()">Generate Vision Document</button>'
-      + '<button class="btn btn-outline" onclick="V.toast(\'Value map export — coming soon\',\'info\')">Export Value Map</button>'
-      + '<button class="btn btn-outline" onclick="V.toast(\'Customer brief — coming soon\',\'info\')">Export Customer Brief</button>'
-      + '</div></div>'
+    var eng  = M.currentEng
+    var wls  = (M.workloadConfigs.uc||[]).concat(M.workloadConfigs.maas||[])
+                .concat(M.workloadConfigs.gpuaas||[]).concat(M.workloadConfigs.bmaas||[])
+    var hasWl = wls.length > 0
+    var hasEng = !!eng
+
+    // ── Current solution snapshot summary ─────────────────────────────
+    var h = '<div class="card" style="margin-bottom:var(--sp-4)">'
+    h += '<div class="card-title">Current Solution Snapshot</div>'
+
+    if (!hasEng) {
+      h += '<div class="warn-panel"><div class="warn-body">Open an engagement to see solution outputs.</div></div></div>'
+      return h
+    }
+
+    // Summary KPIs from sizing
+    var totalGpus=0, totalPowerKw=0, totalCapexEst=0
+    ;(M.workloadConfigs.uc||[]).concat(M.workloadConfigs.maas||[]).forEach(function(wl){
+      var type = (M.workloadConfigs.maas||[]).indexOf(wl)>=0?'maas':'uc'
+      var sz = AtlasSolution.sizeWorkload(wl,type,M)
+      totalGpus += sz.total||0; totalPowerKw += sz.powerKw||0
+      totalCapexEst += (sz.total||0)*30000
+    })
+    ;(M.workloadConfigs.gpuaas||[]).forEach(function(wl){ totalGpus+=wl.gpuCount||0 })
+    ;(M.workloadConfigs.bmaas||[]).forEach(function(wl){
+      var g=M.gpuMap&&M.gpuMap[wl.gpu]
+      totalGpus+=wl.serverCount*(wl.gpusPerServer||(g&&g.gpus_in_unit)||8)
+    })
+
+    var savedAt = M.currentSolutionVersionId ? 'Auto-saved' : 'Not yet saved'
+    var portfolio = M.docketItems ? M.docketItems.filter(function(i){
+      return i.item_type==='solution' && i.item_subtype==='portfolio_selection'
+    }) : []
+    var portCount = portfolio.length ? (JSON.parse(portfolio[0].content||'{}').selected||[]).length : 0
+
+    h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px">'
+    ;[
+      ['Workloads', wls.length, ''],
+      ['Portfolio items', portCount, ''],
+      ['Total GPUs sized', totalGpus, ''],
+      ['Total power', Math.round(totalPowerKw*10)/10+'kW', ''],
+      ['Capex est.', '$'+(totalCapexEst/1e6).toFixed(1)+'M', '']
+    ].forEach(function(kpi){
+      h += '<div style="background:var(--light);border-radius:var(--r);padding:12px;text-align:center">'
+        + '<div style="font-size:20px;font-weight:900;color:var(--navy)">'+kpi[1]+'</div>'
+        + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+kpi[0]+'</div>'
+        + '</div>'
+    })
+    h += '</div>'
+    h += '<div style="font-size:11px;color:var(--mid)">'+savedAt
+      + (M.currentSolutionVersionId ? ' · <a href="#" onclick="C.saveSolution(true);return false" style="color:var(--blue)">Save now</a>' : '')
+      + '</div>'
+    h += '</div>'
+
+    // ── ROM Export ────────────────────────────────────────────────────
+    h += '<div class="card" style="margin-bottom:var(--sp-4)">'
+    h += '<div class="card-title">ROM — Rough Order of Magnitude</div>'
+    h += '<p style="font-size:12px;color:var(--mid);margin-bottom:12px">Customer-facing cost summary. Based on current sizing + standard rate card. Excludes SI fees (add separately). Use for initial budget discussions — ±40% accuracy at this stage.</p>'
+
+    if (!hasWl) {
+      h += '<div class="warn-panel"><div class="warn-body">Add workloads in the UC / MaaS / GPUaaS / BMaaS tabs to generate a ROM.</div></div>'
+    } else {
+      // Build ROM table
+      var rows = []
+      ;(M.workloadConfigs.uc||[]).forEach(function(wl){
+        var sz = AtlasSolution.sizeWorkload(wl,'uc',M)
+        var gpuConf = M.gpuMap&&M.gpuMap[sz.gpu||M.defaultGpu]
+        var gpuName = (gpuConf&&gpuConf.name)||'GPU'
+        var capex = (sz.total||0)*30000
+        rows.push({name:wl.name, type:'UC', gpus:sz.total||0, gpu:gpuName,
+          powerKw:sz.powerKw||0, capex:capex, monthly:0, note:'On-prem UC'})
+      })
+      ;(M.workloadConfigs.maas||[]).forEach(function(wl){
+        var sz = AtlasSolution.sizeWorkload(wl,'maas',M)
+        var gpuConf = M.gpuMap&&M.gpuMap[sz.gpu||M.defaultGpu]
+        var gpuName = (gpuConf&&gpuConf.name)||'GPU'
+        var capex = (sz.total||0)*30000
+        var monthly = (sz.total||0)*8000*0.70*3600*730/1e6*(wl.pricePerMtok||0.75)
+        rows.push({name:wl.name, type:'MaaS', gpus:sz.total||0, gpu:gpuName,
+          powerKw:sz.powerKw||0, capex:capex, monthly:Math.round(monthly), note:'MaaS API'})
+      })
+      ;(M.workloadConfigs.gpuaas||[]).forEach(function(wl){
+        var gpuConf = M.gpuMap&&M.gpuMap[wl.gpu]
+        var gpuName = (gpuConf&&gpuConf.name)||'GPU'
+        var capex = (wl.gpuCount||0)*30000
+        var monthly = (wl.gpuCount||0)*3.5*730
+        rows.push({name:wl.name, type:'GPUaaS', gpus:wl.gpuCount||0, gpu:gpuName,
+          powerKw:Math.round((wl.gpuCount||0)*0.7*10)/10, capex:capex,
+          monthly:Math.round(monthly), note:'GPU/hr × 730hrs'})
+      })
+      ;(M.workloadConfigs.bmaas||[]).forEach(function(wl){
+        var g=M.gpuMap&&M.gpuMap[wl.gpu]
+        var gpuName=(g&&g.name)||'GPU'
+        var gpus=wl.serverCount*(wl.gpusPerServer||(g&&g.gpus_in_unit)||8)
+        var capex=gpus*30000
+        var monthly=wl.serverCount*35000
+        rows.push({name:wl.name,type:'BMaaS',gpus:gpus,gpu:gpuName,
+          powerKw:Math.round(wl.serverCount*(g&&g.tdp_kw||5.6)*10)/10,
+          capex:capex,monthly:Math.round(monthly),note:'$/server/mo'})
+      })
+
+      var totalCapex=0, totalMonthly=0, totalGpusRom=0
+      rows.forEach(function(r){totalCapex+=r.capex;totalMonthly+=r.monthly;totalGpusRom+=r.gpus})
+
+      h += '<table class="tbl"><thead><tr>'
+        + '<th>Workload</th><th>Type</th><th>GPU</th><th class="num">GPUs</th>'
+        + '<th class="num">Power</th><th class="num">Capex est.</th>'
+        + '<th class="num">Monthly est.</th><th>Basis</th></tr></thead><tbody>'
+      rows.forEach(function(r){
+        h += '<tr>'
+          + '<td style="font-weight:600">'+r.name+'</td>'
+          + '<td><span style="font-size:10px;font-weight:700;background:var(--light);padding:1px 6px;border-radius:10px">'+r.type+'</span></td>'
+          + '<td style="font-size:11px">'+r.gpu+'</td>'
+          + '<td class="num">'+r.gpus+'</td>'
+          + '<td class="num">'+r.powerKw+'kW</td>'
+          + '<td class="num">$'+(r.capex/1000).toFixed(0)+'K</td>'
+          + '<td class="num">'+(r.monthly?'$'+r.monthly.toLocaleString():'—')+'</td>'
+          + '<td style="font-size:10px;color:var(--mid)">'+r.note+'</td>'
+          + '</tr>'
+      })
+      h += '<tr style="font-weight:700;background:var(--light)">'
+        + '<td>TOTAL</td><td></td><td></td>'
+        + '<td class="num">'+totalGpusRom+'</td>'
+        + '<td class="num">'+Math.round(totalPowerKw*10)/10+'kW</td>'
+        + '<td class="num">$'+(totalCapex/1e6).toFixed(1)+'M</td>'
+        + '<td class="num">$'+totalMonthly.toLocaleString()+'/mo</td>'
+        + '<td></td></tr>'
+      h += '</tbody></table>'
+      h += '<div style="margin-top:8px;font-size:11px;color:var(--mid)">Estimates: $30k/GPU capex, $3.50/GPU/hr GPUaaS reserved, $35k/server/mo BMaaS, 70% MaaS utilisation at pricing rate. Accuracy ±40%.</div>'
+
+      // Export button
+      h += '<div style="margin-top:12px;display:flex;gap:8px">'
+      h += '<button class="btn btn-primary btn-sm" onclick="C.exportRomText()">&#128196; Copy ROM to clipboard</button>'
+      h += '<button class="btn btn-outline btn-sm" onclick="C.generateVisionDoc()">&#9881; Generate Vision Document</button>'
+      h += '</div>'
+    }
+    h += '</div>'
+
+    // ── Documents ─────────────────────────────────────────────────────
+    h += '<div class="card">'
+    h += '<div class="card-title">Documents</div>'
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'
+    ;[
+      {icon:'&#9881;', title:'Vision Document', desc:'AI capability vision for this engagement — generated via AI using territory intel + requirements.', btn:'Generate', action:'C.generateVisionDoc()'},
+      {icon:'&#128196;', title:'ROM Summary', desc:'Customer-facing one-pager: workloads, GPU counts, power, capex estimate. Ready to share.', btn:'Copy to clipboard', action:'C.exportRomText()'},
+      {icon:'&#128221;', title:'BOM Export', desc:'Full internal bill of materials with all line items. For internal pricing and procurement.', btn:'Coming soon', action:'V.toast("BOM export — coming soon","info")'},
+    ].forEach(function(doc){
+      h += '<div style="border:1px solid var(--border);border-radius:var(--r);padding:14px">'
+        + '<div style="font-size:20px;margin-bottom:6px">'+doc.icon+'</div>'
+        + '<div style="font-weight:700;font-size:12px;color:var(--navy);margin-bottom:4px">'+doc.title+'</div>'
+        + '<div style="font-size:11px;color:var(--mid);line-height:1.5;margin-bottom:10px">'+doc.desc+'</div>'
+        + '<button class="btn btn-outline btn-sm" onclick="'+doc.action+'">'+doc.btn+'</button>'
+        + '</div>'
+    })
+    h += '</div></div>'
+    return h
   },
 
   // ── TAB 7: HISTORY ────────────────────────────────────────────────────
   renderHistoryTab: function() {
-    return '<div class="card"><div class="card-title">Engagement History</div>'
-      + '<div class="coming-soon"><strong>Full audit trail</strong>Every save, status change, version creation, and document generation is logged here.</div></div>'
+    var h = '<div class="card"><div class="card-title">Engagement Timeline</div>'
+
+    // Build timeline from available state
+    var events = []
+    var eng = M.currentEng
+
+    if (!eng) {
+      return h + '<div class="warn-panel"><div class="warn-body">Open an engagement to see its history.</div></div></div>'
+    }
+
+    // Engagement creation
+    if (eng.created_at) {
+      events.push({ts: eng.created_at, type:'created', icon:'🆕',
+        title:'Engagement created', detail: eng.name})
+    }
+
+    // Solution versions saved
+    if (M.currentSolutionVersionId) {
+      events.push({ts: new Date().toISOString(), type:'solution', icon:'💾',
+        title:'Solution auto-saved', detail:'Draft solution with '
+          + ((M.workloadConfigs.uc||[]).length+(M.workloadConfigs.maas||[]).length
+            +(M.workloadConfigs.gpuaas||[]).length+(M.workloadConfigs.bmaas||[]).length)
+          +' workload(s)'})
+    }
+
+    // Docket items — actions, intel, PEI
+    var items = M.docketItems || []
+    items.forEach(function(item) {
+      var icon = {action:'✅', intel:'📡', pei:'🎯', uc:'🔧',
+        solution:'📦', rfp:'📄', pitch:'🎤'}[item.item_type] || '📌'
+      var type = item.item_type
+      if (item.created_at) {
+        events.push({ts:item.created_at, type:type, icon:icon,
+          title: item.title || (type+' item'), detail: item.notes||''})
+      }
+    })
+
+    // Requirements
+    var reqs = items.filter(function(i){ return i.item_type==='rfp'||i.section==='profile' })
+    if (reqs.length) {
+      events.push({ts: eng.updated_at||eng.created_at, type:'requirements', icon:'📋',
+        title:'Requirements captured', detail: reqs.length+' requirement(s) recorded'})
+    }
+
+    // Portfolio selection
+    var portItems = items.filter(function(i){
+      return i.item_type==='solution'&&i.item_subtype==='portfolio_selection'
+    })
+    if (portItems.length && portItems[0].created_at) {
+      try {
+        var portData = JSON.parse(portItems[0].content||'{}')
+        var portCount = (portData.selected||[]).length
+        events.push({ts:portItems[0].created_at, type:'portfolio', icon:'📦',
+          title:'Portfolio selected', detail: portCount+' product(s) selected'})
+      } catch(e){}
+    }
+
+    // Sort newest first
+    events.sort(function(a,b){ return b.ts > a.ts ? 1 : -1 })
+
+    if (!events.length) {
+      h += '<div class="warn-panel"><div class="warn-body">No history yet — start adding workloads and requirements to build the timeline.</div></div>'
+      h += '</div>'
+      return h
+    }
+
+    // Render timeline
+    h += '<div style="position:relative;padding-left:28px">'
+    // Vertical line
+    h += '<div style="position:absolute;left:10px;top:8px;bottom:8px;width:2px;background:var(--border)"></div>'
+
+    events.forEach(function(ev) {
+      var d = new Date(ev.ts)
+      var dateStr = isNaN(d) ? ev.ts : d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})
+      var timeStr = isNaN(d) ? '' : d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})
+      var color = {created:'var(--teal)',solution:'var(--blue)',action:'var(--teal)',
+        intel:'var(--amber)',portfolio:'var(--navy)',requirements:'var(--orange)'}[ev.type]||'var(--mid)'
+
+      h += '<div style="position:relative;margin-bottom:14px">'
+        // Dot on timeline
+        + '<div style="position:absolute;left:-22px;top:4px;width:10px;height:10px;border-radius:50%;background:'+color+';border:2px solid #fff;box-shadow:0 0 0 1px '+color+'"></div>'
+        + '<div style="display:flex;align-items:flex-start;gap:8px">'
+        + '<span style="font-size:14px;flex-shrink:0">'+ev.icon+'</span>'
+        + '<div style="flex:1">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">'
+        + '<span style="font-size:12px;font-weight:700;color:var(--dark)">'+ev.title+'</span>'
+        + '<span style="font-size:10px;color:var(--mid)">'+dateStr+(timeStr?' · '+timeStr:'')+'</span>'
+        + '</div>'
+        + (ev.detail?'<div style="font-size:11px;color:var(--mid);line-height:1.4">'+ev.detail+'</div>':'')
+        + '</div></div></div>'
+    })
+    h += '</div>'
+    h += '<div style="margin-top:8px;font-size:11px;color:var(--mid)">Timeline built from engagement data and saved items. Full server-side audit log planned for Phase 2.</div>'
+    h += '</div>'
+    return h
   },
 
   // ── Archetype selector ────────────────────────────────────────────────
@@ -2957,6 +3198,70 @@ var C = {
   generateVisionDoc: function() {
     V.toast('Vision document generation — coming soon','info')
     // WHEN C WIRED: await atlasExport.generateVisionDoc(M.currentEng.id)
+  },
+
+  exportRomText: function() {
+    var eng = M.currentEng
+    if (!eng) { V.toast('Open an engagement first','warning'); return }
+    var lines = []
+    lines.push('ROM — ROUGH ORDER OF MAGNITUDE')
+    lines.push('Engagement: ' + eng.name)
+    lines.push('Date: ' + new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}))
+    lines.push('Accuracy: ±40% at this stage')
+    lines.push('')
+    lines.push('WORKLOAD SUMMARY')
+    lines.push('─'.repeat(60))
+    var totalGpus=0, totalCapex=0, totalMonthly=0
+    var addWl = function(wl, type) {
+      var sz = type==='gpuaas'
+        ? {total:wl.gpuCount||0, powerKw:Math.round((wl.gpuCount||0)*0.7*10)/10}
+        : AtlasSolution.sizeWorkload(wl, type, M)
+      var gpus = type==='bmaas'
+        ? wl.serverCount*(wl.gpusPerServer||8)
+        : (sz.total||0)
+      var capex = gpus*30000
+      var monthly = type==='gpuaas' ? (wl.gpuCount||0)*3.5*730
+        : type==='bmaas' ? wl.serverCount*35000 : 0
+      totalGpus+=gpus; totalCapex+=capex; totalMonthly+=monthly
+      var gpuConf = M.gpuMap&&M.gpuMap[wl.gpu||sz.gpu||M.defaultGpu]
+      var gpuName = (gpuConf&&gpuConf.name)||'GPU'
+      lines.push('['+type.toUpperCase()+'] '+wl.name)
+      lines.push('  GPU: '+gpuName+' × '+gpus+' | Power: '+(sz.powerKw||0)+'kW')
+      lines.push('  Capex est: $'+(capex/1000).toFixed(0)+'K'+(monthly?' | Monthly est: $'+monthly.toLocaleString():''))
+      lines.push('')
+    }
+    ;(M.workloadConfigs.uc||[]).forEach(function(w){ addWl(w,'uc') })
+    ;(M.workloadConfigs.maas||[]).forEach(function(w){ addWl(w,'maas') })
+    ;(M.workloadConfigs.gpuaas||[]).forEach(function(w){ addWl(w,'gpuaas') })
+    ;(M.workloadConfigs.bmaas||[]).forEach(function(w){ addWl(w,'bmaas') })
+    lines.push('─'.repeat(60))
+    lines.push('TOTAL GPUs: '+totalGpus)
+    lines.push('TOTAL CAPEX EST: $'+(totalCapex/1e6).toFixed(2)+'M')
+    if (totalMonthly) lines.push('TOTAL MONTHLY EST: $'+totalMonthly.toLocaleString()+'/mo')
+    lines.push('')
+    lines.push('Notes:')
+    lines.push('• Capex estimate: $30k/GPU (adjust for actual procurement cost)')
+    lines.push('• GPUaaS: $3.50/GPU/hr × 730hrs/month (12-mo reserved rate)')
+    lines.push('• BMaaS: $35,000/server/month (VR NVL72 full server)')
+    lines.push('• Accuracy ±40% — for budget discussion only, not for contract')
+    lines.push('• SI fees, networking, MDC civil works not included above')
+    lines.push('')
+    lines.push('Generated by ATLAS | Bull India | ' + new Date().toISOString().split('T')[0])
+    var text = lines.join('\n')
+    try {
+      navigator.clipboard.writeText(text).then(function(){
+        V.toast('ROM copied to clipboard','success')
+      })
+    } catch(e) {
+      // Fallback
+      var ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      V.toast('ROM copied to clipboard','success')
+    }
   },
 
   // ── Solution tab controller functions (folded in from workload-profiler-prototype) ──
