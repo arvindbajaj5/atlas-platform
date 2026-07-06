@@ -322,7 +322,7 @@ var CFG = {
 document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css'
 
 // Dynamically load shared scripts in order
-var ATLAS_BUILD_TS = '20260706i'
+var ATLAS_BUILD_TS = '20260706j'
 ;(function loadShared(files, i) {
   if (i >= files.length) { init(); return }
   var s = document.createElement('script')
@@ -2655,10 +2655,128 @@ var V = {
 
     h += AtlasSolution.renderDerivedPanel(sz, wl)
 
+    // Provisioning override + Demand Planner (collapsible)
+    var minGpus = sz.total || 1
+    var provGpus = wl.provisionedGpus || minGpus
+    var tokPerSecGpu = sz.tokPerSec || 15000
+    var supplyTokPerMonthB = provGpus * tokPerSecGpu * 730 * 3600 / 1e9
+    var dpTitle = provGpus > minGpus
+      ? '&#128200; Provisioning &amp; Demand Planner <span style="font-size:10px;color:var(--teal);margin-left:6px">+' + (provGpus - minGpus) + ' GPUs oversized</span>'
+      : '&#128200; Provisioning &amp; Demand Planner'
     h += '<div class="collapsible" style="margin-top:var(--sp-3)">'
-    h += '<div class="collapsible-hdr" onclick="C.toggleCollapsible(this)"><span class="arrow">&#9654;</span> Make vs Buy — On-prem vs API</div>'
+    h += '<div class="collapsible-hdr" onclick="C.toggleCollapsible(this)"><span class="arrow">&#9654;</span> ' + dpTitle + '</div>'
     h += '<div class="collapsible-body"><div class="collapsible-body-pad">'
-    h += V.renderMvBChart(wl, 'maas')
+    h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 1fr">'
+    h += '<div class="fg"><label>Provisioned GPUs</label>'
+      + '<input type="number" min="' + minGpus + '" step="1" value="' + provGpus + '" '
+      + 'onchange="C.updMaas(\'' + wl.id + '\',\'provisionedGpus\',Math.max(' + minGpus + ',+this.value))">'
+      + '<div class="fg-hint">Sizing min: ' + minGpus + ' GPUs. Set higher for future demand growth.</div></div>'
+    h += '<div class="fg"><label>Price $/Mtok</label>'
+      + '<input type="number" min="0.01" step="0.01" value="' + (wl.pricePerMtok||0.75) + '" '
+      + 'onchange="C.updMaas(\'' + wl.id + '\',\'pricePerMtok\',+this.value)">'
+      + '<div class="fg-hint">Revenue per million tokens</div></div>'
+    h += '<div class="fg"><label>Provisioning note</label>'
+      + '<input type="text" value="' + (wl.provisioningReason||'') + '" placeholder="e.g. Sized for Y3 demand" '
+      + 'onchange="C.updMaas(\'' + wl.id + '\',\'provisioningReason\',this.value)">'
+      + '<div class="fg-hint">Why did you overprovision?</div></div>'
+    h += '</div>'
+    h += '<div style="background:rgba(0,178,144,.07);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;font-size:11px;">'
+      + '<strong style="color:var(--teal)">Supply ceiling:</strong> '
+      + provGpus + ' GPUs &times; ~' + tokPerSecGpu.toLocaleString() + ' tok/s = '
+      + '<strong>' + supplyTokPerMonthB.toFixed(1) + ' B tokens/month</strong> at 100% util'
+      + ' &nbsp;|&nbsp; ' + Math.round(supplyTokPerMonthB * 12) + ' B tokens/year'
+      + '</div>'
+    var sources = wl.demandSources || []
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--navy)">Demand Sources'
+      + ' <span style="font-weight:400;color:var(--mid)">— add as many segments as needed</span></div>'
+      + '<button class="btn btn-outline btn-sm" onclick="C.addDemandSource(\'' + wl.id + '\')">+ Add Source</button>'
+      + '</div>'
+    if (!sources.length) {
+      h += '<div style="color:var(--mid);font-size:11px;padding:8px 0">No demand sources yet. Add sources to project token demand and utilisation over time.</div>'
+    } else {
+      var custTypes = [['tsap','TSAP'],['isv','ISV'],['enterprise','Enterprise'],['gov','Government'],['consumer','Consumer platform'],['other','Other']]
+      sources.forEach(function(src) {
+        h += '<div style="background:var(--light);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:8px">'
+        h += '<div class="formgrid" style="grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr auto">'
+        h += '<div class="fg"><label>Source label</label>'
+          + '<input type="text" value="' + src.label + '" placeholder="e.g. Fintech TSAPs" '
+          + 'onchange="C.updDemandSource(\'' + wl.id + '\',\'' + src.id + '\',\'label\',this.value)"></div>'
+        var ctOpts = custTypes.map(function(v){
+          return '<option value="' + v[0] + '"' + (src.customerType === v[0] ? ' selected' : '') + '>' + v[1] + '</option>'
+        }).join('')
+        h += '<div class="fg"><label>Customer type</label>'
+          + '<select onchange="C.updDemandSource(\'' + wl.id + '\',\'' + src.id + '\',\'customerType\',this.value)">'
+          + ctOpts + '</select></div>'
+        h += '<div class="fg"><label>Customers Y1</label>'
+          + '<input type="number" min="1" step="1" value="' + src.customersY1 + '" '
+          + 'onchange="C.updDemandSource(\'' + wl.id + '\',\'' + src.id + '\',\'customersY1\',+this.value)">'
+          + '<div class="fg-hint">Count at launch</div></div>'
+        h += '<div class="fg"><label>Cust. growth %/yr</label>'
+          + '<input type="number" min="0" step="1" value="' + src.customerGrowthPct + '" '
+          + 'onchange="C.updDemandSource(\'' + wl.id + '\',\'' + src.id + '\',\'customerGrowthPct\',+this.value)">'
+          + '<div class="fg-hint">Annual customer growth</div></div>'
+        h += '<div class="fg"><label>Tokens/cust/mo (M)</label>'
+          + '<input type="number" min="0.01" step="0.1" value="' + src.tokensPerCustomerM + '" '
+          + 'onchange="C.updDemandSource(\'' + wl.id + '\',\'' + src.id + '\',\'tokensPerCustomerM\',+this.value)">'
+          + '<div class="fg-hint">M tokens/customer/month</div></div>'
+        h += '<div class="fg"><label>Token growth %/yr</label>'
+          + '<input type="number" min="0" step="1" value="' + src.tokenGrowthPct + '" '
+          + 'onchange="C.updDemandSource(\'' + wl.id + '\',\'' + src.id + '\',\'tokenGrowthPct\',+this.value)">'
+          + '<div class="fg-hint">Avg tokens grows over time</div></div>'
+        h += '<div class="fg" style="align-self:flex-end">'
+          + '<button class="btn btn-danger-text btn-sm" onclick="C.removeDemandSource(\'' + wl.id + '\',\'' + src.id + '\')" style="margin-bottom:4px">&#10005;</button></div>'
+        h += '</div></div>'
+      })
+      // 6-year projection table
+      h += '<div style="margin-top:12px;overflow-x:auto">'
+      h += '<table class="tbl" style="font-size:11px"><thead><tr>'
+        + '<th>Year</th><th class="num">Customers</th>'
+        + '<th class="num">Demand (B tok/mo)</th>'
+        + '<th class="num">Supply (B tok/mo)</th>'
+        + '<th class="num">Utilisation</th>'
+        + '<th class="num">Revenue/yr ($)</th>'
+        + '<th>Status</th></tr></thead><tbody>'
+      var yr3TokB = 0
+      for (var yr = 1; yr <= 6; yr++) {
+        var totalCust = 0, totalTokB = 0
+        sources.forEach(function(src) {
+          var custs = src.customersY1 * Math.pow(1 + src.customerGrowthPct / 100, yr - 1)
+          var tokPerCust = src.tokensPerCustomerM * Math.pow(1 + src.tokenGrowthPct / 100, yr - 1)
+          totalCust += custs
+          totalTokB += custs * tokPerCust / 1000
+        })
+        if (yr === 3) yr3TokB = totalTokB
+        var util = supplyTokPerMonthB > 0 ? totalTokB / supplyTokPerMonthB : 0
+        var revYr = totalTokB * 12 * 1000 * (wl.pricePerMtok || 0.75)
+        var utilPct = Math.min(util * 100, 999).toFixed(1)
+        var utilColor = util > 1 ? 'var(--orange)' : util > 0.75 ? 'var(--amber)' : 'var(--teal)'
+        var status = util > 1 ? '&#128308; Under' : util > 0.85 ? '&#129000; Near full' : util > 0.3 ? '&#128994; Healthy' : '&#9898; Low util'
+        h += '<tr>'
+          + '<td>Y' + yr + '</td>'
+          + '<td class="num">' + Math.round(totalCust).toLocaleString() + '</td>'
+          + '<td class="num">' + totalTokB.toFixed(2) + '</td>'
+          + '<td class="num">' + supplyTokPerMonthB.toFixed(1) + '</td>'
+          + '<td class="num" style="color:' + utilColor + ';font-weight:700">' + utilPct + '%</td>'
+          + '<td class="num">$' + Math.round(revYr).toLocaleString() + '</td>'
+          + '<td style="font-size:10px">' + status + '</td>'
+          + '</tr>'
+      }
+      h += '</tbody></table>'
+      // Recommendation
+      if (yr3TokB > 0) {
+        var gpusNeededY3 = supplyTokPerMonthB > 0 ? Math.ceil(provGpus * yr3TokB / supplyTokPerMonthB) : provGpus
+        if (gpusNeededY3 > provGpus * 0.85) {
+          h += '<div style="margin-top:8px;padding:8px 12px;background:rgba(255,182,0,.1);border-radius:var(--r);font-size:11px;color:#9a6e00">'
+            + '&#9888; Year 3 demand needs ~' + gpusNeededY3 + ' GPUs. Consider provisioning at least ' + gpusNeededY3 + ' to avoid undersizing by Year 3.'
+            + '</div>'
+        }
+      }
+      h += '</div>'
+    }
+    h += '</div></div></div>'
+
+        h += V.renderMvBChart(wl, 'maas')
     h += '</div></div></div>'
 
     h += '<div class="actions-row">'
@@ -3381,11 +3499,42 @@ var C = {
   addMaas: function() {
     var id = 'maas' + (M.workloadConfigs.maas.length + 1) + '-' + Date.now()
     M.workloadConfigs.maas.push({ id:id, name:'New MaaS Pool', archetype:'text_chat', gpu:M.defaultGpu,
-      model:'llama-3.1-8b', precision:'int4', dau:10000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'bronze', mvbView:'maas' })
+      model:'llama-3.1-8b', precision:'int4', dau:10000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'bronze', mvbView:'maas',
+      provisionedGpus:null, provisioningReason:'', pricePerMtok:0.75, demandSources:[] })
     M.openWlRows[id] = true
     V.renderSolTabs(); V.renderSolTabBody()
     C.scheduleSolutionSave()
   },
+  addDemandSource: function(wlId) {
+    var wl = M.workloadConfigs.maas.find(function(w){ return w.id === wlId })
+    if (!wl) return
+    if (!wl.demandSources) wl.demandSources = []
+    wl.demandSources.push({
+      id: 'ds-' + Date.now(),
+      label: 'Source ' + (wl.demandSources.length + 1),
+      customerType: 'tsap',
+      customersY1: 10,
+      customerGrowthPct: 30,
+      tokensPerCustomerM: 5.0,
+      tokenGrowthPct: 20
+    })
+    V.renderSolTabBody(); C.scheduleSolutionSave()
+  },
+
+  updDemandSource: function(wlId, srcId, field, val) {
+    var wl = M.workloadConfigs.maas.find(function(w){ return w.id === wlId })
+    if (!wl || !wl.demandSources) return
+    var src = wl.demandSources.find(function(s){ return s.id === srcId })
+    if (src) { src[field] = val; V.renderSolTabBody(); C.scheduleSolutionSave() }
+  },
+
+  removeDemandSource: function(wlId, srcId) {
+    var wl = M.workloadConfigs.maas.find(function(w){ return w.id === wlId })
+    if (!wl || !wl.demandSources) return
+    wl.demandSources = wl.demandSources.filter(function(s){ return s.id !== srcId })
+    V.renderSolTabBody(); C.scheduleSolutionSave()
+  },
+
   removeMaas: function(id) {
     M.workloadConfigs.maas = M.workloadConfigs.maas.filter(function(w){ return w.id !== id })
     V.renderSolTabs(); V.renderSolTabBody()
