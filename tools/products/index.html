@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — Products Catalogue</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --orange:#FF5539;--navy:#002870;--blue:#1C38F5;
+  --teal:#00B290;--amber:#FFB600;--purple:#6C47FF;
+  --white:#FFF;--light:#F5F6FA;--mid:#8892A4;
+  --dark:#0D1F4E;--border:#E0E4EF;
+  --shadow:0 2px 8px rgba(0,0,0,0.07);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.11);
+  --r:8px;--r-sm:5px;--r-lg:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Roboto',sans-serif;background:var(--light);color:var(--dark);min-height:100vh;}
+
+/* ATLAS CONTEXT BAR */
+.atlas-ctx{background:#001d5c;border-bottom:2px solid var(--orange);padding:0 20px;height:32px;display:flex;align-items:center;gap:0;font-size:11px;}
+.atlas-ctx__back{color:rgba(255,255,255,.7);text-decoration:none;font-weight:600;padding:0 12px 0 0;border-right:1px solid rgba(255,255,255,.15);margin-right:12px;display:flex;align-items:center;gap:4px;transition:color .15s;}
+.atlas-ctx__back:hover{color:var(--orange);}
+.atlas-ctx__sep{color:rgba(255,255,255,.25);margin:0 8px;}
+.atlas-ctx__lbl{color:rgba(255,255,255,.45);font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-size:9px;}
+.atlas-ctx__val{color:rgba(255,255,255,.85);font-weight:600;margin-left:5px;}
+.atlas-ctx__tool{margin-left:auto;color:rgba(255,255,255,.45);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;}
+
+/* HEADER */
+.hdr{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-md);}
+.hdr-brand{font-size:16px;font-weight:900;color:#fff;letter-spacing:3px;}
+.hdr-brand span{color:var(--orange);}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.hdr-badge{background:rgba(255,85,57,.2);color:#ff9985;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;letter-spacing:.5px;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;transition:all .15s;}
+.btn-ghost{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);}
+.btn-ghost:hover{background:rgba(255,255,255,.22);}
+.btn-orange{background:var(--orange);color:#fff;}
+.btn-orange:hover{opacity:.9;}
+
+/* TABS */
+.tabs{background:#fff;border-bottom:2px solid var(--border);padding:0 24px;display:flex;gap:0;}
+.tab{padding:11px 18px;font-size:12px;font-weight:600;color:var(--mid);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .15s;}
+.tab.act{color:var(--navy);border-bottom-color:var(--orange);}
+.tab:hover:not(.act){color:var(--dark);}
+
+/* PAGE */
+.page{padding:20px 24px;max-width:1400px;margin:0 auto;}
+
+/* PRODUCT TIER SECTION */
+.tier-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--border);}
+.tier-icon{width:36px;height:36px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.tier-icon.h{background:rgba(28,56,245,.1);}
+.tier-icon.v{background:rgba(0,178,144,.1);}
+.tier-icon.d{background:rgba(255,182,0,.1);}
+.tier-title{font-size:15px;font-weight:800;color:var(--navy);}
+.tier-subtitle{font-size:11px;color:var(--mid);margin-top:2px;}
+.tier-count{margin-left:auto;background:var(--light);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--mid);}
+
+/* PRODUCT GRID */
+.prod-grid{display:grid;gap:12px;margin-bottom:28px;}
+.prod-grid.horizontal{grid-template-columns:repeat(4,1fr);}
+.prod-grid.vertical{grid-template-columns:repeat(5,1fr);}
+.prod-grid.dedicated{grid-template-columns:repeat(3,1fr);}
+
+/* PRODUCT CARD */
+.prod-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow);position:relative;cursor:pointer;transition:all .18s;}
+.prod-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px);}
+.prod-card.selected{border-color:var(--navy);box-shadow:0 0 0 2px rgba(0,40,112,.15);}
+.prod-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;}
+.prod-seg{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;padding:2px 7px;border-radius:20px;}
+.prod-seg.A{background:rgba(28,56,245,.1);color:var(--blue);}
+.prod-seg.B{background:rgba(0,178,144,.1);color:var(--teal);}
+.prod-seg.C{background:rgba(255,182,0,.12);color:#9a6e00;}
+.prod-seg.D{background:rgba(0,40,112,.08);color:var(--navy);}
+.prod-seg.E{background:rgba(108,71,255,.1);color:var(--purple);}
+.prod-seg.H{background:rgba(0,0,0,.06);color:#555;}
+.prod-avail{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:2px;}
+.prod-avail.live{background:var(--teal);}
+.prod-avail.beta{background:var(--amber);}
+.prod-avail.planned{background:var(--mid);}
+.prod-name{font-size:13px;font-weight:800;color:var(--dark);margin-bottom:4px;line-height:1.3;}
+.prod-tagline{font-size:11px;color:var(--mid);line-height:1.5;margin-bottom:10px;}
+.prod-price{font-size:11px;font-weight:700;color:var(--navy);font-family:'Roboto Mono',monospace;}
+.prod-price-unit{font-size:9px;font-weight:400;color:var(--mid);}
+.prod-features{margin-top:10px;display:flex;flex-wrap:wrap;gap:4px;}
+.prod-feat{font-size:9px;font-weight:600;background:var(--light);border:1px solid var(--border);border-radius:20px;padding:2px 8px;color:var(--mid);white-space:nowrap;}
+.prod-feat.key{background:rgba(0,40,112,.06);border-color:rgba(0,40,112,.15);color:var(--navy);}
+.prod-sla{margin-top:10px;padding-top:8px;border-top:1px solid var(--border);display:flex;gap:6px;align-items:center;}
+.sla-dot{width:6px;height:6px;border-radius:50%;}
+.sla-dot.gold{background:var(--amber);}
+.sla-dot.silver{background:var(--mid);}
+.sla-dot.bronze{background:#b45309;}
+.sla-lbl{font-size:9px;color:var(--mid);font-weight:600;}
+
+/* DETAIL PANEL */
+.detail-panel{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;box-shadow:var(--shadow-md);margin-bottom:20px;}
+.detail-panel-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.detail-name{font-size:18px;font-weight:900;color:var(--navy);}
+.detail-tagline{font-size:12px;color:var(--mid);margin-top:2px;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+.detail-section{margin-bottom:0;}
+.detail-section h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mid);margin-bottom:8px;}
+.detail-section ul{list-style:none;}
+.detail-section ul li{font-size:12px;color:var(--dark);padding:3px 0;display:flex;align-items:flex-start;gap:6px;line-height:1.4;}
+.detail-section ul li::before{content:'·';color:var(--orange);font-weight:900;flex-shrink:0;margin-top:1px;}
+.price-box{background:var(--navy);color:#fff;border-radius:var(--r);padding:12px 16px;margin-top:8px;}
+.price-box-main{font-size:22px;font-weight:900;font-family:'Roboto Mono',monospace;}
+.price-box-unit{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;}
+.price-row{display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.1);}
+.price-row:last-child{border-bottom:none;}
+.price-row .lbl{color:rgba(255,255,255,.6);}
+.price-row .val{font-weight:700;font-family:'Roboto Mono',monospace;}
+.close-btn{margin-left:auto;background:var(--light);border:1px solid var(--border);color:var(--mid);font-size:11px;font-weight:600;padding:5px 12px;border-radius:var(--r-sm);cursor:pointer;}
+.close-btn:hover{color:var(--dark);}
+
+/* SOVEREIGN BADGE */
+.sovereign-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(0,40,112,.08);border:1px solid rgba(0,40,112,.15);border-radius:20px;padding:2px 8px;font-size:9px;font-weight:700;color:var(--navy);}
+
+/* AVAILABILITY LEGEND */
+.legend{display:flex;gap:16px;align-items:center;margin-left:auto;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--mid);}
+.legend-dot{width:8px;height:8px;border-radius:50%;}
+
+/* COMPARE TABLE */
+.cmp-table{width:100%;border-collapse:collapse;font-size:12px;}
+.cmp-table th{background:var(--light);padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid);border-bottom:2px solid var(--border);}
+.cmp-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+.cmp-table tr:hover td{background:rgba(0,40,112,.02);}
+.tick{color:var(--teal);font-weight:700;}
+.cross{color:var(--mid);}
+</style>
+</head>
+<body>
+
+<!-- ATLAS CONTEXT BAR -->
+<div class="atlas-ctx">
+  <a class="atlas-ctx__back" href="../engagement-docket/index-v3.html">&#8592; Docket</a>
+  <span class="atlas-ctx__lbl">Platform</span><span class="atlas-ctx__val">Bull India Sovereign AI</span>
+  <span class="atlas-ctx__sep">|</span>
+  <span class="atlas-ctx__lbl">Tool</span><span class="atlas-ctx__val">Products Catalogue</span>
+  <span class="atlas-ctx__tool">ATLAS</span>
+</div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-brand">ATL<span>A</span>S</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">Products v1.0</span>
+    <button class="btn btn-ghost btn-sm" onclick="window.location.href='../engagement-docket/index-v3.html'">← Back to Docket</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab act" onclick="switchTab('catalogue')">Product Catalogue</div>
+  <div class="tab" onclick="switchTab('compare')">Compare Products</div>
+  <div class="tab" onclick="switchTab('pricing')">Pricing Reference</div>
+  <div class="tab" onclick="switchTab('strategy')">B2B / B2B2B Strategy</div>
+</div>
+
+<div class="page">
+
+<!-- ══ CATALOGUE TAB ═══════════════════════════════════════════════════ -->
+<div id="tab-catalogue">
+
+  <!-- Detail panel (hidden until card clicked) -->
+  <div id="detail-panel" class="detail-panel" style="display:none"></div>
+
+  <!-- Availability legend -->
+  <div style="display:flex;align-items:center;margin-bottom:16px;">
+    <div style="font-size:13px;font-weight:700;color:var(--navy);">Bull India Sovereign AI — Product Catalogue</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Live</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Beta</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--mid)"></div>Planned</div>
+    </div>
+  </div>
+
+  <!-- TIER 1: HORIZONTAL APIs -->
+  <div class="tier-header">
+    <div class="tier-icon h">🔌</div>
+    <div>
+      <div class="tier-title">Tier 1 — Horizontal APIs</div>
+      <div class="tier-subtitle">Foundation inference services available to all operators and segments. OpenAI-compatible endpoints.</div>
+    </div>
+    <div class="tier-count">4 products</div>
+  </div>
+
+  <div class="prod-grid horizontal" id="grid-horizontal"></div>
+
+  <!-- TIER 2: VERTICAL BUNDLES -->
+  <div class="tier-header">
+    <div class="tier-icon v">📦</div>
+    <div>
+      <div class="tier-title">Tier 2 — Vertical API Bundles</div>
+      <div class="tier-subtitle">Domain-specific API packages combining Horizontal APIs with pre-tuned models, prompting, and SLA commitments.</div>
+    </div>
+    <div class="tier-count">5 products</div>
+  </div>
+
+  <div class="prod-grid vertical" id="grid-vertical"></div>
+
+  <!-- TIER 3: DEDICATED CAPACITY -->
+  <div class="tier-header">
+    <div class="tier-icon d">🖥</div>
+    <div>
+      <div class="tier-title">Tier 3 — Dedicated Capacity</div>
+      <div class="tier-subtitle">Reserved GPU blocks and bare-metal servers for operators who need guaranteed capacity, custom models, or air-gap deployment.</div>
+    </div>
+    <div class="tier-count">3 products</div>
+  </div>
+
+  <div class="prod-grid dedicated" id="grid-dedicated"></div>
+
+</div><!-- /tab-catalogue -->
+
+<!-- ══ COMPARE TAB ════════════════════════════════════════════════════ -->
+<div id="tab-compare" style="display:none">
+  <div class="detail-panel">
+    <div class="detail-panel-header">
+      <div><div class="detail-name">Product Comparison</div><div class="detail-tagline">Horizontal APIs vs Vertical Bundles vs Dedicated — what's right for which customer?</div></div>
+    </div>
+    <table class="cmp-table">
+      <thead>
+        <tr>
+          <th style="width:200px">Dimension</th>
+          <th>Tier 1 — Horizontal APIs</th>
+          <th>Tier 2 — Vertical Bundles</th>
+          <th>Tier 3 — Dedicated Capacity</th>
+        </tr>
+      </thead>
+      <tbody id="compare-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ PRICING TAB ════════════════════════════════════════════════════ -->
+<div id="tab-pricing" style="display:none">
+  <div class="detail-panel">
+    <div class="detail-panel-header">
+      <div><div class="detail-name">Pricing Reference</div><div class="detail-tagline">Reference pricing — actual rates set per engagement. Sovereign premium = 15-25% above global cloud.</div></div>
+    </div>
+    <div id="pricing-content"></div>
+  </div>
+</div>
+
+<!-- ══ STRATEGY TAB ═══════════════════════════════════════════════════ -->
+<div id="tab-strategy" style="display:none">
+  <div class="detail-panel">
+    <div class="detail-panel-header">
+      <div><div class="detail-name">Commercial Strategy — B2B &amp; B2B2B</div><div class="detail-tagline">How Bull India goes to market: direct SI delivery + enabling operators</div></div>
+    </div>
+    <div id="strategy-content"></div>
+  </div>
+</div>
+
+</div><!-- /page -->
+
+<script>
+// ── PRODUCT DATA ──────────────────────────────────────────────────────────
+
+var PRODUCTS = {
+
+  horizontal: [
+    {
+      id: 'inf-api',
+      name: 'Inference API',
+      tagline: 'OpenAI-compatible text generation endpoint. Drop-in replacement — change one line of code to migrate.',
+      seg: 'H',
+      tier: 'horizontal',
+      status: 'live',
+      price: '$0.75',
+      priceUnit: '/ 1M tokens (blended)',
+      features: ['OpenAI /v1/chat/completions','All model families','INT4/INT8/FP16 precision','Streaming (SSE)','Token counting'],
+      keyFeatures: ['Sovereign data residency','No egress to foreign cloud'],
+      slas: ['gold','silver','bronze'],
+      models: ['Llama 3.x 8B–405B','DeepSeek R1/V3','Sarvam-2B','Gemma 2','Mistral','Qwen 2.5'],
+      useCases: ['AI-powered applications','Chatbots & assistants','Document Q&A','Code generation','Summarisation'],
+      pricing: [
+        {label:'Small models ≤7B', val:'$0.30 / 1M tok'},
+        {label:'Mid models 8–70B', val:'$0.75 / 1M tok'},
+        {label:'Large models >70B', val:'$1.20 / 1M tok'},
+        {label:'Volume discount (>10B tok/mo)', val:'20% off'},
+      ],
+      targetCustomer: 'TSAPs, ISVs, developers building AI applications'
+    },
+    {
+      id: 'voice-api',
+      name: 'Indic Voice API',
+      tagline: 'Sovereign ASR + TTS for all 22 scheduled Indian languages. Sarvam Whisper + Bulbul under the hood.',
+      seg: 'H',
+      tier: 'horizontal',
+      status: 'live',
+      price: '₹0.12',
+      priceUnit: '/ minute (STT)',
+      features: ['Sarvam Whisper STT','Bulbul TTS','22 Indic languages','Speaker diarisation','Punctuation restoration'],
+      keyFeatures: ['On-premises only','CERT-In compliant'],
+      slas: ['gold','silver'],
+      models: ['Sarvam Whisper (STT)','Bulbul (TTS)','Seamless M4T'],
+      useCases: ['Call centre transcription','Voice bots in vernacular','Court/legislative transcription','Healthcare dictation'],
+      pricing: [
+        {label:'STT — standard', val:'₹0.12 / min'},
+        {label:'STT — enterprise (>1M min/mo)', val:'₹0.08 / min'},
+        {label:'TTS — standard', val:'₹0.10 / min'},
+        {label:'Diarisation add-on', val:'+₹0.03 / min'},
+      ],
+      targetCustomer: 'Fintechs, D2C brands, call centres, state citizen services'
+    },
+    {
+      id: 'embed-api',
+      name: 'Embedding API',
+      tagline: 'Dense vector embeddings for RAG, semantic search, and classification. BGE-M3, Nomic, MXBai.',
+      seg: 'H',
+      tier: 'horizontal',
+      status: 'live',
+      price: '$0.03',
+      priceUnit: '/ 1M tokens',
+      features: ['BGE-M3 multilingual','Nomic Embed 137M','MXBai-embed-large','Jina v3','Batch mode'],
+      keyFeatures: ['Sovereign vector store option','Indic language support'],
+      slas: ['silver','bronze'],
+      models: ['BGE-M3','Nomic Embed','MXBai-embed-large','Jina Embeddings v3'],
+      useCases: ['RAG pipelines','Semantic search','Document classification','Duplicate detection'],
+      pricing: [
+        {label:'Standard batch', val:'$0.03 / 1M tok'},
+        {label:'Real-time (synchronous)', val:'$0.06 / 1M tok'},
+        {label:'Private model fine-tune', val:'From $500 / run'},
+      ],
+      targetCustomer: 'AI platform builders, enterprise search, compliance systems'
+    },
+    {
+      id: 'batch-api',
+      name: 'Batch Processing API',
+      tagline: 'Async bulk inference at 50% cost. Submit jobs up to 10M tokens, get results in hours.',
+      seg: 'H',
+      tier: 'horizontal',
+      status: 'beta',
+      price: '50% off',
+      priceUnit: 'vs synchronous pricing',
+      features: ['Async job submission','Up to 10M tok/job','Priority queue options','Webhook callbacks','JSONL input/output'],
+      keyFeatures: ['Night-shift GPU utilisation','SLA: 24hr completion'],
+      slas: ['bronze'],
+      models: ['All Inference API models'],
+      useCases: ['Document digitisation at scale','Overnight report generation','Training data creation','Bulk classification'],
+      pricing: [
+        {label:'Batch (24hr SLA)', val:'50% of sync price'},
+        {label:'Express batch (4hr SLA)', val:'25% of sync price'},
+        {label:'Minimum job size', val:'100K tokens'},
+      ],
+      targetCustomer: 'BFSI batch processing, document management systems, BPOs'
+    }
+  ],
+
+  vertical: [
+    {
+      id: 'code-api',
+      name: 'Sovereign Code API',
+      tagline: 'Complete coding intelligence stack — completion, review, test generation, and explain code.',
+      seg: 'A',
+      tier: 'vertical',
+      status: 'live',
+      price: '$1.20',
+      priceUnit: '/ 1M tokens',
+      features: ['Code completion (FIM)','Code review & audit','Test generation','Security scan','Explain & document'],
+      keyFeatures: ['Air-gap compatible','Codestral 22B included','IDE plugins'],
+      slas: ['gold','silver'],
+      models: ['Qwen2.5-Coder 72B','DeepSeek-Coder V2','Codestral 22B','Llama 3.1 8B (code)'],
+      useCases: ['Software development teams','DevSecOps pipelines','Code migration projects','Technical documentation'],
+      pricing: [
+        {label:'FIM completion', val:'$0.80 / 1M tok'},
+        {label:'Review + audit', val:'$1.20 / 1M tok'},
+        {label:'IDE plugin seat licence', val:'₹2,500 / user / mo'},
+        {label:'Enterprise (>100 seats)', val:'Custom'},
+      ],
+      targetCustomer: 'IT services companies, product engineering teams, defence software units'
+    },
+    {
+      id: 'indic-suite',
+      name: 'Indic Voice Suite',
+      tagline: 'End-to-end vernacular AI — STT → LLM → TTS in one API call. 22 languages, <1s latency.',
+      seg: 'B',
+      tier: 'vertical',
+      status: 'live',
+      price: '₹0.25',
+      priceUnit: '/ conversation minute',
+      features: ['STT → LLM → TTS pipeline','22 Indic languages','Streaming response','Custom voice cloning','Sentiment tagging'],
+      keyFeatures: ['Single API call end-to-end','Sovereign — no foreign API'],
+      slas: ['gold','silver'],
+      models: ['Sarvam-2B (NLU)','Sarvam Whisper (STT)','Bulbul (TTS)'],
+      useCases: ['Vernacular voice assistants','IVR next-gen','WhatsApp voice bot','Rural banking access','Government citizen helpline'],
+      pricing: [
+        {label:'Per conversation minute', val:'₹0.25 / min'},
+        {label:'Enterprise (>5M min/mo)', val:'₹0.16 / min'},
+        {label:'Custom voice cloning', val:'₹50,000 / voice'},
+        {label:'On-prem edge deployment', val:'Custom'},
+      ],
+      targetCustomer: 'Fintechs, ONDC players, state governments, IVR modernisation'
+    },
+    {
+      id: 'doc-ai',
+      name: 'Document AI API',
+      tagline: 'Ingest, extract, classify and answer from any document — PDFs, scans, forms, emails.',
+      seg: 'C',
+      tier: 'vertical',
+      status: 'live',
+      price: '₹8',
+      priceUnit: '/ document',
+      features: ['PDF/image/scan ingestion','Table extraction','Form field detection','Multi-doc Q&A','Audit trail output'],
+      keyFeatures: ['RBI/SEBI data residency','CERT-In compliant processing'],
+      slas: ['gold','silver'],
+      models: ['Llama 3.1 70B','Qwen 2.5 32B','BGE-M3 (retrieval)','Prithvi 600M (geo)'],
+      useCases: ['Loan origination KYC','Insurance claims','Trade finance LC','Contract review','Regulatory filing extraction'],
+      pricing: [
+        {label:'Standard document', val:'₹8 / doc'},
+        {label:'Complex (>20 pages, tables)', val:'₹25 / doc'},
+        {label:'Volume >1M docs/mo', val:'₹4 / doc'},
+        {label:'On-prem air-gap deployment', val:'Custom'},
+      ],
+      targetCustomer: 'Banks, NBFCs, insurers, law firms, regulatory bodies'
+    },
+    {
+      id: 'govstack-api',
+      name: 'GovStack API',
+      tagline: 'Sovereign AI services for government — citizen services, policy Q&A, translation, and grievance.',
+      seg: 'D',
+      tier: 'vertical',
+      status: 'beta',
+      price: 'Custom',
+      priceUnit: 'annual capacity contract',
+      features: ['Citizen query resolution','Policy document Q&A','22-language translation','Grievance classification','Speech-to-text for courts'],
+      keyFeatures: ['MeitY empanelled architecture','Air-gap option','NIC integration'],
+      slas: ['gold'],
+      models: ['Sarvam-2B','Llama 3.1 70B','Sarvam Whisper','BGE-M3'],
+      useCases: ['Chief Minister helpline AI','e-Governance chatbot','Legislative assembly transcription','RTI response automation','PM Awas Yojana processing'],
+      pricing: [
+        {label:'State platform (annual)', val:'₹1.5–5 Cr / yr'},
+        {label:'Central ministry (annual)', val:'₹5–20 Cr / yr'},
+        {label:'Per-API consumption', val:'Available on request'},
+        {label:'SI implementation', val:'Separate engagement'},
+      ],
+      targetCustomer: 'State governments, central ministries, PSUs, statutory bodies'
+    },
+    {
+      id: 'vision-api',
+      name: 'Vision AI API',
+      tagline: 'Industrial vision intelligence — defect detection, satellite analysis, agricultural monitoring.',
+      seg: 'E',
+      tier: 'vertical',
+      status: 'beta',
+      price: '$0.004',
+      priceUnit: '/ image processed',
+      features: ['Defect detection','Satellite image analysis','Crop health monitoring','CCTV event detection','Multi-spectral support'],
+      keyFeatures: ['SatMAE + Clay FM for geo','PatchCore for anomaly detection','Air-gap capable'],
+      slas: ['gold','silver'],
+      models: ['SatMAE','Clay Foundation Model','PatchCore','SAM-Med2D','Llama 3.2 11B (vision)'],
+      useCases: ['Manufacturing QC','Precision agriculture','Border surveillance','Infrastructure inspection','Disaster damage assessment'],
+      pricing: [
+        {label:'Standard image', val:'$0.004 / image'},
+        {label:'Satellite tile (multispectral)', val:'$0.012 / tile'},
+        {label:'Real-time video stream', val:'$0.50 / stream-hr'},
+        {label:'Edge deployment (hardware)', val:'Custom BOM'},
+      ],
+      targetCustomer: 'Manufacturing, agri-tech, defence, smart cities, geospatial agencies'
+    }
+  ],
+
+  dedicated: [
+    {
+      id: 'reserved-inference',
+      name: 'Reserved Inference',
+      tagline: 'Guaranteed GPU blocks for your models — committed capacity, Gold SLA, 12 or 24-month contracts.',
+      seg: 'H',
+      tier: 'dedicated',
+      status: 'live',
+      price: '$2.75',
+      priceUnit: '/ GPU / hr (24-mo reserved)',
+      features: ['Dedicated GPU allocation','Gold SLA (TTFT <200ms)','Custom model loading','vLLM with custom config','Priority queue'],
+      keyFeatures: ['Price lock for contract duration','Sovereign — no shared tenant'],
+      slas: ['gold'],
+      models: ['Any model in catalogue','Custom fine-tuned models','BYO model weights'],
+      useCases: ['Mission-critical inference','High-volume production API','Regulated workloads (BFSI, health)','Latency-sensitive applications'],
+      pricing: [
+        {label:'On-demand', val:'$5.00 / GPU / hr'},
+        {label:'12-month reserved', val:'$3.50 / GPU / hr'},
+        {label:'24-month reserved', val:'$2.75 / GPU / hr'},
+        {label:'Min commitment', val:'8 GPUs (1 server unit)'},
+      ],
+      targetCustomer: 'Enterprise AI teams, large TSAPs, regulated sector operators'
+    },
+    {
+      id: 'gpuaas',
+      name: 'GPUaaS',
+      tagline: 'Raw GPU compute access via API. Bring your own stack — vLLM, NeMo, PyTorch, anything.',
+      seg: 'H',
+      tier: 'dedicated',
+      status: 'live',
+      price: '$3.50',
+      priceUnit: '/ GPU / hr (12-mo reserved)',
+      features: ['Root-level GPU access','Any CUDA workload','NVLink / InfiniBand','Persistent storage option','SSH + API access'],
+      keyFeatures: ['Sovereign GPU cloud','VR NVL72 / B200 available'],
+      slas: ['gold','silver'],
+      models: ['BYO — any framework'],
+      useCases: ['Model training runs','Fine-tuning at scale','Research compute','HPC + AI hybrid workloads'],
+      pricing: [
+        {label:'On-demand', val:'$5.00 / GPU / hr'},
+        {label:'12-month reserved', val:'$3.50 / GPU / hr'},
+        {label:'24-month reserved', val:'$2.75 / GPU / hr'},
+        {label:'Spot / preemptible', val:'$1.50 / GPU / hr'},
+      ],
+      targetCustomer: 'AI labs, model developers, HPC users, CSPs building on top'
+    },
+    {
+      id: 'bmaas',
+      name: 'BMaaS',
+      tagline: 'Full server reserved — your OS, your drivers, your stack. Complete bare-metal sovereignty.',
+      seg: 'H',
+      tier: 'dedicated',
+      status: 'beta',
+      price: '$35,000',
+      priceUnit: '/ server / month (NVL72)',
+      features: ['Full server dedication','Customer OS install','No hypervisor overhead','IPMI / out-of-band mgmt','Air-gap capable'],
+      keyFeatures: ['Zero multi-tenancy','Hardware-level isolation','OEM direct support'],
+      slas: ['gold'],
+      models: ['BYO — complete freedom'],
+      useCases: ['Defence AI systems','Air-gapped sovereign compute','Telecom AI core','Data sovereignty mandates'],
+      pricing: [
+        {label:'VR NVL72 (72 GPUs)', val:'$35,000 / server / mo'},
+        {label:'B200 NVL72 (72 GPUs)', val:'$28,000 / server / mo'},
+        {label:'H200 SXM 8x (8 GPUs)', val:'$6,000 / server / mo'},
+        {label:'Min term', val:'6 months'},
+      ],
+      targetCustomer: 'Defence, intelligence agencies, large banks with air-gap mandates, telecom'
+    }
+  ]
+}
+
+var COMPARE_ROWS = [
+  ['Customer type', 'TSAPs, ISVs, developers', 'Domain operators, vertical SaaS', 'Enterprises, defence, telco'],
+  ['Pricing model', 'Pay-per-token / per-minute', 'Bundled: token + feature + SLA', 'Fixed monthly capacity contract'],
+  ['Commitment required', 'None (pay-as-you-go)', 'None to annual', 'Minimum 6–24 months'],
+  ['SLA available', 'Gold / Silver / Bronze', 'Gold / Silver', 'Gold (dedicated)'],
+  ['Multi-tenancy', 'Shared pool', 'Shared pool', 'None — fully dedicated'],
+  ['Custom models', 'No', 'Domain fine-tuned included', 'Full freedom — BYO'],
+  ['Air-gap option', 'No', 'On request (some products)', 'Yes — standard for BMaaS'],
+  ['Indic language', 'Voice API only', 'Indic Suite + GovStack', 'BYO — operator choice'],
+  ['OpenAI compat.', '✓ Inference API', '✓ Inference layer', 'Framework-dependent'],
+  ['Integration effort', 'Low — one endpoint change', 'Medium — bundle integration', 'High — full stack setup'],
+  ['B2B2B viable', '✓ Primary route', '✓ Operator model', '✓ Wholesale to CSPs'],
+  ['Margin positioning', 'Thin — commodity compute', 'Medium — value-add bundle', 'High — guaranteed revenue'],
+]
+
+var PRICING_SECTIONS = [
+  {
+    title: 'MaaS — Token API',
+    rows: [
+      ['Small models (≤7B)', '$0.30', '₹25', 'Per 1M tokens — input = output'],
+      ['Mid models (8–70B)', '$0.75', '₹64', 'Per 1M tokens blended'],
+      ['Large models (>70B)', '$1.20', '₹102', 'Per 1M tokens blended'],
+      ['Embedding models', '$0.03', '₹2.5', 'Per 1M tokens'],
+      ['Batch (24hr SLA)', '50% off sync', '50% off', 'Async processing'],
+    ]
+  },
+  {
+    title: 'Indic Voice',
+    rows: [
+      ['STT (Sarvam Whisper)', '₹0.12/min', '$0.0014/min', 'Per audio minute'],
+      ['TTS (Bulbul)', '₹0.10/min', '$0.0012/min', 'Per audio minute'],
+      ['Full pipeline (STT+LLM+TTS)', '₹0.25/min', '$0.003/min', 'Conversation minute'],
+      ['Custom voice cloning', '₹50,000/voice', '$590/voice', 'One-time per voice'],
+    ]
+  },
+  {
+    title: 'Dedicated Capacity',
+    rows: [
+      ['GPUaaS on-demand', '$5.00/GPU/hr', '₹425/GPU/hr', 'VR NVL72 / B200'],
+      ['GPUaaS 12-mo reserved', '$3.50/GPU/hr', '₹298/GPU/hr', '30% discount'],
+      ['GPUaaS 24-mo reserved', '$2.75/GPU/hr', '₹234/GPU/hr', '45% discount'],
+      ['GPUaaS spot / preemptible', '$1.50/GPU/hr', '₹128/GPU/hr', 'Best effort'],
+      ['BMaaS — VR NVL72', '$35,000/server/mo', '₹30L/server/mo', '72 GPUs, full server'],
+      ['BMaaS — H200 SXM 8x', '$6,000/server/mo', '₹5.1L/server/mo', '8 GPUs, full server'],
+    ]
+  }
+]
+
+var STRATEGY_SECTIONS = [
+  {
+    title: 'B2B — Full SI Delivery',
+    color: 'var(--navy)',
+    icon: '🏛',
+    desc: 'Bull India delivers end-to-end to government and enterprise clients. We own the engagement from PREPARE through SUSTAIN. Revenue = hardware + software + SI fees + AMC.',
+    points: [
+      'Primary route for GovTech (D1 national, D2 state)',
+      'Typical deal size: ₹50–500 Cr across 3–5 years',
+      'Deliverables: DC build, GPU fleet, platform deployment, use-case development',
+      'Own the entire stack — hardware OEM + SI + platform',
+      'ATLAS tracks this via Engagement Docket → Solution → Output',
+    ]
+  },
+  {
+    title: 'B2B2B — Enabling Operators',
+    color: 'var(--teal)',
+    icon: '⚡',
+    desc: 'Bull India enables TSAPs, CSPs, and ISVs to become AI operators. We sell wholesale API infrastructure. They sell to end consumers. We never touch end consumers.',
+    points: [
+      'Primary route for MaaS (Segments A, B, C, E)',
+      'Typical operator: telecom, BFSI platform, horizontal SaaS',
+      'Revenue = Reserved capacity contracts + MaaS wholesale rates',
+      'Operators set their own pricing to end customers',
+      'We guarantee sovereign SLA — operator handles customer relationship',
+    ]
+  },
+  {
+    title: 'Product-Led Rules',
+    color: 'var(--orange)',
+    icon: '📋',
+    desc: 'Non-negotiable principles that govern how we position and price.',
+    points: [
+      'GPUaaS/BMaaS = utilisation uplift strategy, NOT core product',
+      'Platform layer (COMPASS, Fine-Tuning, Model Registry) = INTERNAL — not customer-facing',
+      'We enable operators — we never sell to end consumers directly',
+      'OpenAI-compatible endpoints mandatory: migrate by changing one line of code',
+      'Sovereign premium = 15–25% above Together AI / Fireworks reference prices',
+      'No Codestral in commercial offering (MNPL non-commercial licence)',
+    ]
+  },
+  {
+    title: 'Segment Mapping',
+    color: 'var(--amber)',
+    icon: '🗺',
+    desc: 'Each product segment maps to a clear customer archetype and commercial route.',
+    points: [
+      'A — Coding/Agentic: IT services, ISVs, developer platforms → B2B2B',
+      'B — Vernacular/Voice: fintechs, D2C, ONDC players → B2B2B',
+      'C — BFSI/Document: banks, NBFCs, insurers → B2B or B2B2B',
+      'D — GovTech: state/national govt → B2B SI delivery',
+      'E — Vision AI: industrial, agri, defence → B2B or B2B2B',
+    ]
+  }
+]
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+
+function statusDot(status) {
+  return '<div class="prod-avail ' + status + '"></div>'
+}
+
+function renderCard(p, wide) {
+  var slaHtml = ''
+  if (p.slas && p.slas.length) {
+    slaHtml = '<div class="prod-sla">'
+    p.slas.forEach(function(s) {
+      slaHtml += '<div class="sla-dot ' + s + '"></div><span class="sla-lbl">' + s.charAt(0).toUpperCase() + s.slice(1) + '</span>'
+    })
+    slaHtml += '</div>'
+  }
+  return '<div class="prod-card" onclick="showDetail(\'' + p.id + '\')" id="card-' + p.id + '">'
+    + '<div class="prod-card-top">'
+    + '<span class="prod-seg ' + p.seg + '">' + (p.seg === 'H' ? 'Horizontal' : 'Seg ' + p.seg) + '</span>'
+    + statusDot(p.status)
+    + '</div>'
+    + '<div class="prod-name">' + p.name + '</div>'
+    + '<div class="prod-tagline">' + p.tagline + '</div>'
+    + '<div class="prod-price">' + p.price + '<span class="prod-price-unit"> ' + p.priceUnit + '</span></div>'
+    + '<div class="prod-features">'
+    + p.features.slice(0, 3).map(function(f) { return '<span class="prod-feat">' + f + '</span>' }).join('')
+    + (p.keyFeatures || []).slice(0, 1).map(function(f) { return '<span class="prod-feat key">✓ ' + f + '</span>' }).join('')
+    + '</div>'
+    + slaHtml
+    + '</div>'
+}
+
+function renderAllCards() {
+  document.getElementById('grid-horizontal').innerHTML = PRODUCTS.horizontal.map(function(p) { return renderCard(p) }).join('')
+  document.getElementById('grid-vertical').innerHTML   = PRODUCTS.vertical.map(function(p) { return renderCard(p) }).join('')
+  document.getElementById('grid-dedicated').innerHTML  = PRODUCTS.dedicated.map(function(p) { return renderCard(p) }).join('')
+}
+
+function showDetail(id) {
+  var all = [].concat(PRODUCTS.horizontal, PRODUCTS.vertical, PRODUCTS.dedicated)
+  var p = all.find(function(x) { return x.id === id })
+  if (!p) return
+
+  // Deselect all, select this
+  document.querySelectorAll('.prod-card').forEach(function(c) { c.classList.remove('selected') })
+  var card = document.getElementById('card-' + id)
+  if (card) { card.classList.add('selected'); card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }
+
+  var priceRows = (p.pricing || []).map(function(r) {
+    return '<div class="price-row"><span class="lbl">' + r.label + '</span><span class="val">' + r.val + '</span></div>'
+  }).join('')
+
+  var dp = document.getElementById('detail-panel')
+  dp.style.display = 'block'
+  dp.innerHTML = '<div class="detail-panel-header">'
+    + '<span class="prod-seg ' + p.seg + '" style="font-size:11px;padding:3px 10px">' + (p.seg === 'H' ? 'Horizontal' : 'Segment ' + p.seg) + '</span>'
+    + '<div><div class="detail-name">' + p.name + '</div><div class="detail-tagline">' + p.tagline + '</div></div>'
+    + '<span class="sovereign-badge">🔒 Sovereign</span>'
+    + '<button class="close-btn" onclick="closeDetail()">✕ Close</button>'
+    + '</div>'
+    + '<div class="detail-grid">'
+    + '<div class="detail-section"><h4>Features</h4><ul>'
+    + p.features.map(function(f) { return '<li>' + f + '</li>' }).join('')
+    + '</ul>'
+    + (p.keyFeatures ? '<br><h4>Sovereign advantages</h4><ul>' + p.keyFeatures.map(function(f) { return '<li>' + f + '</li>' }).join('') + '</ul>' : '')
+    + '</div>'
+    + '<div class="detail-section"><h4>Use cases</h4><ul>'
+    + (p.useCases || []).map(function(u) { return '<li>' + u + '</li>' }).join('')
+    + '</ul><br><h4>Models included</h4><ul>'
+    + (p.models || []).map(function(m) { return '<li>' + m + '</li>' }).join('')
+    + '</ul><br><h4>Target customer</h4><p style="font-size:12px;color:var(--mid)">' + (p.targetCustomer || '') + '</p></div>'
+    + '<div class="detail-section"><h4>Pricing</h4>'
+    + '<div class="price-box">' + priceRows + '</div>'
+    + '<br><h4>SLA tiers available</h4><ul>'
+    + (p.slas || []).map(function(s) {
+        var desc = {gold:'<200ms TTFT, 99.9% uptime', silver:'<500ms TTFT, 99.5% uptime', bronze:'<2s TTFT, 99% uptime'}[s] || ''
+        return '<li><b>' + s.charAt(0).toUpperCase() + s.slice(1) + '</b> — ' + desc + '</li>'
+      }).join('')
+    + '</ul></div>'
+    + '</div>'
+  dp.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').style.display = 'none'
+  document.querySelectorAll('.prod-card').forEach(function(c) { c.classList.remove('selected') })
+}
+
+function renderCompare() {
+  var el = document.getElementById('compare-body')
+  el.innerHTML = COMPARE_ROWS.map(function(row) {
+    return '<tr><td style="font-weight:600;color:var(--navy);white-space:nowrap">' + row[0] + '</td>'
+      + '<td>' + row[1] + '</td>'
+      + '<td>' + row[2] + '</td>'
+      + '<td>' + row[3] + '</td>'
+      + '</tr>'
+  }).join('')
+}
+
+function renderPricing() {
+  var el = document.getElementById('pricing-content')
+  el.innerHTML = PRICING_SECTIONS.map(function(sec) {
+    return '<div style="margin-bottom:20px">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">' + sec.title + '</div>'
+      + '<table class="cmp-table"><thead><tr><th>Product / Tier</th><th>USD Price</th><th>INR Price</th><th>Unit</th></tr></thead><tbody>'
+      + sec.rows.map(function(r) {
+          return '<tr><td>' + r[0] + '</td><td style="font-family:Roboto Mono,monospace;font-weight:700">' + r[1] + '</td><td style="font-family:Roboto Mono,monospace">' + r[2] + '</td><td style="color:var(--mid);font-size:11px">' + r[3] + '</td></tr>'
+        }).join('')
+      + '</tbody></table></div>'
+  }).join('')
+  el.innerHTML += '<div style="font-size:11px;color:var(--mid);margin-top:12px;padding:10px 14px;background:var(--light);border-radius:var(--r)">Pricing reference only — actual rates set per engagement. Sovereign premium = 15–25% above Together AI / Fireworks. FX: ₹85 / USD reference rate. Volume discounts apply at >10B tokens / month.</div>'
+}
+
+function renderStrategy() {
+  var el = document.getElementById('strategy-content')
+  el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+    + STRATEGY_SECTIONS.map(function(s) {
+        return '<div style="border-left:4px solid ' + s.color + ';padding-left:16px">'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+          + '<span style="font-size:20px">' + s.icon + '</span>'
+          + '<span style="font-size:13px;font-weight:800;color:var(--navy)">' + s.title + '</span></div>'
+          + '<p style="font-size:12px;color:var(--mid);margin-bottom:10px;line-height:1.6">' + s.desc + '</p>'
+          + '<ul style="list-style:none">'
+          + s.points.map(function(p) { return '<li style="font-size:12px;padding:3px 0;display:flex;gap:6px;line-height:1.4"><span style="color:' + s.color + ';font-weight:900;flex-shrink:0">·</span>' + p + '</li>' }).join('')
+          + '</ul></div>'
+      }).join('')
+    + '</div>'
+}
+
+function switchTab(name) {
+  ;['catalogue','compare','pricing','strategy'].forEach(function(t) {
+    document.getElementById('tab-' + t).style.display = t === name ? '' : 'none'
+  })
+  document.querySelectorAll('.tab').forEach(function(el, i) {
+    el.classList.toggle('act', i === ['catalogue','compare','pricing','strategy'].indexOf(name))
+  })
+  if (name === 'compare')  renderCompare()
+  if (name === 'pricing')  renderPricing()
+  if (name === 'strategy') renderStrategy()
+}
+
+// Init
+renderAllCards()
+</script>
+</body>
+</html>
