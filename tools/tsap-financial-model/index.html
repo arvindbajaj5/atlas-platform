@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TSAP Financial Model   ATLAS</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -13,7 +13,7 @@
   --dark:#111827;--mid:#6B7280;--light:#F8F9FA;--white:#fff;--border:#E5E7EB;--card:#fff;
   --r:8px;--r-sm:6px
 }
-body{font-family:'Inter',sans-serif;font-size:13px;color:var(--dark);background:#F0F2F5;min-height:100vh}
+body{font-family:'Roboto',sans-serif;font-size:13px;color:var(--dark);background:#F0F2F5;min-height:100vh}
 /* Header */
 .hdr{background:var(--navy);color:#fff;padding:14px 20px}
 .hdr-row1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
@@ -25,10 +25,10 @@ body{font-family:'Inter',sans-serif;font-size:13px;color:var(--dark);background:
 .hdr-kpi-lbl{font-size:10px;opacity:0.7;margin-top:1px}
 /* Engagement bar */
 .eng-bar{background:var(--white);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:10px}
-.eng-bar select{flex:1;max-width:300px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Inter',sans-serif}
+.eng-bar select{flex:1;max-width:300px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Roboto',sans-serif}
 /* Tabs */
 .tab-bar{display:flex;background:var(--white);border-bottom:1px solid var(--border);padding:0 16px;overflow-x:auto}
-.tab-btn{padding:10px 14px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:var(--mid);font-family:'Inter',sans-serif;white-space:nowrap;margin-bottom:-1px;transition:color 0.15s}
+.tab-btn{padding:10px 14px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:var(--mid);font-family:'Roboto',sans-serif;white-space:nowrap;margin-bottom:-1px;transition:color 0.15s}
 /* Cards */
 .card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
 .card-hdr{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px}
@@ -39,7 +39,7 @@ body{font-family:'Inter',sans-serif;font-size:13px;color:var(--dark);background:
 /* Forms */
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 label{display:block;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
-input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Inter',sans-serif;color:var(--dark);background:var(--white)}
+input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Roboto',sans-serif;color:var(--dark);background:var(--white)}
 /* Tables */
 .fm-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .fm-tbl th{text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);color:var(--mid);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
@@ -47,7 +47,7 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
 .fm-tbl .total-row{border-top:2px solid var(--navy)}
 .fm-tbl .total-row td{font-weight:700;color:var(--navy)}
 /* Buttons */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--dark)}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:'Roboto',sans-serif;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--dark)}
 .btn-primary{background:var(--orange);color:#fff;border-color:var(--orange)}
 .btn-outline{background:transparent;color:var(--navy);border-color:var(--navy)}
 /* Main */
@@ -78,6 +78,15 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
 </head>
 <body>
 
+<div style="background:#001d5c;border-bottom:2px solid #FF5539;padding:0 20px;height:32px;display:flex;align-items:center;font-family:'Roboto',sans-serif;font-size:11px;">
+  <a href="../../tools/engagement-docket/index-v3.html" style="color:rgba(255,255,255,.7);text-decoration:none;font-weight:600;padding:0 12px 0 0;border-right:1px solid rgba(255,255,255,.15);margin-right:12px;">&#8592; Docket</a>
+  <span style="color:rgba(255,255,255,.45);font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-size:9px;">Tool</span>
+  <span style="color:rgba(255,255,255,.85);font-weight:600;margin-left:5px;">TSAP Financial Model</span>
+  <span style="color:rgba(255,255,255,.25);margin:0 8px;">|</span>
+  <span style="color:rgba(255,255,255,.45);font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-size:9px;">Engagement</span>
+  <span id="ctx-eng-name" style="color:rgba(255,255,255,.85);font-weight:600;margin-left:5px;">—</span>
+  <span style="margin-left:auto;color:rgba(255,255,255,.45);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">ATLAS</span>
+</div>
 <div class="atlas-hdr">
   <div class="atlas-hdr-left">
     <div class="atlas-brand">ATL<span>A</span>S</div>
@@ -177,7 +186,7 @@ async function atlasLogUsage(params) {
 
 //    Currency layer                                                             
 var FX_RATES = { usd_inr: 95.76, usd_eur: 0.865, eur_inr: 110.70, _source: 'config', _date: '' }
-var ACTIVE_CURRENCY = 'INR'
+var ACTIVE_CURRENCY = 'USD'
 async function loadFXRates() {
   try {
     var ctrl = new AbortController()
@@ -793,7 +802,7 @@ var TP = {
 
 // Back to Docket navigation
 function backToDocket() {
-  var url = '../../tools/engagement-docket/index.html'
+  var url = '../../tools/engagement-docket/index-v3.html'
   if (ENGAGEMENT_ID) url += '?eng=' + ENGAGEMENT_ID
   window.location.href = url
 }
@@ -1594,6 +1603,32 @@ function tcClearAll() {
 
 
 // ── Populate MODEL from SASC BOM docket_item ─────────────────────────────────
+// Map new Docket solution_versions workload_configs to FM model
+function populateModelFromWorkloadConfigs(wc) {
+  if (!wc) return
+  var uc = wc.uc||[], maas = wc.maas||[], gpuaas = wc.gpuaas||[], bmaas = wc.bmaas||[]
+  var allWl = uc.concat(maas).concat(gpuaas).concat(bmaas)
+  if (!allWl.length) return
+  var totalGpus = 0
+  gpuaas.forEach(function(wl){ totalGpus += wl.gpuCount||0 })
+  bmaas.forEach(function(wl){ totalGpus += wl.serverCount*(wl.gpusPerServer||8) })
+  // Store docket metadata for use in cost tab UI
+  MODEL._docket_uc_count     = uc.length
+  MODEL._docket_maas_count   = maas.length
+  MODEL._docket_gpuaas_count = gpuaas.length
+  MODEL._docket_bmaas_count  = bmaas.length
+  MODEL._docket_total_gpus   = totalGpus
+  MODEL._docket_uc_names     = uc.map(function(w){ return w.name }).join(', ')
+  // Estimate MW from dedicated GPU count (NVL72: 72 GPUs per 150kW rack / PUE 1.25)
+  if (totalGpus > 0 && MODEL.phase1_mw === 10) {
+    var estMw = Math.ceil(totalGpus/72*150*1.25/1000*10)/10
+    MODEL.phase1_mw = Math.max(1, Math.min(100, estMw))
+  }
+  console.log('[FM] workload_configs: UC=' + uc.length + ' MaaS=' + maas.length
+    + ' GPUaaS=' + gpuaas.length + ' BMaaS=' + bmaas.length
+    + ' total GPU est=' + totalGpus + ' phase1_mw=' + MODEL.phase1_mw)
+}
+
 // Called after SASC_DATA is loaded. Maps SASC output → FM MODEL fields.
 // Only sets values not already overridden by user.
 function populateModelFromSASC(data) {
@@ -1678,13 +1713,20 @@ async function init() {
       }
     }
 
-    // Load SASC output for this engagement
-    var sascItems = await sbGet('docket_items', 'engagement_id=eq.' + ENGAGEMENT_ID + '&item_type=eq.solution&order=created_at.desc', 1)
-    if (sascItems && sascItems[0] && sascItems[0].content) {
-      SASC_DATA = sascItems[0].content
-      console.log('SASC data loaded for engagement:', ENGAGEMENT_ID)
-      // Populate MODEL from SASC BOM
-      populateModelFromSASC(SASC_DATA)
+    // Load solution from solution_versions (new Docket) first, fall back to legacy docket_items
+    var svResult = await sbGet('solution_versions', 'engagement_id=eq.' + ENGAGEMENT_ID + '&order=version_number.desc', 1)
+    if (svResult && svResult[0] && svResult[0].bom_snapshot) {
+      var sv = svResult[0]
+      SASC_DATA = sv.bom_snapshot
+      console.log('[FM] Loaded from solution_versions:', sv.version_label || 'draft')
+      populateModelFromWorkloadConfigs(sv.bom_snapshot.workload_configs || {})
+    } else {
+      var sascItems = await sbGet('docket_items', 'engagement_id=eq.' + ENGAGEMENT_ID + '&item_type=eq.solution&order=created_at.desc', 1)
+      if (sascItems && sascItems[0] && sascItems[0].content) {
+        SASC_DATA = sascItems[0].content
+        console.log('[FM] Loaded from docket_items (legacy SASC)')
+        populateModelFromSASC(SASC_DATA)
+      }
     }
 
     // Load funding sources
@@ -1710,6 +1752,7 @@ async function init() {
   }
 
   var _es = document.getElementById('eng-status'); if (ENGAGEMENT_NAME && _es) _es.textContent = ENGAGEMENT_NAME
+  var _ctx = document.getElementById('ctx-eng-name'); if (ENGAGEMENT_NAME && _ctx) _ctx.textContent = ENGAGEMENT_NAME
   updateHeader()
   TP_INIT_DONE = true
   if (!atlasAI.getGeminiKey()) {

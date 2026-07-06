@@ -322,7 +322,7 @@ var CFG = {
 document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css'
 
 // Dynamically load shared scripts in order
-var ATLAS_BUILD_TS = '20260706g'
+var ATLAS_BUILD_TS = '20260706h'
 ;(function loadShared(files, i) {
   if (i >= files.length) { init(); return }
   var s = document.createElement('script')
@@ -1177,6 +1177,7 @@ var V = {
       {icon:'&#9881;', title:'Vision Document', desc:'AI capability vision for this engagement — generated via AI using territory intel + requirements.', btn:'Generate', action:'C.generateVisionDoc()'},
       {icon:'&#128196;', title:'ROM Summary', desc:'Customer-facing one-pager: workloads, GPU counts, power, capex estimate. Ready to share.', btn:'Copy to clipboard', action:'C.exportRomText()'},
       {icon:'&#128221;', title:'BOM Export', desc:'Full internal bill of materials with all line items. For internal pricing and procurement.', btn:'Coming soon', action:'V.toast("BOM export — coming soon","info")'},
+      {icon:'&#128200;', title:'TSAP Financial Model', desc:'Open the territory financial model for this engagement — programme cost, funding sources, revenue model and cash flow.', btn:'Open FM', action:'C.openFM()'},
     ].forEach(function(doc){
       h += '<div style="border:1px solid var(--border);border-radius:var(--r);padding:14px">'
         + '<div style="font-size:20px;margin-bottom:6px">'+doc.icon+'</div>'
@@ -3198,6 +3199,13 @@ var C = {
   generateVisionDoc: function() {
     V.toast('Vision document generation — coming soon','info')
     // WHEN C WIRED: await atlasExport.generateVisionDoc(M.currentEng.id)
+  },
+
+  openFM: function() {
+    var eng = M.currentEng
+    var url = '../tsap-financial-model/index.html'
+    if (eng && eng.id) url += '?eng=' + eng.id
+    window.open(url, '_blank')
   },
 
   exportRomText: function() {
