@@ -322,7 +322,7 @@ var CFG = {
 document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css'
 
 // Dynamically load shared scripts in order
-var ATLAS_BUILD_TS = '20260702d'
+var ATLAS_BUILD_TS = '20260706e'
 ;(function loadShared(files, i) {
   if (i >= files.length) { init(); return }
   var s = document.createElement('script')
@@ -1177,6 +1177,10 @@ var V = {
       // Fallback bottom-up using AtlasSolution throughput factors
       var maxDau = cap && !cap.error ? cap.max_dau : Math.floor(sz.total * 8000 / ((wl.reqPerDay||12)/86400 * (wl.outputTok||500)))
       var demandDau = wl.dau || 1000
+      // GPU throughput factor vs H200 baseline (7680 INT4 TFlops)
+      var gpuFactor = gpuConf && gpuConf.int4_tflops ? gpuConf.int4_tflops / 7680 : 1.0
+      var tokPerSecPerGpu = 8000 * gpuFactor
+      var racksNeeded = gpuConf && gpuConf.gpus_in_unit ? Math.ceil(sz.total / gpuConf.gpus_in_unit) : Math.ceil(sz.total / 8)
       results.push({
         gpuId: gpuId,
         gpuName: (gpuConf && gpuConf.name) || gpuId,
@@ -1184,6 +1188,8 @@ var V = {
         baseGpus: sz.baseGpus,
         buffers: sz.buffers,
         powerKw: sz.powerKw,
+        racksNeeded: racksNeeded,
+        tokPerSec: Math.round(sz.total * tokPerSecPerGpu),
         maxDau: Math.max(maxDau, demandDau),
         demandDau: demandDau,
         headroom: Math.round(((maxDau - demandDau) / demandDau) * 100),
