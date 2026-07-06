@@ -322,7 +322,7 @@ var CFG = {
 document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css'
 
 // Dynamically load shared scripts in order
-var ATLAS_BUILD_TS = '20260706e'
+var ATLAS_BUILD_TS = '20260706f'
 ;(function loadShared(files, i) {
   if (i >= files.length) { init(); return }
   var s = document.createElement('script')
@@ -1123,6 +1123,7 @@ var V = {
     else if (t === 'margin')       body = V.renderMarginTab()
     else if (t === 'benchmarks')   body = V.renderBenchmarksTab()
     else if (t === 'fleetyield')   body = V.renderFleetYieldTab()
+    else if (t === 'bmaas')        body = V.renderBmaasTab()
     else                          body = V.renderComingSoon(t)
     el.innerHTML = tm + body
   },
@@ -1823,28 +1824,105 @@ var V = {
     }
     h += '</div>'
 
-    // Scenario 2 — Inventory yield
-    h += '<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Scenario 2 — Inventory yield: Committed vs headroom</div>'
-    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:12px">'
+    // Scenario 2 — Inventory yield with segment breakdown
+    h += '<div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Scenario 2 — Inventory Yield: Fleet Allocation by Segment</div>'
+
+    // Compute per-type committed GPU count
+    var ucGpus=0, gpuaasGpus=0, bmaasGpus=0, maasGpus=0
+    ;(M.workloadConfigs.uc||[]).forEach(function(wl){
+      var sz = AtlasSolution.sizeWorkload(wl,'uc',M); ucGpus += sz.total||0
+    })
+    ;(M.workloadConfigs.gpuaas||[]).forEach(function(wl){ gpuaasGpus += wl.gpuCount||0 })
+    ;(M.workloadConfigs.bmaas||[]).forEach(function(wl){
+      var g = M.gpuMap&&M.gpuMap[wl.gpu]; maasGpus += 0 // bmaas doesn't count as shared
+      bmaasGpus += wl.serverCount * (wl.gpusPerServer||(g&&g.gpus_in_unit)||8)
+    })
+    ;(M.workloadConfigs.maas||[]).forEach(function(wl){
+      var sz = AtlasSolution.sizeWorkload(wl,'maas',M); maasGpus += sz.total||0
+    })
+    var usedGpus = ucGpus + gpuaasGpus + bmaasGpus + maasGpus
+    var headroomGpus = Math.max(0, fy.totalFleet - usedGpus - failoverReserve)
+    var headroomPct = fy.totalFleet > 0 ? Math.round(headroomGpus/fy.totalFleet*100) : 0
+
     var segments = [
-      {label:'Committed (UC/GPUaaS)', gpus: commitedGpus, color:'var(--navy)'},
-      {label:'Failover reserve (20%)', gpus: failoverReserve, color:'var(--amber)'},
-      {label:'Available for MaaS', gpus: Math.max(0, fy.totalFleet - commitedGpus - failoverReserve), color:'var(--teal)'},
+      {label:'UC / Sovereign workloads', gpus:ucGpus,       color:'var(--navy)',   icon:'🏛'},
+      {label:'GPUaaS — Reserved blocks', gpus:gpuaasGpus,   color:'var(--blue)',   icon:'⚡'},
+      {label:'BMaaS — Bare metal',       gpus:bmaasGpus,    color:'#6C47FF',       icon:'🖥'},
+      {label:'MaaS — Inference API',     gpus:maasGpus,     color:'var(--teal)',   icon:'🔌'},
+      {label:'Failover / HA reserve',    gpus:failoverReserve, color:'var(--amber)', icon:'🛡'},
+      {label:'Available headroom',       gpus:headroomGpus, color:'#E5E7EB',       icon:'📦'},
     ]
-    segments.forEach(function(s) {
+
+    // Stacked bar chart
+    var barTotal = fy.totalFleet || 1
+    h += '<div style="margin-bottom:12px">'
+    h += '<div style="height:28px;border-radius:6px;overflow:hidden;display:flex;width:100%">'
+    segments.forEach(function(s){
+      var pct = Math.round(s.gpus/barTotal*100)
+      if (pct <= 0) return
+      h += '<div style="width:'+pct+'%;background:'+s.color+';transition:width .3s" title="'+s.label+': '+s.gpus+' GPUs ('+pct+'%)"></div>'
+    })
+    h += '</div></div>'
+
+    // Grid of segment cards
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">'
+    segments.forEach(function(s){
       var pct = fy.totalFleet > 0 ? Math.round(s.gpus/fy.totalFleet*100) : 0
-      h += '<div style="background:var(--light);border-radius:var(--r);padding:12px;text-align:center">'
+      h += '<div style="background:var(--light);border-radius:var(--r);padding:10px;border-left:3px solid '+s.color+'">'
+        + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+        + '<span style="font-size:14px">'+s.icon+'</span>'
+        + '<span style="font-size:11px;color:var(--mid)">'+s.label+'</span></div>'
         + '<div style="font-size:20px;font-weight:900;color:'+s.color+'">'+s.gpus+'</div>'
-        + '<div style="font-size:11px;color:var(--mid)">'+s.label+'</div>'
-        + '<div style="font-size:11px;color:var(--mid)">'+pct+'% of fleet</div>'
+        + '<div style="font-size:10px;color:var(--mid)">'+pct+'% of fleet</div>'
         + '</div>'
     })
     h += '</div>'
-    var headroomPct = fy.totalFleet > 0 ? Math.round(Math.max(0, fy.totalFleet - commitedGpus - failoverReserve)/fy.totalFleet*100) : 0
+
+    // Tenants table — show per-tenant GPU allocation
+    var tenants = M.tenantsList || {}
+    var tenantGpus = {}
+    var countWls = function(list, type) {
+      (list||[]).forEach(function(wl) {
+        if (!wl.tenant) return
+        if (!tenantGpus[wl.tenant]) tenantGpus[wl.tenant] = {uc:0,gpuaas:0,bmaas:0,maas:0}
+        if (type==='uc')     { var sz=AtlasSolution.sizeWorkload(wl,'uc',M); tenantGpus[wl.tenant].uc+=sz.total||0 }
+        if (type==='gpuaas') { tenantGpus[wl.tenant].gpuaas+=wl.gpuCount||0 }
+        if (type==='bmaas')  { var g=M.gpuMap&&M.gpuMap[wl.gpu]; tenantGpus[wl.tenant].bmaas+=wl.serverCount*(wl.gpusPerServer||(g&&g.gpus_in_unit)||8) }
+        if (type==='maas')   { var sz2=AtlasSolution.sizeWorkload(wl,'maas',M); tenantGpus[wl.tenant].maas+=sz2.total||0 }
+      })
+    }
+    countWls(M.workloadConfigs.uc,'uc')
+    countWls(M.workloadConfigs.gpuaas,'gpuaas')
+    countWls(M.workloadConfigs.bmaas,'bmaas')
+    countWls(M.workloadConfigs.maas,'maas')
+
+    if (Object.keys(tenantGpus).length) {
+      h += '<div style="font-size:12px;font-weight:700;color:var(--navy);margin:12px 0 6px">Per-Tenant GPU Allocation</div>'
+      h += '<table class="tbl"><thead><tr><th>Tenant</th><th class="num">UC GPUs</th><th class="num">GPUaaS</th><th class="num">BMaaS</th><th class="num">MaaS</th><th class="num">Total</th><th class="num">% of fleet</th></tr></thead><tbody>'
+      Object.keys(tenantGpus).sort().forEach(function(tid) {
+        var tg = tenantGpus[tid]
+        var t = tenants[tid]
+        var total = tg.uc+tg.gpuaas+tg.bmaas+tg.maas
+        var pct = fy.totalFleet>0 ? Math.round(total/fy.totalFleet*100) : 0
+        h += '<tr>'
+          + '<td><span class="tenant-badge">'+(t?t.name:tid)+'</span></td>'
+          + '<td class="num">'+(tg.uc||'—')+'</td>'
+          + '<td class="num">'+(tg.gpuaas||'—')+'</td>'
+          + '<td class="num">'+(tg.bmaas||'—')+'</td>'
+          + '<td class="num">'+(tg.maas||'—')+'</td>'
+          + '<td class="num" style="font-weight:700">'+total+'</td>'
+          + '<td class="num">'+pct+'%</td>'
+          + '</tr>'
+      })
+      h += '</tbody></table>'
+    }
+
     if (headroomPct < 20) {
-      h += '<div class="sla-banner sla-breach">&#9888; Low headroom ('+headroomPct+'%) — consider promotional pricing or defer new MaaS commitments</div>'
+      h += '<div class="sla-banner sla-breach" style="margin-top:10px">&#9888; Low headroom ('+headroomPct+'%) — defer new commitments or expand fleet</div>'
+    } else if (headroomPct > 50) {
+      h += '<div class="sla-banner" style="margin-top:10px;background:rgba(255,182,0,.1);color:var(--amber);border-color:var(--amber)">&#128200; High headroom ('+headroomPct+'%) — push promotional MaaS pricing or BMaaS spot offers</div>'
     } else {
-      h += '<div class="sla-banner sla-met">&#10003; Sufficient headroom ('+headroomPct+'%) for MaaS growth — consider seasonal push to fill idle capacity</div>'
+      h += '<div class="sla-banner sla-met" style="margin-top:10px">&#10003; Good headroom ('+headroomPct+'%) — fleet well-balanced for growth</div>'
     }
     h += '</div>'
     h += '</div>'
@@ -1950,6 +2028,73 @@ var V = {
   },
 
 
+  renderBmaasTab: function() {
+    var rows = M.workloadConfigs.bmaas || []
+    var totalServers = 0, totalPowerKw = 0
+
+    var html = '<div class="tablewrap"><table class="wl"><thead><tr>'
+      + '<th>Block</th><th>GPU</th><th class="num">Servers</th><th class="num">GPUs/srv</th>'
+      + '<th>SLA</th><th>Tenant</th><th class="num">Power</th><th></th></tr></thead><tbody>'
+
+    rows.forEach(function(wl) {
+      var gpuConf = M.gpuMap && M.gpuMap[wl.gpu]
+      var gpusPerServer = wl.gpusPerServer || (gpuConf && gpuConf.gpus_in_unit) || 8
+      var totalGpus = wl.serverCount * gpusPerServer
+      var tdpKwPerUnit = (gpuConf && gpuConf.tdp_kw) ? gpuConf.tdp_kw : gpusPerServer * 0.7
+      var powerKw = Math.round(wl.serverCount * tdpKwPerUnit * 10) / 10
+      totalServers += wl.serverCount; totalPowerKw += powerKw
+      var isOpen = !!M.openWlRows[wl.id]
+      var t = wl.tenant ? M.tenantsList[wl.tenant] : null
+      var slaLabel = {gold:'Gold SLA',silver:'Silver SLA',bronze:'Bronze SLA'}[wl.sla||'gold'] || 'Gold SLA'
+      html += '<tr class="row-main'+(isOpen?' open':'`')+'" onclick="C.toggleRow(\''+wl.id+'\')">'
+        + '<td class="name">'+wl.name+'</td>'
+        + '<td>'+gpuLabel(wl.gpu)+'</td>'
+        + '<td class="num">'+wl.serverCount+'</td>'
+        + '<td class="num">'+gpusPerServer+'</td>'
+        + '<td><span class="pool-badge-'+(wl.sla||'gold')+'">'+slaLabel+'</span></td>'
+        + '<td>'+(t?'<span class="tenant-badge">'+t.name+'</span>':'<span style="color:var(--mid);font-size:10px">Unassigned</span>')+'</td>'
+        + '<td class="num">'+powerKw+'kW</td>'
+        + '<td><span class="arrow">&#9654;</span></td></tr>'
+      html += '<tr class="expand-row"><td colspan="8"><div class="expand-inner'+(isOpen?' open':'`')+'">'
+      if (isOpen) {
+        html += '<div class="expand-pad">'
+        html += '<div class="formgrid" style="grid-template-columns:1.5fr 1fr 1fr 1fr">'
+        html += '<div class="fg"><label>Block Name</label><input type="text" value="'+wl.name+'" onchange="C.updBmaas(\''+wl.id+'\',\'name\',this.value)"></div>'
+        html += '<div class="fg"><label>GPU Architecture</label>'+AtlasSolution.renderGpuDropdown(wl.gpu, M, "C.updBmaas('"+wl.id+"','gpu',this.value)")+'</div>'
+        html += '<div class="fg"><label>Server Count</label><input type="number" min="1" step="1" value="'+wl.serverCount+'" onchange="C.updBmaas(\''+wl.id+'\',\'serverCount\',+this.value)"><div class="fg-hint">Each server = 1 rack unit</div></div>'
+        html += '<div class="fg"><label>GPUs per server</label><input type="number" min="1" step="1" value="'+gpusPerServer+'" onchange="C.updBmaas(\''+wl.id+'\',\'gpusPerServer\',+this.value)"><div class="fg-hint">Auto-set from GPU config</div></div>'
+        html += '</div>'
+        html += '<div class="formgrid">'
+        html += '<div class="fg"><label>SLA Tier</label><select onchange="C.updBmaas(\''+wl.id+'\',\'sla\',this.value)">'
+        ;[['gold','Gold SLA — dedicated bare metal access'],['silver','Silver SLA — guaranteed allocation'],['bronze','Bronze SLA — best-effort']].forEach(function(v){ html += '<option value="'+v[0]+'"'+((wl.sla||'gold')===v[0]?' selected':'')+'>'+v[1]+'</option>' })
+        html += '</select></div>'
+        html += '<div class="fg"><label>Guest OS</label><select onchange="C.updBmaas(\''+wl.id+'\',\'guestOs\',this.value)">'
+        ;[['ubuntu','Ubuntu 22.04 LTS'],['rhel','RHEL 8/9'],['custom','Customer image']].forEach(function(v){ html += '<option value="'+v[0]+'"'+((wl.guestOs||'ubuntu')===v[0]?' selected':'')+'>'+v[1]+'</option>' })
+        html += '</select></div>'
+        html += '<div class="fg"><label>Interconnect</label><select onchange="C.updBmaas(\''+wl.id+'\',\'interconnect\',this.value)">'
+        ;[['standalone','Standalone — single server'],['nvlink','NVLink — same chassis'],['infiniband','InfiniBand — multi-server']].forEach(function(v){ html += '<option value="'+v[0]+'"'+((wl.interconnect||'standalone')===v[0]?' selected':'')+'>'+v[1]+'</option>' })
+        html += '</select></div>'
+        html += '</div>'
+        html += '<div class="derived"><div class="derived-line">'
+          + '<span>GPU<br><b>'+gpuLabel(wl.gpu)+'</b></span>'
+          + '<span>Servers<br><b>'+wl.serverCount+'</b></span>'
+          + '<span>Total GPUs<br><b>'+totalGpus+'</b></span>'
+          + '<span>VRAM<br><b>'+((gpuConf&&gpuConf.vram_per_gpu_gb)?totalGpus*gpuConf.vram_per_gpu_gb+'GB':'—')+'</b></span>'
+          + '<span>Power<br><b>'+powerKw+'kW</b></span>'
+          + '<span>SLA<br><b>'+(wl.sla||'gold').toUpperCase()+'</b></span>'
+          + '</div></div>'
+        html += V.renderTenantBlock(wl, 'bmaas')
+        html += '<div class="actions-row"><button class="btn btn-danger-text" onclick="C.removeBmaas(\''+wl.id+'\')">Remove</button><button class="btn btn-ghost" onclick="C.toggleRow(\''+wl.id+'\')">&#9650; Collapse</button></div>'
+        html += '</div>'
+      }
+      html += '</div></td></tr>'
+    })
+    html += '<tr class="totals-row"><td>TOTALS</td><td></td><td class="num">'+totalServers+'</td><td></td><td></td><td></td><td class="num">'+Math.round(totalPowerKw*10)/10+'kW</td><td></td></tr>'
+    html += '</tbody></table></div>'
+    html += '<div class="tablewrap add-row"><button class="add-btn" onclick="C.addBmaas()">+ Add BMaaS Block</button></div>'
+    return html
+  },
+
   renderGpuaasTab: function() {
     var rows = M.workloadConfigs.gpuaas, totalGpus = 0, totalPowerKw = 0
     var html = '<div class="tablewrap"><table class="wl"><thead><tr>'
@@ -1998,7 +2143,7 @@ var V = {
         html += '<div class="derived-line">'
           + '<span>GPU<br><b>'+gpuLabel(wl.gpu)+'</b></span>'
           + '<span>Count<br><b>'+wl.gpuCount+'</b></span>'
-          + '<span>VRAM<br><b>'+((gpuConf&&gpuConf.hbm_size_gb)?wl.gpuCount*gpuConf.hbm_size_gb+'GB':'—')+'</b></span>'
+          + '<span>VRAM<br><b>'+((gpuConf&&gpuConf.vram_per_gpu_gb)?wl.gpuCount*gpuConf.vram_per_gpu_gb+'GB':'—')+'</b></span>'
           + '<span>Power<br><b>'+powerKw+'kW</b></span>'
           + '<span>Racks<br><b>'+Math.ceil(wl.gpuCount/8)+' rack(s)</b></span>'
           + '<span>Dedication<br><b>'+(wl.dedicated!==false?'Dedicated':'Shared')+'</b></span>'
@@ -2942,6 +3087,37 @@ var C = {
     M.workloadConfigs.gpuaas = M.workloadConfigs.gpuaas.filter(function(w){ return w.id !== id })
     V.renderSolTabs(); V.renderSolTabBody()
     C.scheduleSolutionSave()
+  },
+
+  addBmaas: function() {
+    var id = 'bm-' + Date.now()
+    var defaultGpu = M.gpuConfigs && M.gpuConfigs.length ? M.gpuConfigs[0].id : ''
+    var gpuConf = M.gpuMap && M.gpuMap[defaultGpu]
+    M.workloadConfigs.bmaas.push({
+      id: id, name: 'BMaaS Block ' + (M.workloadConfigs.bmaas.length + 1),
+      gpu: defaultGpu, serverCount: 1,
+      gpusPerServer: (gpuConf && gpuConf.gpus_in_unit) || 8,
+      sla: 'gold', guestOs: 'ubuntu', interconnect: 'standalone',
+      tenant: null, poolType: 'reserved'
+    })
+    M.openWlRows[id] = true
+    V.renderSolTabs(); V.renderSolTabBody(); C.scheduleSolutionSave()
+  },
+
+  updBmaas: function(id, field, val) {
+    var wl = M.workloadConfigs.bmaas.find(function(w){ return w.id === id })
+    if (!wl) return
+    wl[field] = val
+    if (field === 'gpu') {
+      var gpuConf = M.gpuMap && M.gpuMap[val]
+      if (gpuConf && gpuConf.gpus_in_unit) wl.gpusPerServer = gpuConf.gpus_in_unit
+    }
+    V.renderSolTabBody(); C.scheduleSolutionSave()
+  },
+
+  removeBmaas: function(id) {
+    M.workloadConfigs.bmaas = M.workloadConfigs.bmaas.filter(function(w){ return w.id !== id })
+    V.renderSolTabs(); V.renderSolTabBody(); C.scheduleSolutionSave()
   },
 
   // ── Solution save — writes to solution_versions in Supabase ─────────────
