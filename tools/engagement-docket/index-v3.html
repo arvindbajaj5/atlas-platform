@@ -1275,6 +1275,69 @@ var V = {
   },
 
   renderWhatIfChart: function(results, wl) {
+    if (!results || !results.length) return ''
+
+    // Chart 1: GPU count comparison (bar chart — most useful comparison)
+    var W=680, H=220, PL=160, PR=20, PT=20, PB=40
+    var cW=W-PL-PR, cH=H-PT-PB
+    var maxGpus = Math.max.apply(null, results.map(function(r){ return r.gpusNeeded||r.total||0 })) * 1.2 || 1
+    var barH = Math.min(32, Math.floor((cH - (results.length-1)*6) / results.length))
+    var COLORS=['#002870','#FF5539','#00B290','#FFB600','#1C38F5']
+
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:var(--font)">'
+    svg+='<text x="'+(W/2)+'" y="14" text-anchor="middle" font-size="11" font-weight="700" fill="#1F2937">GPUs Required by Architecture</text>'
+
+    results.forEach(function(r,i){
+      var gpus = r.gpusNeeded || r.total || 0
+      var barW = gpus/maxGpus*cW
+      var yy = PT+(i*(barH+6))
+      var col = COLORS[i%COLORS.length]
+      // GPU name label
+      svg+='<text x="'+(PL-6)+'" y="'+(yy+barH/2+4)+'" text-anchor="end" font-size="10" fill="#374151" font-weight="600">'+r.gpuName+'</text>'
+      // Bar
+      svg+='<rect x="'+PL+'" y="'+yy+'" width="'+barW+'" height="'+barH+'" rx="3" fill="'+col+'"/>'
+      // Value label
+      svg+='<text x="'+(PL+barW+4)+'" y="'+(yy+barH/2+4)+'" font-size="10" fill="'+col+'" font-weight="700">'+gpus+' GPUs</text>'
+      // Rack count
+      var units = r.racksNeeded || Math.ceil(gpus/(r.gpusInUnit||8))
+      svg+='<text x="'+(PL+barW+4)+'" y="'+(yy+barH/2+16)+'" font-size="9" fill="#6B7280">'+(units)+' rack unit'+(units!==1?'s':'')+'</text>'
+    })
+
+    // X axis
+    svg+='<line x1="'+PL+'" y1="'+(PT+cH)+'" x2="'+(PL+cW)+'" y2="'+(PT+cH)+'" stroke="#374151" stroke-width="1"/>'
+    for(var xi=0;xi<=4;xi++){
+      var xv=Math.round(maxGpus*xi/4)
+      var xx=PL+xi/4*cW
+      svg+='<text x="'+xx+'" y="'+(PT+cH+14)+'" text-anchor="middle" font-size="9" fill="#6B7280">'+xv+'</text>'
+    }
+    svg+='<text x="'+(PL+cW/2)+'" y="'+(H-2)+'" text-anchor="middle" font-size="10" fill="#374151">GPU count</text>'
+    svg+='</svg>'
+
+    // Chart 2: tok/s throughput comparison (horizontal bar)
+    var W2=680, H2=200
+    var maxTps = Math.max.apply(null, results.map(function(r){ return r.tokPerSec||r.throughputTokPerSec||0 })) * 1.2 || 1
+    svg+='<svg viewBox="0 0 '+W2+' '+H2+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:var(--font);margin-top:8px">'
+    svg+='<text x="'+(W2/2)+'" y="14" text-anchor="middle" font-size="11" font-weight="700" fill="#1F2937">Throughput Comparison (tok/s at target demand)</text>'
+    var cH2=H2-PT-PB
+    results.forEach(function(r,i){
+      var tps = r.tokPerSec || r.throughputTokPerSec || 0
+      var barW2 = tps/maxTps*cW
+      var yy = PT+(i*(barH+6))
+      var col = COLORS[i%COLORS.length]
+      var fmtTps = tps >= 1000 ? Math.round(tps/100)/10+'K' : tps
+      svg+='<text x="'+(PL-6)+'" y="'+(yy+barH/2+4)+'" text-anchor="end" font-size="10" fill="#374151" font-weight="600">'+r.gpuName+'</text>'
+      svg+='<rect x="'+PL+'" y="'+yy+'" width="'+barW2+'" height="'+barH+'" rx="3" fill="'+col+'" opacity="0.75"/>'
+      svg+='<text x="'+(PL+barW2+4)+'" y="'+(yy+barH/2+4)+'" font-size="10" fill="'+col+'" font-weight="700">'+fmtTps+' tok/s</text>'
+    })
+    svg+='<line x1="'+PL+'" y1="'+(PT+cH2)+'" x2="'+(PL+cW)+'" y2="'+(PT+cH2)+'" stroke="#374151" stroke-width="1"/>'
+    svg+='<text x="'+(PL+cW/2)+'" y="'+(H2-2)+'" text-anchor="middle" font-size="10" fill="#374151">tok/s</text>'
+    svg+='</svg>'
+
+    return svg
+
+    // Old DAU-based chart kept below for reference — replaced by cleaner bar charts above
+    var OLD_CHART_START = true
+    if (!OLD_CHART_START) {
     var W = 680, H = 280, PL = 60, PR = 20, PT = 20, PB = 50
     var cW = W - PL - PR, cH = H - PT - PB
     var demandDau = (wl && wl.dau) || 1000
@@ -1348,8 +1411,8 @@ var V = {
       svg += '<text x="'+(lx+16)+'" y="'+ly+'" font-size="10" fill="#374151">'+r.gpuName+'</text>'
     })
 
-    svg += '</svg>'
-    return svg
+    // end of old chart (unreachable)
+    }
   },
 
     // ── Make vs Buy ────────────────────────────────────────────────────────
@@ -1402,9 +1465,99 @@ var V = {
         + '</tr>'
     })
     h += '</tbody></table>'
-    h += '<div style="margin-top:12px;font-size:11px;color:var(--mid)">Assumptions: $0.08/kWh power, $30k/GPU capex, 60-month amortisation, 8,000 tok/s/GPU (H200 INT4 baseline). Market prices from model_catalogue.price_input/output_per_1m.</div>'
+    h += '<div style="margin-top:12px;font-size:11px;color:var(--mid)">Assumptions: $0.08/kWh power, $30k/GPU capex, 60-month amortisation, 8,000 tok/s/GPU (H200 INT4 baseline). Market prices from model_catalogue.</div>'
+
+    // 5-year cost curve
+    if (wls.length) {
+      h += V._renderMvbCostCurve(wls)
+    }
+
     h += '</div>'
     return h
+  },
+
+  _renderMvbCostCurve: function(wls) {
+    // Show on-prem cost/Mtok vs market price across 5 years (GPU deflation 10%/yr)
+    var W=680, H=240, PL=64, PR=20, PT=24, PB=44
+    var cW=W-PL-PR, cH=H-PT-PB
+    var years=[1,2,3,4,5]
+    var deflation=0.10  // market price falls 10%/yr
+    var COLORS=['#002870','#FF5539','#00B290','#FFB600','#1C38F5']
+
+    // Gather series: one on-prem cost line + one market line per model
+    var series=[]
+    wls.slice(0,4).forEach(function(wl,wi){
+      var model = M.modelMap && M.modelMap[wl.model]
+      var sz = AtlasSolution.sizeWorkload(wl, 'uc', M)
+      var gpus = sz.total || 1
+      var mktBase = model && model.price_input_per_1m ? (model.price_input_per_1m+model.price_output_per_1m)/2 : null
+      // On-prem cost/Mtok: (power + amortised capex) / tokens_at_75pct_util
+      var tokPerMonthM = gpus * 8000 * 0.75 * 3600 * 730 / 1e6
+      var onpremBase = (gpus*0.7*0.08*730 + gpus*30000/60) / tokPerMonthM
+
+      // On-prem is fixed (our cost doesn't deflate much)
+      // Market price deflates 10%/yr
+      var onpremPts = years.map(function(){ return onpremBase })
+      var mktPts    = mktBase ? years.map(function(y){ return mktBase * Math.pow(1-deflation,y-1) }) : null
+      series.push({name:wl.name, onprem:onpremPts, mkt:mktPts, col:COLORS[wi%COLORS.length]})
+    })
+
+    // Y scale: 0 to max across all series
+    var allVals=[]
+    series.forEach(function(s){ allVals=allVals.concat(s.onprem); if(s.mkt) allVals=allVals.concat(s.mkt) })
+    var yMax = Math.max.apply(null,allVals)*1.2 || 1
+    var xScale=function(yr){ return PL+(yr-1)/(years.length-1)*cW }
+    var yScale=function(v){ return PT+cH-(v/yMax)*cH }
+    var fmt2=function(v){ return '$'+v.toFixed(3) }
+
+    var svg='<div style="margin-top:16px"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">5-Year Cost Curve — On-prem vs Market API Price/Mtok (10%/yr GPU deflation)</div>'
+    svg+='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:var(--font)">'
+
+    // Grid
+    for(var gi=0;gi<=4;gi++){
+      var gy=PT+(gi/4)*cH
+      svg+='<line x1="'+PL+'" y1="'+gy+'" x2="'+(PL+cW)+'" y2="'+gy+'" stroke="#E5E7EB" stroke-width="1"/>'
+      svg+='<text x="'+(PL-6)+'" y="'+(gy+4)+'" text-anchor="end" font-size="9" fill="#6B7280">'+fmt2(yMax*(1-gi/4))+'</text>'
+    }
+    years.forEach(function(yr){
+      var xx=xScale(yr)
+      svg+='<line x1="'+xx+'" y1="'+PT+'" x2="'+xx+'" y2="'+(PT+cH)+'" stroke="#E5E7EB" stroke-width="1"/>'
+      svg+='<text x="'+xx+'" y="'+(PT+cH+14)+'" text-anchor="middle" font-size="10" fill="#374151">Yr '+yr+'</text>'
+    })
+
+    // Axes
+    svg+='<line x1="'+PL+'" y1="'+PT+'" x2="'+PL+'" y2="'+(PT+cH)+'" stroke="#374151" stroke-width="1.5"/>'
+    svg+='<line x1="'+PL+'" y1="'+(PT+cH)+'" x2="'+(PL+cW)+'" y2="'+(PT+cH)+'" stroke="#374151" stroke-width="1.5"/>'
+    svg+='<text x="'+(PL+cW/2)+'" y="'+(H-4)+'" text-anchor="middle" font-size="10" fill="#374151">Year</text>'
+    svg+='<text x="14" y="'+(PT+cH/2)+'" text-anchor="middle" font-size="10" fill="#374151" transform="rotate(-90,14,'+(PT+cH/2)+')">$/Mtok</text>'
+
+    // Draw lines
+    series.forEach(function(s){
+      // On-prem — solid
+      var pts=s.onprem.map(function(v,i){ return xScale(years[i])+','+yScale(v) }).join(' ')
+      svg+='<polyline points="'+pts+'" fill="none" stroke="'+s.col+'" stroke-width="2"/>'
+      svg+='<text x="'+(xScale(5)+4)+'" y="'+yScale(s.onprem[4])+'" font-size="9" fill="'+s.col+'">'+s.name+' (on-prem)</text>'
+      // Market — dashed
+      if(s.mkt){
+        var mpts=s.mkt.map(function(v,i){ return xScale(years[i])+','+yScale(v) }).join(' ')
+        svg+='<polyline points="'+mpts+'" fill="none" stroke="'+s.col+'" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.7"/>'
+        // Crossover point
+        for(var yi=0;yi<years.length-1;yi++){
+          var op=s.onprem[yi],om=s.mkt[yi],np=s.onprem[yi+1],nm=s.mkt[yi+1]
+          if((op>om)!=(np>nm)){
+            // Interpolate crossover
+            var t=(op-om)/((op-om)-(np-nm))
+            var cx=xScale(years[yi]+t),cy=yScale(op+t*(np-op))
+            svg+='<circle cx="'+cx+'" cy="'+cy+'" r="5" fill="'+s.col+'" opacity="0.8"/>'
+            svg+='<text x="'+cx+'" y="'+(cy-8)+'" text-anchor="middle" font-size="9" fill="'+s.col+'" font-weight="700">Break-even</text>'
+          }
+        }
+      }
+    })
+
+    svg+='<text x="'+(PL+cW-80)+'" y="'+(PT+16)+'" font-size="9" fill="#6B7280">— Solid=On-prem   - - Market API</text>'
+    svg+='</svg></div>'
+    return svg
   },
 
   // ── BOM Complete ────────────────────────────────────────────────────────
@@ -1546,16 +1699,16 @@ var V = {
 
     // GPU specs table
     h += '<div style="margin-bottom:var(--sp-4)"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">GPU Catalogue — Specs</div>'
-    h += '<table class="tbl"><thead><tr><th>GPU</th><th>Vendor</th><th class="num">HBM (GB)</th><th class="num">FP8 TFlops</th><th class="num">TDP (W)</th><th>Status</th></tr></thead><tbody>'
+    h += '<table class="tbl"><thead><tr><th>GPU</th><th class="num">VRAM (GB)</th><th class="num">INT4 TFlops</th><th class="num">TDP (kW)</th><th class="num">GPUs/unit</th><th>Benchmark rows</th></tr></thead><tbody>'
     gpus.forEach(function(g) {
-      var hasSpecs = g.fp8_tflops || g.hbm_size_gb
+      var hasSpecs = g.int4_tflops || g.vram_per_gpu_gb
       h += '<tr>'
         + '<td style="font-weight:600">' + g.name + '</td>'
-        + '<td>' + (g.vendor || '—') + '</td>'
-        + '<td class="num">' + (g.hbm_size_gb || '—') + '</td>'
-        + '<td class="num">' + (g.fp8_tflops || '—') + '</td>'
-        + '<td class="num">' + (g.tdp_w || '—') + '</td>'
-        + '<td><span style="color:' + (hasSpecs?'var(--teal)':'var(--orange)') + '">' + (hasSpecs?'✓ Specs present':'⚠ Incomplete') + '</span></td>'
+        + '<td class="num">' + (g.vram_per_gpu_gb || '—') + '</td>'
+        + '<td class="num">' + (g.int4_tflops ? g.int4_tflops.toLocaleString() : '—') + '</td>'
+        + '<td class="num">' + (g.tdp_kw || '—') + '</td>'
+        + '<td class="num">' + (g.gpus_in_unit || '—') + '</td>'
+        + '<td><span style="color:' + (hasSpecs?'var(--teal)':'var(--orange)') + '">' + (hasSpecs?'✓ Has specs':'⚠ Missing') + '</span></td>'
         + '</tr>'
     })
     h += '</tbody></table></div>'
