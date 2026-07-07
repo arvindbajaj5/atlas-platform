@@ -322,7 +322,7 @@ var CFG = {
 document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css'
 
 // Dynamically load shared scripts in order
-var ATLAS_BUILD_TS = '20260706j'
+var ATLAS_BUILD_TS = '20260706k'
 ;(function loadShared(files, i) {
   if (i >= files.length) { init(); return }
   var s = document.createElement('script')
@@ -2651,14 +2651,12 @@ var V = {
     h += '</div></div>'
     h += '</div>'
 
-    h += V.renderTenantBlock(wl, 'maas')
-
     h += AtlasSolution.renderDerivedPanel(sz, wl)
 
     // Provisioning override + Demand Planner (collapsible)
-    var minGpus = sz.total || 1
+    var minGpus = (sz && !sz.error && sz.total) ? sz.total : 1
     var provGpus = wl.provisionedGpus || minGpus
-    var tokPerSecGpu = sz.tokPerSec || 15000
+    var tokPerSecGpu = (sz && sz.tokPerSec) ? sz.tokPerSec : ((sz && sz.total) ? sz.total * 15417 : 15417)
     var supplyTokPerMonthB = provGpus * tokPerSecGpu * 730 * 3600 / 1e9
     var dpTitle = provGpus > minGpus
       ? '&#128200; Provisioning &amp; Demand Planner <span style="font-size:10px;color:var(--teal);margin-left:6px">+' + (provGpus - minGpus) + ' GPUs oversized</span>'
@@ -2776,8 +2774,15 @@ var V = {
     }
     h += '</div></div></div>'
 
-        h += V.renderMvBChart(wl, 'maas')
     h += '</div></div></div>'
+
+    h += '<div class="collapsible" style="margin-top:var(--sp-3)">'
+    h += '<div class="collapsible-hdr" onclick="C.toggleCollapsible(this)"><span class="arrow">&#9654;</span> Make vs Buy — On-prem vs API Market</div>'
+    h += '<div class="collapsible-body"><div class="collapsible-body-pad">'
+    h += V.renderMvBChart(wl, 'maas')
+    h += '</div></div></div>'
+
+    h += V.renderTenantBlock(wl, 'maas')
 
     h += '<div class="actions-row">'
     h += '<button class="btn btn-danger-text" onclick="C.removeMaas(\''+wl.id+'\')">Remove</button>'
