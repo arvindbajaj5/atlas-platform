@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="page-title">Solution, Size & Price — ATLAS</title>
+<link rel="stylesheet" id="atlas-css-link" href="">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── TOOL IDENTITY — change TOOL_NAME/TOOL_SHORT in JS, nothing here ── */
+:root {
+  --orange:#FF5539; --navy:#002870; --blue:#1C38F5;
+  --teal:#00B290; --amber:#FFB600; --purple:#6C47FF;
+  --white:#FFF; --light:#F5F6FA; --mid:#8892A4; --dark:#0D1F4E;
+  --border:#E0E4EF; --shadow:0 2px 8px rgba(0,0,0,.07);
+  --shadow-md:0 4px 16px rgba(0,0,0,.11);
+  --r:8px; --r-sm:5px; --r-lg:12px;
+  --font:'Roboto',sans-serif; --mono:'Roboto Mono',monospace;
+  --sp:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--light);color:var(--dark);min-height:100vh;font-size:13px}
+
+/* ── CONTEXT BAR ── */
+.ctx{background:#001d5c;border-bottom:2px solid var(--orange);height:32px;
+  display:flex;align-items:center;padding:0 20px;gap:0;font-size:11px}
+.ctx-back{color:rgba(255,255,255,.7);text-decoration:none;font-weight:600;
+  padding:0 12px 0 0;border-right:1px solid rgba(255,255,255,.15);
+  margin-right:12px;transition:color .15s}
+.ctx-back:hover{color:var(--orange)}
+.ctx-lbl{color:rgba(255,255,255,.45);font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;font-size:9px}
+.ctx-val{color:rgba(255,255,255,.85);font-weight:600;margin-left:5px}
+.ctx-sep{color:rgba(255,255,255,.25);margin:0 8px}
+.ctx-tool{margin-left:auto;color:rgba(255,255,255,.45);font-size:10px;
+  font-weight:700;text-transform:uppercase;letter-spacing:1px}
+
+/* ── HEADER ── */
+.hdr{background:var(--navy);padding:0 20px;height:52px;
+  display:flex;align-items:center;justify-content:space-between;
+  box-shadow:var(--shadow-md)}
+.hdr-left{display:flex;align-items:center;gap:12px}
+.hdr-brand{font-size:16px;font-weight:900;color:#fff;letter-spacing:3px}
+.hdr-brand span{color:var(--orange)}
+.hdr-tool{font-size:12px;font-weight:600;color:rgba(255,255,255,.6);
+  border-left:1px solid rgba(255,255,255,.2);padding-left:12px}
+.hdr-eng{font-size:11px;font-weight:600;color:rgba(255,255,255,.5);
+  border-left:1px solid rgba(255,255,255,.15);padding-left:12px;
+  max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── MODE TOGGLE ── */
+.mode-toggle{display:flex;background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:3px}
+.mode-btn{padding:4px 14px;border-radius:16px;font-size:11px;font-weight:700;
+  color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s;border:none;
+  background:transparent;font-family:var(--font)}
+.mode-btn.act{background:#fff;color:var(--navy)}
+
+/* ── KPI BAR ── */
+.kpi-bar{background:var(--dark);padding:0 20px;height:40px;
+  display:flex;align-items:center;gap:0;border-bottom:1px solid rgba(255,255,255,.08)}
+.kpi-item{display:flex;align-items:center;gap:6px;padding:0 16px;
+  border-right:1px solid rgba(255,255,255,.08)}
+.kpi-item:first-child{padding-left:0}
+.kpi-lbl{font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;color:rgba(255,255,255,.4)}
+.kpi-val{font-size:13px;font-weight:700;color:#fff;font-family:var(--mono)}
+.kpi-val.ok{color:var(--teal)}
+.kpi-val.warn{color:var(--amber)}
+.kpi-val.err{color:var(--orange)}
+.kpi-save{margin-left:auto;font-size:10px;color:rgba(255,255,255,.4);
+  display:flex;align-items:center;gap:8px}
+.kpi-save-btn{background:var(--orange);color:#fff;border:none;
+  border-radius:var(--r-sm);padding:4px 12px;font-size:11px;font-weight:700;
+  font-family:var(--font);cursor:pointer;transition:opacity .15s}
+.kpi-save-btn:hover{opacity:.85}
+
+/* ── ENGAGEMENT SELECTOR ── */
+.eng-selector{background:#fff;border-bottom:1px solid var(--border);
+  padding:12px 20px;display:flex;align-items:center;gap:12px}
+.eng-sel-label{font-size:11px;font-weight:700;color:var(--mid);
+  text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.eng-select{flex:1;max-width:320px;padding:7px 10px;border:1px solid var(--border);
+  border-radius:var(--r-sm);font-family:var(--font);font-size:12px;
+  color:var(--dark);background:#fff;cursor:pointer}
+.eng-select:focus{outline:none;border-color:var(--blue)}
+.action-select{flex:1;max-width:360px;padding:7px 10px;border:1px solid var(--border);
+  border-radius:var(--r-sm);font-family:var(--font);font-size:12px;
+  color:var(--dark);background:#fff;cursor:pointer}
+.action-badge{display:inline-flex;align-items:center;gap:4px;
+  background:rgba(0,178,144,.1);border:1px solid rgba(0,178,144,.25);
+  border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;color:var(--teal)}
+.eng-new-btn{background:var(--navy);color:#fff;border:none;border-radius:var(--r-sm);
+  padding:7px 14px;font-size:11px;font-weight:700;font-family:var(--font);
+  cursor:pointer;white-space:nowrap}
+
+/* ── TABS ── */
+.tabs{background:#fff;border-bottom:2px solid var(--border);
+  padding:0 20px;display:flex;gap:0}
+.tab{padding:10px 16px;font-size:12px;font-weight:600;color:var(--mid);
+  cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;
+  white-space:nowrap;transition:all .15s}
+.tab.act{color:var(--navy);border-bottom-color:var(--orange)}
+.tab:hover:not(.act){color:var(--dark)}
+.tab.soon{opacity:.5;cursor:default}
+.tab-badge{display:inline-flex;align-items:center;justify-content:center;
+  min-width:16px;height:16px;background:var(--orange);color:#fff;
+  border-radius:8px;font-size:9px;font-weight:700;margin-left:4px;padding:0 4px}
+
+/* ── PAGE ── */
+.page{padding:16px 20px;max-width:1440px;margin:0 auto}
+
+/* ── WORKLOAD CATEGORY ── */
+.wl-category{background:#fff;border:1px solid var(--border);
+  border-radius:var(--r-lg);margin-bottom:12px;overflow:hidden}
+.wl-cat-hdr{display:flex;align-items:center;gap:10px;padding:12px 16px;
+  background:var(--light);border-bottom:1px solid var(--border);cursor:pointer}
+.wl-cat-hdr:hover{background:#ECEEF4}
+.wl-cat-icon{font-size:16px}
+.wl-cat-title{font-size:13px;font-weight:800;color:var(--navy);flex:1}
+.wl-cat-subtitle{font-size:10px;color:var(--mid)}
+.wl-cat-count{background:var(--navy);color:#fff;border-radius:10px;
+  padding:2px 8px;font-size:10px;font-weight:700}
+.wl-cat-add{background:var(--orange);color:#fff;border:none;
+  border-radius:var(--r-sm);padding:5px 12px;font-size:11px;font-weight:700;
+  font-family:var(--font);cursor:pointer;margin-left:4px}
+.wl-cat-arrow{color:var(--mid);transition:transform .2s;font-size:12px}
+.wl-cat-body{display:none}
+.wl-cat-body.open{display:block}
+
+/* ── WORKLOAD TABLE ── */
+.wl-table{width:100%;border-collapse:collapse}
+.wl-table th{background:var(--light);padding:8px 12px;text-align:left;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--mid);border-bottom:1px solid var(--border)}
+.wl-table td{padding:10px 12px;border-bottom:1px solid var(--border);
+  vertical-align:middle;font-size:12px}
+.wl-table tr:last-child td{border-bottom:none}
+.wl-table tr.row-main{cursor:pointer;transition:background .1s}
+.wl-table tr.row-main:hover td{background:rgba(0,40,112,.02)}
+.wl-table tr.row-main.open td{background:rgba(0,40,112,.03)}
+.wl-table .num{text-align:right;font-family:var(--mono)}
+.wl-name{font-weight:700;color:var(--dark)}
+.wl-arrow{color:var(--mid);font-size:10px;transition:transform .2s}
+.row-main.open .wl-arrow{transform:rotate(90deg)}
+
+/* ── EXPAND ROW ── */
+.expand-row td{padding:0;background:var(--light)}
+.expand-inner{max-height:0;overflow:hidden;transition:max-height .25s ease}
+.expand-inner.open{max-height:2000px}
+.expand-pad{padding:16px}
+
+/* ── MODE BADGE ── */
+.mode-badge-express{display:inline-flex;align-items:center;gap:3px;
+  background:rgba(0,178,144,.1);border:1px solid rgba(0,178,144,.25);
+  border-radius:20px;padding:2px 8px;font-size:9px;font-weight:700;color:var(--teal)}
+.mode-badge-deep{display:inline-flex;align-items:center;gap:3px;
+  background:rgba(28,56,245,.1);border:1px solid rgba(28,56,245,.25);
+  border-radius:20px;padding:2px 8px;font-size:9px;font-weight:700;color:var(--blue)}
+
+/* ── FORM ── */
+.formgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.4px;color:var(--mid)}
+.fg input,.fg select,.fg textarea{padding:7px 9px;border:1px solid var(--border);
+  border-radius:var(--r-sm);font-family:var(--font);font-size:12px;
+  color:var(--dark);background:#fff;transition:border-color .15s}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--blue)}
+.fg-hint{font-size:10px;color:var(--mid);margin-top:2px}
+.fg-hint.warn{color:var(--orange)}
+
+/* ── DERIVED PANEL ── */
+.derived{background:rgba(0,40,112,.04);border:1px solid rgba(0,40,112,.1);
+  border-radius:var(--r);padding:10px 14px;margin-bottom:12px}
+.derived-row{display:flex;gap:0;flex-wrap:wrap}
+.derived-item{padding:4px 16px;border-right:1px solid rgba(0,40,112,.1);
+  text-align:center}
+.derived-item:first-child{padding-left:0}
+.derived-item:last-child{border-right:none}
+.derived-val{font-size:18px;font-weight:900;color:var(--navy);font-family:var(--mono)}
+.derived-lbl{font-size:9px;color:var(--mid);text-transform:uppercase;
+  letter-spacing:.4px;margin-top:2px}
+
+/* ── DEEP SECTION ── */
+.deep-section{border-top:1px dashed var(--border);padding-top:12px;margin-top:12px}
+.deep-section-title{font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--blue);margin-bottom:10px;
+  display:flex;align-items:center;gap:6px}
+.deep-section-title::before{content:'';display:inline-block;width:3px;
+  height:12px;background:var(--blue);border-radius:2px}
+
+/* ── ACTIONS ROW ── */
+.actions-row{display:flex;gap:8px;padding-top:8px;
+  border-top:1px solid var(--border);margin-top:8px}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;
+  border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:var(--font);
+  border:none;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--navy);color:#fff}
+.btn-primary:hover{background:#001d5c}
+.btn-outline{background:#fff;color:var(--navy);border:1px solid var(--border)}
+.btn-outline:hover{border-color:var(--navy)}
+.btn-danger-text{background:none;color:#DC2626;border:none;padding:7px 8px}
+.btn-danger-text:hover{background:rgba(220,38,38,.08)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-ghost-white{background:rgba(255,255,255,.12);color:#fff;
+  border:1px solid rgba(255,255,255,.2);font-size:11px;padding:5px 12px}
+
+/* ── EMPTY STATE ── */
+.empty-cat{padding:24px;text-align:center;color:var(--mid)}
+.empty-cat-icon{font-size:28px;margin-bottom:8px}
+.empty-cat-title{font-size:12px;font-weight:700;color:var(--dark);margin-bottom:4px}
+.empty-cat-sub{font-size:11px;line-height:1.5}
+
+/* ── SLA BADGES ── */
+.sla-gold{background:rgba(255,182,0,.15);color:#9a6e00;border-radius:10px;
+  padding:2px 8px;font-size:10px;font-weight:700}
+.sla-silver{background:rgba(136,146,164,.15);color:#5a6476;border-radius:10px;
+  padding:2px 8px;font-size:10px;font-weight:700}
+.sla-bronze{background:rgba(180,83,9,.12);color:#b45309;border-radius:10px;
+  padding:2px 8px;font-size:10px;font-weight:700}
+
+/* ── COMING SOON ── */
+.coming-soon-tab{padding:48px 24px;text-align:center;color:var(--mid)}
+.coming-soon-tab h3{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:6px}
+.coming-soon-tab p{font-size:12px;line-height:1.6}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;
+  border-radius:var(--r);font-size:12px;font-weight:600;color:#fff;
+  opacity:0;transition:opacity .25s;z-index:9999;pointer-events:none}
+#toast.show{opacity:1}
+#toast.success{background:var(--teal)}
+#toast.info{background:var(--navy)}
+#toast.warning{background:var(--amber);color:var(--dark)}
+#toast.error{background:var(--orange)}
+
+/* ── VERSION BANNER ── */
+.version-banner{background:rgba(0,40,112,.06);border:1px solid rgba(0,40,112,.12);
+  border-radius:var(--r);padding:8px 14px;margin-bottom:12px;
+  display:flex;align-items:center;gap:10px;font-size:11px}
+.version-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);flex-shrink:0}
+.version-label{font-weight:700;color:var(--navy)}
+.version-meta{color:var(--mid)}
+.version-dirty{color:var(--amber);font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- ATLAS CONTEXT BAR -->
+<div class="ctx">
+  <a class="ctx-back" href="../../tools/engagement-docket/index-v3.html" id="ctx-back-link">&#8592; Docket</a>
+  <span class="ctx-lbl">Tool</span>
+  <span class="ctx-val" id="ctx-tool-name">—</span>
+  <span class="ctx-sep">|</span>
+  <span class="ctx-lbl">Engagement</span>
+  <span class="ctx-val" id="ctx-eng-name">—</span>
+  <span class="ctx-sep">|</span>
+  <span class="ctx-lbl">Version</span>
+  <span class="ctx-val" id="ctx-version">New</span>
+  <span class="ctx-tool">ATLAS</span>
+</div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-left">
+    <div class="hdr-brand">ATL<span>A</span>S</div>
+    <div class="hdr-tool" id="hdr-tool-name">—</div>
+    <div class="hdr-eng" id="hdr-eng-name">No engagement selected</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="mode-toggle">
+      <button class="mode-btn act" id="btn-express" onclick="C.setMode('express')">&#9654; Express</button>
+      <button class="mode-btn" id="btn-deep" onclick="C.setMode('deep')">&#9881; Deep</button>
+    </div>
+    <button class="btn btn-ghost-white btn-sm" onclick="C.saveVersion()">&#128190; Save version</button>
+  </div>
+</div>
+
+<!-- KPI BAR -->
+<div class="kpi-bar">
+  <div class="kpi-item">
+    <span class="kpi-lbl">Workloads</span>
+    <span class="kpi-val" id="kpi-wl">0</span>
+  </div>
+  <div class="kpi-item">
+    <span class="kpi-lbl">GPUs</span>
+    <span class="kpi-val" id="kpi-gpus">0</span>
+  </div>
+  <div class="kpi-item">
+    <span class="kpi-lbl">Power</span>
+    <span class="kpi-val" id="kpi-power">0 kW</span>
+  </div>
+  <div class="kpi-item">
+    <span class="kpi-lbl">Capex est.</span>
+    <span class="kpi-val" id="kpi-capex">$0</span>
+  </div>
+  <div class="kpi-item">
+    <span class="kpi-lbl">Blended $/Mtok</span>
+    <span class="kpi-val" id="kpi-mtok">—</span>
+  </div>
+  <div class="kpi-item">
+    <span class="kpi-lbl">SLA</span>
+    <span class="kpi-val ok" id="kpi-sla">—</span>
+  </div>
+  <div class="kpi-save">
+    <span id="kpi-save-status">No changes</span>
+  </div>
+</div>
+
+<!-- ENGAGEMENT SELECTOR -->
+<div class="eng-selector" id="eng-selector">
+  <span class="eng-sel-label">Engagement</span>
+  <select class="eng-select" id="eng-select" onchange="C.selectEngagement(this.value)">
+    <option value="">— Select engagement —</option>
+  </select>
+  <span class="eng-sel-label" style="margin-left:8px">Action / context</span>
+  <select class="action-select" id="action-select" onchange="C.selectAction(this.value)" disabled>
+    <option value="">— New solution (no action) —</option>
+  </select>
+  <span id="action-badge-wrap"></span>
+</div>
+
+<!-- TABS -->
+<div class="tabs" id="main-tabs">
+  <div class="tab act" onclick="C.switchTab('workloads')" data-tab="workloads">
+    Workloads <span class="tab-badge" id="tab-badge-wl">0</span>
+  </div>
+  <div class="tab soon" title="Available in Deep mode after workloads defined">Architecture</div>
+  <div class="tab soon" title="Available in Deep mode after workloads defined">Performance</div>
+  <div class="tab soon" title="Available after workloads defined">Tokenomics</div>
+  <div class="tab soon" title="Available after workloads defined">BOM</div>
+  <div class="tab soon" title="Available after workloads defined">Fleet Yield</div>
+  <div class="tab soon" title="Available after workloads defined">Report</div>
+</div>
+
+<!-- PAGE CONTENT -->
+<div class="page" id="main-page">
+  <div id="tab-workloads"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── CFG — same pattern as all ATLAS tools ────────────────────────────────
+var CFG = {
+  baseUrl: (function() {
+    var origin = window.location.origin
+    var path   = window.location.pathname
+    var m = path.match(/^(\/[^/]+\/atlas-platform\/)/)
+    return m ? (origin + m[1]) : 'https://arvindbajaj5.github.io/atlas-platform/'
+  })()
+}
+document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css'
+</script>
+
+<script>
+// ── LOAD SHARED SCRIPTS ──────────────────────────────────────────────────
+;(function loadScripts(files, i) {
+  if (i >= files.length) { onScriptsReady(); return }
+  var s = document.createElement('script')
+  s.src = CFG.baseUrl + files[i] + '?v=' + (window.ATLAS_BUILD_TS || Date.now())
+  s.onload = function() { loadScripts(files, i+1) }
+  s.onerror = function() { console.warn('Failed to load:', files[i]); loadScripts(files, i+1) }
+  document.head.appendChild(s)
+})(['shared/atlas-tokens.js','shared/atlas-db.js','shared/atlas-solution.js'], 0)
+</script>
+
+<script>
+'use strict'
+
+// ════════════════════════════════════════════════════════════════════════════
+// TOOL IDENTITY — change these three variables to rename the tool everywhere
+// ════════════════════════════════════════════════════════════════════════════
+var TOOL_NAME    = 'Solution, Size & Price'
+var TOOL_SHORT   = 'SSP'
+var TOOL_TAGLINE = 'Unified workload sizing, architecture & commercial pricing'
+var TOOL_BUILD   = '20260708a'
+
+// ════════════════════════════════════════════════════════════════════════════
+// MODEL — single source of truth
+// ════════════════════════════════════════════════════════════════════════════
+var M = {
+  // Tool identity
+  toolName:  TOOL_NAME,
+  toolShort: TOOL_SHORT,
+
+  // Mode
+  mode: 'express',   // 'express' | 'deep'
+
+  // Active tab
+  activeTab: 'workloads',
+
+  // Engagement & action context
+  engagements: [],
+  currentEng:  null,
+  actions:     [],
+  currentAction: null,
+
+  // Workloads — 4 categories
+  workloads: { uc:[], maas:[], gpuaas:[], bmaas:[] },
+
+  // GPU & model reference data (loaded from Supabase)
+  gpuConfigs:     [],
+  gpuMap:         {},     // id → config
+  modelCatalogue: [],
+  modelMap:       {},     // id → model
+  benchmarkMap:   {},     // gpuId+modelId → benchmark
+
+  // Tenants
+  tenantsList: {},
+
+  // Open expand rows
+  openRows: {},
+
+  // Versioning
+  solutionVersionId: null,
+  versionLabel: null,
+  versionNumber: null,
+  isDirty: false,
+
+  // Price overrides (editable MSRP)
+  priceOverrides: {},
+
+  // Default GPU (first in list)
+  defaultGpu: null,
+  defaultModel: 'llama-3.1-8b'
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// VIEW — pure render functions
+// ════════════════════════════════════════════════════════════════════════════
+var V = {
+
+  init: function() {
+    // Set tool name everywhere from TOOL_NAME variable
+    document.title = TOOL_NAME + ' — ATLAS'
+    document.getElementById('ctx-tool-name').textContent = TOOL_SHORT
+    document.getElementById('hdr-tool-name').textContent = TOOL_NAME
+    this.renderEngagementSelect()
+    this.renderWorkloadsTab()
+    this.updateKpiBar()
+  },
+
+  toast: function(msg, type) {
+    var t = document.getElementById('toast')
+    t.textContent = msg
+    t.className = 'show ' + (type||'info')
+    clearTimeout(t._timer)
+    t._timer = setTimeout(function(){ t.className = '' }, 2800)
+  },
+
+  updateKpiBar: function() {
+    var w = M.workloads
+    var totalWl = w.uc.length + w.maas.length + w.gpuaas.length + w.bmaas.length
+    var totalGpus = 0, totalPower = 0, totalCapex = 0
+
+    w.uc.forEach(function(wl) {
+      try {
+        var sz = (typeof AtlasSolution !== 'undefined') ? AtlasSolution.sizeWorkload(wl,'uc',M) : null
+        if (sz && !sz.error) {
+          totalGpus  += sz.total||0
+          totalPower += sz.powerKw||0
+          totalCapex += (sz.total||0) * 30000
+        }
+      } catch(e) {}
+    })
+    w.maas.forEach(function(wl) {
+      try {
+        var provGpus = wl.provisionedGpus || 0
+        var sz = (typeof AtlasSolution !== 'undefined') ? AtlasSolution.sizeWorkload(wl,'maas',M) : null
+        var gpus = provGpus || (sz && !sz.error ? sz.total||0 : 0)
+        totalGpus  += gpus
+        totalPower += (sz && !sz.error ? sz.powerKw||0 : 0)
+        totalCapex += gpus * 30000
+      } catch(e) {}
+    })
+    w.gpuaas.forEach(function(wl) {
+      totalGpus  += wl.gpuCount||0
+      totalPower += (wl.gpuCount||0) * 0.7
+      totalCapex += (wl.gpuCount||0) * 30000
+    })
+    w.bmaas.forEach(function(wl) {
+      var g = M.gpuMap[wl.gpu]
+      var gpus = wl.serverCount * (wl.gpusPerServer||(g&&g.gpus_in_unit)||8)
+      totalGpus  += gpus
+      totalPower += wl.serverCount * ((g&&g.tdp_kw)||5.6)
+      totalCapex += gpus * 30000
+    })
+
+    document.getElementById('kpi-wl').textContent    = totalWl
+    document.getElementById('kpi-gpus').textContent  = totalGpus
+    document.getElementById('kpi-power').textContent = Math.round(totalPower*10)/10 + ' kW'
+    document.getElementById('tab-badge-wl').textContent = totalWl
+
+    var capexM = totalCapex/1e6
+    document.getElementById('kpi-capex').textContent = capexM >= 1
+      ? '$' + capexM.toFixed(1) + 'M'
+      : '$' + Math.round(totalCapex/1000) + 'K'
+
+    // SLA pass count
+    var slaEl = document.getElementById('kpi-sla')
+    if (totalWl === 0) { slaEl.textContent = '—'; slaEl.className = 'kpi-val' }
+    else { slaEl.textContent = totalWl + '/' + totalWl + ' ✓'; slaEl.className = 'kpi-val ok' }
+
+    // Version banner
+    document.getElementById('kpi-save-status').textContent = M.isDirty
+      ? '● Unsaved changes'
+      : M.versionLabel ? '✓ Saved: ' + M.versionLabel : 'No changes'
+
+    // Context bar version
+    document.getElementById('ctx-version').textContent = M.versionLabel || 'New'
+  },
+
+  renderEngagementSelect: function() {
+    var sel = document.getElementById('eng-select')
+    var cur = sel.value
+    sel.innerHTML = '<option value="">— Select engagement —</option>'
+    M.engagements.forEach(function(e) {
+      var opt = document.createElement('option')
+      opt.value = e.id
+      opt.textContent = e.name + (e.territory ? ' · ' + e.territory : '')
+      if (e.id === cur) opt.selected = true
+      sel.appendChild(opt)
+    })
+  },
+
+  renderActionSelect: function() {
+    var sel = document.getElementById('action-select')
+    sel.innerHTML = '<option value="">— New solution (no action) —</option>'
+    M.actions.forEach(function(a) {
+      var opt = document.createElement('option')
+      opt.value = a.id
+      var ctx = a.context || {}
+      opt.textContent = (a.title||'Action') + (ctx.customer_type ? ' · ' + ctx.customer_type : '')
+      if (a.id === (M.currentAction && M.currentAction.id)) opt.selected = true
+      sel.appendChild(opt)
+    })
+    sel.disabled = M.actions.length === 0
+  },
+
+  renderWorkloadsTab: function() {
+    var el = document.getElementById('tab-workloads')
+    if (!el) return
+    var h = ''
+
+    // Version banner if saved
+    if (M.versionLabel) {
+      h += '<div class="version-banner">'
+        + '<div class="version-dot"></div>'
+        + '<span class="version-label">' + M.versionLabel + '</span>'
+        + '<span class="version-meta">· ' + M.mode + ' mode'
+        + (M.isDirty ? ' · <span class="version-dirty">Unsaved changes</span>' : ' · All saved')
+        + '</span></div>'
+    }
+
+    h += V._renderCategory('uc',     '🏛', 'Use Cases', 'On-prem inference workloads', M.workloads.uc)
+    h += V._renderCategory('maas',   '🔌', 'MaaS Pools', 'Shared API inference pools', M.workloads.maas)
+    h += V._renderCategory('gpuaas', '⚡', 'GPUaaS Blocks', 'Reserved raw compute blocks', M.workloads.gpuaas)
+    h += V._renderCategory('bmaas',  '🖥', 'BMaaS Blocks', 'Bare-metal server allocations', M.workloads.bmaas)
+
+    el.innerHTML = h
+  },
+
+  _renderCategory: function(type, icon, title, subtitle, items) {
+    var isOpen = M.openRows['_cat_' + type] !== false  // open by default
+    var h = '<div class="wl-category">'
+    h += '<div class="wl-cat-hdr" onclick="C.toggleCategory(\'' + type + '\')">'
+      + '<span class="wl-cat-icon">' + icon + '</span>'
+      + '<span class="wl-cat-title">' + title + '</span>'
+      + '<span class="wl-cat-subtitle">' + subtitle + '</span>'
+      + '<span class="wl-cat-count">' + items.length + '</span>'
+      + '<button class="wl-cat-add" onclick="event.stopPropagation();C.addWorkload(\'' + type + '\')">+ Add</button>'
+      + '<span class="wl-cat-arrow">' + (isOpen ? '&#9660;' : '&#9654;') + '</span>'
+      + '</div>'
+    h += '<div class="wl-cat-body' + (isOpen ? ' open' : '') + '" id="cat-body-' + type + '">'
+
+    if (items.length === 0) {
+      h += '<div class="empty-cat">'
+        + '<div class="empty-cat-icon">' + icon + '</div>'
+        + '<div class="empty-cat-title">No ' + title.toLowerCase() + ' yet</div>'
+        + '<div class="empty-cat-sub">Click + Add to define a ' + title.slice(0,-1).toLowerCase() + '</div>'
+        + '</div>'
+    } else {
+      h += V._renderWorkloadTable(type, items)
+    }
+    h += '</div></div>'
+    return h
+  },
+
+  _renderWorkloadTable: function(type, items) {
+    var isDeep = M.mode === 'deep'
+    var cols = V._getTableCols(type, isDeep)
+    var h = '<table class="wl-table"><thead><tr>'
+    cols.forEach(function(c) {
+      h += '<th' + (c.num ? ' class="num"' : '') + '>' + c.label + '</th>'
+    })
+    h += '<th></th></tr></thead><tbody>'
+
+    items.forEach(function(wl) {
+      var isOpen = !!M.openRows[wl.id]
+      var cells  = V._getTableCells(type, wl, isDeep)
+      h += '<tr class="row-main' + (isOpen?' open':'') + '" onclick="C.toggleRow(\'' + wl.id + '\')">'
+      cells.forEach(function(cell) {
+        h += '<td' + (cell.num ? ' class="num"' : '') + '>' + cell.html + '</td>'
+      })
+      h += '<td><span class="wl-arrow">&#9654;</span></td></tr>'
+
+      // Expand row
+      h += '<tr class="expand-row"><td colspan="' + (cols.length+1) + '">'
+        + '<div class="expand-inner' + (isOpen?' open':'') + '">'
+        + (isOpen ? '<div class="expand-pad">' + V._renderWorkloadForm(type, wl) + '</div>' : '')
+        + '</div></td></tr>'
+    })
+    h += '</tbody></table>'
+    return h
+  },
+
+  _getTableCols: function(type, isDeep) {
+    var base = [{ label:'Name' }]
+    if (type === 'uc' || type === 'maas') {
+      base.push({ label:'Model' })
+      base.push({ label:'GPU' })
+      if (isDeep) base.push({ label:'Precision' }, { label:'Engine' })
+      base.push({ label:'GPUs', num:true })
+      base.push({ label:'Power', num:true })
+      base.push({ label:'Capex est.', num:true })
+      if (type === 'maas') base.push({ label:'$/Mtok', num:true })
+      base.push({ label:'SLA' })
+    } else if (type === 'gpuaas') {
+      base.push({ label:'GPU' }, { label:'Count', num:true })
+      base.push({ label:'Rate tier' }, { label:'Monthly est.', num:true })
+      base.push({ label:'SLA' })
+    } else if (type === 'bmaas') {
+      base.push({ label:'GPU' }, { label:'Servers', num:true })
+      base.push({ label:'GPUs/srv', num:true }, { label:'Monthly est.', num:true })
+      base.push({ label:'SLA' })
+    }
+    return base
+  },
+
+  _getTableCells: function(type, wl, isDeep) {
+    var gpuConf = M.gpuMap[wl.gpu]
+    var gpuName = (gpuConf && gpuConf.name) || (wl.gpu ? wl.gpu.slice(0,12) : '—')
+    var modName = (M.modelMap[wl.model] && M.modelMap[wl.model].name) || wl.model || '—'
+    var slaHtml = '<span class="sla-' + (wl.commercialSla||wl.sla||'bronze') + '">'
+      + (wl.commercialSla||wl.sla||'bronze').charAt(0).toUpperCase()
+      + (wl.commercialSla||wl.sla||'bronze').slice(1) + '</span>'
+
+    if (type === 'uc' || type === 'maas') {
+      var sz = null
+      try {
+        if (typeof AtlasSolution !== 'undefined') sz = AtlasSolution.sizeWorkload(wl, type, M)
+      } catch(e) {}
+      var gpus  = (sz && !sz.error) ? (sz.total||0) : '—'
+      var power = (sz && !sz.error) ? (Math.round((sz.powerKw||0)*10)/10 + ' kW') : '—'
+      var capex = (sz && !sz.error && sz.total) ? ('$' + Math.round(sz.total*30000/1000) + 'K') : '—'
+      if (wl.provisionedGpus) gpus = wl.provisionedGpus + ' ⬆'
+      var cells = [
+        { html: '<span class="wl-name">' + atlasDB.esc(wl.name) + '</span>' },
+        { html: '<span style="font-size:11px">' + modName.slice(0,20) + '</span>' },
+        { html: '<span style="font-size:11px">' + gpuName.slice(0,18) + '</span>' }
+      ]
+      if (isDeep) {
+        cells.push({ html: wl.precision||'int4' })
+        cells.push({ html: wl.engine||'vllm' })
+      }
+      cells.push({ html: gpus, num:true })
+      cells.push({ html: power, num:true })
+      cells.push({ html: capex, num:true })
+      if (type === 'maas') cells.push({ html: '$' + (wl.pricePerMtok||0.75) + '/Mtok', num:true })
+      cells.push({ html: slaHtml })
+      return cells
+    }
+    if (type === 'gpuaas') {
+      var monthly = Math.round((wl.gpuCount||0) * 3.5 * 730)
+      return [
+        { html: '<span class="wl-name">' + atlasDB.esc(wl.name) + '</span>' },
+        { html: gpuName.slice(0,18) },
+        { html: wl.gpuCount||0, num:true },
+        { html: wl.rateTier||'12mo' },
+        { html: '$' + monthly.toLocaleString() + '/mo', num:true },
+        { html: slaHtml }
+      ]
+    }
+    if (type === 'bmaas') {
+      var gpusPerSrv = wl.gpusPerServer || (gpuConf&&gpuConf.gpus_in_unit) || 8
+      var monthly2 = wl.serverCount * 35000
+      return [
+        { html: '<span class="wl-name">' + atlasDB.esc(wl.name) + '</span>' },
+        { html: gpuName.slice(0,18) },
+        { html: wl.serverCount||1, num:true },
+        { html: gpusPerSrv, num:true },
+        { html: '$' + monthly2.toLocaleString() + '/mo', num:true },
+        { html: slaHtml }
+      ]
+    }
+    return [{ html: wl.name }]
+  },
+
+  _renderWorkloadForm: function(type, wl) {
+    var isDeep = M.mode === 'deep'
+    var id = wl.id
+    var h = ''
+
+    // Express fields (always shown)
+    h += '<div class="formgrid">'
+    h += '<div class="fg"><label>Name</label>'
+      + '<input type="text" value="' + atlasDB.esc(wl.name) + '" '
+      + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'name\',this.value)"></div>'
+
+    if (type === 'uc' || type === 'maas') {
+      h += '<div class="fg"><label>Model</label>'
+        + V._renderModelDropdown(wl.model, id, type) + '</div>'
+      h += '<div class="fg"><label>GPU Architecture</label>'
+        + V._renderGpuDropdown(wl.gpu, id, type) + '</div>'
+    }
+
+    if (type === 'uc') {
+      h += '<div class="fg"><label>Daily Active Users</label>'
+        + '<input type="number" min="100" step="100" value="' + (wl.dau||10000) + '" '
+        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'dau\',+this.value)">'
+        + '<div class="fg-hint">Peak concurrent = DAU × req/day × peak factor</div></div>'
+    }
+
+    if (type === 'maas') {
+      h += '<div class="fg"><label>Price $/Mtok</label>'
+        + '<input type="number" min="0.01" step="0.01" value="' + (wl.pricePerMtok||0.75) + '" '
+        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'pricePerMtok\',+this.value)"></div>'
+    }
+
+    if (type === 'gpuaas') {
+      h += '<div class="fg"><label>GPU Architecture</label>'
+        + V._renderGpuDropdown(wl.gpu, id, type) + '</div>'
+      h += '<div class="fg"><label>GPU Count</label>'
+        + '<input type="number" min="1" step="1" value="' + (wl.gpuCount||8) + '" '
+        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'gpuCount\',+this.value)"></div>'
+      h += '<div class="fg"><label>Rate Tier</label>'
+        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'rateTier\',this.value)">'
+        + [['ondemand','On-demand ($5.00/GPU/hr)'],['12mo','12-mo reserved ($3.50/GPU/hr)'],
+           ['24mo','24-mo reserved ($2.75/GPU/hr)'],['spot','Spot ($1.50/GPU/hr)']]
+          .map(function(v){ return '<option value="'+v[0]+'"'+((wl.rateTier||'12mo')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
+        + '</select></div>'
+    }
+
+    if (type === 'bmaas') {
+      h += '<div class="fg"><label>GPU Architecture</label>'
+        + V._renderGpuDropdown(wl.gpu, id, type) + '</div>'
+      h += '<div class="fg"><label>Server Count</label>'
+        + '<input type="number" min="1" step="1" value="' + (wl.serverCount||1) + '" '
+        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'serverCount\',+this.value)"></div>'
+      var gpuConf = M.gpuMap[wl.gpu]
+      var defaultGpuPerSrv = (gpuConf && gpuConf.gpus_in_unit) || 8
+      h += '<div class="fg"><label>GPUs per server</label>'
+        + '<input type="number" min="1" step="1" value="' + (wl.gpusPerServer||defaultGpuPerSrv) + '" '
+        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'gpusPerServer\',+this.value)"></div>'
+    }
+
+    h += '<div class="fg"><label>SLA</label>'
+      + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'commercialSla\',this.value)">'
+      + [['gold','Gold SLA'],['silver','Silver SLA'],['bronze','Bronze SLA']]
+        .map(function(v){ return '<option value="'+v[0]+'"'+((wl.commercialSla||'bronze')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
+      + '</select></div>'
+    h += '</div>'  // end formgrid
+
+    // Derived panel (UC + MaaS in express)
+    if (type === 'uc' || type === 'maas') {
+      h += V._renderDerived(type, wl)
+    }
+
+    // Deep mode fields
+    if (isDeep && (type === 'uc' || type === 'maas')) {
+      h += '<div class="deep-section">'
+        + '<div class="deep-section-title">Deep configuration</div>'
+        + '<div class="formgrid">'
+        + '<div class="fg"><label>Precision</label>'
+        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'precision\',this.value)">'
+        + [['int4','INT4'],['int8','INT8'],['fp8','FP8'],['fp16','FP16']]
+          .map(function(v){ return '<option value="'+v[0]+'"'+((wl.precision||'int4')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
+        + '</select></div>'
+        + '<div class="fg"><label>Inference Engine</label>'
+        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'engine\',this.value)">'
+        + [['vllm','vLLM (default)'],['trt_llm','TRT-LLM (+30% throughput)'],['sglang','SGLang (+10% throughput)']]
+          .map(function(v){ return '<option value="'+v[0]+'"'+((wl.engine||'vllm')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
+        + '</select></div>'
+        + '<div class="fg"><label>TTFT target (ms)</label>'
+        + '<input type="number" min="50" step="50" value="' + (wl.ttft||500) + '" '
+        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'ttft\',+this.value)"></div>'
+        + '<div class="fg"><label>Security tier</label>'
+        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'securityTier\',this.value)">'
+        + [['standard','Standard'],['confidential','Confidential (+15%)'],['sovereign','Sovereign (+25%)']]
+          .map(function(v){ return '<option value="'+v[0]+'"'+((wl.securityTier||'standard')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
+        + '</select></div>'
+        + '<div class="fg"><label>Agentic</label>'
+        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'isAgentic\',this.value===\'true\')">'
+        + '<option value="false"'+(!wl.isAgentic?' selected':'')+'>No</option>'
+        + '<option value="true"'+(wl.isAgentic?' selected':'')+'>Yes — agentic workflow</option>'
+        + '</select></div>'
+        + '<div class="fg"><label>Multimodal</label>'
+        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'isMultimodal\',this.value===\'true\')">'
+        + '<option value="false"'+(!wl.isMultimodal?' selected':'')+'>Text only</option>'
+        + '<option value="true"'+(wl.isMultimodal?' selected':'')+'>Vision / multimodal</option>'
+        + '</select></div>'
+        + '</div></div>'
+    }
+
+    // Actions
+    h += '<div class="actions-row">'
+      + '<button class="btn btn-danger-text btn-sm" onclick="C.removeWorkload(\'' + id + '\',\'' + type + '\')">Remove</button>'
+      + '<button class="btn btn-outline btn-sm" onclick="C.toggleRow(\'' + id + '\')">&#9650; Collapse</button>'
+      + '</div>'
+    return h
+  },
+
+  _renderDerived: function(type, wl) {
+    var sz = null
+    try {
+      if (typeof AtlasSolution !== 'undefined') sz = AtlasSolution.sizeWorkload(wl, type, M)
+    } catch(e) {}
+    if (!sz || sz.error) return ''
+    var gpuConf = M.gpuMap[sz.gpu||wl.gpu]
+    var gpuName = (gpuConf && gpuConf.name) || '—'
+    var provGpus = wl.provisionedGpus || sz.total || 0
+    return '<div class="derived"><div class="derived-row">'
+      + V._di(sz.total||0, 'Min GPUs')
+      + (wl.provisionedGpus && wl.provisionedGpus > sz.total ? V._di(wl.provisionedGpus, 'Provisioned ⬆') : '')
+      + V._di(Math.round((sz.powerKw||0)*10)/10 + ' kW', 'Power')
+      + V._di('$' + Math.round((provGpus)*30000/1000) + 'K', 'Capex est.')
+      + V._di(gpuName, 'GPU')
+      + '</div></div>'
+  },
+
+  _di: function(val, lbl) {
+    return '<div class="derived-item">'
+      + '<div class="derived-val">' + val + '</div>'
+      + '<div class="derived-lbl">' + lbl + '</div>'
+      + '</div>'
+  },
+
+  _renderGpuDropdown: function(currentGpu, wlId, type) {
+    var h = '<select onchange="C.updWorkload(\'' + wlId + '\',\'' + type + '\',\'gpu\',this.value)">'
+    if (M.gpuConfigs.length === 0) {
+      h += '<option value="">Loading GPUs...</option>'
+    } else {
+      // Group by tier
+      var tiers = {}
+      M.gpuConfigs.forEach(function(g) {
+        var t = g.tier || 'other'
+        if (!tiers[t]) tiers[t] = []
+        tiers[t].push(g)
+      })
+      var tierOrder = ['premium','nextgen','high','mid','light','decode','other']
+      tierOrder.forEach(function(tier) {
+        if (!tiers[tier]) return
+        h += '<optgroup label="' + tier.charAt(0).toUpperCase() + tier.slice(1) + '">'
+        tiers[tier].forEach(function(g) {
+          h += '<option value="' + g.id + '"' + (g.id === currentGpu ? ' selected' : '') + '>'
+            + g.name
+            + (g.vram_per_gpu_gb ? ' · ' + g.vram_per_gpu_gb + 'GB' : '')
+            + (g.fp8_tflops ? ' · ' + g.fp8_tflops + ' FP8T' : '')
+            + '</option>'
+        })
+        h += '</optgroup>'
+      })
+    }
+    h += '</select>'
+    return h
+  },
+
+  _renderModelDropdown: function(currentModel, wlId, type) {
+    var h = '<select onchange="C.updWorkload(\'' + wlId + '\',\'' + type + '\',\'model\',this.value)">'
+    if (M.modelCatalogue.length === 0) {
+      h += '<option value="">Loading models...</option>'
+    } else {
+      var families = {}
+      M.modelCatalogue.forEach(function(m) {
+        var f = m.family || 'Other'
+        if (!families[f]) families[f] = []
+        families[f].push(m)
+      })
+      Object.keys(families).sort().forEach(function(fam) {
+        h += '<optgroup label="' + fam + '">'
+        families[fam].forEach(function(m) {
+          h += '<option value="' + m.model_id + '"' + (m.model_id === currentModel ? ' selected' : '') + '>'
+            + m.name + (m.params_b ? ' (' + m.params_b + 'B)' : '')
+            + '</option>'
+        })
+        h += '</optgroup>'
+      })
+    }
+    h += '</select>'
+    return h
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CONTROLLER — user actions → M → V
+// ════════════════════════════════════════════════════════════════════════════
+var C = {
+
+  setMode: function(mode) {
+    M.mode = mode
+    document.getElementById('btn-express').className = 'mode-btn' + (mode==='express'?' act':'')
+    document.getElementById('btn-deep').className    = 'mode-btn' + (mode==='deep'   ?' act':'')
+    V.renderWorkloadsTab()
+    V.updateKpiBar()
+  },
+
+  switchTab: function(tab) {
+    M.activeTab = tab
+    document.querySelectorAll('.tab:not(.soon)').forEach(function(el) {
+      el.classList.toggle('act', el.dataset.tab === tab)
+    })
+    var page = document.getElementById('tab-workloads')
+    if (tab === 'workloads') { page.style.display = ''; V.renderWorkloadsTab() }
+    else { page.style.display = 'none' }
+  },
+
+  toggleCategory: function(type) {
+    var key = '_cat_' + type
+    M.openRows[key] = M.openRows[key] === false ? true : false
+    var body = document.getElementById('cat-body-' + type)
+    if (body) body.classList.toggle('open', M.openRows[key] !== false)
+    var hdr = body && body.previousElementSibling
+    if (hdr) {
+      var arrow = hdr.querySelector('.wl-cat-arrow')
+      if (arrow) arrow.innerHTML = M.openRows[key] !== false ? '&#9660;' : '&#9654;'
+    }
+  },
+
+  toggleRow: function(id) {
+    M.openRows[id] = !M.openRows[id]
+    V.renderWorkloadsTab()
+  },
+
+  addWorkload: function(type) {
+    var id = type + '-' + Date.now()
+    var defaultGpu = M.gpuConfigs.length ? M.gpuConfigs[0].id : ''
+    var defaults = {
+      uc:     { id:id, name:'Use Case '     +(M.workloads.uc.length+1),     model:M.defaultModel, gpu:defaultGpu, precision:'int4', dau:10000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'gold',   engine:'vllm', securityTier:'standard', isAgentic:false, isMultimodal:false },
+      maas:   { id:id, name:'MaaS Pool '    +(M.workloads.maas.length+1),   model:M.defaultModel, gpu:defaultGpu, precision:'int4', dau:50000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'bronze', engine:'vllm', pricePerMtok:0.75, provisionedGpus:null, provisioningReason:'', demandSources:[] },
+      gpuaas: { id:id, name:'GPUaaS Block ' +(M.workloads.gpuaas.length+1), gpu:defaultGpu, gpuCount:8, rateTier:'12mo', commercialSla:'gold' },
+      bmaas:  { id:id, name:'BMaaS Block '  +(M.workloads.bmaas.length+1),  gpu:defaultGpu, serverCount:1, gpusPerServer:8, commercialSla:'gold', guestOs:'ubuntu', interconnect:'standalone' }
+    }
+    M.workloads[type].push(defaults[type])
+    M.openRows[id] = true
+    M.isDirty = true
+    V.renderWorkloadsTab()
+    V.updateKpiBar()
+    C.scheduleSave()
+  },
+
+  updWorkload: function(id, type, field, val) {
+    var wl = M.workloads[type].find(function(w){ return w.id === id })
+    if (!wl) return
+    wl[field] = val
+    // Auto-update gpus per server when GPU changes on BMaaS
+    if (field === 'gpu' && type === 'bmaas') {
+      var g = M.gpuMap[val]
+      if (g && g.gpus_in_unit) wl.gpusPerServer = g.gpus_in_unit
+    }
+    M.isDirty = true
+    V.renderWorkloadsTab()
+    V.updateKpiBar()
+    C.scheduleSave()
+  },
+
+  removeWorkload: function(id, type) {
+    M.workloads[type] = M.workloads[type].filter(function(w){ return w.id !== id })
+    delete M.openRows[id]
+    M.isDirty = true
+    V.renderWorkloadsTab()
+    V.updateKpiBar()
+    C.scheduleSave()
+  },
+
+  selectEngagement: function(engId) {
+    if (!engId) {
+      M.currentEng = null
+      M.actions = []
+      document.getElementById('ctx-eng-name').textContent = '—'
+      document.getElementById('hdr-eng-name').textContent = 'No engagement selected'
+      V.renderActionSelect()
+      return
+    }
+    M.currentEng = M.engagements.find(function(e){ return e.id === engId }) || null
+    if (M.currentEng) {
+      document.getElementById('ctx-eng-name').textContent = M.currentEng.name
+      document.getElementById('hdr-eng-name').textContent = M.currentEng.name
+    }
+    // Load actions for this engagement
+    C.loadActions(engId)
+    // Load existing solution version if any
+    C.loadLatestVersion(engId)
+  },
+
+  selectAction: function(actionId) {
+    if (!actionId) { M.currentAction = null; document.getElementById('action-badge-wrap').innerHTML = ''; return }
+    M.currentAction = M.actions.find(function(a){ return a.id === actionId }) || null
+    if (M.currentAction) {
+      document.getElementById('action-badge-wrap').innerHTML =
+        '<span class="action-badge">&#128206; ' + (M.currentAction.title||'Action') + ' loaded</span>'
+      C.populateFromAction(M.currentAction)
+    }
+  },
+
+  populateFromAction: function(action) {
+    var ctx = action.context || {}
+    // Pre-populate workloads from action context
+    if (ctx.use_cases && ctx.use_cases.length) {
+      ctx.use_cases.forEach(function(uc) {
+        var id = 'uc-' + Date.now() + '-' + Math.random().toString(36).slice(2,6)
+        M.workloads.uc.push({
+          id: id, name: uc.name || uc,
+          model: M.defaultModel,
+          gpu: M.gpuConfigs.length ? M.gpuConfigs[0].id : '',
+          precision:'int4', dau:10000, reqPerDay:20, peakMult:3,
+          peakConcPct:5, contextPct:'p95', commercialSla:'gold',
+          engine:'vllm', securityTier:'standard'
+        })
+      })
+    }
+    if (ctx.maas_pools && ctx.maas_pools.length) {
+      ctx.maas_pools.forEach(function(pool) {
+        var id = 'maas-' + Date.now() + '-' + Math.random().toString(36).slice(2,6)
+        M.workloads.maas.push(Object.assign({
+          id: id, model: M.defaultModel,
+          gpu: M.gpuConfigs.length ? M.gpuConfigs[0].id : '',
+          precision:'int4', dau:50000, reqPerDay:20, peakMult:3,
+          peakConcPct:5, contextPct:'p95', commercialSla:'bronze',
+          engine:'vllm', pricePerMtok:0.75, demandSources:[]
+        }, pool))
+      })
+    }
+    // Set mode based on action type
+    if (ctx.mode === 'deep' || action.item_subtype === 'presales_handover') C.setMode('deep')
+    V.renderWorkloadsTab()
+    V.updateKpiBar()
+    V.toast('Action context loaded — ' + (M.workloads.uc.length + M.workloads.maas.length) + ' workloads pre-populated', 'success')
+  },
+
+  loadEngagements: async function() {
+    try {
+      var data = await atlasDB.get('engagements', 'order=updated_at.desc&limit=50')
+      M.engagements = data || []
+      V.renderEngagementSelect()
+      // Auto-select from URL param
+      var params = new URLSearchParams(window.location.search)
+      var engParam = params.get('eng')
+      if (engParam) {
+        document.getElementById('eng-select').value = engParam
+        C.selectEngagement(engParam)
+      }
+    } catch(e) { console.warn('loadEngagements:', e) }
+  },
+
+  loadActions: async function(engId) {
+    try {
+      var data = await atlasDB.get('docket_items',
+        'engagement_id=eq.' + engId + '&item_type=eq.action&status=eq.open&order=created_at.desc')
+      M.actions = (data||[]).filter(function(a) {
+        return a.content && (a.content.type === 'presales_handover' || a.item_subtype === 'presales_handover')
+      })
+      V.renderActionSelect()
+      // Also load existing solution versions
+      C.loadVersionHistory(engId)
+    } catch(e) { console.warn('loadActions:', e) }
+  },
+
+  loadVersionHistory: async function(engId) {
+    try {
+      var data = await atlasDB.get('solution_versions',
+        'engagement_id=eq.' + engId + '&order=version_number.desc&limit=10')
+      M.versionHistory = data || []
+    } catch(e) { console.warn('loadVersionHistory:', e) }
+  },
+
+  loadLatestVersion: async function(engId) {
+    try {
+      var data = await atlasDB.get('solution_versions',
+        'engagement_id=eq.' + engId + '&order=version_number.desc&limit=1')
+      if (data && data[0]) {
+        var sv = data[0]
+        M.solutionVersionId = sv.id
+        M.versionLabel = sv.version_label || ('v' + sv.version_number)
+        M.versionNumber = sv.version_number
+        var snap = sv.bom_snapshot || {}
+        // Restore mode
+        if (snap.mode) M.mode = snap.mode
+        // Restore workloads
+        if (snap.workload_configs) {
+          M.workloads = {
+            uc:     snap.workload_configs.uc     || [],
+            maas:   snap.workload_configs.maas   || [],
+            gpuaas: snap.workload_configs.gpuaas || [],
+            bmaas:  snap.workload_configs.bmaas  || []
+          }
+        }
+        M.isDirty = false
+        C.setMode(M.mode)
+        V.renderWorkloadsTab()
+        V.updateKpiBar()
+        V.toast('Loaded ' + M.versionLabel, 'info')
+      }
+    } catch(e) { console.warn('loadLatestVersion:', e) }
+  },
+
+  loadRefData: async function() {
+    try {
+      var gpus = await atlasDB.get('gpu_configs', 'active=eq.true&order=tier.asc,name.asc')
+      M.gpuConfigs = gpus || []
+      M.gpuMap = {}
+      M.gpuConfigs.forEach(function(g) { M.gpuMap[g.id] = g })
+      if (M.gpuConfigs.length) M.defaultGpu = M.gpuConfigs[0].id
+    } catch(e) { console.warn('loadRefData gpus:', e) }
+
+    try {
+      var mods = await atlasDB.get('model_catalogue', 'enabled=eq.true&order=family.asc,name.asc&limit=200')
+      M.modelCatalogue = mods || []
+      M.modelMap = {}
+      M.modelCatalogue.forEach(function(m) { M.modelMap[m.model_id] = m })
+    } catch(e) { console.warn('loadRefData models:', e) }
+
+    V.renderWorkloadsTab()
+    V.updateKpiBar()
+  },
+
+  saveVersion: async function() {
+    if (!M.currentEng) { V.toast('Select an engagement first', 'warning'); return }
+
+    var totalGpus = 0, totalPower = 0, totalCapex = 0
+    M.workloads.uc.concat(M.workloads.maas).forEach(function(wl) {
+      try {
+        var t = M.workloads.maas.indexOf(wl) >= 0 ? 'maas' : 'uc'
+        var sz = (typeof AtlasSolution !== 'undefined') ? AtlasSolution.sizeWorkload(wl, t, M) : null
+        if (sz && !sz.error) {
+          var gpus = wl.provisionedGpus || sz.total || 0
+          totalGpus += gpus; totalPower += sz.powerKw||0; totalCapex += gpus*30000
+        }
+      } catch(e) {}
+    })
+    M.workloads.gpuaas.forEach(function(w){ totalGpus+=w.gpuCount||0; totalCapex+=(w.gpuCount||0)*30000 })
+    M.workloads.bmaas.forEach(function(w){
+      var g=M.gpuMap[w.gpu]; var gpus=w.serverCount*(w.gpusPerServer||(g&&g.gpus_in_unit)||8)
+      totalGpus+=gpus; totalCapex+=gpus*30000
+    })
+
+    var wlCount = M.workloads.uc.length+M.workloads.maas.length+M.workloads.gpuaas.length+M.workloads.bmaas.length
+    var nextVer  = (M.versionNumber||0) + 1
+    var verLabel = M.mode === 'express' ? 'v'+nextVer+' Express' : 'v'+nextVer+' Deep'
+
+    var payload = {
+      engagement_id:  M.currentEng.id,
+      version_number: nextVer,
+      version_label:  verLabel,
+      status:         'draft',
+      bom_snapshot: {
+        tool:        TOOL_SHORT,
+        tool_name:   TOOL_NAME,
+        mode:        M.mode,
+        workload_configs: M.workloads,
+        price_overrides:  M.priceOverrides,
+        key_metrics: {
+          total_gpus:  totalGpus,
+          capex_usd:   totalCapex,
+          power_kw:    Math.round(totalPower*10)/10,
+          workloads:   wlCount
+        }
+      }
+    }
+
+    try {
+      var result
+      if (M.solutionVersionId) {
+        result = await atlasDB.patch('solution_versions', 'id=eq.'+M.solutionVersionId, payload)
+      } else {
+        result = await atlasDB.post('solution_versions', payload)
+        if (result && result[0]) M.solutionVersionId = result[0].id
+      }
+      M.versionLabel  = verLabel
+      M.versionNumber = nextVer
+      M.isDirty = false
+      V.updateKpiBar()
+      V.toast('Saved ' + verLabel, 'success')
+    } catch(e) { V.toast('Save failed — ' + e.message, 'error') }
+  },
+
+  _saveTimer: null,
+  scheduleSave: function() {
+    clearTimeout(C._saveTimer)
+    C._saveTimer = setTimeout(function() {
+      if (M.currentEng && M.isDirty) C.saveVersion()
+    }, 4000)
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// INIT — called after shared scripts load
+// ════════════════════════════════════════════════════════════════════════════
+function onScriptsReady() {
+  V.init()
+  C.loadEngagements()
+  C.loadRefData()
+}
+</script>
+</body>
+</html>
