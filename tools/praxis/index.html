@@ -392,7 +392,7 @@ document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css
 var TOOL_NAME    = 'Solution, Size & Price'
 var TOOL_SHORT   = 'SSP'
 var TOOL_TAGLINE = 'Unified workload sizing, architecture & commercial pricing'
-var TOOL_BUILD   = '20260708e'
+var TOOL_BUILD   = '20260708f'
 
 // ════════════════════════════════════════════════════════════════════════════
 // MODEL — single source of truth
@@ -1019,40 +1019,75 @@ var V = {
     var provGpus = wl.provisionedGpus || 1
     var supplyB = provGpus * tokPerSec * 730 * 3600 / 1e9
 
-    var dpId = 'dp-' + id
-    var h = '<div id="' + dpId + '" style="background:rgba(0,178,144,.05);border:1px solid rgba(0,178,144,.2);border-radius:var(--r);padding:14px;margin-bottom:12px">'
+    // All interactive elements use data-* attributes — event delegation handles clicks/changes
+    var h = '<div id="dp-' + id + '" data-wlid="' + id + '" '
+      + 'style="background:rgba(0,178,144,.05);border:1px solid rgba(0,178,144,.2);'
+      + 'border-radius:var(--r);padding:14px;margin-bottom:12px">'
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
       + '<div style="font-size:11px;font-weight:700;color:var(--teal)">&#128200; Demand Planner'
-      + (wl.provisionedGpus ? ' <span style="font-size:10px;color:var(--mid);font-weight:400">Supply ceiling: ' + supplyB.toFixed(1) + ' B tok/mo</span>' : '')
-      + '</div>'
-      + '<button class="btn btn-outline btn-sm" ' + V._oc('addDemandSource', id) + '>+ Source</button>'
+      + (wl.provisionedGpus ? ' <span style="font-size:10px;color:var(--mid);font-weight:400">Supply: '
+        + supplyB.toFixed(1) + ' B tok/mo</span>' : '') + '</div>'
+      + '<button class="btn btn-outline btn-sm" data-action="addSource" data-wlid="' + id + '">+ Source</button>'
       + '</div>'
 
     if (!sources.length) {
-      h += '<div style="color:var(--mid);font-size:11px;padding:4px 0">No demand sources yet. Click + Source to add a customer segment.</div>'
+      h += '<div style="color:var(--mid);font-size:11px;padding:4px 0">'
+        + 'No demand sources yet. Click + Source to add a customer segment.</div>'
     } else {
-      var custTypes = [['tsap','TSAP'],['isv','ISV'],['enterprise','Enterprise'],['gov','Government'],['consumer','Consumer'],['other','Other']]
+      var custTypes = [['tsap','TSAP'],['isv','ISV'],['enterprise','Enterprise'],
+                       ['gov','Government'],['consumer','Consumer'],['other','Other']]
+
       sources.forEach(function(src) {
-        h += '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:8px">'
-        h += '<div class="formgrid" style="grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr auto">'
-        h += V._fg('Label',          '<input type="text" value="' + atlasDB.esc(src.label||'') + '" onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('label') + ',this.value)">')
-        h += V._fg('Type',           '<select onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('customerType') + ',this.value)">'
-          + custTypes.map(function(v){ return '<option value="' + v[0] + '"' + (src.customerType===v[0]?' selected':'') + '>' + v[1] + '</option>' }).join('')
-          + '</select>')
-        h += V._fg('Customers Y1',   '<input type="number" min="1" value="' + (src.customersY1||10) + '" onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('customersY1') + ',+this.value)">')
-        h += V._fg('Growth %/yr',    '<input type="number" min="0" value="' + (src.customerGrowthPct||30) + '" onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('customerGrowthPct') + ',+this.value)">')
-        h += V._fg('Tok/cust/mo (M)','<input type="number" min="0.01" step="0.1" value="' + (src.tokensPerCustomerM||5) + '" onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('tokensPerCustomerM') + ',+this.value)">')
-        h += V._fg('Token growth %', '<input type="number" min="0" value="' + (src.tokenGrowthPct||20) + '" onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('tokenGrowthPct') + ',+this.value)">')
-        h += '<div class="fg" style="align-self:flex-end">'
-          + '<button class="btn btn-danger-text btn-sm" ' + V._oc('removeDemandSource', id, src.id) + '>&#10005;</button></div>'
-        h += '</div></div>'
+        h += '<div style="background:#fff;border:1px solid var(--border);'
+          + 'border-radius:var(--r);padding:10px;margin-bottom:8px">'
+          + '<div class="formgrid" style="grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr auto">'
+
+          // All inputs use data-* for delegation — no inline event handlers
+          + '<div class="fg"><label>Label</label>'
+          + '<input type="text" value="' + atlasDB.esc(src.label||'') + '" '
+          + 'data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="label" data-isnum="0">'
+          + '</div>'
+
+          + '<div class="fg"><label>Type</label>'
+          + '<select data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="customerType" data-isnum="0">'
+          + custTypes.map(function(v) {
+              return '<option value="' + v[0] + '"' + (src.customerType===v[0]?' selected':'') + '>' + v[1] + '</option>'
+            }).join('')
+          + '</select></div>'
+
+          + '<div class="fg"><label>Customers Y1</label>'
+          + '<input type="number" min="1" value="' + (src.customersY1||10) + '" '
+          + 'data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="customersY1" data-isnum="1">'
+          + '</div>'
+
+          + '<div class="fg"><label>Growth %/yr</label>'
+          + '<input type="number" min="0" value="' + (src.customerGrowthPct||30) + '" '
+          + 'data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="customerGrowthPct" data-isnum="1">'
+          + '</div>'
+
+          + '<div class="fg"><label>Tok/cust/mo (M)</label>'
+          + '<input type="number" min="0.01" step="0.1" value="' + (src.tokensPerCustomerM||5) + '" '
+          + 'data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="tokensPerCustomerM" data-isnum="1">'
+          + '</div>'
+
+          + '<div class="fg"><label>Token growth %</label>'
+          + '<input type="number" min="0" value="' + (src.tokenGrowthPct||20) + '" '
+          + 'data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="tokenGrowthPct" data-isnum="1">'
+          + '</div>'
+
+          + '<div class="fg" style="align-self:flex-end">'
+          + '<button class="btn btn-danger-text btn-sm" '
+          + 'data-action="removeSource" data-wlid="' + id + '" data-srcid="' + src.id + '">&#10005;</button>'
+          + '</div>'
+          + '</div></div>'
       })
 
-      // 6-year projection table
+      // 6-year projection table (read-only derived output)
       h += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:8px">'
-      h += '<thead><tr style="background:var(--light)">'
-      ;['Year','Customers','Demand (B tok/mo)','Supply (B tok/mo)','Util %','Revenue/yr','Status'].forEach(function(col){
-        h += '<th style="padding:5px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:var(--mid);text-align:' + (col==='Year'||col==='Status'?'left':'right') + '">' + col + '</th>'
+        + '<thead><tr style="background:var(--light)">'
+      ;['Year','Customers','Demand B tok/mo','Supply B tok/mo','Util %','Revenue/yr','Status'].forEach(function(col){
+        h += '<th style="padding:5px 8px;font-size:9px;font-weight:700;text-transform:uppercase;'
+          + 'color:var(--mid);text-align:' + (col==='Year'||col==='Status'?'left':'right') + '">' + col + '</th>'
       })
       h += '</tr></thead><tbody>'
       for (var yr = 1; yr <= 6; yr++) {
@@ -1065,13 +1100,15 @@ var V = {
         var util = supplyB > 0 ? tb / supplyB : 0
         var rev  = tb * 12 * 1000 * (wl.pricePerMtok || 0.75)
         var col  = util > 1 ? 'var(--orange)' : util > 0.85 ? 'var(--amber)' : 'var(--teal)'
-        var st   = util > 1 ? '&#128308; Under' : util > 0.85 ? '&#129000; Near full' : util > 0.3 ? '&#128994; Healthy' : '&#9898; Low'
+        var st   = util > 1 ? '&#128308; Under' : util > 0.85 ? '&#129000; Near full'
+                 : util > 0.3 ? '&#128994; Healthy' : '&#9898; Low'
         h += '<tr style="border-top:1px solid var(--border)">'
           + '<td style="padding:5px 8px">Y' + yr + '</td>'
           + '<td style="padding:5px 8px;text-align:right">' + Math.round(tc).toLocaleString() + '</td>'
           + '<td style="padding:5px 8px;text-align:right">' + tb.toFixed(2) + '</td>'
           + '<td style="padding:5px 8px;text-align:right">' + supplyB.toFixed(1) + '</td>'
-          + '<td style="padding:5px 8px;text-align:right;font-weight:700;color:' + col + '">' + Math.min(util*100,999).toFixed(1) + '%</td>'
+          + '<td style="padding:5px 8px;text-align:right;font-weight:700;color:' + col + '">'
+            + Math.min(util*100,999).toFixed(1) + '%</td>'
           + '<td style="padding:5px 8px;text-align:right">$' + Math.round(rev).toLocaleString() + '</td>'
           + '<td style="padding:5px 8px;font-size:10px">' + st + '</td>'
           + '</tr>'
@@ -1552,6 +1589,29 @@ function onScriptsReady() {
   V.init()
   C.loadEngagements()
   C.loadRefData()
+
+  // ── Event delegation for demand planner (data-action pattern) ──────────
+  // Handles addSource / updSource / removeSource without inline event handlers
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]')
+    if (!btn) return
+    var action = btn.dataset.action
+    var wlId  = btn.dataset.wlid
+    var srcId = btn.dataset.srcid
+    if (action === 'addSource')    C.addDemandSource(wlId)
+    if (action === 'removeSource') C.removeDemandSource(wlId, srcId)
+  })
+
+  document.addEventListener('change', function(e) {
+    var el = e.target.closest('[data-action="updSource"]')
+    if (!el) return
+    var wlId  = el.dataset.wlid
+    var srcId = el.dataset.srcid
+    var field = el.dataset.field
+    var isNum = el.dataset.isnum === '1'
+    var val   = isNum ? +el.value : el.value
+    C.updDemandSource(wlId, srcId, field, val)
+  })
 }
 </script>
 </body>
