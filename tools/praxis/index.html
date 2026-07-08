@@ -392,7 +392,7 @@ document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css
 var TOOL_NAME    = 'Solution, Size & Price'
 var TOOL_SHORT   = 'SSP'
 var TOOL_TAGLINE = 'Unified workload sizing, architecture & commercial pricing'
-var TOOL_BUILD   = '20260708d'
+var TOOL_BUILD   = '20260708e'
 
 // ════════════════════════════════════════════════════════════════════════════
 // MODEL — single source of truth
@@ -721,16 +721,19 @@ var V = {
     var gpuConf = M.gpuMap[wl.gpu]
     var h = ''
 
-    // ROW 1 — Name + Model + GPU + SLA
-    h += '<div class="formgrid" style="grid-template-columns:1.5fr 1.5fr 1.5fr 1fr">'
+    // ROW 1 — Name + Model + GPU + SLA + Tenant
+    h += '<div class="formgrid" style="grid-template-columns:1.4fr 1.4fr 1.4fr 0.8fr 0.9fr">'
     h += V._fg('Name', '<input type="text" value="' + atlasDB.esc(wl.name) + '" ' + V._u(id,type,'name') + '>')
     if (type === 'uc' || type === 'maas') {
       h += V._fg('Model', V._renderModelDropdown(wl.model, id, type))
       h += V._fg('GPU Architecture', V._renderGpuDropdown(wl.gpu, id, type))
+    } else {
+      h += '<div class="fg"></div><div class="fg"></div>'
     }
     h += V._fg('SLA', '<select ' + V._u(id,type,'commercialSla') + '>'
       + V._opts([['gold','Gold SLA'],['silver','Silver SLA'],['bronze','Bronze SLA']], wl.commercialSla||wl.sla||'bronze')
       + '</select>')
+    h += V._tenantDropdown(wl, id, type)
     h += '</div>'
 
     // ROW 2 — Presets + data source
@@ -887,15 +890,10 @@ var V = {
         + V._fg('Speculative decoding', '<select ' + V._u(id,type,'cascadeModel') + '>'
           + V._opts([['none','None'],['small','Small draft model (2-3x speedup)'],['ngram','n-gram draft']], wl.cascadeModel||'none')
           + '</select>', 'Reduces output latency')
-        + V._tenantDropdown(wl, id, type)
         + '</div></div>'
     }
 
-    // Tenant — express UC
-    if (!isDeep && type === 'uc') {
-      h += '<div class="formgrid" style="grid-template-columns:1fr 3fr">'
-        + V._tenantDropdown(wl, id, type) + '</div>'
-    }
+
 
     // Actions row
     h += '<div class="actions-row">'
@@ -1001,18 +999,16 @@ var V = {
   _tenantDropdown: function(wl, id, type) {
     var tenants = M.tenantsList || {}
     var keys = Object.keys(tenants)
-    var addBtn = '<button class="btn btn-outline btn-sm" style="margin-top:4px" '
-      + 'onclick="C.addTenant()">+ New tenant</button>'
-    if (!keys.length) {
-      return '<div class="fg"><label>Tenant</label>' + addBtn + '</div>'
-    }
-    return '<div class="fg"><label>Tenant</label>'
+    return '<div class="fg"><label>Tenant'
+      + ' <span style="font-weight:400;color:var(--blue);cursor:pointer;font-size:9px" onclick="C.addTenant()">+ New</span>'
+      + '</label>'
       + '<select ' + V._u(id, type, 'tenant') + '>'
       + '<option value="">— Unassigned —</option>'
       + keys.map(function(k) {
-          return '<option value="' + k + '"' + (wl.tenant === k ? ' selected' : '') + '>' + atlasDB.esc(tenants[k].name || k) + '</option>'
+          return '<option value="' + k + '"' + (wl.tenant === k ? ' selected' : '') + '>'
+            + atlasDB.esc(tenants[k].name || k) + '</option>'
         }).join('')
-      + '</select>' + addBtn + '</div>'
+      + '</select></div>'
   },
 
   // Demand planner for MaaS
@@ -1023,7 +1019,8 @@ var V = {
     var provGpus = wl.provisionedGpus || 1
     var supplyB = provGpus * tokPerSec * 730 * 3600 / 1e9
 
-    var h = '<div style="background:rgba(0,178,144,.05);border:1px solid rgba(0,178,144,.2);border-radius:var(--r);padding:14px;margin-bottom:12px">'
+    var dpId = 'dp-' + id
+    var h = '<div id="' + dpId + '" style="background:rgba(0,178,144,.05);border:1px solid rgba(0,178,144,.2);border-radius:var(--r);padding:14px;margin-bottom:12px">'
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
       + '<div style="font-size:11px;font-weight:700;color:var(--teal)">&#128200; Demand Planner'
       + (wl.provisionedGpus ? ' <span style="font-size:10px;color:var(--mid);font-weight:400">Supply ceiling: ' + supplyB.toFixed(1) + ' B tok/mo</span>' : '')
@@ -1165,7 +1162,7 @@ var V = {
       Object.keys(families).sort().forEach(function(fam) {
         h += '<optgroup label="' + fam + '">'
         families[fam].forEach(function(m) {
-          h += '<option value="' + m.model_id + '"' + (m.model_id === currentModel ? ' selected' : '') + '>'
+          h += '<option value="' + m.model_id + '"' + (m.model_id === currentModel || m.id === currentModel ? ' selected' : '') + '>'
             + m.name + (m.params_b ? ' (' + m.params_b + 'B)' : '')
             + '</option>'
         })
@@ -1265,21 +1262,21 @@ var C = {
     wl.demandSources.push({ id:'ds-'+Date.now(), label:'Source '+(wl.demandSources.length+1),
       customerType:'tsap', customersY1:10, customerGrowthPct:30,
       tokensPerCustomerM:5.0, tokenGrowthPct:20 })
-    M.isDirty = true; V.renderWorkloadsTab(); C.scheduleSave()
+    M.isDirty = true; C._refreshDemandPlanner(wlId, wl); C.scheduleSave()
   },
 
   updDemandSource: function(wlId, srcId, field, val) {
     var wl = M.workloads.maas.find(function(w){ return w.id === wlId })
     if (!wl || !wl.demandSources) return
     var src = wl.demandSources.find(function(s){ return s.id === srcId })
-    if (src) { src[field] = val; M.isDirty = true; V.renderWorkloadsTab(); C.scheduleSave() }
+    if (src) { src[field] = val; M.isDirty = true; C._refreshDemandPlanner(wlId, wl); C.scheduleSave() }
   },
 
   removeDemandSource: function(wlId, srcId) {
     var wl = M.workloads.maas.find(function(w){ return w.id === wlId })
     if (!wl || !wl.demandSources) return
     wl.demandSources = wl.demandSources.filter(function(s){ return s.id !== srcId })
-    M.isDirty = true; V.renderWorkloadsTab(); C.scheduleSave()
+    M.isDirty = true; C._refreshDemandPlanner(wlId, wl); C.scheduleSave()
   },
 
   selectEngagement: function(engId) {
@@ -1524,6 +1521,19 @@ var C = {
       V.renderWorkloadsTab()
       V.toast('Tenant added locally: ' + name.trim(), 'info')
     }
+  },
+
+  // Targeted demand planner refresh — avoids full tab re-render (preserves scroll + focus)
+  _refreshDemandPlanner: function(wlId, wl) {
+    var el = document.getElementById('dp-' + wlId)
+    if (!el) { V.renderWorkloadsTab(); return }  // fallback if not found
+    var newHtml = V._renderDemandPlanner(wl)
+    // Replace just the demand planner div content
+    var tmp = document.createElement('div')
+    tmp.innerHTML = newHtml
+    var newEl = tmp.firstElementChild
+    if (newEl) el.parentNode.replaceChild(newEl, el)
+    V.updateKpiBar()
   },
 
   _saveTimer: null,
