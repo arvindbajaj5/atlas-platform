@@ -336,7 +336,7 @@ function praxisSizing(){
     // API cost
     var apiMoCost=0;
     if(w.src==='api'&&(m||{}).tp==='closed')apiMoCost=est.moTok*0.5*((m.ai||1)+(m.ao||1))/1e6;
-    else if(w.src==='hybrid'&&w.apiProvider){ var ap=MDL[w.apiProvider];if((ap||{}).tp==='closed')apiMoCost=est.moTok*(1-est.onPremFrac)*0.5*((ap.ai||1)+(ap.ao||1))/1e6;}
+    else if(w.src==='hybrid'&&w.apiProvider){ var ap=getMDL(w.apiProvider);if((ap||{}).tp==='closed')apiMoCost=est.moTok*(1-est.onPremFrac)*0.5*((ap.ai||1)+(ap.ao||1))/1e6;}
     
     // Security cost multiplier
     var secMult=((SEC_TIERS[w.securityTier]||{}).cost_mult)||1;
@@ -428,7 +428,7 @@ function praxisSizing(){
   // Edge
   var edgeTotalCost=0,edgeTotalPow=0,edgeTotalGPUs=0;
   if(edgeCfg.enabled){
-    var ep=PROC[edgeCfg.gpuModel];
+    var ep=getPROC(edgeCfg.gpuModel);
     var perSiteGPUCost=edgeCfg.gpusPerSite*price(edgeCfg.gpuModel)*1.8;
     var perSiteCPU=15000; var perSiteDRAM=1200; var perSiteSSD=1600; var perSiteNIC=1000; var perSiteRack=5000; var perSiteLB=500;
     var perSiteCost=perSiteGPUCost+perSiteCPU+perSiteDRAM+perSiteSSD+perSiteNIC+perSiteRack+perSiteLB;
@@ -740,7 +740,7 @@ var showP=true;
   var gpuTotals={};sz.det.filter(d=>d.src!=='api').forEach(d=>{gpuTotals[d.proc]=(gpuTotals[d.proc]||0)+d.gpus;if(d.decGPUs)gpuTotals[d.decodeProc]=(gpuTotals[d.decodeProc]||0)+d.decGPUs;});
   
   h+=`<h3 style="margin-top:16px;color:var(--p2)">Aggregated BOM</h3><table><thead><tr><th>Category</th><th>Spec</th><th>Qty</th>${showP?'<th>Total</th>':''}</tr></thead><tbody>`;
-  Object.entries(gpuTotals).forEach(([k,c])=>{h+=`<tr><td><b>GPU</b></td><td>${PROC[k]?.n||k}</td><td>${c}</td>${showP?`<td><b>${fmt$(c*price(k))}</b></td>`:''}</tr>`;});
+  Object.entries(gpuTotals).forEach(([k,c])=>{h+=`<tr><td><b>GPU</b></td><td>${((getPROC(k)||{}).n||k)}</td><td>${c}</td>${showP?`<td><b>${fmt$(c*price(k))}</b></td>`:''}</tr>`;});
   h+=`<tr><td><b>Chassis</b></td><td>DLC/AC-ready</td><td>${sz.srvTotal}</td>${showP?`<td><b>${fmt$(sz.chassisCost)}</b></td>`:''}</tr>`;
   h+=`<tr><td><b>CPUs</b></td><td>EPYC 9965</td><td>${sz.cpuCnt}</td>${showP?`<td><b>${fmt$(sz.cpuCost)}</b></td>`:''}</tr>`;
   h+=`<tr><td><b>DRAM</b></td><td>DDR5 128GB DIMMs</td><td>${sz.srvTotal*8}</td>${showP?`<td><b>${fmt$(sz.dramCost)}</b></td>`:''}</tr>`;
@@ -758,7 +758,7 @@ var showP=true;
   if(sz.agentOrcSrv>0)h+=`<tr><td><b>Agentic Orchestrator</b></td><td>Agent runtime CPU servers (64-core, 256GB)</td><td>${sz.agentOrcSrv} srv</td>${showP?`<td><b>${fmt$(sz.agentOrcCost)}</b></td>`:''}</tr>`;
   if(sz.geoCost>0)h+=`<tr><td><b>Geospatial Platform</b></td><td>PostGIS, STAC, RAG, preprocessing</td><td>—</td>${showP?`<td><b>${fmt$(sz.geoCost)}</b></td>`:''}</tr>`;
   if(sz.spareCost>0)h+=`<tr><td><b>Spare Parts</b></td><td>Hot spare GPUs (${sz.det.some(d=>d.criticality==='mission_critical')?'10':'5'}%)</td><td>—</td>${showP?`<td><b>${fmt$(sz.spareCost)}</b></td>`:''}</tr>`;
-  if(sz.edgeTotalCost>0)h+=`<tr><td><b>Edge Deployment</b></td><td>${edgeCfg.sites} sites × ${edgeCfg.gpusPerSite} ${PROC[edgeCfg.gpuModel]?.n||''}</td><td>${sz.edgeTotalGPUs} GPUs</td>${showP?`<td><b>${fmt$(sz.edgeTotalCost)}</b></td>`:''}</tr>`;
+  if(sz.edgeTotalCost>0)h+=`<tr><td><b>Edge Deployment</b></td><td>${edgeCfg.sites} sites × ${edgeCfg.gpusPerSite} ${getPROC(edgeCfg.gpuModel)?.n||''}</td><td>${sz.edgeTotalGPUs} GPUs</td>${showP?`<td><b>${fmt$(sz.edgeTotalCost)}</b></td>`:''}</tr>`;
   // Software stack
   h+=`<tr style="background:var(--ibg)"><td colspan="${showP?4:3}" style="font-weight:700;color:var(--s1);font-size:10px;padding:4px 5px">SOFTWARE LICENSES (Annual)</td></tr>`;
   sz.swDetail.forEach(s=>{
@@ -1107,6 +1107,325 @@ V.renderYieldTab = function() {
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.label+': '+c.parsed.y+' GPUs ('+Math.round(c.parsed.y/total*100)+'%)'}}}},scales:{y:{title:{display:true,text:'GPUs',font:{size:9}}}}}
     });
   }
+};
+
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// PROJECT SCOPE TAB — full port from IF renderScope + calcServices
+// ════════════════════════════════════════════════════════════════════════════
+
+var MODALITIES=[{k:'text',n:'Text Documents',ic:'📄'},{k:'structured',n:'Structured DB',ic:'🗃️'},{k:'images',n:'Images',ic:'🖼️'},{k:'audio',n:'Audio',ic:'🎙️'},{k:'video',n:'Video',ic:'🎬'},{k:'geospatial',n:'Geospatial',ic:'🛰️'},{k:'sensor',n:'Sensor/IoT',ic:'📡'},{k:'mixed',n:'Mixed',ic:'📦'}];
+
+function getScopeState(){
+  if(!M.scopeState)M.scopeState={
+    dataSources:[
+      {id:1,name:'Customer Knowledge Base',modality:'text',volumeGB:50,format:'semi',connectivity:'file_share',refresh:'daily',cleanup:'medium',labelling:'none',pii:'detect'},
+      {id:2,name:'Product Database',modality:'structured',volumeGB:10,format:'clean',connectivity:'db',refresh:'realtime',cleanup:'none',labelling:'none',pii:'none'},
+    ],
+    globalSetup:{dataPlatform:{days:0,auto:true},governance:{days:0,auto:true},netSecurity:{days:0,auto:true},monitoring:{days:0,auto:true},teamOnboard:{days:0,auto:true}},
+    envStrategy:{devPct:10,testPct:25,devDedicated:false,testDedicated:false,devTemp:true,testTemp:true},
+    testingConfig:{unitTest:true,integrationTest:true,loadTest:true,accuracyEval:true,securityTest:false,uat:true,testDataPct:10},
+    servicesRates:{dataEngineer:1200,mlEngineer:1400,devOps:1100,pm:1300,qa:900},
+    timeline:{infraWeeks:4,dataWeeks:6,perWLDevWeeks:3,perWLTestWeeks:2,integrationWeeks:3,goLiveWeeks:1,bufferWeeks:2},
+    wlOverrides:{},dsCounter:3
+  };
+  return M.scopeState;
+}
+function praxisDsUpd(id,field,val){var sc=getScopeState();var ds=sc.dataSources.find(function(d){return d.id===id;});if(ds){ds[field]=val;V.renderScopeTab();}}
+function praxisDsAdd(){var sc=getScopeState();sc.dataSources.push({id:sc.dsCounter++,name:'New Source',modality:'text',volumeGB:10,format:'semi',connectivity:'file_share',refresh:'daily',cleanup:'light',labelling:'none',pii:'none'});V.renderScopeTab();}
+function praxisDsDelete(id){var sc=getScopeState();sc.dataSources=sc.dataSources.filter(function(d){return d.id!==id;});V.renderScopeTab();}
+function praxisWlUpdScope(wlId,field,val){['uc','maas','gpuaas','bmaas'].forEach(function(t){var w=(M.workloads[t]||[]).find(function(w){return w.id===wlId;});if(w){w[field]=val;}});V.renderScopeTab();}
+function praxisWlEffortOverride(wlId,days){getScopeState().wlOverrides[wlId]=days;V.renderScopeTab();}
+function praxisScopeUpd(section,key,val){
+  var sc=getScopeState();
+  if(section==='env'){sc.envStrategy[key]=val;}
+  if(section==='test'){sc.testingConfig[key]=val;}
+  if(section==='rate'){sc.servicesRates[key]=val;}
+  if(section==='time'){sc.timeline[key]=val;}
+  if(section==='setup'){var parts=key.split('.');if(parts[1]==='days')sc.globalSetup[parts[0]].days=val;if(parts[1]==='auto')sc.globalSetup[parts[0]].auto=val;}
+  V.renderScopeTab();
+}
+function calcServices(sz){
+  var sc=getScopeState();
+  var dataSources=sc.dataSources;
+  var globalSetup=sc.globalSetup;
+  var testingConfig=sc.testingConfig;
+  var servicesRates=sc.servicesRates;
+  var timeline=sc.timeline;
+  var wlOverrides=sc.wlOverrides;
+
+  var onPrem=sz.det.filter(d=>d.src!=='api');
+  var nWL=getIFWorkloads().length;
+  var totalDataGB=dataSources.reduce((s,d)=>s+d.volumeGB,0);
+  var heavyCleanup=dataSources.filter(d=>d.cleanup==='heavy').length;
+  var medCleanup=dataSources.filter(d=>d.cleanup==='medium').length;
+  var hasLabelling=dataSources.some(d=>d.labelling==='manual'||d.labelling==='active_learning');
+  var hasPII=dataSources.some(d=>d.pii==='mask'||d.pii==='redact');
+  var hasFineTune=wls.some(w=>w.fineTune==='lora'||w.fineTune==='full');
+  var hasRAG=wls.some(w=>w.ragType!=='none');
+  var hasHeavyCustom=wls.some(w=>w.customLevel==='heavy');
+  var hasSecurity=onPrem.some(d=>d.securityTier==='enhanced'||d.securityTier==='regulated');
+  
+  // Global setup days (auto-estimated or user-overridden)
+  var dataPlatformDays_auto=10+(hasRAG?5:0)+(totalDataGB>500?5:0);
+  var govDays_auto=5+(hasPII?5:0)+(hasSecurity?5:0);
+  var netSecDays_auto=5+(hasSecurity?5:0)+(edgeCfg.enabled?3:0);
+  var monDays_auto=5;
+  var trainDays_auto=3+Math.ceil(nWL*0.5);
+  
+  var dataPlatformDays=globalSetup.dataPlatform.auto?dataPlatformDays_auto:globalSetup.dataPlatform.days;
+  var govDays=globalSetup.governance.auto?govDays_auto:globalSetup.governance.days;
+  var netSecDays=globalSetup.netSecurity.auto?netSecDays_auto:globalSetup.netSecurity.days;
+  var monDays=globalSetup.monitoring.auto?monDays_auto:globalSetup.monitoring.days;
+  var trainDays=globalSetup.teamOnboard.auto?trainDays_auto:globalSetup.teamOnboard.days;
+  var globalTotal=dataPlatformDays+govDays+netSecDays+monDays+trainDays;
+  
+  // Per-data-source effort
+  var dsEffort=dataSources.reduce((s,d)=>{
+    var days=2; // base per source
+    if(d.cleanup==='heavy')days+=5;else if(d.cleanup==='medium')days+=3;else if(d.cleanup==='light')days+=1;
+    if(d.labelling==='manual')days+=Math.ceil(d.volumeGB/10);
+    if(d.labelling==='active_learning')days+=5;
+    if(d.pii==='mask'||d.pii==='redact')days+=3;
+    if(d.refresh==='realtime')days+=3;else if(d.refresh==='hourly')days+=2;
+    return s+days;
+  },0);
+  
+  // Per-workload effort (auto or overridden)
+  var perWL=wls.map(w=>{
+    if(w._effortOverride!==undefined)return w._effortOverride;
+    var days=3; // base per workload
+    if(w.ragType!=='none')days+=5;if(w.ragType==='agentic'||w.ragType==='graph')days+=5;
+    if(w.fineTune==='lora')days+=8;if(w.fineTune==='full')days+=15;
+    if(w.customLevel==='heavy')days+=10;else if(w.customLevel==='medium')days+=5;else if(w.customLevel==='light')days+=2;
+    if(w.isAgentic)days+=5;
+    if(w.isGeo)days+=8;
+    return days;
+  });
+  var perWLTotal=perWL.reduce((s,d)=>s+d,0);
+  
+  // Testing effort
+  var testEffort={
+    unitTest:testingConfig.unitTest?Math.ceil(nWL*2):0,
+    integrationTest:testingConfig.integrationTest?Math.ceil(nWL*3):0,
+    loadTest:testingConfig.loadTest?5:0,
+    accuracyEval:testingConfig.accuracyEval?Math.ceil(nWL*2):0,
+    securityTest:testingConfig.securityTest?5:0,
+    uat:testingConfig.uat?Math.ceil(nWL*2):0,
+  };
+  var testTotal=Object.values(testEffort).reduce((s,d)=>s+d,0);
+  
+  // Role allocation
+  var deDay=dsEffort+dataPlatformDays+Math.ceil(perWLTotal*0.3);
+  var mlDay=Math.ceil(perWLTotal*0.7)+Math.ceil(testTotal*0.3)+(hasFineTune?10:0);
+  var doDay=netSecDays+monDays+Math.ceil(nWL*3)+timeline.infraWeeks*5;
+  var pmDay=Math.ceil((deDay+mlDay+doDay)*0.15)+trainDays;
+  var qaDay=testTotal;
+  var totalDays=deDay+mlDay+doDay+pmDay+qaDay;
+  
+  var totalServicesCost=deDay*servicesRates.dataEngineer+mlDay*servicesRates.mlEngineer+doDay*servicesRates.devOps+pmDay*servicesRates.pm+qaDay*servicesRates.qa;
+  
+  // Timeline
+  var wlPhaseWeeks=Math.ceil(getIFWorkloads().length*(timeline.perWLDevWeeks+timeline.perWLTestWeeks)/2); // overlapping
+  var totalWeeks=timeline.infraWeeks+timeline.dataWeeks+wlPhaseWeeks+timeline.integrationWeeks+timeline.goLiveWeeks+timeline.bufferWeeks;
+  
+  return{dataPlatformDays,govDays,netSecDays,monDays,trainDays,globalTotal,dsEffort,perWL,perWLTotal,testEffort,testTotal,
+    deDay,mlDay,doDay,pmDay,qaDay,totalDays,totalServicesCost,totalWeeks};
+}
+
+V.renderScopeTab=function(){
+  var el=document.getElementById('tab-scope');
+  if(!el)return;
+  var sc=getScopeState();
+  var dataSources=sc.dataSources;
+  var globalSetup=sc.globalSetup;
+  var envStrategy=sc.envStrategy;
+  var testingConfig=sc.testingConfig;
+  var servicesRates=sc.servicesRates;
+  var timeline=sc.timeline;
+  var wlOverrides=sc.wlOverrides;
+  var sz=praxisSizing();
+  if(!sz)sz={det:[],tGPU:0,total:0,srvTotal:0};
+  var showP=true;
+  var svc=calcServices(sz);
+  
+  var onPremWLs=sz.det.filter(function(d){return d.src!=='api';});
+  
+  // Calculate services effort
+  
+  el.innerHTML=`
+    <!-- S1: DATA SOURCE REGISTRY -->
+    <div class="card" style="border-left:4px solid var(--s1)">
+      <h3>📂 Data Source Registry</h3>
+      <p style="font-size:10px;color:var(--txM);margin-bottom:8px">Register all data sources for the project. These feed one or more workloads via RAG, fine-tuning, or direct ingestion.</p>
+      <table style="font-size:10px"><thead><tr>
+        <th>Name</th><th>Modality</th><th>Volume</th><th>Format</th><th>Connection</th><th>Refresh</th><th>Cleanup</th><th>Labelling</th><th>PII</th><th style="width:20px"></th>
+      </tr></thead><tbody>
+        ${dataSources.map(ds=>`<tr>
+          <td><input type="text" value="${ds.name}" style="width:120px;font-size:9px;padding:1px 3px" onchange="praxisDsUpd(${ds.id},'name',this.value)"></td>
+          <td><select style="font-size:9px;padding:1px" onchange="praxisDsUpd(${ds.id},'modality',this.value)">${MODALITIES.map(m=>`<option value="${m.k}"${ds.modality===m.k?' selected':''}>${m.ic} ${m.n}</option>`).join('')}</select></td>
+          <td><input type="number" value="${ds.volumeGB}" style="width:50px;font-size:9px" onchange="praxisDsUpd(${ds.id},'volumeGB',+this.value)"> GB</td>
+          <td><select style="font-size:9px;padding:1px" onchange="praxisDsUpd(${ds.id},'format',this.value)"><option value="clean"${ds.format==='clean'?' selected':''}>Clean</option><option value="semi"${ds.format==='semi'?' selected':''}>Semi</option><option value="unstructured"${ds.format==='unstructured'?' selected':''}>Unstructured</option><option value="mixed"${ds.format==='mixed'?' selected':''}>Mixed</option></select></td>
+          <td><select style="font-size:9px;padding:1px" onchange="praxisDsUpd(${ds.id},'connectivity',this.value)"><option value="db"${ds.connectivity==='db'?' selected':''}>Database</option><option value="api"${ds.connectivity==='api'?' selected':''}>API</option><option value="file_share"${ds.connectivity==='file_share'?' selected':''}>File Share</option><option value="s3"${ds.connectivity==='s3'?' selected':''}>S3/Object</option><option value="kafka"${ds.connectivity==='kafka'?' selected':''}>Kafka Stream</option><option value="iot"${ds.connectivity==='iot'?' selected':''}>IoT/Sensor</option></select></td>
+          <td><select style="font-size:9px;padding:1px" onchange="praxisDsUpd(${ds.id},'refresh',this.value)"><option value="onetime"${ds.refresh==='onetime'?' selected':''}>One-time</option><option value="daily"${ds.refresh==='daily'?' selected':''}>Daily</option><option value="hourly"${ds.refresh==='hourly'?' selected':''}>Hourly</option><option value="realtime"${ds.refresh==='realtime'?' selected':''}>Real-time</option></select></td>
+          <td><select style="font-size:9px;padding:1px" onchange="praxisDsUpd(${ds.id},'cleanup',this.value)"><option value="none"${ds.cleanup==='none'?' selected':''}>None</option><option value="light"${ds.cleanup==='light'?' selected':''}>Light</option><option value="medium"${ds.cleanup==='medium'?' selected':''}>Medium</option><option value="heavy"${ds.cleanup==='heavy'?' selected':''}>Heavy</option></select></td>
+          <td><select style="font-size:9px;padding:1px" onchange="praxisDsUpd(${ds.id},'labelling',this.value)"><option value="none"${ds.labelling==='none'?' selected':''}>None</option><option value="existing"${ds.labelling==='existing'?' selected':''}>Existing</option><option value="manual"${ds.labelling==='manual'?' selected':''}>Manual</option><option value="active_learning"${ds.labelling==='active_learning'?' selected':''}>Active Learning</option></select></td>
+          <td><select style="font-size:9px;padding:1px" onchange="praxisDsUpd(${ds.id},'pii',this.value)"><option value="none"${ds.pii==='none'?' selected':''}>None</option><option value="detect"${ds.pii==='detect'?' selected':''}>Detect</option><option value="mask"${ds.pii==='mask'?' selected':''}>Mask</option><option value="redact"${ds.pii==='redact'?' selected':''}>Redact</option></select></td>
+          <td><button style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--txL)" onclick="praxisDsDelete(${ds.id})">×</button></td>
+        </tr>`).join('')}
+      </tbody></table>
+      <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+        <button class="bp" style="font-size:10px;padding:4px 12px" onclick="praxisDsAdd()">+ Add Source</button>
+        <span style="font-size:10px;color:var(--txM)">${dataSources.length} sources · ${dataSources.reduce((s,d)=>s+d.volumeGB,0)} GB total · ${[...new Set(dataSources.map(d=>d.modality))].length} modalities</span>
+      </div>
+    </div>
+
+    <div class="g2" style="margin-top:12px;gap:14px">
+      <!-- S2: GLOBAL PROJECT SETUP -->
+      <div class="card">
+        <h3>🏗️ Global Project Setup</h3>
+        <p style="font-size:9px;color:var(--txM);margin-bottom:6px">One-time setup activities. Days are auto-estimated — override any value. Changes flow to services cost.</p>
+        <table style="font-size:10px"><thead><tr><th>Activity</th><th>Scope</th><th style="min-width:80px">Days</th></tr></thead><tbody>
+          ${[
+            ['dataPlatform','Data Platform','Vector DB, data lake, ingestion pipeline, metadata catalog'],
+            ['governance','Governance','Compliance framework, RBAC, audit trail, PII handling'],
+            ['netSecurity','Network & Security','Fabric setup, firewall rules, certificates, HSM'],
+            ['monitoring','Monitoring','Observability stack, alerting, dashboards, FinOps'],
+            ['teamOnboard','Team Onboarding','Training on platform, tools, and processes'],
+          ].map(([k,n,d])=>{
+            var autoVal=svc[k+'Days']||svc[{dataPlatform:'dataPlatformDays',governance:'govDays',netSecurity:'netSecDays',monitoring:'monDays',teamOnboard:'trainDays'}[k]];
+            var curVal=globalSetup[k].auto?autoVal:globalSetup[k].days;
+            return`<tr>
+              <td><b>${n}</b></td>
+              <td style="font-size:9px;color:var(--txM)">${d}</td>
+              <td><div style="display:flex;align-items:center;gap:3px">
+                <input type="number" value="${curVal}" min="0" max="100" style="width:45px;font-size:10px;padding:2px 4px;${globalSetup[k].auto?'color:var(--s1)':'color:var(--p2);font-weight:700'}" onchange=\"praxisScopeUpd('setup','${k}.days',+this.value)\">
+                <button style="background:none;border:1px solid var(--bdr);border-radius:3px;font-size:7px;padding:1px 4px;cursor:pointer;color:${globalSetup[k].auto?'var(--s2)':'var(--txL)'}" onclick=\"praxisScopeUpd('setup','${k}.auto',true)\">${globalSetup[k].auto?'Auto':'Manual'}</button>
+              </div></td>
+            </tr>`;}).join('')}
+          <tr style="font-weight:700;background:var(--bg)"><td colspan="2">Total Global Setup</td><td style="color:var(--p2)">${svc.globalTotal}d</td></tr>
+        </tbody></table>
+      </div>
+
+      <!-- S3: ENVIRONMENT STRATEGY -->
+      <div class="card">
+        <h3>🔄 Environment Strategy</h3>
+        <p style="font-size:9px;color:var(--txM);margin-bottom:6px">Size Dev/Test/Prod environments. Dev/Test as % of production capacity.</p>
+        <table style="font-size:10px"><thead><tr><th>Env</th><th>% of Prod</th><th>Dedicated HW</th><th>Permanent</th><th>Est. GPUs</th></tr></thead><tbody>
+          <tr><td><b style="color:var(--s1)">Dev</b></td>
+            <td><input type="number" value="${envStrategy.devPct}" min="5" max="50" style="width:40px;font-size:10px" onchange="praxisScopeUpd(\'env\',\'devPct\',+this.value)">%</td>
+            <td><select style="font-size:9px" onchange="praxisScopeUpd(\'env\',\'devDedicated\',this.value==='1')"><option value="0"${!envStrategy.devDedicated?' selected':''}>Shared</option><option value="1"${envStrategy.devDedicated?' selected':''}>Dedicated</option></select></td>
+            <td><select style="font-size:9px" onchange="praxisScopeUpd(\'env\',\'devTemp\',this.value==='1')"><option value="1"${envStrategy.devTemp?' selected':''}>Temporary</option><option value="0"${!envStrategy.devTemp?' selected':''}>Permanent</option></select></td>
+            <td style="font-weight:700;color:var(--s1)">${Math.ceil(sz.tGPU*envStrategy.devPct/100)}</td></tr>
+          <tr><td><b style="color:var(--s3)">Test</b></td>
+            <td><input type="number" value="${envStrategy.testPct}" min="10" max="100" style="width:40px;font-size:10px" onchange="praxisScopeUpd(\'env\',\'testPct\',+this.value)">%</td>
+            <td><select style="font-size:9px" onchange="praxisScopeUpd(\'env\',\'testDedicated\',this.value==='1')"><option value="0"${!envStrategy.testDedicated?' selected':''}>Shared</option><option value="1"${envStrategy.testDedicated?' selected':''}>Dedicated</option></select></td>
+            <td><select style="font-size:9px" onchange="praxisScopeUpd(\'env\',\'testTemp\',this.value==='1')"><option value="1"${envStrategy.testTemp?' selected':''}>Temporary</option><option value="0"${!envStrategy.testTemp?' selected':''}>Permanent</option></select></td>
+            <td style="font-weight:700;color:var(--s3)">${Math.ceil(sz.tGPU*envStrategy.testPct/100)}</td></tr>
+          <tr style="background:var(--sbg)"><td><b style="color:var(--s2)">Prod</b></td><td>100%</td><td>Dedicated</td><td>Permanent</td><td style="font-weight:700;color:var(--s2)">${sz.tGPU}</td></tr>
+          <tr style="font-weight:700"><td>Total</td><td colspan="3"></td><td style="color:var(--p2)">${sz.tGPU+Math.ceil(sz.tGPU*envStrategy.devPct/100)+Math.ceil(sz.tGPU*envStrategy.testPct/100)} GPUs</td></tr>
+        </tbody></table>
+        ${showP?`<div style="font-size:9px;color:var(--txM);margin-top:4px">Additional HW cost for Dev+Test: <b>${fmt$(sz.total*(envStrategy.devPct+envStrategy.testPct)/100)}</b></div>`:''}
+      </div>
+    </div>
+
+    <div class="g2" style="margin-top:12px;gap:14px">
+      <!-- S4: TESTING -->
+      <div class="card">
+        <h3>🧪 Testing & Validation</h3>
+        <table style="font-size:10px"><tbody>
+          ${[['unitTest','Unit Tests','Model output validation, edge cases'],['integrationTest','Integration Tests','End-to-end pipeline, API contracts'],['loadTest','Load / Stress Tests','Peak traffic simulation, SLA verification'],['accuracyEval','Accuracy Evaluation','Benchmark datasets, domain-specific eval'],['securityTest','Security Testing','Prompt injection, data leakage, RBAC'],['uat','User Acceptance Testing','Customer stakeholder validation']].map(([k,n,d])=>`<tr>
+            <td><label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ${testingConfig[k]?'checked':''} onchange=\"praxisScopeUpd('test','${k}',this.checked)\"><b>${n}</b></label></td>
+            <td style="font-size:9px;color:var(--txM)">${d}</td>
+            <td style="color:var(--s1);font-weight:600;font-size:10px">${testingConfig[k]?svc.testEffort[k]+'d':'—'}</td>
+          </tr>`).join('')}
+          <tr style="font-weight:700;background:var(--bg)"><td colspan="2">Test Data: ${testingConfig.testDataPct}% of production</td>
+            <td><input type="number" value="${testingConfig.testDataPct}" min="1" max="100" style="width:40px;font-size:10px" onchange="praxisScopeUpd(\'test\',\'testDataPct\',+this.value)">%</td></tr>
+        </tbody></table>
+      </div>
+
+      <!-- S5: PER-WORKLOAD DATA PROFILE (EDITABLE) -->
+      <div class="card">
+        <h3>⚙️ Per-Workload Data & MLOps Profile</h3>
+        <p style="font-size:9px;color:var(--txM);margin-bottom:6px">Configure RAG, embeddings, fine-tuning, and customization per workload. Effort auto-calculates but is editable.</p>
+        <div style="max-height:400px;overflow-y:auto">
+        <table style="font-size:9px"><thead><tr><th>Workload</th><th>Data Sources</th><th>RAG Type</th><th>Embed Model</th><th>Fine-tune</th><th>Custom Level</th><th style="min-width:50px">Effort</th></tr></thead><tbody>
+          ${getIFWorkloads().map(function(w,i){ var wp=(WP[w.tp]||{n:w.name||w.tp,ic:'📋'}); return `<tr>
+            <td><b>${(wp||{}).ic||''} ${(wp||{}).n||''}</b></td>
+            <td><select multiple style="font-size:8px;width:90px;height:40px" onchange="praxisWlUpdScope(${w.id},this)">${dataSources.map(ds=>`<option value="${ds.id}"${(w.dataSrcIds||[]).includes(ds.id)?' selected':''}>${ds.name}</option>`).join('')}</select></td>
+            <td><select style="font-size:9px;padding:1px" onchange="praxisWlUpdScope(${w.id},'ragType',this.value)">
+              <option value="none"${w.ragType==='none'?' selected':''}>None</option>
+              <option value="simple"${w.ragType==='simple'?' selected':''}>Simple</option>
+              <option value="multi_stage"${w.ragType==='multi_stage'?' selected':''}>Multi-stage</option>
+              <option value="agentic"${w.ragType==='agentic'?' selected':''}>Agentic RAG</option>
+              <option value="graph"${w.ragType==='graph'?' selected':''}>Graph RAG</option>
+              <option value="hybrid"${w.ragType==='hybrid'?' selected':''}>Hybrid</option>
+            </select></td>
+            <td><select style="font-size:9px;padding:1px;width:80px" onchange="praxisWlUpdScope(${w.id},'embedModel',this.value)"${w.ragType==='none'?' disabled':''}>
+              ${(M.modelCatalogue||[]).filter(function(m){return (m.family||'').toLowerCase().includes('embed');}).map(function(m){return '<option value="'+m.model_id+'"'+(w.embedModel===m.model_id?' selected':'')+'>'+m.name+'</option>';}).join('')}
+            </select></td>
+            <td><select style="font-size:9px;padding:1px" onchange="praxisWlUpdScope(${w.id},'fineTune',this.value)">
+              <option value="none"${w.fineTune==='none'?' selected':''}>None</option>
+              <option value="prompt"${w.fineTune==='prompt'?' selected':''}>Prompt Eng</option>
+              <option value="few_shot"${w.fineTune==='few_shot'?' selected':''}>Few-shot</option>
+              <option value="lora"${w.fineTune==='lora'?' selected':''}>LoRA FT</option>
+              <option value="full"${w.fineTune==='full'?' selected':''}>Full FT</option>
+            </select></td>
+            <td><select style="font-size:9px;padding:1px" onchange="praxisWlUpdScope(${w.id},'customLevel',this.value)">
+              <option value="oob"${w.customLevel==='oob'?' selected':''}>OOB</option>
+              <option value="light"${w.customLevel==='light'?' selected':''}>Light</option>
+              <option value="medium"${w.customLevel==='medium'?' selected':''}>Medium</option>
+              <option value="heavy"${w.customLevel==='heavy'?' selected':''}>Heavy</option>
+            </select></td>
+            <td><input type="number" value="${svc.perWL[i]||0}" min="0" max="200" style="width:40px;font-size:9px;padding:1px 3px;font-weight:700;color:var(--s1)" onchange="praxisWlEffortOverride(${w.id},+this.value)">d</td>
+          </tr>`;}).join('')}
+          <tr style="font-weight:700;background:var(--bg)"><td colspan="6">Total Per-Workload Effort</td><td style="color:var(--p2)">${svc.perWLTotal}d</td></tr>
+        </tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- S6: TIMELINE -->
+    <div class="card" style="margin-top:12px">
+      <h3>📅 Project Timeline</h3>
+      <div class="g4" style="gap:8px;margin-bottom:12px">
+        <div><span class="lb">Infra (wks)</span><input type="number" value="${timeline.infraWeeks}" min="1" max="20" style="font-size:10px" onchange="praxisScopeUpd(\'time\',\'infraWeeks\',+this.value)"></div>
+        <div><span class="lb">Data Env (wks)</span><input type="number" value="${timeline.dataWeeks}" min="1" max="24" style="font-size:10px" onchange="praxisScopeUpd(\'time\',\'dataWeeks\',+this.value)"></div>
+        <div><span class="lb">Dev/WL (wks)</span><input type="number" value="${timeline.perWLDevWeeks}" min="1" max="12" style="font-size:10px" onchange="praxisScopeUpd(\'time\',\'perWLDevWeeks\',+this.value)"></div>
+        <div><span class="lb">Test/WL (wks)</span><input type="number" value="${timeline.perWLTestWeeks}" min="1" max="8" style="font-size:10px" onchange="praxisScopeUpd(\'time\',\'perWLTestWeeks\',+this.value)"></div>
+        <div><span class="lb">Integration (wks)</span><input type="number" value="${timeline.integrationWeeks}" min="1" max="12" style="font-size:10px" onchange="praxisScopeUpd(\'time\',\'integrationWeeks\',+this.value)"></div>
+        <div><span class="lb">Go-Live (wks)</span><input type="number" value="${timeline.goLiveWeeks}" min="1" max="4" style="font-size:10px" onchange="praxisScopeUpd(\'time\',\'goLiveWeeks\',+this.value)"></div>
+        <div><span class="lb">Buffer (wks)</span><input type="number" value="${timeline.bufferWeeks}" min="0" max="8" style="font-size:10px" onchange="praxisScopeUpd(\'time\',\'bufferWeeks\',+this.value)"></div>
+        <div class="st" style="background:var(--ibg);border-radius:6px"><div class="v" style="color:var(--p2);font-size:18px">${svc.totalWeeks}</div><div class="l">Total Weeks</div></div>
+      </div>
+      <div class="cc t"><canvas id="cTimeline"></canvas></div>
+    </div>
+
+    <!-- S7: SERVICES & TOTAL COST -->
+    <div class="card" style="margin-top:12px;background:linear-gradient(135deg,rgba(0,40,112,.03),rgba(28,56,245,.03))">
+      <h3>💼 Services Effort & Total Project Cost</h3>
+      <div class="g2" style="gap:14px">
+        <div>
+          <table style="font-size:10px"><thead><tr><th>Role</th><th>Days</th><th>Rate</th>${showP?'<th>Cost</th>':''}</tr></thead><tbody>
+            ${[['Data Engineer',svc.deDay,'dataEngineer'],['ML Engineer',svc.mlDay,'mlEngineer'],['DevOps Engineer',svc.doDay,'devOps'],['Project Manager',svc.pmDay,'pm'],['QA Engineer',svc.qaDay,'qa']].map(([role,days,rk])=>`<tr>
+              <td><b>${role}</b></td><td>${days}</td>
+              <td><input type="number" value="${servicesRates[rk]}" style="width:60px;font-size:9px" onchange="servicesRates['${rk}']=+this.value;render()">/d</td>
+              ${showP?`<td style="font-weight:600">${fmt$(days*servicesRates[rk])}</td>`:''}
+            </tr>`).join('')}
+            <tr style="font-weight:700;background:var(--bg)"><td>Total</td><td>${svc.totalDays} days</td><td></td>${showP?`<td>${fmt$(svc.totalServicesCost)}</td>`:''}</tr>
+          </tbody></table>
+        </div>
+        <div>
+          <div class="ps" style="grid-template-columns:1fr 1fr">
+            <div class="pc" style="background:var(--ibg)"><div class="v" style="color:var(--p2)">${fmt$(sz.total)}</div><div class="l">Hardware + SW</div></div>
+            ${showP?`<div class="pc" style="background:var(--wbg)"><div class="v" style="color:#B8860B">${fmt$(svc.totalServicesCost)}</div><div class="l">Services</div></div>`:''}
+            <div class="pc" style="background:var(--dbg)"><div class="v" style="color:var(--p1)">${fmt$(sz.total*(envStrategy.devPct+envStrategy.testPct)/100)}</div><div class="l">Dev+Test Env</div></div>
+            <div class="pc" style="background:var(--sbg)"><div class="v" style="color:var(--s2)">${fmt$(sz.total+svc.totalServicesCost+sz.total*(envStrategy.devPct+envStrategy.testPct)/100)}</div><div class="l">GRAND TOTAL</div></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
 };
 
 
