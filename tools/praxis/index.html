@@ -147,7 +147,7 @@ body{font-family:var(--font);background:var(--light);color:var(--dark);min-heigh
 /* ── EXPAND ROW ── */
 .expand-row td{padding:0;background:var(--light)}
 .expand-inner{max-height:0;overflow:hidden;transition:max-height .25s ease}
-.expand-inner.open{max-height:2000px}
+.expand-inner.open{max-height:9000px}
 .expand-pad{padding:16px}
 
 /* ── MODE BADGE ── */
@@ -224,6 +224,23 @@ body{font-family:var(--font);background:var(--light);color:var(--dark);min-heigh
 .coming-soon-tab{padding:48px 24px;text-align:center;color:var(--mid)}
 .coming-soon-tab h3{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:6px}
 .coming-soon-tab p{font-size:12px;line-height:1.6}
+
+/* ── SLIDER ── */
+.slider-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px}
+.slider-row input[type=range]{width:100%;accent-color:var(--orange);height:4px;cursor:pointer}
+.slider-row input[type=number]{width:72px;text-align:right;padding:5px 6px;
+  border:1px solid var(--border);border-radius:var(--r-sm);font-family:var(--mono);font-size:11px}
+.preset-bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.preset-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+  background:var(--light);border:1px solid var(--border);border-radius:20px;
+  font-size:10px;font-weight:600;cursor:pointer;transition:all .15s;color:var(--dark)}
+.preset-chip:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+.preset-chip.act{background:var(--navy);color:#fff;border-color:var(--navy)}
+.src-tag{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;
+  border-radius:20px;font-size:10px;font-weight:700}
+.src-onprem{background:rgba(0,40,112,.1);color:var(--navy)}
+.src-api{background:rgba(28,56,245,.1);color:var(--blue)}
+.src-hybrid{background:rgba(0,178,144,.1);color:var(--teal)}
 
 /* ── TOAST ── */
 #toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;
@@ -375,7 +392,7 @@ document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css
 var TOOL_NAME    = 'Solution, Size & Price'
 var TOOL_SHORT   = 'SSP'
 var TOOL_TAGLINE = 'Unified workload sizing, architecture & commercial pricing'
-var TOOL_BUILD   = '20260708b'
+var TOOL_BUILD   = '20260708c'
 
 // ════════════════════════════════════════════════════════════════════════════
 // MODEL — single source of truth
@@ -716,34 +733,33 @@ var V = {
       + '</select>')
     h += '</div>'
 
-    // ROW 2 — UC/MaaS sizing inputs
+    // ROW 2 — Presets + data source
     if (type === 'uc' || type === 'maas') {
-      h += '<div class="formgrid">'
-      h += V._fg('Daily Active Users',
-        '<input type="number" min="100" step="100" value="' + (wl.dau||10000) + '" ' + V._uNum(id,type,'dau') + '>',
-        'Users per day at full load')
-      h += V._fg('Requests per user/day',
-        '<input type="number" min="1" step="1" value="' + (wl.reqPerDay||20) + '" ' + V._uNum(id,type,'reqPerDay') + '>',
-        'Avg requests each active user makes')
-      h += V._fg('Peak multiplier',
-        '<input type="number" min="1" step="0.5" value="' + (wl.peakMult||3) + '" ' + V._uNum(id,type,'peakMult') + '>',
-        'Rush hour vs average load ratio')
-      h += V._fg('Peak concurrency %',
-        '<input type="number" min="1" max="100" step="1" value="' + (wl.peakConcPct||5) + '" ' + V._uNum(id,type,'peakConcPct') + '>',
-        '% of peak users concurrent')
+      h += V._renderPresetBar(wl, type)
+      h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 3fr;margin-bottom:8px">'
+      h += V._fg('Data source',
+        '<select ' + V._u(id,type,'src') + '>'
+        + V._opts([['onprem','🏢 On-Prem inference'],['api','☁️ API / MaaS'],['hybrid','🔀 Hybrid']], wl.src||'onprem')
+        + '</select>', 'Where this workload runs')
+      h += V._fg('Chargeout model',
+        '<select ' + V._u(id,type,'chargeoutModel') + '>'
+        + V._opts([['per_token','Per token / consumption'],['flat','Flat rate / subscription'],['hybrid','Hybrid']], wl.chargeoutModel||'per_token')
+        + '</select>', 'Commercial billing model')
       h += '</div>'
 
-      // ROW 3 — Token sizing
+      // Sizing inputs with sliders
       h += '<div class="formgrid">'
-      h += V._fg('Avg input tokens',
-        '<input type="number" min="50" step="50" value="' + (wl.avgInputTokens||512) + '" ' + V._uNum(id,type,'avgInputTokens') + '>',
-        'Prompt length per request')
-      h += V._fg('Avg output tokens',
-        '<input type="number" min="10" step="10" value="' + (wl.avgOutputTokens||256) + '" ' + V._uNum(id,type,'avgOutputTokens') + '>',
-        'Response length per request')
-      h += V._fg('GPU utilisation target %',
-        '<input type="number" min="10" max="95" step="5" value="' + (wl.gpuUtilTarget||75) + '" ' + V._uNum(id,type,'gpuUtilTarget') + '>',
-        'Lower = more headroom buffer')
+      h += V._sNum(id, type, 'dau', wl.dau||10000, 1000, 5000000, 1000, 'Daily Active Users')
+      h += V._sNum(id, type, 'reqPerDay', wl.reqPerDay||20, 1, 200, 1, 'Requests / user / day')
+      h += V._sNum(id, type, 'peakMult', wl.peakMult||3, 1, 20, 0.5, 'Peak multiplier')
+      h += V._sNum(id, type, 'peakConcPct', wl.peakConcPct||5, 1, 100, 1, 'Peak concurrency %')
+      h += '</div>'
+
+      // Token inputs with sliders
+      h += '<div class="formgrid">'
+      h += V._sNum(id, type, 'avgInputTokens', wl.avgInputTokens||512, 50, 128000, 50, 'Avg input tokens')
+      h += V._sNum(id, type, 'avgOutputTokens', wl.avgOutputTokens||256, 10, 32000, 10, 'Avg output tokens')
+      h += V._sNum(id, type, 'gpuUtilTarget', wl.gpuUtilTarget||75, 10, 95, 5, 'GPU util target %')
       h += V._fg('Context percentile',
         '<select ' + V._u(id,type,'contextPct') + '>'
         + V._opts([['p50','P50 — median'],['p75','P75 — busy'],['p95','P95 — near-peak'],['p99','P99 — tail']], wl.contextPct||'p95')
@@ -914,6 +930,141 @@ var V = {
   },
 
 
+
+  // ── WORKLOAD PRESETS (from AI Inferencing Factory) ─────────────────────
+  WP: {
+    chatbot:       {n:'Chatbot',        ic:'💬', ai:256,  ao:512,  ttft:200,  tbt:30, e2e:2000,  dau:10000,  reqPerDay:5,  peakMult:3,   batch:8,  gpuUtilTarget:75},
+    rag_qa:        {n:'RAG Q&A',        ic:'🔍', ai:2000, ao:400,  ttft:300,  tbt:25, e2e:3000,  dau:8000,   reqPerDay:6,  peakMult:2.5, batch:12, gpuUtilTarget:75},
+    summarization: {n:'Doc Summary',    ic:'📄', ai:4000, ao:800,  ttft:2000, tbt:20, e2e:10000, dau:2000,   reqPerDay:10, peakMult:2,   batch:32, gpuUtilTarget:80},
+    code_assist:   {n:'Code Assist',    ic:'💻', ai:1000, ao:2000, ttft:500,  tbt:25, e2e:5000,  dau:5000,   reqPerDay:8,  peakMult:2.5, batch:16, gpuUtilTarget:75},
+    reasoning:     {n:'Reasoning',      ic:'🧠', ai:2000, ao:4000, ttft:1000, tbt:40, e2e:15000, dau:2000,   reqPerDay:4,  peakMult:2,   batch:4,  gpuUtilTarget:60},
+    agentic:       {n:'Agentic',        ic:'🤖', ai:1000, ao:1500, ttft:500,  tbt:30, e2e:30000, dau:3000,   reqPerDay:6,  peakMult:2.5, batch:4,  gpuUtilTarget:40, isAgentic:true,    agentSteps:15, toolWait:1000},
+    autonomous:    {n:'Autonomous',     ic:'🔄', ai:2000, ao:3000, ttft:1000, tbt:40, e2e:120000,dau:500,    reqPerDay:3,  peakMult:1.5, batch:2,  gpuUtilTarget:30, isAgentic:true,    agentSteps:40, toolWait:2000},
+    audio_bot:     {n:'Audio / Voice',  ic:'🎙️', ai:100,  ao:200,  ttft:100,  tbt:12, e2e:800,   dau:15000,  reqPerDay:3,  peakMult:4,   batch:4,  gpuUtilTarget:75},
+    visual_qa:     {n:'Visual Q&A',     ic:'👁️', ai:500,  ao:300,  ttft:800,  tbt:30, e2e:4000,  dau:3000,   reqPerDay:6,  peakMult:2,   batch:8,  gpuUtilTarget:70, isMultimodal:true, avgImgPerReq:1, imgRes:'1024'},
+    classification:{n:'Classification', ic:'🏷️', ai:200,  ao:10,   ttft:100,  tbt:5,  e2e:200,   dau:50000,  reqPerDay:20, peakMult:3,   batch:64, gpuUtilTarget:85},
+    embedding:     {n:'Embedding',      ic:'🧮', ai:300,  ao:0,    ttft:50,   tbt:0,  e2e:100,   dau:100000, reqPerDay:50, peakMult:3,   batch:128,gpuUtilTarget:85},
+    satellite:     {n:'Satellite AI',   ic:'🛰️', ai:512,  ao:100,  ttft:500,  tbt:0,  e2e:2000,  dau:100,    reqPerDay:50, peakMult:2,   batch:64, gpuUtilTarget:80},
+  },
+
+  // Apply a preset to a workload
+  _applyPreset: function(wl, presetKey, type) {
+    var p = V.WP[presetKey]
+    if (!p) return
+    Object.keys(p).forEach(function(k) {
+      if (k !== 'n' && k !== 'ic') wl[k] = p[k]
+    })
+    wl.preset = presetKey
+    M.isDirty = true
+    V.renderWorkloadsTab()
+    V.updateKpiBar()
+    C.scheduleSave()
+  },
+
+  // Render preset bar
+  _renderPresetBar: function(wl, type) {
+    var h = '<div class="preset-bar">'
+      + '<span style="font-size:10px;font-weight:700;color:var(--mid);align-self:center;margin-right:4px">Preset:</span>'
+    Object.keys(V.WP).forEach(function(key) {
+      var p = V.WP[key]
+      h += '<span class="preset-chip' + (wl.preset === key ? ' act' : '') + '" '
+        + 'onclick="V._applyPreset(M.workloads.' + type + '.find(function(w){return w.id===\'' + wl.id + '\'}),\'' + key + '\',\'' + type + '\')">'
+        + p.ic + ' ' + p.n + '</span>'
+    })
+    h += '</div>'
+    return h
+  },
+
+  // Linked slider + number input
+  _sNum: function(id, type, field, val, min, max, step, hint) {
+    var sid = 's_' + id + '_' + field
+    var nid = 'n_' + id + '_' + field
+    var onInput = 'document.getElementById(\'' + nid + '\').value=this.value;C.updWorkload(\'' + id + '\',\'' + type + '\',\'' + field + '\',+this.value)'
+    var onNumChange = 'document.getElementById(\'' + sid + '\').value=this.value;C.updWorkload(\'' + id + '\',\'' + type + '\',\'' + field + '\',+this.value)'
+    return '<div class="fg">'
+      + '<label>' + hint + '</label>'
+      + '<div class="slider-row">'
+      + '<input type="range" id="' + sid + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '" oninput="' + onInput + '">'
+      + '<input type="number" id="' + nid + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '" onchange="' + onNumChange + '">'
+      + '</div></div>'
+  },
+
+  // Tenant dropdown
+  _tenantDropdown: function(wl, id, type) {
+    var tenants = M.tenantsList || {}
+    var keys = Object.keys(tenants)
+    if (!keys.length) return ''
+    return '<div class="fg"><label>Tenant</label>'
+      + '<select ' + V._u(id, type, 'tenant') + '>'
+      + '<option value="">— Unassigned —</option>'
+      + keys.map(function(k) {
+          return '<option value="' + k + '"' + (wl.tenant === k ? ' selected' : '') + '>' + atlasDB.esc(tenants[k].name || k) + '</option>'
+        }).join('')
+      + '</select></div>'
+  },
+
+  // Demand planner for MaaS
+  _renderDemandPlanner: function(wl) {
+    var id = wl.id
+    var sources = wl.demandSources || []
+    var tokPerSec = 15417
+    var provGpus = wl.provisionedGpus || 1
+    var supplyB = provGpus * tokPerSec * 730 * 3600 / 1e9
+    var h = '<div style="background:rgba(0,178,144,.05);border:1px solid rgba(0,178,144,.2);border-radius:var(--r);padding:14px;margin-bottom:12px">'
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--teal)">📈 Demand Planner'
+      + (wl.provisionedGpus ? ' <span style="font-size:10px;color:var(--mid);font-weight:400">· Supply: ' + supplyB.toFixed(1) + ' B tok/mo</span>' : '')
+      + '</div>'
+      + '<button class="btn btn-outline btn-sm" onclick="C.addDemandSource(\'' + id + '\')">+ Source</button>'
+      + '</div>'
+    if (!sources.length) {
+      h += '<div style="color:var(--mid);font-size:11px">No demand sources. Add to project utilisation and revenue over time.</div>'
+    } else {
+      var custTypes = [['tsap','TSAP'],['isv','ISV'],['enterprise','Enterprise'],['gov','Government'],['consumer','Consumer'],['other','Other']]
+      sources.forEach(function(src) {
+        h += '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:8px">'
+          + '<div class="formgrid" style="grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr auto">'
+          + V._fg('Label', '<input type="text" value="' + atlasDB.esc(src.label) + '" onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'label\',this.value)">')
+          + V._fg('Type', '<select onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'customerType\',this.value)">'
+            + custTypes.map(function(v){ return '<option value="'+v[0]+'"'+(src.customerType===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
+            + '</select>')
+          + V._fg('Customers Y1', '<input type="number" min="1" value="' + src.customersY1 + '" onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'customersY1\',+this.value)">')
+          + V._fg('Growth %/yr', '<input type="number" min="0" value="' + src.customerGrowthPct + '" onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'customerGrowthPct\',+this.value)">')
+          + V._fg('Tok/cust/mo (M)', '<input type="number" min="0.01" step="0.1" value="' + src.tokensPerCustomerM + '" onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'tokensPerCustomerM\',+this.value)">')
+          + V._fg('Token growth %', '<input type="number" min="0" value="' + src.tokenGrowthPct + '" onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'tokenGrowthPct\',+this.value)">')
+          + '<div class="fg" style="align-self:flex-end"><button class="btn btn-danger-text btn-sm" onclick="C.removeDemandSource(\'' + id + '\',\'' + src.id + '\')">✕</button></div>'
+          + '</div></div>'
+      })
+      // 6-year table
+      h += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:8px"><thead><tr style="background:var(--light)">'
+      ;['Year','Customers','Demand B tok/mo','Supply B tok/mo','Util %','Revenue/yr','Status'].forEach(function(col){
+        h += '<th style="padding:5px 8px;text-align:' + (col==='Year'||col==='Status'?'left':'right') + ';font-size:9px;font-weight:700;text-transform:uppercase;color:var(--mid)">' + col + '</th>'
+      })
+      h += '</tr></thead><tbody>'
+      for (var yr=1; yr<=6; yr++) {
+        var tc=0, tb=0
+        sources.forEach(function(src){
+          tc += src.customersY1 * Math.pow(1+src.customerGrowthPct/100, yr-1)
+          tb += (src.customersY1 * Math.pow(1+src.customerGrowthPct/100,yr-1)) * (src.tokensPerCustomerM * Math.pow(1+src.tokenGrowthPct/100,yr-1)) / 1000
+        })
+        var util = supplyB>0 ? tb/supplyB : 0
+        var rev  = tb*12*1000*(wl.pricePerMtok||0.75)
+        var col  = util>1?'var(--orange)':util>0.85?'var(--amber)':'var(--teal)'
+        var st   = util>1?'🔴 Under':util>0.85?'🟡 Near full':util>0.3?'🟢 Healthy':'⚪ Low'
+        var td = function(v, right, bold, color) {
+          return '<td style="padding:5px 8px;text-align:'+(right?'right':'left')+';'+(bold?'font-weight:700;':'')+( color?'color:'+color+';':'')+'">' + v + '</td>'
+        }
+        h += '<tr style="border-top:1px solid var(--border)">'
+          + td('Y'+yr,false) + td(Math.round(tc).toLocaleString(),true) + td(tb.toFixed(2),true)
+          + td(supplyB.toFixed(1),true) + td(Math.min(util*100,999).toFixed(1)+'%',true,true,col)
+          + td('$'+Math.round(rev).toLocaleString(),true) + td(st,false) + '</tr>'
+      }
+      h += '</tbody></table>'
+    }
+    h += '</div>'
+    return h
+  },
+
   _renderDerived: function(type, wl) {
     var sz = null
     try {
@@ -1049,8 +1200,8 @@ var C = {
     var id = type + '-' + Date.now()
     var defaultGpu = M.gpuConfigs.length ? M.gpuConfigs[0].id : ''
     var defaults = {
-      uc:     { id:id, name:'Use Case '     +(M.workloads.uc.length+1),     model:M.defaultModel, gpu:defaultGpu, precision:'int4', dau:10000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'gold',   engine:'vllm', securityTier:'standard', isAgentic:false, isMultimodal:false },
-      maas:   { id:id, name:'MaaS Pool '    +(M.workloads.maas.length+1),   model:M.defaultModel, gpu:defaultGpu, precision:'int4', dau:50000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'bronze', engine:'vllm', pricePerMtok:0.75, provisionedGpus:null, provisioningReason:'', demandSources:[] },
+      uc:     { id:id, name:'Use Case '     +(M.workloads.uc.length+1),     model:M.defaultModel, gpu:defaultGpu, precision:'int4', dau:10000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'gold',   engine:'vllm', securityTier:'standard', isAgentic:false, isMultimodal:false, src:'onprem', chargeoutModel:'per_token', avgInputTokens:512, avgOutputTokens:256, gpuUtilTarget:75 },
+      maas:   { id:id, name:'MaaS Pool '    +(M.workloads.maas.length+1),   model:M.defaultModel, gpu:defaultGpu, precision:'int4', dau:50000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'bronze', engine:'vllm', pricePerMtok:0.75, provisionedGpus:null, provisioningReason:'', demandSources:[], src:'onprem', chargeoutModel:'per_token', avgInputTokens:512, avgOutputTokens:256, gpuUtilTarget:75 },
       gpuaas: { id:id, name:'GPUaaS Block ' +(M.workloads.gpuaas.length+1), gpu:defaultGpu, gpuCount:8, rateTier:'12mo', commercialSla:'gold' },
       bmaas:  { id:id, name:'BMaaS Block '  +(M.workloads.bmaas.length+1),  gpu:defaultGpu, serverCount:1, gpusPerServer:8, commercialSla:'gold', guestOs:'ubuntu', interconnect:'standalone' }
     }
