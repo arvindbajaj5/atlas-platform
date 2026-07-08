@@ -260,7 +260,37 @@ body{font-family:var(--font);background:var(--light);color:var(--dark);min-heigh
 .version-label{font-weight:700;color:var(--navy)}
 .version-meta{color:var(--mid)}
 .version-dirty{color:var(--amber);font-weight:600}
+
+/* ── IF-compatible CSS classes ─────────────────────────────────────── */
+.card{background:#fff;border-radius:10px;border:1px solid var(--border);padding:16px;margin-bottom:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.st{text-align:center;padding:6px 3px}
+.v{font-size:20px;font-weight:700}
+.l{font-size:9px;color:var(--mid);margin-top:2px}
+.cc{position:relative;width:100%;height:280px}
+.cc.t{height:360px}
+.ib{padding:8px 10px;border-radius:6px;font-size:10px}
+.ib.s{background:rgba(0,178,144,.08)}
+.ib.i{background:rgba(0,40,112,.04)}
+.ibg{background:rgba(28,56,245,.06);border-radius:6px;padding:8px}
+.sbg{background:rgba(0,178,144,.08);border-radius:6px;padding:8px}
+.dbg{background:rgba(255,85,57,.06);border-radius:6px;padding:8px}
+.wbg{background:rgba(255,182,0,.08);border-radius:6px;padding:8px}
+.txM{color:var(--mid)}
+.s2{color:var(--teal)}
+.s1{color:var(--blue)}
+.p1{color:var(--orange)}
+.p2{color:var(--navy)}
+.s3{color:var(--amber)}
+table{width:100%;border-collapse:collapse;font-size:11px}
+table th{padding:7px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mid);text-align:left;background:var(--light)}
+table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+table tr:last-child td{border-bottom:none}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -340,7 +370,8 @@ body{font-family:var(--font);background:var(--light);color:var(--dark);min-heigh
 
 <!-- TABS -->
 <div class="tabs" id="main-tabs">
-  <div class="tab act" onclick="C.switchTab('workloads')" data-tab="workloads">
+  <div class="tab act" onclick="C.switchTab('scope')" data-tab="scope">Project Scope</div>
+  <div class="tab" onclick="C.switchTab('workloads')" data-tab="workloads">
     Workloads <span class="tab-badge" id="tab-badge-wl">0</span>
   </div>
   <div class="tab" onclick="C.switchTab('arch')" data-tab="arch">Architecture</div>
@@ -353,7 +384,8 @@ body{font-family:var(--font);background:var(--light);color:var(--dark);min-heigh
 
 <!-- PAGE CONTENT -->
 <div class="page" id="main-page">
-  <div id="tab-workloads"></div>
+  <div id="tab-scope"></div>
+  <div id="tab-workloads" style="display:none"></div>
   <div id="tab-arch"  style="display:none"></div>
   <div id="tab-perf"  style="display:none"></div>
   <div id="tab-tok"   style="display:none"></div>
@@ -398,7 +430,7 @@ document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css
 var TOOL_NAME    = 'Solution, Size & Price'
 var TOOL_SHORT   = 'SSP'
 var TOOL_TAGLINE = 'Unified workload sizing, architecture & commercial pricing'
-var TOOL_BUILD   = '20260708g'
+var TOOL_BUILD   = '20260708h'
 
 // ════════════════════════════════════════════════════════════════════════════
 // MODEL — single source of truth
@@ -1235,20 +1267,19 @@ var C = {
     document.querySelectorAll('.tab').forEach(function(el) {
       el.classList.toggle('act', el.dataset.tab === tab)
     })
-    // Hide all tabs, show active
-    var tabs = ['workloads','arch','perf','tok','bom','yield','report']
+    var tabs = ['scope','workloads','arch','perf','tok','bom','yield','report']
     tabs.forEach(function(t) {
       var el = document.getElementById('tab-' + t)
       if (el) el.style.display = t === tab ? '' : 'none'
     })
-    // Render active tab
-    if (tab === 'workloads') V.renderWorkloadsTab()
-    else if (tab === 'arch')   V.renderArchTab()
-    else if (tab === 'perf')   V.renderPerfTab()
-    else if (tab === 'tok')    V.renderTokTab()
-    else if (tab === 'bom')    V.renderBomTab()
-    else if (tab === 'yield')  V.renderYieldTab()
-    else if (tab === 'report') V.renderReportTab()
+    if      (tab === 'scope')    V.renderScopeTab()
+    else if (tab === 'workloads') V.renderWorkloadsTab()
+    else if (tab === 'arch')     { V.renderArchTab();  setTimeout(praxisRebuildCharts, 300) }
+    else if (tab === 'perf')     { V.renderPerfTab();  setTimeout(praxisRebuildCharts, 300) }
+    else if (tab === 'tok')      { V.renderTokTab();   setTimeout(praxisRebuildCharts, 300) }
+    else if (tab === 'bom')      V.renderBOMTab()
+    else if (tab === 'yield')    V.renderYieldTab()
+    else if (tab === 'report')   V.renderReportTab()
   },
 
   toggleCategory: function(type) {
@@ -1639,618 +1670,13 @@ var C = {
 // ════════════════════════════════════════════════════════════════════════════
 // INIT — called after shared scripts load
 // ════════════════════════════════════════════════════════════════════════════
-// ════════════════════════════════════════════════════════════════════════════
-// TAB RENDER FUNCTIONS
-// ════════════════════════════════════════════════════════════════════════════
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-function sizeWl(wl, type) {
-  try {
-    if (typeof AtlasSolution !== 'undefined') return AtlasSolution.sizeWorkload(wl, type, M)
-  } catch(e) {}
-  return null
-}
-
-function fmtK(n) { return n >= 1e6 ? '$' + (n/1e6).toFixed(1) + 'M' : n >= 1000 ? '$' + Math.round(n/1000) + 'K' : '$' + Math.round(n) }
-
-function allWlSized() {
-  var items = []
-  M.workloads.uc.forEach(function(wl) {
-    var sz = sizeWl(wl, 'uc')
-    if (sz && !sz.error) items.push({ wl:wl, sz:sz, type:'uc' })
-  })
-  M.workloads.maas.forEach(function(wl) {
-    var sz = sizeWl(wl, 'maas')
-    if (sz && !sz.error) items.push({ wl:wl, sz:sz, type:'maas' })
-  })
-  M.workloads.gpuaas.forEach(function(wl) {
-    items.push({ wl:wl, sz:{ total:wl.gpuCount||0, powerKw:(wl.gpuCount||0)*0.7 }, type:'gpuaas' })
-  })
-  M.workloads.bmaas.forEach(function(wl) {
-    var g = M.gpuMap[wl.gpu]
-    var gpus = wl.serverCount*(wl.gpusPerServer||(g&&g.gpus_in_unit)||8)
-    items.push({ wl:wl, sz:{ total:gpus, powerKw:wl.serverCount*((g&&g.tdp_kw)||5.6) }, type:'bmaas' })
-  })
-  return items
-}
-
-// ── ARCHITECTURE TAB ────────────────────────────────────────────────────────
-V.renderArchTab = function() {
-  var el = document.getElementById('tab-arch')
-  if (!el) return
-  var items = allWlSized()
-  if (!items.length) {
-    el.innerHTML = '<div class="coming-soon-tab"><h3>No workloads defined</h3><p>Add workloads in the Workloads tab first.</p></div>'
-    return
-  }
-
-  var totalGpus = 0, totalPower = 0, totalRacks = 0
-  items.forEach(function(x) { totalGpus += x.sz.total||0; totalPower += x.sz.powerKw||0 })
-
-  var h = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">'
-  ;[['Total GPUs', totalGpus, 'var(--navy)'],
-    ['Total Power', Math.round(totalPower*10)/10 + ' kW', 'var(--teal)'],
-    ['Workloads', items.length, 'var(--blue)']
-  ].forEach(function(k) {
-    h += '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">'
-      + '<div style="font-size:24px;font-weight:900;color:' + k[2] + '">' + k[1] + '</div>'
-      + '<div style="font-size:10px;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-top:4px">' + k[0] + '</div>'
-      + '</div>'
-  })
-  h += '</div>'
-
-  // Per-workload architecture cards
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
-  items.forEach(function(x) {
-    var wl = x.wl, sz = x.sz, type = x.type
-    var gpuConf = M.gpuMap[wl.gpu || (sz && sz.gpu)]
-    var gpuName = (gpuConf && gpuConf.name) || '—'
-    var gpus = sz.total || 0
-    var gpusPerUnit = (gpuConf && gpuConf.gpus_in_unit) || 8
-    var racks = Math.ceil(gpus / gpusPerUnit)
-    totalRacks += racks
-
-    // Disagg recommendation
-    var modelObj = M.modelMap[wl.model] || (M.modelById && M.modelById[wl.model])
-    var params = (modelObj && modelObj.params_b) || 0
-    var needsDisagg = params >= 70 && !wl.disaggAccepted
-    var hasDisagg = wl.disaggAccepted
-
-    // Interconnect recommendation
-    var icRec = gpus > gpusPerUnit ? 'InfiniBand (multi-server cluster)' : (gpuConf && gpuConf.interconnect) || 'NVLink (single chassis)'
-
-    // Engine recommendation
-    var engRec = { vllm:'vLLM', trt_llm:'TRT-LLM (+30% throughput)', sglang:'SGLang (+10% throughput)' }[wl.engine || 'vllm']
-
-    var typeLabel = { uc:'UC', maas:'MaaS', gpuaas:'GPUaaS', bmaas:'BMaaS' }[type]
-    var typeColor = { uc:'var(--navy)', maas:'var(--teal)', gpuaas:'var(--blue)', bmaas:'var(--purple)' }[type]
-
-    h += '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:16px">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">'
-      + '<span style="background:' + typeColor + ';color:#fff;border-radius:10px;padding:2px 8px;font-size:9px;font-weight:700">' + typeLabel + '</span>'
-      + '<span style="font-weight:700;font-size:13px">' + wl.name + '</span>'
-      + '</div>'
-
-      // Rack layout
-      + '<div style="margin-bottom:10px">'
-      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mid);margin-bottom:6px">Rack Layout</div>'
-      + '<div style="display:flex;gap:6px;align-items:center">'
-      + '<span style="font-size:20px">🖥</span>'
-      + '<div>'
-      + '<div style="font-weight:700;color:var(--navy)">' + gpus + ' GPUs · ' + racks + ' rack unit' + (racks !== 1 ? 's' : '') + '</div>'
-      + '<div style="font-size:11px;color:var(--mid)">' + gpuName + ' · ' + gpusPerUnit + ' GPUs/unit · ' + Math.round(sz.powerKw||0*10)/10 + ' kW total</div>'
-      + '</div></div></div>'
-
-      // Interconnect
-      + '<div style="margin-bottom:10px">'
-      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mid);margin-bottom:4px">Interconnect</div>'
-      + '<div style="font-size:12px">' + (wl.interconnect ? ({ standalone:'Standalone — single unit', nvlink:'NVLink — same chassis', infiniband:'InfiniBand — multi-server cluster' }[wl.interconnect] || wl.interconnect) : icRec) + '</div>'
-      + '</div>'
-
-      // Engine
-      + (type === 'uc' || type === 'maas' ? '<div style="margin-bottom:10px">'
-        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mid);margin-bottom:4px">Inference Engine</div>'
-        + '<div style="font-size:12px">' + engRec + '</div>'
-        + '</div>' : '')
-
-      // Disaggregation
-      + (type === 'uc' || type === 'maas' ? '<div>'
-        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mid);margin-bottom:4px">Disaggregated Inference</div>'
-        + (hasDisagg
-          ? '<div style="color:var(--teal);font-size:12px">✓ Enabled — prefill/decode split' + (wl.decodeProc ? ' with ' + (M.gpuMap[wl.decodeProc] && M.gpuMap[wl.decodeProc].name || 'CPU decode') : '') + '</div>'
-          : needsDisagg
-            ? '<div style="color:var(--amber);font-size:12px">⚠ Recommended for ' + params + 'B model — enable in Deep mode to reduce TTFT</div>'
-            : '<div style="color:var(--mid);font-size:12px">Not required (' + (params || '?') + 'B model)</div>')
-        + '</div>' : '')
-
-      + '</div>'
-  })
-  h += '</div>'
-
-  // Fleet summary box
-  h += '<div style="margin-top:16px;background:var(--navy);color:#fff;border-radius:var(--r);padding:14px 20px;display:flex;gap:24px;align-items:center">'
-    + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5)">Fleet Summary</div>'
-    + '<div><div style="font-size:20px;font-weight:900">' + totalGpus + '</div><div style="font-size:10px;color:rgba(255,255,255,.5)">Total GPUs</div></div>'
-    + '<div><div style="font-size:20px;font-weight:900">' + Math.round(totalPower*10)/10 + ' kW</div><div style="font-size:10px;color:rgba(255,255,255,.5)">Total Power</div></div>'
-    + '<div><div style="font-size:20px;font-weight:900">' + totalRacks + '</div><div style="font-size:10px;color:rgba(255,255,255,.5)">Rack Units</div></div>'
-    + '<div><div style="font-size:20px;font-weight:900">' + fmtK(totalGpus*30000) + '</div><div style="font-size:10px;color:rgba(255,255,255,.5)">Capex est.</div></div>'
-    + '</div>'
-
-  el.innerHTML = h
-}
-
-// ── PERFORMANCE TAB ──────────────────────────────────────────────────────────
-V.renderPerfTab = function() {
-  var el = document.getElementById('tab-perf')
-  if (!el) return
-  var items = allWlSized().filter(function(x){ return x.type === 'uc' || x.type === 'maas' })
-
-  if (!items.length) {
-    el.innerHTML = '<div class="coming-soon-tab"><h3>No UC or MaaS workloads</h3><p>Performance analysis applies to UC and MaaS workloads.</p></div>'
-    return
-  }
-
-  // Engine throughput factors
-  var engFactor = { vllm:1.0, trt_llm:1.3, sglang:1.1 }
-
-  var h = '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:12px">'
-    + '<table style="width:100%;border-collapse:collapse">'
-    + '<thead><tr style="background:var(--light)">'
-    + '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Workload</th>'
-    + '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">GPUs</th>'
-    + '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Throughput (tok/s)</th>'
-    + '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">TTFT target</th>'
-    + '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">TBT target</th>'
-    + '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">E2E target</th>'
-    + '<th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">SLA</th>'
-    + '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">Engine</th>'
-    + '</tr></thead><tbody>'
-
-  var totalTps = 0, slaPass = 0
-  items.forEach(function(x) {
-    var wl = x.wl, sz = x.sz
-    var gpuConf = M.gpuMap[wl.gpu || sz.gpu]
-    var tps = (sz.total||0) * 15417 * (engFactor[wl.engine||'vllm']||1.0)
-    if (wl.gpuUtilTarget) tps *= (wl.gpuUtilTarget / 100)
-    totalTps += tps
-
-    // SLA check — simple heuristic based on GPU count vs demand
-    var slaOk = sz.total > 0
-    if (slaOk) slaPass++
-
-    // Latency estimates (rough heuristics from GPU throughput)
-    var ttftEst = wl.ttft || (wl.avgInputTokens||512) / ((sz.tokPerSec||tps) / Math.max(sz.total||1,1)) * 1000
-    var tbtEst  = wl.tbt  || Math.round(1000 / ((sz.tokPerSec||tps) / Math.max(sz.total||1,1)))
-
-    h += '<tr style="border-top:1px solid var(--border)">'
-      + '<td style="padding:10px 12px;font-weight:600">' + wl.name + '</td>'
-      + '<td style="padding:10px 12px;text-align:right;font-family:var(--mono)">' + (sz.total||0) + '</td>'
-      + '<td style="padding:10px 12px;text-align:right;font-family:var(--mono)">' + Math.round(tps).toLocaleString() + '</td>'
-      + '<td style="padding:10px 12px;text-align:right;font-family:var(--mono)">' + (wl.ttft || '—') + ' ms</td>'
-      + '<td style="padding:10px 12px;text-align:right;font-family:var(--mono)">' + (wl.tbt  || '—') + ' ms</td>'
-      + '<td style="padding:10px 12px;text-align:right;font-family:var(--mono)">' + (wl.e2e  || '—') + ' ms</td>'
-      + '<td style="padding:10px 12px;text-align:center">'
-        + (slaOk ? '<span style="color:var(--teal);font-weight:700">✓ Pass</span>' : '<span style="color:var(--orange);font-weight:700">✗ Fail</span>')
-        + '</td>'
-      + '<td style="padding:10px 12px;font-size:11px;color:var(--mid)">' + ({ vllm:'vLLM', trt_llm:'TRT-LLM', sglang:'SGLang' }[wl.engine||'vllm']) + '</td>'
-      + '</tr>'
-  })
-
-  h += '</tbody></table></div>'
-
-  // Fleet performance summary
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">'
-  ;[
-    ['Fleet Throughput', Math.round(totalTps).toLocaleString() + ' tok/s', 'var(--navy)'],
-    ['SLA Pass Rate', slaPass + '/' + items.length, slaPass === items.length ? 'var(--teal)' : 'var(--orange)'],
-    ['Engines Used', [...new Set(items.map(function(x){ return x.wl.engine||'vllm' }))].join(', '), 'var(--blue)'],
-    ['Precision Mix', [...new Set(items.map(function(x){ return x.wl.precision||'int4' }))].join(', '), 'var(--mid)'],
-  ].forEach(function(k) {
-    h += '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:14px">'
-      + '<div style="font-size:18px;font-weight:900;color:' + k[2] + '">' + k[1] + '</div>'
-      + '<div style="font-size:10px;color:var(--mid);margin-top:4px">' + k[0] + '</div></div>'
-  })
-  h += '</div>'
-
-  el.innerHTML = h
-}
-
-// ── TOKENOMICS TAB ───────────────────────────────────────────────────────────
-V.renderTokTab = function() {
-  var el = document.getElementById('tab-tok')
-  if (!el) return
-  var items = allWlSized().filter(function(x){ return x.type === 'uc' || x.type === 'maas' })
-
-  if (!items.length) {
-    el.innerHTML = '<div class="coming-soon-tab"><h3>No UC or MaaS workloads</h3><p>Tokenomics analysis applies to inference workloads.</p></div>'
-    return
-  }
-
-  var POWER_COST_KWH = 0.08  // $0.08/kWh
-  var AMORT_MONTHS   = 36    // 3-year amortisation
-  var GPU_PRICE_USD  = 30000 // default if not in gpu_configs
-  var CAPEX_OVERHEAD = 1.8   // infra overhead multiplier on GPU price
-
-  var rows = items.map(function(x) {
-    var wl = x.wl, sz = x.sz, type = x.type
-    var gpuConf = M.gpuMap[wl.gpu || sz.gpu]
-    var pricePerGpu = (gpuConf && gpuConf.price_usd) || GPU_PRICE_USD
-    var gpus = wl.provisionedGpus || sz.total || 0
-    var powerKw = sz.powerKw || 0
-
-    // On-prem monthly cost
-    var capexMo  = (gpus * pricePerGpu * CAPEX_OVERHEAD) / AMORT_MONTHS
-    var powerMo  = powerKw * POWER_COST_KWH * 24 * 30
-    var onPremMo = capexMo + powerMo
-
-    // Monthly tokens served (at utilisation target)
-    var util = (wl.gpuUtilTarget || 75) / 100
-    var tokPerSec = gpus * 15417 * util
-    var moTokM = tokPerSec * 730 * 3600 / 1e6  // millions of tokens/month
-
-    // Cost per million tokens
-    var cpm = moTokM > 0 ? onPremMo / moTokM : 0
-
-    // API equivalent (market rates from model_catalogue or defaults)
-    var modelObj = M.modelMap[wl.model] || (M.modelById && M.modelById[wl.model])
-    var apiIn  = (modelObj && modelObj.price_input_per_1m)  || 0.75
-    var apiOut = (modelObj && modelObj.price_output_per_1m) || 1.50
-    var inputFrac = (wl.avgInputTokens||512) / ((wl.avgInputTokens||512) + (wl.avgOutputTokens||256))
-    var apiPerMtok = apiIn * inputFrac + apiOut * (1-inputFrac)
-    var apiEquivMo = moTokM * apiPerMtok
-
-    // Savings
-    var savingsPct = apiEquivMo > 0 ? Math.round((1 - onPremMo/apiEquivMo)*100) : 0
-
-    // Crossover: tokens/month where on-prem = API cost
-    // on-prem fixed cost / (api_per_mtok - marginal_on_prem_per_mtok_variable)
-    // Simplified: months to pay back at current demand
-    var crossoverMonths = apiEquivMo > 0 ? Math.round((gpus * pricePerGpu * CAPEX_OVERHEAD) / (apiEquivMo - onPremMo)) : null
-
-    return {
-      name: wl.name, type: type, src: wl.src || 'onprem',
-      gpus: gpus, moTokM: moTokM, onPremMo: onPremMo,
-      cpm: cpm, apiPerMtok: apiPerMtok, apiEquivMo: apiEquivMo,
-      savingsPct: savingsPct, crossoverMonths: crossoverMonths,
-      pricePerMtok: wl.pricePerMtok || 0
-    }
-  })
-
-  var h = '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px">'
-    + '<table style="width:100%;border-collapse:collapse">'
-    + '<thead><tr style="background:var(--light)">'
-    + ['Workload','Src','GPUs','Tok/mo (M)','On-prem $/mo','On-prem $/Mtok','API $/Mtok','API equiv $/mo','Savings %','Sell price $/Mtok']
-      .map(function(h) { return '<th style="padding:9px 10px;font-size:9px;font-weight:700;text-transform:uppercase;color:var(--mid);white-space:nowrap">' + h + '</th>' }).join('')
-    + '</tr></thead><tbody>'
-
-  var totalOnPrem = 0, totalApiEquiv = 0
-  rows.forEach(function(r) {
-    totalOnPrem   += r.onPremMo
-    totalApiEquiv += r.apiEquivMo
-    var srcIcon = { onprem:'🏢', api:'☁️', hybrid:'🔀' }[r.src] || '🏢'
-    var savColor = r.savingsPct > 0 ? 'var(--teal)' : 'var(--orange)'
-    var margin = r.pricePerMtok > 0 ? Math.round((1 - r.cpm/r.pricePerMtok)*100) : null
-
-    h += '<tr style="border-top:1px solid var(--border)">'
-      + '<td style="padding:9px 10px;font-weight:600">' + r.name + '</td>'
-      + '<td style="padding:9px 10px;text-align:center">' + srcIcon + '</td>'
-      + '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">' + r.gpus + '</td>'
-      + '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">' + Math.round(r.moTokM).toLocaleString() + '</td>'
-      + '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">$' + Math.round(r.onPremMo).toLocaleString() + '</td>'
-      + '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">$' + r.cpm.toFixed(3) + '</td>'
-      + '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">$' + r.apiPerMtok.toFixed(3) + '</td>'
-      + '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">$' + Math.round(r.apiEquivMo).toLocaleString() + '</td>'
-      + '<td style="padding:9px 10px;text-align:right;font-weight:700;color:' + savColor + '">' + r.savingsPct + '%</td>'
-      + '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">'
-        + (r.pricePerMtok > 0
-          ? '$' + r.pricePerMtok.toFixed(3) + (margin !== null ? ' <span style="font-size:10px;color:var(--teal)">' + margin + '% margin</span>' : '')
-          : '<span style="color:var(--mid)">—</span>')
-        + '</td>'
-      + '</tr>'
-  })
-  var blendedSavings = totalApiEquiv > 0 ? Math.round((1 - totalOnPrem/totalApiEquiv)*100) : 0
-  h += '<tr style="background:var(--light);font-weight:700;border-top:2px solid var(--border)">'
-    + '<td style="padding:9px 10px">FLEET TOTAL</td>'
-    + '<td></td><td></td><td></td>'
-    + '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">$' + Math.round(totalOnPrem).toLocaleString() + '/mo</td>'
-    + '<td></td>'
-    + '<td></td>'
-    + '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">$' + Math.round(totalApiEquiv).toLocaleString() + '/mo</td>'
-    + '<td style="padding:9px 10px;text-align:right;color:var(--teal)">' + blendedSavings + '%</td>'
-    + '<td></td></tr>'
-  h += '</tbody></table></div>'
-
-  // Assumptions note
-  h += '<div style="font-size:11px;color:var(--mid);background:var(--light);border-radius:var(--r);padding:10px 14px">'
-    + 'Assumptions: $' + POWER_COST_KWH + '/kWh power · ' + AMORT_MONTHS + '-month amortisation · '
-    + CAPEX_OVERHEAD + '× infra overhead on GPU MSRP · ' + 'GPU MSRP from gpu_configs.price_usd · '
-    + 'API rates from model_catalogue (input/output per 1M tokens) · '
-    + 'On-prem throughput at GPU util target %.</div>'
-
-  el.innerHTML = h
-}
-
-// ── BOM TAB ──────────────────────────────────────────────────────────────────
-V.renderBomTab = function() {
-  var el = document.getElementById('tab-bom')
-  if (!el) return
-  var items = allWlSized()
-
-  if (!items.length) {
-    el.innerHTML = '<div class="coming-soon-tab"><h3>No workloads defined</h3><p>Add workloads to generate a BOM.</p></div>'
-    return
-  }
-
-  var GPU_PRICE = 30000, RACK_PRICE = 8000, SWITCH_PRICE = 25000
-  var totalCapex = 0
-
-  var h = '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:12px">'
-    + '<table style="width:100%;border-collapse:collapse">'
-    + '<thead><tr style="background:var(--light)">'
-    + ['Workload','Type','GPU','Units','GPUs','Power (kW)','GPU cost','Rack cost','Total est.']
-      .map(function(col) { return '<th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid);text-align:' + (col==='Workload'||col==='Type'||col==='GPU'?'left':'right') + '">' + col + '</th>' }).join('')
-    + '</tr></thead><tbody>'
-
-  items.forEach(function(x) {
-    var wl = x.wl, sz = x.sz, type = x.type
-    var gpuConf = M.gpuMap[wl.gpu || sz.gpu]
-    var gpuName = (gpuConf && gpuConf.name) || '—'
-    var gpus = wl.provisionedGpus || sz.total || 0
-    var gpusPerUnit = (gpuConf && gpuConf.gpus_in_unit) || 8
-    var units = Math.ceil(gpus / gpusPerUnit)
-    var pricePerGpu = (M.priceOverrides[wl.id] || (gpuConf && gpuConf.price_usd) || GPU_PRICE)
-    var gpuCost = gpus * pricePerGpu
-    var rackCost = units * RACK_PRICE
-    var total = gpuCost + rackCost
-    totalCapex += total
-    var typeColor = { uc:'var(--navy)', maas:'var(--teal)', gpuaas:'var(--blue)', bmaas:'var(--purple)' }[type]
-    h += '<tr style="border-top:1px solid var(--border)">'
-      + '<td style="padding:9px 12px;font-weight:600">' + wl.name + '</td>'
-      + '<td style="padding:9px 12px"><span style="background:' + typeColor + ';color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:700">' + type.toUpperCase() + '</span></td>'
-      + '<td style="padding:9px 12px;font-size:11px">' + gpuName + '</td>'
-      + '<td style="padding:9px 12px;text-align:right">' + units + '</td>'
-      + '<td style="padding:9px 12px;text-align:right">' + gpus + '</td>'
-      + '<td style="padding:9px 12px;text-align:right">' + Math.round((sz.powerKw||0)*10)/10 + '</td>'
-      + '<td style="padding:9px 12px;text-align:right;font-family:var(--mono)">' + fmtK(gpuCost) + '</td>'
-      + '<td style="padding:9px 12px;text-align:right;font-family:var(--mono)">' + fmtK(rackCost) + '</td>'
-      + '<td style="padding:9px 12px;text-align:right;font-family:var(--mono);font-weight:700">' + fmtK(total) + '</td>'
-      + '</tr>'
-  })
-  // Networking (one switch per 8 rack units)
-  var totalUnits = items.reduce(function(s,x){ return s + Math.ceil((x.wl.provisionedGpus||x.sz.total||0)/((M.gpuMap[x.wl.gpu]&&M.gpuMap[x.wl.gpu].gpus_in_unit)||8)) }, 0)
-  var switches = Math.max(1, Math.ceil(totalUnits/8))
-  var switchCost = switches * SWITCH_PRICE
-  totalCapex += switchCost
-
-  h += '<tr style="border-top:1px solid var(--border);background:rgba(28,56,245,.03)">'
-    + '<td style="padding:9px 12px;font-weight:600;color:var(--blue)">Networking</td>'
-    + '<td colspan="3" style="padding:9px 12px;color:var(--mid);font-size:11px">' + switches + ' × InfiniBand/NVLink switch(es)</td>'
-    + '<td colspan="4"></td>'
-    + '<td style="padding:9px 12px;text-align:right;font-family:var(--mono);font-weight:700;color:var(--blue)">' + fmtK(switchCost) + '</td>'
-    + '</tr>'
-
-  h += '<tr style="background:var(--navy);color:#fff;font-weight:700">'
-    + '<td style="padding:10px 12px" colspan="8">TOTAL CAPEX ESTIMATE</td>'
-    + '<td style="padding:10px 12px;text-align:right;font-family:var(--mono);font-size:16px">' + fmtK(totalCapex) + '</td>'
-    + '</tr>'
-  h += '</tbody></table></div>'
-
-  h += '<div style="font-size:11px;color:var(--mid);background:var(--light);border-radius:var(--r);padding:10px 14px">'
-    + 'GPU pricing from gpu_configs.price_usd (MSRP). Rack: $' + RACK_PRICE.toLocaleString() + '/unit. '
-    + 'Switch: $' + SWITCH_PRICE.toLocaleString() + '/switch. Accuracy ±30% — for ROM discussion only. '
-    + 'SI fees, civil works, and MDC build not included.</div>'
-
-  el.innerHTML = h
-}
-
-// ── FLEET YIELD TAB ──────────────────────────────────────────────────────────
-V.renderYieldTab = function() {
-  var el = document.getElementById('tab-yield')
-  if (!el) return
-  var items = allWlSized()
-
-  if (!items.length) {
-    el.innerHTML = '<div class="coming-soon-tab"><h3>No workloads defined</h3></div>'
-    return
-  }
-
-  // S1: SLA performance per workload
-  var h = '<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">Scenario 1 — SLA Performance</div>'
-  h += '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:20px">'
-    + '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--light)">'
-    + ['Workload','Type','GPUs','SLA Tier','TTFT Target','TBT Target','Status']
-      .map(function(c) { return '<th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">' + c + '</th>' }).join('')
-    + '</tr></thead><tbody>'
-
-  var slaPass = 0
-  items.forEach(function(x) {
-    var wl = x.wl, sz = x.sz, type = x.type
-    var gpus = sz.total || 0
-    var slaOk = gpus > 0
-    if (slaOk) slaPass++
-    var slaColor = slaOk ? 'var(--teal)' : 'var(--orange)'
-    var typeLabel = type.toUpperCase()
-    h += '<tr style="border-top:1px solid var(--border)">'
-      + '<td style="padding:9px 12px;font-weight:600">' + wl.name + '</td>'
-      + '<td style="padding:9px 12px"><span style="font-size:10px;font-weight:700;color:var(--mid)">' + typeLabel + '</span></td>'
-      + '<td style="padding:9px 12px;text-align:right;font-family:var(--mono)">' + gpus + '</td>'
-      + '<td style="padding:9px 12px"><span class="sla-' + (wl.commercialSla||'bronze') + '">' + (wl.commercialSla||'bronze').charAt(0).toUpperCase() + (wl.commercialSla||'bronze').slice(1) + '</span></td>'
-      + '<td style="padding:9px 12px;text-align:right;font-family:var(--mono)">' + (wl.ttft ? wl.ttft + ' ms' : (type==='uc'||type==='maas' ? '—' : 'N/A')) + '</td>'
-      + '<td style="padding:9px 12px;text-align:right;font-family:var(--mono)">' + (wl.tbt  ? wl.tbt  + ' ms' : (type==='uc'||type==='maas' ? '—' : 'N/A')) + '</td>'
-      + '<td style="padding:9px 12px"><span style="color:' + slaColor + ';font-weight:700">' + (slaOk ? '✓ Meets SLA' : '✗ Not sized') + '</span></td>'
-      + '</tr>'
-  })
-  h += '</tbody></table></div>'
-
-  // S2: Fleet inventory
-  h += '<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">Scenario 2 — Fleet Inventory</div>'
-  var totalGpus = 0, ucGpus = 0, maasGpus = 0, gpuaasGpus = 0, bmaasGpus = 0
-  items.forEach(function(x) {
-    var gpus = x.sz.total || 0
-    totalGpus += gpus
-    if (x.type === 'uc')     ucGpus     += gpus
-    if (x.type === 'maas')   maasGpus   += gpus
-    if (x.type === 'gpuaas') gpuaasGpus += gpus
-    if (x.type === 'bmaas')  bmaasGpus  += gpus
-  })
-  var failover = Math.round(totalGpus * 0.2)
-  var headroom = Math.max(0, totalGpus - ucGpus - maasGpus - gpuaasGpus - bmaasGpus - failover)
-
-  // Stacked bar
-  var segs = [
-    { label:'Use Cases', gpus:ucGpus,     color:'var(--navy)' },
-    { label:'MaaS',      gpus:maasGpus,   color:'var(--teal)' },
-    { label:'GPUaaS',    gpus:gpuaasGpus, color:'var(--blue)' },
-    { label:'BMaaS',     gpus:bmaasGpus,  color:'var(--purple)' },
-    { label:'Failover',  gpus:failover,   color:'var(--amber)' },
-  ]
-  var total = totalGpus || 1
-  h += '<div style="height:28px;border-radius:6px;overflow:hidden;display:flex;margin-bottom:10px">'
-  segs.forEach(function(s) {
-    if (!s.gpus) return
-    h += '<div style="width:' + Math.round(s.gpus/total*100) + '%;background:' + s.color + '" title="' + s.label + ': ' + s.gpus + ' GPUs"></div>'
-  })
-  h += '</div>'
-
-  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">'
-  segs.forEach(function(s) {
-    var pct = Math.round(s.gpus/total*100)
-    h += '<div style="border-left:4px solid ' + s.color + ';padding:8px 12px;background:#fff;border-radius:0 var(--r) var(--r) 0">'
-      + '<div style="font-size:20px;font-weight:900;color:' + s.color + '">' + s.gpus + '</div>'
-      + '<div style="font-size:11px;color:var(--mid)">' + s.label + ' · ' + pct + '% of fleet</div>'
-      + '</div>'
-  })
-  h += '</div>'
-
-  h += '<div style="background:var(--navy);color:#fff;border-radius:var(--r);padding:12px 20px;display:flex;gap:20px;align-items:center">'
-    + '<span style="font-size:11px;font-weight:700;color:rgba(255,255,255,.5)">SLA SUMMARY</span>'
-    + '<span style="font-size:18px;font-weight:900">' + slaPass + '/' + items.length + ' ✓</span>'
-    + '<span style="font-size:11px;color:rgba(255,255,255,.5)">workloads meeting SLA</span>'
-    + '</div>'
-
-  el.innerHTML = h
-}
-
-// ── REPORT TAB ───────────────────────────────────────────────────────────────
-V.renderReportTab = function() {
-  var el = document.getElementById('tab-report')
-  if (!el) return
-  var items = allWlSized()
-  var eng = M.currentEng
-
-  var h = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
-
-  // Save version card
-  h += '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px">'
-    + '<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:6px">💾 Save Solution Version</div>'
-    + '<div style="font-size:12px;color:var(--mid);margin-bottom:14px;line-height:1.5">'
-    + 'Save the current workload configuration as a versioned solution. '
-    + (M.versionLabel ? 'Current: <strong>' + M.versionLabel + '</strong>' : 'No version saved yet.')
-    + '</div>'
-    + (eng
-      ? '<button class="btn btn-primary" onclick="C.saveVersion()">Save as ' + (M.mode==='deep'?'Deep':'Express') + ' version</button>'
-      : '<div style="color:var(--mid);font-size:11px">Select an engagement first</div>')
-    + '</div>'
-
-  // ROM export card
-  h += '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px">'
-    + '<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:6px">📄 ROM Export</div>'
-    + '<div style="font-size:12px;color:var(--mid);margin-bottom:14px;line-height:1.5">'
-    + 'Copy a plain-text ROM summary to clipboard. Ready to paste into email or deck.'
-    + '</div>'
-    + '<button class="btn btn-outline" onclick="C.exportRomText()">Copy ROM to clipboard</button>'
-    + '</div>'
-
-  // Solution summary
-  if (items.length) {
-    var totalGpus = items.reduce(function(s,x){ return s+(x.sz.total||0) },0)
-    var totalPower = items.reduce(function(s,x){ return s+(x.sz.powerKw||0) },0)
-    var totalCapex = totalGpus * 30000
-    h += '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px;grid-column:1/-1">'
-      + '<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:12px">📊 Solution Summary</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px">'
-      + [
-          ['Workloads', items.length],
-          ['Total GPUs', totalGpus],
-          ['Power', Math.round(totalPower*10)/10 + ' kW'],
-          ['Capex est.', fmtK(totalCapex)],
-          ['Mode', M.mode.charAt(0).toUpperCase()+M.mode.slice(1)]
-        ].map(function(k) {
-          return '<div style="text-align:center;padding:10px;background:var(--light);border-radius:var(--r)">'
-            + '<div style="font-size:18px;font-weight:900;color:var(--navy)">' + k[1] + '</div>'
-            + '<div style="font-size:10px;color:var(--mid);margin-top:2px">' + k[0] + '</div></div>'
-        }).join('')
-      + '</div>'
-      // Workload list
-      + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
-      + '<thead><tr style="background:var(--light)">'
-      + ['Workload','Type','Model','GPU','Count','Power','Capex est.','SLA']
-        .map(function(col){ return '<th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mid)">' + col + '</th>' }).join('')
-      + '</tr></thead><tbody>'
-      + items.map(function(x) {
-          var wl = x.wl, sz = x.sz, type = x.type
-          var gpuConf = M.gpuMap[wl.gpu || sz.gpu]
-          var modObj = M.modelMap[wl.model] || (M.modelById && M.modelById[wl.model])
-          return '<tr style="border-top:1px solid var(--border)">'
-            + '<td style="padding:7px 10px;font-weight:600">' + wl.name + '</td>'
-            + '<td style="padding:7px 10px">' + type.toUpperCase() + '</td>'
-            + '<td style="padding:7px 10px;font-size:11px">' + ((modObj&&modObj.name)||wl.model||'—').slice(0,20) + '</td>'
-            + '<td style="padding:7px 10px;font-size:11px">' + ((gpuConf&&gpuConf.name)||'—').slice(0,16) + '</td>'
-            + '<td style="padding:7px 10px;text-align:right">' + (sz.total||0) + '</td>'
-            + '<td style="padding:7px 10px;text-align:right">' + Math.round((sz.powerKw||0)*10)/10 + ' kW</td>'
-            + '<td style="padding:7px 10px;text-align:right">' + fmtK((sz.total||0)*30000) + '</td>'
-            + '<td style="padding:7px 10px"><span class="sla-' + (wl.commercialSla||'bronze') + '">' + (wl.commercialSla||'bronze').charAt(0).toUpperCase()+(wl.commercialSla||'bronze').slice(1) + '</span></td>'
-            + '</tr>'
-        }).join('')
-      + '</tbody></table></div>'
-  }
-  h += '</div>'
-
-  el.innerHTML = h
-}
-
-// Add exportRomText to C if not already defined
-if (!C.exportRomText) {
-  C.exportRomText = function() {
-    var eng = M.currentEng
-    var lines = ['ROM — ROUGH ORDER OF MAGNITUDE']
-    lines.push('Engagement: ' + (eng ? eng.name : 'Not selected'))
-    lines.push('Date: ' + new Date().toLocaleDateString())
-    lines.push('Mode: ' + M.mode.charAt(0).toUpperCase()+M.mode.slice(1))
-    lines.push('Accuracy: ±30% at this stage')
-    lines.push('')
-    var items = allWlSized()
-    var totalGpus = 0, totalCapex = 0
-    items.forEach(function(x) {
-      var wl = x.wl, sz = x.sz
-      var gpuConf = M.gpuMap[wl.gpu||sz.gpu]
-      var gpus = sz.total||0; totalGpus+=gpus; totalCapex+=gpus*30000
-      lines.push('[' + x.type.toUpperCase() + '] ' + wl.name)
-      lines.push('  GPU: ' + ((gpuConf&&gpuConf.name)||'—') + ' × ' + gpus)
-      lines.push('  Power: ' + Math.round((sz.powerKw||0)*10)/10 + ' kW  |  Capex est: ' + fmtK(gpus*30000))
-      lines.push('')
-    })
-    lines.push('─'.repeat(50))
-    lines.push('TOTAL GPUs: ' + totalGpus)
-    lines.push('TOTAL CAPEX EST: ' + fmtK(totalCapex))
-    lines.push('')
-    lines.push('Generated by ATLAS | ' + new Date().toISOString().split('T')[0])
-    var text = lines.join('\n')
-    try {
-      navigator.clipboard.writeText(text).then(function(){ V.toast('ROM copied to clipboard','success') })
-    } catch(e) {
-      var ta=document.createElement('textarea'); ta.value=text
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
-      V.toast('ROM copied to clipboard','success')
-    }
-  }
-}
-
 
 function onScriptsReady() {
   V.init()
   C.loadEngagements()
   C.loadRefData()
+  // Default to scope tab on load
+  C.switchTab('scope')
 
   // ── Event delegation for demand planner (data-action pattern) ──────────
   // Handles addSource / updSource / removeSource without inline event handlers
@@ -2276,5 +1702,6 @@ function onScriptsReady() {
   })
 }
 </script>
+<script src="engine.js?v=20260708g"></script>
 </body>
 </html>
