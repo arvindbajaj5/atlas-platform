@@ -392,7 +392,7 @@ document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css
 var TOOL_NAME    = 'Solution, Size & Price'
 var TOOL_SHORT   = 'SSP'
 var TOOL_TAGLINE = 'Unified workload sizing, architecture & commercial pricing'
-var TOOL_BUILD   = '20260708c'
+var TOOL_BUILD   = '20260708d'
 
 // ════════════════════════════════════════════════════════════════════════════
 // MODEL — single source of truth
@@ -659,7 +659,7 @@ var V = {
   _getTableCells: function(type, wl, isDeep) {
     var gpuConf = M.gpuMap[wl.gpu]
     var gpuName = (gpuConf && gpuConf.name) || (wl.gpu ? wl.gpu.slice(0,12) : '—')
-    var modName = (M.modelMap[wl.model] && M.modelMap[wl.model].name) || wl.model || '—'
+    var modObj = M.modelMap[wl.model] || (M.modelById && M.modelById[wl.model]); var modName = (modObj && modObj.name) || (wl.model && wl.model.length < 30 ? wl.model : '—')
     var slaHtml = '<span class="sla-' + (wl.commercialSla||wl.sla||'bronze') + '">'
       + (wl.commercialSla||wl.sla||'bronze').charAt(0).toUpperCase()
       + (wl.commercialSla||wl.sla||'bronze').slice(1) + '</span>'
@@ -918,6 +918,14 @@ var V = {
     }).join('')
   },
 
+  // onclick/quote helpers — avoids all escaping issues in event handlers
+  _q: function(val) { return "'" + val + "'" },                          // wrap in single quotes
+  _oc: function(fn) {                                                     // onclick="C.fn(arg1,arg2...)"
+    var args = Array.prototype.slice.call(arguments, 1)
+      .map(function(a){ return "'" + a + "'" }).join(',')
+    return 'onclick="C.' + fn + '(' + args + ')"'
+  },
+
   // onchange helpers — avoids quote escaping in templates
   _u: function(id, type, field) {
     return 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'' + field + '\',this.value)"'
@@ -993,14 +1001,18 @@ var V = {
   _tenantDropdown: function(wl, id, type) {
     var tenants = M.tenantsList || {}
     var keys = Object.keys(tenants)
-    if (!keys.length) return ''
+    var addBtn = '<button class="btn btn-outline btn-sm" style="margin-top:4px" '
+      + 'onclick="C.addTenant()">+ New tenant</button>'
+    if (!keys.length) {
+      return '<div class="fg"><label>Tenant</label>' + addBtn + '</div>'
+    }
     return '<div class="fg"><label>Tenant</label>'
       + '<select ' + V._u(id, type, 'tenant') + '>'
       + '<option value="">— Unassigned —</option>'
       + keys.map(function(k) {
           return '<option value="' + k + '"' + (wl.tenant === k ? ' selected' : '') + '>' + atlasDB.esc(tenants[k].name || k) + '</option>'
         }).join('')
-      + '</select></div>'
+      + '</select>' + addBtn + '</div>'
   },
 
   // Demand planner for MaaS
@@ -1010,60 +1022,69 @@ var V = {
     var tokPerSec = 15417
     var provGpus = wl.provisionedGpus || 1
     var supplyB = provGpus * tokPerSec * 730 * 3600 / 1e9
+
     var h = '<div style="background:rgba(0,178,144,.05);border:1px solid rgba(0,178,144,.2);border-radius:var(--r);padding:14px;margin-bottom:12px">'
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
-      + '<div style="font-size:11px;font-weight:700;color:var(--teal)">📈 Demand Planner'
-      + (wl.provisionedGpus ? ' <span style="font-size:10px;color:var(--mid);font-weight:400">· Supply: ' + supplyB.toFixed(1) + ' B tok/mo</span>' : '')
+      + '<div style="font-size:11px;font-weight:700;color:var(--teal)">&#128200; Demand Planner'
+      + (wl.provisionedGpus ? ' <span style="font-size:10px;color:var(--mid);font-weight:400">Supply ceiling: ' + supplyB.toFixed(1) + ' B tok/mo</span>' : '')
       + '</div>'
-      + '<button class="btn btn-outline btn-sm" onclick="C.addDemandSource(\'' + id + '\')">+ Source</button>'
+      + '<button class="btn btn-outline btn-sm" ' + V._oc('addDemandSource', id) + '>+ Source</button>'
       + '</div>'
+
     if (!sources.length) {
-      h += '<div style="color:var(--mid);font-size:11px">No demand sources. Add to project utilisation and revenue over time.</div>'
+      h += '<div style="color:var(--mid);font-size:11px;padding:4px 0">No demand sources yet. Click + Source to add a customer segment.</div>'
     } else {
       var custTypes = [['tsap','TSAP'],['isv','ISV'],['enterprise','Enterprise'],['gov','Government'],['consumer','Consumer'],['other','Other']]
       sources.forEach(function(src) {
         h += '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:8px">'
-          + '<div class="formgrid" style="grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr auto">'
-          + V._fg('Label', '<input type="text" value="' + atlasDB.esc(src.label) + '" onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'label\',this.value)">')
-          + V._fg('Type', '<select onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'customerType\',this.value)">'
-            + custTypes.map(function(v){ return '<option value="'+v[0]+'"'+(src.customerType===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
-            + '</select>')
-          + V._fg('Customers Y1', '<input type="number" min="1" value="' + src.customersY1 + '" onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'customersY1\',+this.value)">')
-          + V._fg('Growth %/yr', '<input type="number" min="0" value="' + src.customerGrowthPct + '" onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'customerGrowthPct\',+this.value)">')
-          + V._fg('Tok/cust/mo (M)', '<input type="number" min="0.01" step="0.1" value="' + src.tokensPerCustomerM + '" onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'tokensPerCustomerM\',+this.value)">')
-          + V._fg('Token growth %', '<input type="number" min="0" value="' + src.tokenGrowthPct + '" onchange="C.updDemandSource(\'' + id + '\',\'' + src.id + '\',\'tokenGrowthPct\',+this.value)">')
-          + '<div class="fg" style="align-self:flex-end"><button class="btn btn-danger-text btn-sm" onclick="C.removeDemandSource(\'' + id + '\',\'' + src.id + '\')">✕</button></div>'
-          + '</div></div>'
+        h += '<div class="formgrid" style="grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr auto">'
+        h += V._fg('Label',          '<input type="text" value="' + atlasDB.esc(src.label||'') + '" onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('label') + ',this.value)">')
+        h += V._fg('Type',           '<select onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('customerType') + ',this.value)">'
+          + custTypes.map(function(v){ return '<option value="' + v[0] + '"' + (src.customerType===v[0]?' selected':'') + '>' + v[1] + '</option>' }).join('')
+          + '</select>')
+        h += V._fg('Customers Y1',   '<input type="number" min="1" value="' + (src.customersY1||10) + '" onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('customersY1') + ',+this.value)">')
+        h += V._fg('Growth %/yr',    '<input type="number" min="0" value="' + (src.customerGrowthPct||30) + '" onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('customerGrowthPct') + ',+this.value)">')
+        h += V._fg('Tok/cust/mo (M)','<input type="number" min="0.01" step="0.1" value="' + (src.tokensPerCustomerM||5) + '" onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('tokensPerCustomerM') + ',+this.value)">')
+        h += V._fg('Token growth %', '<input type="number" min="0" value="' + (src.tokenGrowthPct||20) + '" onchange="C.updDemandSource(' + V._q(id) + ',' + V._q(src.id) + ',' + V._q('tokenGrowthPct') + ',+this.value)">')
+        h += '<div class="fg" style="align-self:flex-end">'
+          + '<button class="btn btn-danger-text btn-sm" ' + V._oc('removeDemandSource', id, src.id) + '>&#10005;</button></div>'
+        h += '</div></div>'
       })
-      // 6-year table
-      h += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:8px"><thead><tr style="background:var(--light)">'
-      ;['Year','Customers','Demand B tok/mo','Supply B tok/mo','Util %','Revenue/yr','Status'].forEach(function(col){
-        h += '<th style="padding:5px 8px;text-align:' + (col==='Year'||col==='Status'?'left':'right') + ';font-size:9px;font-weight:700;text-transform:uppercase;color:var(--mid)">' + col + '</th>'
+
+      // 6-year projection table
+      h += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:8px">'
+      h += '<thead><tr style="background:var(--light)">'
+      ;['Year','Customers','Demand (B tok/mo)','Supply (B tok/mo)','Util %','Revenue/yr','Status'].forEach(function(col){
+        h += '<th style="padding:5px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:var(--mid);text-align:' + (col==='Year'||col==='Status'?'left':'right') + '">' + col + '</th>'
       })
       h += '</tr></thead><tbody>'
-      for (var yr=1; yr<=6; yr++) {
-        var tc=0, tb=0
-        sources.forEach(function(src){
-          tc += src.customersY1 * Math.pow(1+src.customerGrowthPct/100, yr-1)
-          tb += (src.customersY1 * Math.pow(1+src.customerGrowthPct/100,yr-1)) * (src.tokensPerCustomerM * Math.pow(1+src.tokenGrowthPct/100,yr-1)) / 1000
+      for (var yr = 1; yr <= 6; yr++) {
+        var tc = 0, tb = 0
+        sources.forEach(function(src) {
+          var custs = (src.customersY1||0) * Math.pow(1 + (src.customerGrowthPct||0)/100, yr-1)
+          tc += custs
+          tb += custs * ((src.tokensPerCustomerM||0) * Math.pow(1 + (src.tokenGrowthPct||0)/100, yr-1)) / 1000
         })
-        var util = supplyB>0 ? tb/supplyB : 0
-        var rev  = tb*12*1000*(wl.pricePerMtok||0.75)
-        var col  = util>1?'var(--orange)':util>0.85?'var(--amber)':'var(--teal)'
-        var st   = util>1?'🔴 Under':util>0.85?'🟡 Near full':util>0.3?'🟢 Healthy':'⚪ Low'
-        var td = function(v, right, bold, color) {
-          return '<td style="padding:5px 8px;text-align:'+(right?'right':'left')+';'+(bold?'font-weight:700;':'')+( color?'color:'+color+';':'')+'">' + v + '</td>'
-        }
+        var util = supplyB > 0 ? tb / supplyB : 0
+        var rev  = tb * 12 * 1000 * (wl.pricePerMtok || 0.75)
+        var col  = util > 1 ? 'var(--orange)' : util > 0.85 ? 'var(--amber)' : 'var(--teal)'
+        var st   = util > 1 ? '&#128308; Under' : util > 0.85 ? '&#129000; Near full' : util > 0.3 ? '&#128994; Healthy' : '&#9898; Low'
         h += '<tr style="border-top:1px solid var(--border)">'
-          + td('Y'+yr,false) + td(Math.round(tc).toLocaleString(),true) + td(tb.toFixed(2),true)
-          + td(supplyB.toFixed(1),true) + td(Math.min(util*100,999).toFixed(1)+'%',true,true,col)
-          + td('$'+Math.round(rev).toLocaleString(),true) + td(st,false) + '</tr>'
+          + '<td style="padding:5px 8px">Y' + yr + '</td>'
+          + '<td style="padding:5px 8px;text-align:right">' + Math.round(tc).toLocaleString() + '</td>'
+          + '<td style="padding:5px 8px;text-align:right">' + tb.toFixed(2) + '</td>'
+          + '<td style="padding:5px 8px;text-align:right">' + supplyB.toFixed(1) + '</td>'
+          + '<td style="padding:5px 8px;text-align:right;font-weight:700;color:' + col + '">' + Math.min(util*100,999).toFixed(1) + '%</td>'
+          + '<td style="padding:5px 8px;text-align:right">$' + Math.round(rev).toLocaleString() + '</td>'
+          + '<td style="padding:5px 8px;font-size:10px">' + st + '</td>'
+          + '</tr>'
       }
       h += '</tbody></table>'
     }
     h += '</div>'
     return h
   },
+
 
   _renderDerived: function(type, wl) {
     var sz = null
@@ -1404,9 +1425,18 @@ var C = {
     try {
       var mods = await atlasDB.get('model_catalogue', 'enabled=eq.true&order=family.asc,name.asc&limit=200')
       M.modelCatalogue = mods || []
-      M.modelMap = {}
-      M.modelCatalogue.forEach(function(m) { M.modelMap[m.model_id] = m })
+      M.modelMap = {}; M.modelById = {}
+      M.modelCatalogue.forEach(function(m) {
+        M.modelMap[m.model_id] = m   // lookup by slug e.g. 'llama-3.1-8b'
+        M.modelById[m.id]      = m   // lookup by UUID (from saved solution_versions)
+      })
     } catch(e) { console.warn('loadRefData models:', e) }
+
+    try {
+      var tens = await atlasDB.get('tenants', 'active=eq.true&order=name.asc')
+      M.tenantsList = {}
+      ;(tens||[]).forEach(function(t){ M.tenantsList[t.id] = t })
+    } catch(e) { console.warn('loadRefData tenants:', e) }
 
     V.renderWorkloadsTab()
     V.updateKpiBar()
@@ -1470,6 +1500,30 @@ var C = {
       V.updateKpiBar()
       V.toast('Saved ' + verLabel, 'success')
     } catch(e) { V.toast('Save failed — ' + e.message, 'error') }
+  },
+
+  addTenant: async function() {
+    var name = prompt('Tenant name:')
+    if (!name || !name.trim()) return
+    if (!M.currentEng) { V.toast('Select an engagement first', 'warning'); return }
+    try {
+      var result = await atlasDB.post('tenants', {
+        name: name.trim(),
+        engagement_id: M.currentEng.id,
+        active: true
+      })
+      if (result && result[0]) {
+        M.tenantsList[result[0].id] = result[0]
+        V.renderWorkloadsTab()
+        V.toast('Tenant created: ' + name.trim(), 'success')
+      }
+    } catch(e) {
+      // Fallback: create in local state only
+      var tempId = 'tenant-' + Date.now()
+      M.tenantsList[tempId] = { id: tempId, name: name.trim() }
+      V.renderWorkloadsTab()
+      V.toast('Tenant added locally: ' + name.trim(), 'info')
+    }
   },
 
   _saveTimer: null,
