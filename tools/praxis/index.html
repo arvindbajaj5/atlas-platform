@@ -375,7 +375,7 @@ document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css
 var TOOL_NAME    = 'Solution, Size & Price'
 var TOOL_SHORT   = 'SSP'
 var TOOL_TAGLINE = 'Unified workload sizing, architecture & commercial pricing'
-var TOOL_BUILD   = '20260708a'
+var TOOL_BUILD   = '20260708b'
 
 // ════════════════════════════════════════════════════════════════════════════
 // MODEL — single source of truth
@@ -698,119 +698,221 @@ var V = {
     return [{ html: wl.name }]
   },
 
-  _renderWorkloadForm: function(type, wl) {
+    _renderWorkloadForm: function(type, wl) {
     var isDeep = M.mode === 'deep'
     var id = wl.id
+    var gpuConf = M.gpuMap[wl.gpu]
     var h = ''
 
-    // Express fields (always shown)
-    h += '<div class="formgrid">'
-    h += '<div class="fg"><label>Name</label>'
-      + '<input type="text" value="' + atlasDB.esc(wl.name) + '" '
-      + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'name\',this.value)"></div>'
-
+    // ROW 1 — Name + Model + GPU + SLA
+    h += '<div class="formgrid" style="grid-template-columns:1.5fr 1.5fr 1.5fr 1fr">'
+    h += V._fg('Name', '<input type="text" value="' + atlasDB.esc(wl.name) + '" ' + V._u(id,type,'name') + '>')
     if (type === 'uc' || type === 'maas') {
-      h += '<div class="fg"><label>Model</label>'
-        + V._renderModelDropdown(wl.model, id, type) + '</div>'
-      h += '<div class="fg"><label>GPU Architecture</label>'
-        + V._renderGpuDropdown(wl.gpu, id, type) + '</div>'
+      h += V._fg('Model', V._renderModelDropdown(wl.model, id, type))
+      h += V._fg('GPU Architecture', V._renderGpuDropdown(wl.gpu, id, type))
+    }
+    h += V._fg('SLA', '<select ' + V._u(id,type,'commercialSla') + '>'
+      + V._opts([['gold','Gold SLA'],['silver','Silver SLA'],['bronze','Bronze SLA']], wl.commercialSla||wl.sla||'bronze')
+      + '</select>')
+    h += '</div>'
+
+    // ROW 2 — UC/MaaS sizing inputs
+    if (type === 'uc' || type === 'maas') {
+      h += '<div class="formgrid">'
+      h += V._fg('Daily Active Users',
+        '<input type="number" min="100" step="100" value="' + (wl.dau||10000) + '" ' + V._uNum(id,type,'dau') + '>',
+        'Users per day at full load')
+      h += V._fg('Requests per user/day',
+        '<input type="number" min="1" step="1" value="' + (wl.reqPerDay||20) + '" ' + V._uNum(id,type,'reqPerDay') + '>',
+        'Avg requests each active user makes')
+      h += V._fg('Peak multiplier',
+        '<input type="number" min="1" step="0.5" value="' + (wl.peakMult||3) + '" ' + V._uNum(id,type,'peakMult') + '>',
+        'Rush hour vs average load ratio')
+      h += V._fg('Peak concurrency %',
+        '<input type="number" min="1" max="100" step="1" value="' + (wl.peakConcPct||5) + '" ' + V._uNum(id,type,'peakConcPct') + '>',
+        '% of peak users concurrent')
+      h += '</div>'
+
+      // ROW 3 — Token sizing
+      h += '<div class="formgrid">'
+      h += V._fg('Avg input tokens',
+        '<input type="number" min="50" step="50" value="' + (wl.avgInputTokens||512) + '" ' + V._uNum(id,type,'avgInputTokens') + '>',
+        'Prompt length per request')
+      h += V._fg('Avg output tokens',
+        '<input type="number" min="10" step="10" value="' + (wl.avgOutputTokens||256) + '" ' + V._uNum(id,type,'avgOutputTokens') + '>',
+        'Response length per request')
+      h += V._fg('GPU utilisation target %',
+        '<input type="number" min="10" max="95" step="5" value="' + (wl.gpuUtilTarget||75) + '" ' + V._uNum(id,type,'gpuUtilTarget') + '>',
+        'Lower = more headroom buffer')
+      h += V._fg('Context percentile',
+        '<select ' + V._u(id,type,'contextPct') + '>'
+        + V._opts([['p50','P50 — median'],['p75','P75 — busy'],['p95','P95 — near-peak'],['p99','P99 — tail']], wl.contextPct||'p95')
+        + '</select>')
+      h += '</div>'
     }
 
-    if (type === 'uc') {
-      h += '<div class="fg"><label>Daily Active Users</label>'
-        + '<input type="number" min="100" step="100" value="' + (wl.dau||10000) + '" '
-        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'dau\',+this.value)">'
-        + '<div class="fg-hint">Peak concurrent = DAU × req/day × peak factor</div></div>'
-    }
-
+    // MaaS — price + provisioning + demand planner
     if (type === 'maas') {
-      h += '<div class="fg"><label>Price $/Mtok</label>'
-        + '<input type="number" min="0.01" step="0.01" value="' + (wl.pricePerMtok||0.75) + '" '
-        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'pricePerMtok\',+this.value)"></div>'
+      h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 2fr">'
+      h += V._fg('Price $/Mtok',
+        '<input type="number" min="0.01" step="0.01" value="' + (wl.pricePerMtok||0.75) + '" ' + V._uNum(id,type,'pricePerMtok') + '>',
+        'Revenue per million tokens')
+      h += V._fg('Provisioned GPUs',
+        '<input type="number" min="1" step="1" value="' + (wl.provisionedGpus||'') + '" placeholder="Auto from sizing" ' + V._uNum(id,type,'provisionedGpus') + '>',
+        'Override to size for future demand')
+      h += V._fg('Provisioning note',
+        '<input type="text" value="' + atlasDB.esc(wl.provisioningReason||'') + '" placeholder="e.g. Sized for Year 3 demand" ' + V._u(id,type,'provisioningReason') + '>')
+      h += '</div>'
+      h += V._renderDemandPlanner(wl)
     }
 
+    // GPUaaS fields
     if (type === 'gpuaas') {
-      h += '<div class="fg"><label>GPU Architecture</label>'
-        + V._renderGpuDropdown(wl.gpu, id, type) + '</div>'
-      h += '<div class="fg"><label>GPU Count</label>'
-        + '<input type="number" min="1" step="1" value="' + (wl.gpuCount||8) + '" '
-        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'gpuCount\',+this.value)"></div>'
-      h += '<div class="fg"><label>Rate Tier</label>'
-        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'rateTier\',this.value)">'
-        + [['ondemand','On-demand ($5.00/GPU/hr)'],['12mo','12-mo reserved ($3.50/GPU/hr)'],
-           ['24mo','24-mo reserved ($2.75/GPU/hr)'],['spot','Spot ($1.50/GPU/hr)']]
-          .map(function(v){ return '<option value="'+v[0]+'"'+((wl.rateTier||'12mo')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
-        + '</select></div>'
+      h += '<div class="formgrid">'
+      h += V._fg('GPU Architecture', V._renderGpuDropdown(wl.gpu, id, type))
+      h += V._fg('GPU Count', '<input type="number" min="1" step="1" value="' + (wl.gpuCount||8) + '" ' + V._uNum(id,type,'gpuCount') + '>')
+      h += V._fg('Rate Tier', '<select ' + V._u(id,type,'rateTier') + '>'
+        + V._opts([['ondemand','On-demand — $5.00/GPU/hr'],['12mo','12-mo reserved — $3.50/GPU/hr'],['24mo','24-mo reserved — $2.75/GPU/hr'],['spot','Spot — $1.50/GPU/hr']], wl.rateTier||'12mo')
+        + '</select>')
+      h += V._fg('Commitment period', '<select ' + V._u(id,type,'contractMonths') + '>'
+        + V._opts([['0','Month-to-month'],['6','6 months'],['12','12 months'],['24','24 months'],['36','36 months']], String(wl.contractMonths||12))
+        + '</select>')
+      h += '</div>'
+      h += '<div class="formgrid">'
+      h += V._fg('Dedication model', '<select ' + V._u(id,type,'dedicationModel') + '>'
+        + V._opts([['dedicated','Dedicated — single tenant'],['shared','Shared pool — multi-tenant']], wl.dedicationModel||'dedicated')
+        + '</select>')
+      h += V._fg('Interconnect', '<select ' + V._u(id,type,'interconnect') + '>'
+        + V._opts([['standalone','Standalone'],['nvlink','NVLink — same chassis'],['infiniband','InfiniBand — multi-server']], wl.interconnect||'standalone')
+        + '</select>')
+      h += V._tenantDropdown(wl, id, type)
+      h += '</div>'
     }
 
+    // BMaaS fields
     if (type === 'bmaas') {
-      h += '<div class="fg"><label>GPU Architecture</label>'
-        + V._renderGpuDropdown(wl.gpu, id, type) + '</div>'
-      h += '<div class="fg"><label>Server Count</label>'
-        + '<input type="number" min="1" step="1" value="' + (wl.serverCount||1) + '" '
-        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'serverCount\',+this.value)"></div>'
-      var gpuConf = M.gpuMap[wl.gpu]
       var defaultGpuPerSrv = (gpuConf && gpuConf.gpus_in_unit) || 8
-      h += '<div class="fg"><label>GPUs per server</label>'
-        + '<input type="number" min="1" step="1" value="' + (wl.gpusPerServer||defaultGpuPerSrv) + '" '
-        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'gpusPerServer\',+this.value)"></div>'
+      h += '<div class="formgrid">'
+      h += V._fg('GPU Architecture', V._renderGpuDropdown(wl.gpu, id, type))
+      h += V._fg('Server Count', '<input type="number" min="1" step="1" value="' + (wl.serverCount||1) + '" ' + V._uNum(id,type,'serverCount') + '>')
+      h += V._fg('GPUs per server', '<input type="number" min="1" step="1" value="' + (wl.gpusPerServer||defaultGpuPerSrv) + '" ' + V._uNum(id,type,'gpusPerServer') + '>', 'Auto from gpu_configs')
+      h += V._fg('SLA Tier', '<select ' + V._u(id,type,'commercialSla') + '>'
+        + V._opts([['gold','Gold — dedicated bare metal'],['silver','Silver — guaranteed'],['bronze','Bronze — best effort']], wl.commercialSla||'gold')
+        + '</select>')
+      h += '</div>'
+      h += '<div class="formgrid">'
+      h += V._fg('Guest OS', '<select ' + V._u(id,type,'guestOs') + '>'
+        + V._opts([['ubuntu','Ubuntu 22.04 LTS'],['rhel','RHEL 8/9'],['custom','Customer image']], wl.guestOs||'ubuntu')
+        + '</select>')
+      h += V._fg('Interconnect', '<select ' + V._u(id,type,'interconnect') + '>'
+        + V._opts([['standalone','Standalone'],['nvlink','NVLink — same chassis'],['infiniband','InfiniBand — multi-server']], wl.interconnect||'standalone')
+        + '</select>')
+      h += V._tenantDropdown(wl, id, type)
+      h += '</div>'
     }
 
-    h += '<div class="fg"><label>SLA</label>'
-      + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'commercialSla\',this.value)">'
-      + [['gold','Gold SLA'],['silver','Silver SLA'],['bronze','Bronze SLA']]
-        .map(function(v){ return '<option value="'+v[0]+'"'+((wl.commercialSla||'bronze')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
-      + '</select></div>'
-    h += '</div>'  // end formgrid
-
-    // Derived panel (UC + MaaS in express)
+    // Derived panel
     if (type === 'uc' || type === 'maas') {
       h += V._renderDerived(type, wl)
     }
 
-    // Deep mode fields
+    // Deep mode — UC + MaaS
     if (isDeep && (type === 'uc' || type === 'maas')) {
       h += '<div class="deep-section">'
-        + '<div class="deep-section-title">Deep configuration</div>'
+        + '<div class="deep-section-title">Latency &amp; Performance</div>'
         + '<div class="formgrid">'
-        + '<div class="fg"><label>Precision</label>'
-        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'precision\',this.value)">'
-        + [['int4','INT4'],['int8','INT8'],['fp8','FP8'],['fp16','FP16']]
-          .map(function(v){ return '<option value="'+v[0]+'"'+((wl.precision||'int4')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
-        + '</select></div>'
-        + '<div class="fg"><label>Inference Engine</label>'
-        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'engine\',this.value)">'
-        + [['vllm','vLLM (default)'],['trt_llm','TRT-LLM (+30% throughput)'],['sglang','SGLang (+10% throughput)']]
-          .map(function(v){ return '<option value="'+v[0]+'"'+((wl.engine||'vllm')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
-        + '</select></div>'
-        + '<div class="fg"><label>TTFT target (ms)</label>'
-        + '<input type="number" min="50" step="50" value="' + (wl.ttft||500) + '" '
-        + 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'ttft\',+this.value)"></div>'
-        + '<div class="fg"><label>Security tier</label>'
-        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'securityTier\',this.value)">'
-        + [['standard','Standard'],['confidential','Confidential (+15%)'],['sovereign','Sovereign (+25%)']]
-          .map(function(v){ return '<option value="'+v[0]+'"'+((wl.securityTier||'standard')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
-        + '</select></div>'
-        + '<div class="fg"><label>Agentic</label>'
-        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'isAgentic\',this.value===\'true\')">'
-        + '<option value="false"'+(!wl.isAgentic?' selected':'')+'>No</option>'
-        + '<option value="true"'+(wl.isAgentic?' selected':'')+'>Yes — agentic workflow</option>'
-        + '</select></div>'
-        + '<div class="fg"><label>Multimodal</label>'
-        + '<select onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'isMultimodal\',this.value===\'true\')">'
-        + '<option value="false"'+(!wl.isMultimodal?' selected':'')+'>Text only</option>'
-        + '<option value="true"'+(wl.isMultimodal?' selected':'')+'>Vision / multimodal</option>'
-        + '</select></div>'
+        + V._fg('Precision', '<select ' + V._u(id,type,'precision') + '>'
+          + V._opts([['int4','INT4 — best throughput'],['int8','INT8'],['fp8','FP8'],['fp16','FP16 — best quality']], wl.precision||'int4')
+          + '</select>')
+        + V._fg('Inference Engine', '<select ' + V._u(id,type,'engine') + '>'
+          + V._opts([['vllm','vLLM (standard)'],['trt_llm','TRT-LLM (+30%)'],['sglang','SGLang (+10%)']], wl.engine||'vllm')
+          + '</select>')
+        + V._fg('TTFT target (ms)', '<input type="number" min="50" step="50" value="' + (wl.ttft||500) + '" ' + V._uNum(id,type,'ttft') + '>', 'Time to first token')
+        + V._fg('TBT target (ms)', '<input type="number" min="5" step="5" value="' + (wl.tbt||30) + '" ' + V._uNum(id,type,'tbt') + '>', 'Time between tokens')
+        + V._fg('E2E latency (ms)', '<input type="number" min="200" step="100" value="' + (wl.e2e||2000) + '" ' + V._uNum(id,type,'e2e') + '>', 'Full round-trip target')
+        + V._fg('Batch size', '<input type="number" min="1" step="1" value="' + (wl.batch||1) + '" ' + V._uNum(id,type,'batch') + '>', '1=real-time; >1=throughput optimised')
+        + '</div>'
+        + '<div class="deep-section-title">Deployment Architecture</div>'
+        + '<div class="formgrid">'
+        + V._fg('Security tier', '<select ' + V._u(id,type,'securityTier') + '>'
+          + V._opts([['standard','Standard'],['confidential','Confidential (+15%)'],['sovereign','Sovereign air-gap (+25%)']], wl.securityTier||'standard')
+          + '</select>')
+        + V._fg('MIG profile', '<select ' + V._u(id,type,'migProfile') + '>'
+          + V._opts([['none','None — full GPU'],['7g','7g.80gb — full slice'],['4g','4g.40gb'],['2g','2g.20gb'],['1g','1g.10gb']], wl.migProfile||'none')
+          + '</select>', 'Requires MIG-capable GPU')
+        + V._fg('Disaggregated inference', '<select ' + V._uBool(id,type,'disaggAccepted') + '>'
+          + '<option value="false"' + (!wl.disaggAccepted ? ' selected' : '') + '>No — unified prefill/decode</option>'
+          + '<option value="true"' + (wl.disaggAccepted ? ' selected' : '') + '>Yes — separate prefill/decode</option>'
+          + '</select>', 'For models >70B; reduces TTFT')
+        + (wl.disaggAccepted
+          ? V._fg('CPU decode processor', V._renderGpuDropdown(wl.decodeProc||'', id, type, 'decodeProc', true), 'CPU/ASIC for decode stage')
+          : '<div class="fg"></div>')
+        + '</div>'
+        + '<div class="deep-section-title">Advanced Features</div>'
+        + '<div class="formgrid">'
+        + V._fg('Agentic workflow', '<select ' + V._uBool(id,type,'isAgentic') + '>'
+          + '<option value="false"' + (!wl.isAgentic ? ' selected' : '') + '>No</option>'
+          + '<option value="true"' + (wl.isAgentic ? ' selected' : '') + '>Yes — multi-step agent</option>'
+          + '</select>')
+        + (wl.isAgentic
+          ? V._fg('Agent steps', '<input type="number" min="2" step="1" value="' + (wl.agentSteps||5) + '" ' + V._uNum(id,type,'agentSteps') + '>', 'LLM calls per user request')
+            + V._fg('Tool wait (ms)', '<input type="number" min="0" step="100" value="' + (wl.toolWait||500) + '" ' + V._uNum(id,type,'toolWait') + '>', 'Avg tool/API call latency')
+          : '')
+        + V._fg('Multimodal / vision', '<select ' + V._uBool(id,type,'isMultimodal') + '>'
+          + '<option value="false"' + (!wl.isMultimodal ? ' selected' : '') + '>Text only</option>'
+          + '<option value="true"' + (wl.isMultimodal ? ' selected' : '') + '>Vision / multimodal</option>'
+          + '</select>')
+        + (wl.isMultimodal
+          ? V._fg('Images per request', '<input type="number" min="1" step="1" value="' + (wl.avgImgPerReq||1) + '" ' + V._uNum(id,type,'avgImgPerReq') + '>')
+            + V._fg('Image resolution', '<select ' + V._u(id,type,'imgRes') + '>'
+              + V._opts([['512','512px — 576 tok'],['1024','1024px — 1024 tok'],['2048','2048px — 2048 tok']], wl.imgRes||'512')
+              + '</select>')
+          : '')
+        + V._fg('Speculative decoding', '<select ' + V._u(id,type,'cascadeModel') + '>'
+          + V._opts([['none','None'],['small','Small draft model (2-3x speedup)'],['ngram','n-gram draft']], wl.cascadeModel||'none')
+          + '</select>', 'Reduces output latency')
+        + V._tenantDropdown(wl, id, type)
         + '</div></div>'
     }
 
-    // Actions
+    // Tenant — express UC
+    if (!isDeep && type === 'uc') {
+      h += '<div class="formgrid" style="grid-template-columns:1fr 3fr">'
+        + V._tenantDropdown(wl, id, type) + '</div>'
+    }
+
+    // Actions row
     h += '<div class="actions-row">'
       + '<button class="btn btn-danger-text btn-sm" onclick="C.removeWorkload(\'' + id + '\',\'' + type + '\')">Remove</button>'
       + '<button class="btn btn-outline btn-sm" onclick="C.toggleRow(\'' + id + '\')">&#9650; Collapse</button>'
       + '</div>'
     return h
   },
+
+  // Form helper — field group wrapper
+  _fg: function(label, control, hint) {
+    return '<div class="fg"><label>' + label + '</label>' + control
+      + (hint ? '<div class="fg-hint">' + hint + '</div>' : '') + '</div>'
+  },
+
+  // Form helper — select options
+  _opts: function(pairs, current) {
+    return pairs.map(function(v) {
+      return '<option value="' + v[0] + '"' + (v[0] === current ? ' selected' : '') + '>' + v[1] + '</option>'
+    }).join('')
+  },
+
+  // onchange helpers — avoids quote escaping in templates
+  _u: function(id, type, field) {
+    return 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'' + field + '\',this.value)"'
+  },
+  _uNum: function(id, type, field) {
+    return 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'' + field + '\',+this.value)"'
+  },
+  _uBool: function(id, type, field) {
+    return 'onchange="C.updWorkload(\'' + id + '\',\'' + type + '\',\'' + field + '\',this.value===\'true\')"'
+  },
+
 
   _renderDerived: function(type, wl) {
     var sz = null
@@ -837,8 +939,18 @@ var V = {
       + '</div>'
   },
 
-  _renderGpuDropdown: function(currentGpu, wlId, type) {
+  _renderGpuDropdown: function(currentGpu, wlId, type, fieldOverride, cpuOnly) {
     var h = '<select onchange="C.updWorkload(\'' + wlId + '\',\'' + type + '\',\'gpu\',this.value)">'
+    if (cpuOnly) {
+      // Filter to CPU/ASIC only (for disaggregated decode node)
+      var filtered = M.gpuConfigs.filter(function(g){ return g.processor_type === 'CPU' || g.processor_type === 'ASIC' })
+      if (!filtered.length) return '<select><option>No CPU configs</option></select>'
+      var h2 = '<select onchange="C.updWorkload(\'' + wlId + '\',\'' + type + '\',\'' + (fieldOverride||'gpu') + '\',this.value)">'
+      filtered.forEach(function(g) {
+        h2 += '<option value="' + g.id + '"' + (g.id === currentGpu ? ' selected' : '') + '>' + g.name + '</option>'
+      })
+      return h2 + '</select>'
+    }
     if (M.gpuConfigs.length === 0) {
       h += '<option value="">Loading GPUs...</option>'
     } else {
@@ -972,6 +1084,30 @@ var C = {
     V.renderWorkloadsTab()
     V.updateKpiBar()
     C.scheduleSave()
+  },
+
+  addDemandSource: function(wlId) {
+    var wl = M.workloads.maas.find(function(w){ return w.id === wlId })
+    if (!wl) return
+    if (!wl.demandSources) wl.demandSources = []
+    wl.demandSources.push({ id:'ds-'+Date.now(), label:'Source '+(wl.demandSources.length+1),
+      customerType:'tsap', customersY1:10, customerGrowthPct:30,
+      tokensPerCustomerM:5.0, tokenGrowthPct:20 })
+    M.isDirty = true; V.renderWorkloadsTab(); C.scheduleSave()
+  },
+
+  updDemandSource: function(wlId, srcId, field, val) {
+    var wl = M.workloads.maas.find(function(w){ return w.id === wlId })
+    if (!wl || !wl.demandSources) return
+    var src = wl.demandSources.find(function(s){ return s.id === srcId })
+    if (src) { src[field] = val; M.isDirty = true; V.renderWorkloadsTab(); C.scheduleSave() }
+  },
+
+  removeDemandSource: function(wlId, srcId) {
+    var wl = M.workloads.maas.find(function(w){ return w.id === wlId })
+    if (!wl || !wl.demandSources) return
+    wl.demandSources = wl.demandSources.filter(function(s){ return s.id !== srcId })
+    M.isDirty = true; V.renderWorkloadsTab(); C.scheduleSave()
   },
 
   selectEngagement: function(engId) {
