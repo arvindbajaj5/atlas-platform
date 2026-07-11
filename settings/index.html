@@ -666,7 +666,7 @@ async function loadFromSupabase() {
   if (!url || !key) return
   try {
     var r = await fetch(
-      url + '/rest/v1/app_config?key=in.(brand_name,brand_tagline,brand_logo_url,brand_doc_logo_url,brand_colour_primary,brand_colour_accent,parent_company_name,parent_company_website,parent_company_addr1,parent_company_addr2,parent_company_city,parent_company_country,local_company_name,local_company_addr1,local_company_addr2,local_company_city,doc_author_default,doc_prefix,nat_avg_power_tariff_inr,nat_avg_water_cost_inr_kl,nat_avg_land_cost_lakh_acre,nat_avg_engineer_salary_lakh,nat_avg_civil_cost_index,nat_avg_construction_cr_mw,atlasai_primary_model,gpu_skus)&limit=50',
+      url + '/rest/v1/app_config?key=in.(brand_name,brand_tagline,brand_logo_url,brand_doc_logo_url,brand_colour_primary,brand_colour_accent,parent_company_name,parent_company_website,parent_company_addr1,parent_company_addr2,parent_company_city,parent_company_country,local_company_name,local_company_addr1,local_company_addr2,local_company_city,doc_author_default,doc_prefix,nat_avg_power_tariff_inr,nat_avg_water_cost_inr_kl,nat_avg_land_cost_lakh_acre,nat_avg_engineer_salary_lakh,nat_avg_civil_cost_index,nat_avg_construction_cr_mw,atlasai_primary_model,gpu_skus,software_stack,storage_vendor,storage_replication_factor,storage_nvme_pct,storage_hdd_pct,storage_obj_pct,storage_nvme_price_per_tb,storage_hdd_price_per_tb,storage_obj_price_per_tb,storage_appliance_cost)&limit=80',
       { headers: sbHeaders(key) }
     )
     if (!r.ok) return
@@ -693,6 +693,18 @@ async function loadFromSupabase() {
       }
       if (row.key === 'gpu_skus' && !CFG.gpu_skus) {
         try { CFG.gpu_skus = JSON.parse(row.value); changed = true } catch(e) {}
+      }
+      if (row.key === 'software_stack' && !CFG.software_stack) {
+        try { CFG.software_stack = JSON.parse(row.value); changed = true } catch(e) {}
+      }
+      if (row.key.startsWith('storage_')) {
+        var sto = CFG.storage_config || {}
+        var sk = row.key.replace('storage_', '')
+        if (sto[sk] === undefined) {
+          var nv = parseFloat(row.value)
+          sto[sk] = isNaN(nv) ? row.value : nv
+          CFG.storage_config = sto; changed = true
+        }
       }
       if (row.key.startsWith('hw_cost_') && CFG.hardware_costs === undefined) {
         var hc = CFG.hardware_costs || {}
@@ -1077,6 +1089,84 @@ function renderHardware() {
     + '</div>'
     + '</div>'
 
+  // ── Storage Configuration (NEW — extends hardware_costs) ────────────────
+  var sto = g.storage_config || {}
+  var stoVendors = [['ddn','DDN AI400X2'],['vast','VAST Data'],['weka','WEKA'],['pure','Pure FlashBlade'],['netapp','NetApp'],['generic','Generic NVMe']]
+  html += '<div class="card">'
+    + '<div class="card-title">Storage Configuration</div>'
+    + '<div class="card-sub">Parallel filesystem + tiering. Used by sizing engine for storage BOM.</div>'
+    + '<div class="field-row">'
+    + '<div class="field"><label>Storage Vendor</label>'
+    + '<select id="sto-vendor" onchange="liveStorage(\'vendor\',this.value)">'
+    + stoVendors.map(function(v){ return '<option value="'+v[0]+'"'+((sto.vendor||'ddn')===v[0]?' selected':'')+'>'+v[1]+'</option>' }).join('')
+    + '</select><div class="field-note">Parallel FS appliance vendor</div></div>'
+    + '<div class="field"><label>Replication Factor</label>'
+    + '<input type="number" step="1" min="1" value="' + (sto.replication_factor||2) + '" onchange="liveStorage(\'replication_factor\',+this.value)">'
+    + '<div class="field-note">Data copies for redundancy</div></div>'
+    + '</div>'
+    + '<div class="field-row">'
+    + '<div class="field"><label>NVMe Tier %</label>'
+    + '<input type="number" step="1" min="0" max="100" value="' + (sto.nvme_pct||70) + '" onchange="liveStorage(\'nvme_pct\',+this.value)">'
+    + '<div class="field-note">Hot tier (fast)</div></div>'
+    + '<div class="field"><label>HDD Tier %</label>'
+    + '<input type="number" step="1" min="0" max="100" value="' + (sto.hdd_pct||30) + '" onchange="liveStorage(\'hdd_pct\',+this.value)">'
+    + '<div class="field-note">Warm tier</div></div>'
+    + '<div class="field"><label>Object Tier %</label>'
+    + '<input type="number" step="1" min="0" max="100" value="' + (sto.obj_pct||0) + '" onchange="liveStorage(\'obj_pct\',+this.value)">'
+    + '<div class="field-note">Cold/archive tier</div></div>'
+    + '</div>'
+    + '<div class="field-row">'
+    + '<div class="field"><label>NVMe $/TB (USD)</label>'
+    + '<input type="number" step="1" value="' + (sto.nvme_price_per_tb||280) + '" onchange="liveStorage(\'nvme_price_per_tb\',+this.value)"></div>'
+    + '<div class="field"><label>HDD $/TB (USD)</label>'
+    + '<input type="number" step="1" value="' + (sto.hdd_price_per_tb||40) + '" onchange="liveStorage(\'hdd_price_per_tb\',+this.value)"></div>'
+    + '<div class="field"><label>Object $/TB (USD)</label>'
+    + '<input type="number" step="1" value="' + (sto.obj_price_per_tb||15) + '" onchange="liveStorage(\'obj_price_per_tb\',+this.value)"></div>'
+    + '</div>'
+    + '<div class="field-row">'
+    + '<div class="field"><label>Appliance Base Cost (USD)</label>'
+    + '<input type="number" step="1000" value="' + (sto.appliance_cost||120000) + '" onchange="liveStorage(\'appliance_cost\',+this.value)">'
+    + '<div class="field-note">Controller/appliance flat cost</div></div>'
+    + '</div>'
+    + '<div class="btn-row" style="margin-top:8px">'
+    + '<button class="btn btn-teal" onclick="saveStorageConfig()">&#8593; Save to Supabase</button>'
+    + '</div>'
+    + '</div>'
+
+  // ── Software Stack (NEW — full editable license list) ───────────────────
+  var sw = g.software_stack || [
+    { id:1, name:'RHEL / Ubuntu Pro',            cat:'OS',          license:'per_server', unitCost:1500, enabled:true  },
+    { id:2, name:'NVIDIA AI Enterprise (NVAIE)', cat:'AI Platform', license:'per_gpu',    unitCost:4500, enabled:true  },
+    { id:3, name:'NVIDIA Base Command Manager',  cat:'AI Platform', license:'per_node',   unitCost:2000, enabled:false },
+    { id:4, name:'VMware vSphere / KVM',         cat:'Virtualization',license:'per_server',unitCost:1200, enabled:false },
+    { id:5, name:'Kubernetes Platform (OpenShift)',cat:'Orchestration',license:'per_node', unitCost:3000, enabled:false }
+  ]
+  if (!g.software_stack) CFG.software_stack = sw
+  var licTypes = [['per_server','Per Server'],['per_gpu','Per GPU'],['per_node','Per Node'],['flat','Flat/Annual']]
+  html += '<div class="card">'
+    + '<div class="card-title">Software Stack (Annual Licenses)</div>'
+    + '<div class="card-sub">Editable license catalogue. Enabled entries flow into BOM annual OpEx.</div>'
+    + '<table class="nat-table">'
+    + '<tr><th>Software</th><th>Category</th><th>License Model</th><th>Unit Cost (USD/yr)</th><th>Enabled</th><th></th></tr>'
+    + sw.map(function(item, i){
+        return '<tr>'
+          + '<td><input type="text" value="' + esc(item.name) + '" oninput="updateSW(' + i + ',\'name\',this.value)" style="width:180px"></td>'
+          + '<td><input type="text" value="' + esc(item.cat) + '" oninput="updateSW(' + i + ',\'cat\',this.value)" style="width:110px"></td>'
+          + '<td><select onchange="updateSW(' + i + ',\'license\',this.value)">'
+          + licTypes.map(function(l){ return '<option value="'+l[0]+'"'+(item.license===l[0]?' selected':'')+'>'+l[1]+'</option>' }).join('')
+          + '</select></td>'
+          + '<td><input type="number" value="' + item.unitCost + '" onchange="updateSW(' + i + ',\'unitCost\',+this.value)" style="width:100px"></td>'
+          + '<td style="text-align:center"><input type="checkbox"' + (item.enabled?' checked':'') + ' onchange="updateSW(' + i + ',\'enabled\',this.checked)"></td>'
+          + '<td><button class="btn-icon" onclick="removeSW(' + i + ')" title="Remove">&#10005;</button></td>'
+          + '</tr>'
+      }).join('')
+    + '</table>'
+    + '<div class="btn-row" style="margin-top:8px">'
+    + '<button class="btn btn-light" onclick="addSWRow()">+ Add Software</button>'
+    + '<button class="btn btn-teal" onclick="saveSoftwareStack()">&#8593; Save to Supabase</button>'
+    + '</div>'
+    + '</div>'
+
   return html
 }
 
@@ -1106,6 +1196,60 @@ function liveHC(key, val) {
   var hc = CFG.hardware_costs || {}
   hc[key] = val
   CFG.hardware_costs = hc
+}
+
+// ── Storage config live + save (NEW) ──────────────────────────────────────
+function liveStorage(key, val) {
+  var sto = CFG.storage_config || {}
+  sto[key] = val
+  CFG.storage_config = sto
+}
+async function saveStorageConfig() {
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) { showToast('Configure Supabase first', 'error'); return }
+  var sto = CFG.storage_config || {}
+  var rows = Object.keys(sto).map(function(k) { return { key: 'storage_' + k, value: String(sto[k]) } })
+  if (!rows.length) { showToast('No storage config to save', 'error'); return }
+  try {
+    var r = await fetch(url + '/rest/v1/app_config', {
+      method: 'POST',
+      headers: sbHeaders(key, {'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal'}),
+      body: JSON.stringify(rows)
+    })
+    if (r.ok) showToast('\u2713 Storage config saved')
+    else showToast('Save failed: HTTP ' + r.status, 'error')
+  } catch(e) { showToast('Save failed: ' + e.message, 'error') }
+}
+
+// ── Software stack editing + save (NEW) ────────────────────────────────────
+function updateSW(i, field, val) {
+  if (!CFG.software_stack) CFG.software_stack = []
+  if (CFG.software_stack[i]) CFG.software_stack[i][field] = val
+}
+function addSWRow() {
+  if (!CFG.software_stack) CFG.software_stack = []
+  var maxId = CFG.software_stack.reduce(function(m,x){ return Math.max(m, x.id||0) }, 0)
+  CFG.software_stack.push({ id:maxId+1, name:'New Software', cat:'Other', license:'per_server', unitCost:1000, enabled:false })
+  showTab('hardware')
+}
+function removeSW(i) {
+  if (CFG.software_stack) { CFG.software_stack.splice(i,1); showTab('hardware') }
+}
+async function saveSoftwareStack() {
+  var url = CFG.sbUrl || CFG.sb_url || ''
+  var key = CFG.sbKey || CFG.sb_key || ''
+  if (!url || !key) { showToast('Configure Supabase first', 'error'); return }
+  var sw = CFG.software_stack || []
+  try {
+    var r = await fetch(url + '/rest/v1/app_config', {
+      method: 'POST',
+      headers: sbHeaders(key, {'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal'}),
+      body: JSON.stringify([{ key: 'software_stack', value: JSON.stringify(sw) }])
+    })
+    if (r.ok) showToast('\u2713 Software stack saved')
+    else showToast('Save failed: HTTP ' + r.status, 'error')
+  } catch(e) { showToast('Save failed: ' + e.message, 'error') }
 }
 async function saveSkus() {
   var url = CFG.sbUrl || CFG.sb_url || ''
