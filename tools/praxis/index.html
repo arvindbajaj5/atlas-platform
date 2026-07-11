@@ -56,7 +56,7 @@ body{font-family:var(--font);background:var(--light);color:var(--dark);min-heigh
   font-weight:700;text-transform:uppercase;letter-spacing:1px}
 
 /* ── HEADER ── */
-.hdr{background:var(--navy);padding:0 20px;height:52px;
+.hdr{background:linear-gradient(135deg,var(--navy),var(--blue));padding:0 28px;height:56px;
   display:flex;align-items:center;justify-content:space-between;
   box-shadow:var(--shadow-md)}
 .hdr-left{display:flex;align-items:center;gap:12px}
@@ -656,10 +656,11 @@ var V = {
   _renderCategory: function(type, icon, title, subtitle, items) {
     var isOpen = M.openRows['_cat_' + type] !== false  // open by default
     var cc = (typeof catColor === 'function') ? catColor(type) : 'var(--navy)'
+    var tint = (typeof catTint === 'function') ? catTint(type) : 'rgba(0,40,112,.05)'
     var h = '<div class="wl-category" style="border-left:4px solid ' + cc + '">'
-    h += '<div class="wl-cat-hdr" onclick="C.toggleCategory(\'' + type + '\')">'
+    h += '<div class="wl-cat-hdr" style="background:' + tint + ';border-bottom:2px solid ' + cc + '" onclick="C.toggleCategory(\'' + type + '\')">'
       + '<span class="wl-cat-icon" style="color:' + cc + '">' + icon + '</span>'
-      + '<span class="wl-cat-title" style="color:' + cc + '">' + title + '</span>'
+      + '<span class="wl-cat-title" style="color:' + cc + ';font-weight:700">' + title + '</span>'
       + '<span class="wl-cat-subtitle">' + subtitle + '</span>'
       + '<span class="wl-cat-count" style="background:' + cc + ';color:#fff">' + items.length + '</span>'
       + '<button class="wl-cat-add" style="background:' + cc + ';color:#fff;border-color:' + cc + '" onclick="event.stopPropagation();C.addWorkload(\'' + type + '\')">+ Add</button>'
@@ -1788,6 +1789,8 @@ function dc(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
 var CAT_COLORS = { uc:'#002870', maas:'#00B290', gpuaas:'#1C38F5', bmaas:'#FF5539' };
 var CAT_LABELS = { uc:'UC', maas:'MaaS', gpuaas:'GPUaaS', bmaas:'BMaaS' };
 function catColor(type){ return CAT_COLORS[type] || '#002870'; }
+var CAT_TINTS = { uc:'rgba(0,40,112,.06)', maas:'rgba(0,178,144,.08)', gpuaas:'rgba(28,56,245,.06)', bmaas:'rgba(255,85,57,.07)' };
+function catTint(type){ return CAT_TINTS[type] || 'rgba(0,40,112,.05)'; }
 // Semantic hex values (for Chart.js which needs literal colors)
 var SEM = { action:'#FF5539', data:'#1C38F5', struct:'#002870', pass:'#00B290', warn:'#FFB600' };
 
@@ -3479,15 +3482,15 @@ V.renderScopeTab = function(){
         <th>Name</th><th>Modality</th><th>Volume</th><th>Format</th><th>Connection</th><th>Refresh</th><th>Cleanup</th><th>Labelling</th><th>PII</th><th style="width:20px"></th>
       </tr></thead><tbody>
         ${dataSources.map(ds=>`<tr>
-          <td><input type="text" value="${ds.name}" style="width:120px;font-size:11px;padding:1px 3px" onchange="praxisDsUpd(${ds.id},'name',this.value)"></td>
-          <td><select style="font-size:11px;padding:1px" onchange="praxisDsUpd(${ds.id},'modality',this.value)">${MODALITIES.map(m=>`<option value="${m.k}"${ds.modality===m.k?' selected':''}>${m.ic} ${m.n}</option>`).join('')}</select></td>
-          <td><input type="number" value="${ds.volumeGB}" style="width:50px;font-size:11px" onchange="praxisDsUpd(${ds.id},'volumeGB',+this.value)"> GB</td>
-          <td><select style="font-size:11px;padding:1px" onchange="praxisDsUpd(${ds.id},'format',this.value)"><option value="clean"${ds.format==='clean'?' selected':''}>Clean</option><option value="semi"${ds.format==='semi'?' selected':''}>Semi</option><option value="unstructured"${ds.format==='unstructured'?' selected':''}>Unstructured</option><option value="mixed"${ds.format==='mixed'?' selected':''}>Mixed</option></select></td>
-          <td><select style="font-size:11px;padding:1px" onchange="praxisDsUpd(${ds.id},'connectivity',this.value)"><option value="db"${ds.connectivity==='db'?' selected':''}>Database</option><option value="api"${ds.connectivity==='api'?' selected':''}>API</option><option value="file_share"${ds.connectivity==='file_share'?' selected':''}>File Share</option><option value="s3"${ds.connectivity==='s3'?' selected':''}>S3/Object</option><option value="kafka"${ds.connectivity==='kafka'?' selected':''}>Kafka Stream</option><option value="iot"${ds.connectivity==='iot'?' selected':''}>IoT/Sensor</option></select></td>
-          <td><select style="font-size:11px;padding:1px" onchange="praxisDsUpd(${ds.id},'refresh',this.value)"><option value="onetime"${ds.refresh==='onetime'?' selected':''}>One-time</option><option value="daily"${ds.refresh==='daily'?' selected':''}>Daily</option><option value="hourly"${ds.refresh==='hourly'?' selected':''}>Hourly</option><option value="realtime"${ds.refresh==='realtime'?' selected':''}>Real-time</option></select></td>
-          <td><select style="font-size:11px;padding:1px" onchange="praxisDsUpd(${ds.id},'cleanup',this.value)"><option value="none"${ds.cleanup==='none'?' selected':''}>None</option><option value="light"${ds.cleanup==='light'?' selected':''}>Light</option><option value="medium"${ds.cleanup==='medium'?' selected':''}>Medium</option><option value="heavy"${ds.cleanup==='heavy'?' selected':''}>Heavy</option></select></td>
-          <td><select style="font-size:11px;padding:1px" onchange="praxisDsUpd(${ds.id},'labelling',this.value)"><option value="none"${ds.labelling==='none'?' selected':''}>None</option><option value="existing"${ds.labelling==='existing'?' selected':''}>Existing</option><option value="manual"${ds.labelling==='manual'?' selected':''}>Manual</option><option value="active_learning"${ds.labelling==='active_learning'?' selected':''}>Active Learning</option></select></td>
-          <td><select style="font-size:11px;padding:1px" onchange="praxisDsUpd(${ds.id},'pii',this.value)"><option value="none"${ds.pii==='none'?' selected':''}>None</option><option value="detect"${ds.pii==='detect'?' selected':''}>Detect</option><option value="mask"${ds.pii==='mask'?' selected':''}>Mask</option><option value="redact"${ds.pii==='redact'?' selected':''}>Redact</option></select></td>
+          <td><input type="text" value="${ds.name}" style="min-width:150px;width:100%;font-size:12px;padding:5px 7px" onchange="praxisDsUpd(${ds.id},'name',this.value)"></td>
+          <td><select style="font-size:12px;padding:5px 6px" onchange="praxisDsUpd(${ds.id},'modality',this.value)">${MODALITIES.map(m=>`<option value="${m.k}"${ds.modality===m.k?' selected':''}>${m.ic} ${m.n}</option>`).join('')}</select></td>
+          <td><input type="number" value="${ds.volumeGB}" style="width:64px;font-size:12px;padding:5px 6px" onchange="praxisDsUpd(${ds.id},'volumeGB',+this.value)"> GB</td>
+          <td><select style="font-size:12px;padding:5px 6px" onchange="praxisDsUpd(${ds.id},'format',this.value)"><option value="clean"${ds.format==='clean'?' selected':''}>Clean</option><option value="semi"${ds.format==='semi'?' selected':''}>Semi</option><option value="unstructured"${ds.format==='unstructured'?' selected':''}>Unstructured</option><option value="mixed"${ds.format==='mixed'?' selected':''}>Mixed</option></select></td>
+          <td><select style="font-size:12px;padding:5px 6px" onchange="praxisDsUpd(${ds.id},'connectivity',this.value)"><option value="db"${ds.connectivity==='db'?' selected':''}>Database</option><option value="api"${ds.connectivity==='api'?' selected':''}>API</option><option value="file_share"${ds.connectivity==='file_share'?' selected':''}>File Share</option><option value="s3"${ds.connectivity==='s3'?' selected':''}>S3/Object</option><option value="kafka"${ds.connectivity==='kafka'?' selected':''}>Kafka Stream</option><option value="iot"${ds.connectivity==='iot'?' selected':''}>IoT/Sensor</option></select></td>
+          <td><select style="font-size:12px;padding:5px 6px" onchange="praxisDsUpd(${ds.id},'refresh',this.value)"><option value="onetime"${ds.refresh==='onetime'?' selected':''}>One-time</option><option value="daily"${ds.refresh==='daily'?' selected':''}>Daily</option><option value="hourly"${ds.refresh==='hourly'?' selected':''}>Hourly</option><option value="realtime"${ds.refresh==='realtime'?' selected':''}>Real-time</option></select></td>
+          <td><select style="font-size:12px;padding:5px 6px" onchange="praxisDsUpd(${ds.id},'cleanup',this.value)"><option value="none"${ds.cleanup==='none'?' selected':''}>None</option><option value="light"${ds.cleanup==='light'?' selected':''}>Light</option><option value="medium"${ds.cleanup==='medium'?' selected':''}>Medium</option><option value="heavy"${ds.cleanup==='heavy'?' selected':''}>Heavy</option></select></td>
+          <td><select style="font-size:12px;padding:5px 6px" onchange="praxisDsUpd(${ds.id},'labelling',this.value)"><option value="none"${ds.labelling==='none'?' selected':''}>None</option><option value="existing"${ds.labelling==='existing'?' selected':''}>Existing</option><option value="manual"${ds.labelling==='manual'?' selected':''}>Manual</option><option value="active_learning"${ds.labelling==='active_learning'?' selected':''}>Active Learning</option></select></td>
+          <td><select style="font-size:12px;padding:5px 6px" onchange="praxisDsUpd(${ds.id},'pii',this.value)"><option value="none"${ds.pii==='none'?' selected':''}>None</option><option value="detect"${ds.pii==='detect'?' selected':''}>Detect</option><option value="mask"${ds.pii==='mask'?' selected':''}>Mask</option><option value="redact"${ds.pii==='redact'?' selected':''}>Redact</option></select></td>
           <td><button style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--txL)" onclick="praxisDsDelete(${ds.id})">×</button></td>
         </tr>`).join('')}
       </tbody></table>
@@ -3527,21 +3530,21 @@ V.renderScopeTab = function(){
       <!-- S3: ENVIRONMENT STRATEGY -->
       <div class="card">
         <h3>🔄 Environment Strategy</h3>
-        <p style="font-size:11px;color:var(--txM);margin-bottom:6px">Size Dev/Test/Prod environments. Dev/Test as % of production capacity.</p>
+        <p style="font-size:11px;color:var(--txM);margin-bottom:6px">Size Dev/Test/Prod environments. Dev/Test sized as % of production. Note: Prod GPU count includes HA/failover overhead + decode GPUs, so it exceeds the raw Workloads-tab count.</p>
         <table style="font-size:12px"><thead><tr><th>Env</th><th>% of Prod</th><th>Dedicated HW</th><th>Permanent</th><th>Est. GPUs</th></tr></thead><tbody>
           <tr><td><b style="color:var(--s1)">Dev</b></td>
-            <td><input type="number" value="${envStrategy.devPct}" min="5" max="50" style="width:40px;font-size:12px" onchange="envStrategy.devPct=+this.value;V.renderScopeTab()">%</td>
-            <td><select style="font-size:11px" onchange="envStrategy.devDedicated=this.value==='1';V.renderScopeTab()"><option value="0"${!envStrategy.devDedicated?' selected':''}>Shared</option><option value="1"${envStrategy.devDedicated?' selected':''}>Dedicated</option></select></td>
-            <td><select style="font-size:11px" onchange="envStrategy.devTemp=this.value==='1';V.renderScopeTab()"><option value="1"${envStrategy.devTemp?' selected':''}>Temporary</option><option value="0"${!envStrategy.devTemp?' selected':''}>Permanent</option></select></td>
+            <td><input type="number" value="${envStrategy.devPct}" min="5" max="50" style="width:60px;font-size:12px;padding:5px 6px" onchange="envStrategy.devPct=+this.value;V.renderScopeTab()">%</td>
+            <td><select style="font-size:12px;padding:5px 6px" onchange="envStrategy.devDedicated=this.value==='1';V.renderScopeTab()"><option value="0"${!envStrategy.devDedicated?' selected':''}>Shared</option><option value="1"${envStrategy.devDedicated?' selected':''}>Dedicated</option></select></td>
+            <td><select style="font-size:12px;padding:5px 6px" onchange="envStrategy.devTemp=this.value==='1';V.renderScopeTab()"><option value="1"${envStrategy.devTemp?' selected':''}>Temporary</option><option value="0"${!envStrategy.devTemp?' selected':''}>Permanent</option></select></td>
             <td style="font-weight:700;color:var(--s1)">${Math.ceil(sz.tGPU*envStrategy.devPct/100)}</td></tr>
           <tr><td><b style="color:var(--s3)">Test</b></td>
-            <td><input type="number" value="${envStrategy.testPct}" min="10" max="100" style="width:40px;font-size:12px" onchange="envStrategy.testPct=+this.value;V.renderScopeTab()">%</td>
-            <td><select style="font-size:11px" onchange="envStrategy.testDedicated=this.value==='1';V.renderScopeTab()"><option value="0"${!envStrategy.testDedicated?' selected':''}>Shared</option><option value="1"${envStrategy.testDedicated?' selected':''}>Dedicated</option></select></td>
-            <td><select style="font-size:11px" onchange="envStrategy.testTemp=this.value==='1';V.renderScopeTab()"><option value="1"${envStrategy.testTemp?' selected':''}>Temporary</option><option value="0"${!envStrategy.testTemp?' selected':''}>Permanent</option></select></td>
+            <td><input type="number" value="${envStrategy.testPct}" min="10" max="100" style="width:60px;font-size:12px;padding:5px 6px" onchange="envStrategy.testPct=+this.value;V.renderScopeTab()">%</td>
+            <td><select style="font-size:12px;padding:5px 6px" onchange="envStrategy.testDedicated=this.value==='1';V.renderScopeTab()"><option value="0"${!envStrategy.testDedicated?' selected':''}>Shared</option><option value="1"${envStrategy.testDedicated?' selected':''}>Dedicated</option></select></td>
+            <td><select style="font-size:12px;padding:5px 6px" onchange="envStrategy.testTemp=this.value==='1';V.renderScopeTab()"><option value="1"${envStrategy.testTemp?' selected':''}>Temporary</option><option value="0"${!envStrategy.testTemp?' selected':''}>Permanent</option></select></td>
             <td style="font-weight:700;color:var(--s3)">${Math.ceil(sz.tGPU*envStrategy.testPct/100)}</td></tr>
           <tr style="background:var(--sbg)"><td><b style="color:var(--s2)">Prod</b></td><td>100%</td><td>Dedicated</td><td>Permanent</td><td style="font-weight:700;color:var(--s2)">${sz.tGPU}</td></tr>
           <tr style="font-weight:700"><td>Total</td><td colspan="3"></td><td style="color:var(--p2)">${sz.tGPU+Math.ceil(sz.tGPU*envStrategy.devPct/100)+Math.ceil(sz.tGPU*envStrategy.testPct/100)} GPUs</td></tr>
-        </tbody></table>
+        <tr style="background:var(--bg-struct);font-weight:700"><td><b style="color:var(--sem-struct)">Prod</b></td><td>100%</td><td>Dedicated</td><td>Permanent</td><td style="color:var(--sem-struct)">${sz.tGPU} <span style="font-weight:400;font-size:10px;color:var(--txM)">(incl. HA)</span></td></tr></tbody></table>
         ${showP?`<div style="font-size:11px;color:var(--txM);margin-top:4px">Additional HW cost for Dev+Test: <b>${fmt$(sz.total*(envStrategy.devPct+envStrategy.testPct)/100)}</b></div>`:''}
       </div>
     </div>
@@ -3554,10 +3557,10 @@ V.renderScopeTab = function(){
           ${[['unitTest','Unit Tests','Model output validation, edge cases'],['integrationTest','Integration Tests','End-to-end pipeline, API contracts'],['loadTest','Load / Stress Tests','Peak traffic simulation, SLA verification'],['accuracyEval','Accuracy Evaluation','Benchmark datasets, domain-specific eval'],['securityTest','Security Testing','Prompt injection, data leakage, RBAC'],['uat','User Acceptance Testing','Customer stakeholder validation']].map(([k,n,d])=>`<tr>
             <td><label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ${testingConfig[k]?'checked':''} onchange="testingConfig['${k}']=this.checked;V.renderScopeTab()"><b>${n}</b></label></td>
             <td style="font-size:11px;color:var(--txM)">${d}</td>
-            <td>${testingConfig[k]?`<input type="number" value="${testEffortVal(k,svc)}" min="0" style="width:52px;font-size:12px;color:var(--s1);font-weight:600" onchange="praxisTestEffortOverride('${k}',+this.value)">d`:'<span style="color:var(--txM)">—</span>'}</td>
+            <td>${testingConfig[k]?`<input type="number" value="${testEffortVal(k,svc)}" min="0" style="width:64px;font-size:12px;padding:5px 6px;color:var(--s1);font-weight:600" onchange="praxisTestEffortOverride('${k}',+this.value)">d`:'<span style="color:var(--txM)">—</span>'}</td>
           </tr>`).join('')}
           <tr style="font-weight:700;background:var(--bg)"><td colspan="2">Test Data: ${testingConfig.testDataPct}% of production</td>
-            <td><input type="number" value="${testingConfig.testDataPct}" min="1" max="100" style="width:40px;font-size:12px" onchange="testingConfig.testDataPct=+this.value;V.renderScopeTab()">%</td></tr>
+            <td><input type="number" value="${testingConfig.testDataPct}" min="1" max="100" style="width:60px;font-size:12px;padding:5px 6px" onchange="testingConfig.testDataPct=+this.value;V.renderScopeTab()">%</td></tr>
         </tbody></table>
       </div>
 
@@ -3569,8 +3572,8 @@ V.renderScopeTab = function(){
         <table style="font-size:12px"><thead><tr><th>Workload</th><th>Data Sources</th><th>RAG Type</th><th>Embed Model</th><th>Fine-tune</th><th>Custom Level</th><th style="min-width:50px">Effort</th></tr></thead><tbody>
           ${getIFWorkloads().map((w,i)=>{var wp=(WP[w.tp]||{n:w.name||w.tp,ic:'📋'});return`<tr>
             <td><b>${(wp||{}).ic||''} ${(wp||{}).n||''}</b></td>
-            <td><select multiple style="font-size:11px;width:130px;height:56px" onchange="praxisWlUpdDataSrc('${w.id}',this)">${dataSources.map(ds=>`<option value="${ds.id}"${(w.dataSrcIds||[]).includes(ds.id)?' selected':''}>${ds.name}</option>`).join('')}</select></td>
-            <td><select style="font-size:11px;padding:1px" onchange="praxisWlUpdScope('${w.id}','ragType',this.value)">
+            <td><select multiple style="font-size:11px;min-width:150px;height:64px" onchange="praxisWlUpdDataSrc('${w.id}',this)">${dataSources.map(ds=>`<option value="${ds.id}"${(w.dataSrcIds||[]).includes(ds.id)?' selected':''}>${ds.name}</option>`).join('')}</select></td>
+            <td><select style="font-size:12px;padding:5px 6px" onchange="praxisWlUpdScope('${w.id}','ragType',this.value)">
               <option value="none"${w.ragType==='none'?' selected':''}>None</option>
               <option value="simple"${w.ragType==='simple'?' selected':''}>Simple</option>
               <option value="multi_stage"${w.ragType==='multi_stage'?' selected':''}>Multi-stage</option>
@@ -3578,23 +3581,23 @@ V.renderScopeTab = function(){
               <option value="graph"${w.ragType==='graph'?' selected':''}>Graph RAG</option>
               <option value="hybrid"${w.ragType==='hybrid'?' selected':''}>Hybrid</option>
             </select></td>
-            <td><select style="font-size:11px;padding:1px;width:110px" onchange="praxisWlUpdScope('${w.id}','embedModel',this.value)"${w.ragType==='none'?' disabled':''}>
+            <td><select style="font-size:12px;padding:5px 6px;width:110px" onchange="praxisWlUpdScope('${w.id}','embedModel',this.value)"${w.ragType==='none'?' disabled':''}>
               ${(M.modelCatalogue||[]).filter(function(m){return (m.family||'').toLowerCase().indexOf('embed')>=0;}).map(function(m){return `<option value="${m.model_id}"${w.embedModel===m.model_id?' selected':''}>${m.name}</option>`;}).join('')}
             </select></td>
-            <td><select style="font-size:11px;padding:1px" onchange="praxisWlUpdScope('${w.id}','fineTune',this.value)">
+            <td><select style="font-size:12px;padding:5px 6px" onchange="praxisWlUpdScope('${w.id}','fineTune',this.value)">
               <option value="none"${w.fineTune==='none'?' selected':''}>None</option>
               <option value="prompt"${w.fineTune==='prompt'?' selected':''}>Prompt Eng</option>
               <option value="few_shot"${w.fineTune==='few_shot'?' selected':''}>Few-shot</option>
               <option value="lora"${w.fineTune==='lora'?' selected':''}>LoRA FT</option>
               <option value="full"${w.fineTune==='full'?' selected':''}>Full FT</option>
             </select></td>
-            <td><select style="font-size:11px;padding:1px" onchange="praxisWlUpdScope('${w.id}','customLevel',this.value)">
+            <td><select style="font-size:12px;padding:5px 6px" onchange="praxisWlUpdScope('${w.id}','customLevel',this.value)">
               <option value="oob"${w.customLevel==='oob'?' selected':''}>OOB</option>
               <option value="light"${w.customLevel==='light'?' selected':''}>Light</option>
               <option value="medium"${w.customLevel==='medium'?' selected':''}>Medium</option>
               <option value="heavy"${w.customLevel==='heavy'?' selected':''}>Heavy</option>
             </select></td>
-            <td><input type="number" value="${svc.perWL[i]||0}" min="0" max="200" style="width:40px;font-size:11px;padding:1px 3px;font-weight:700;color:var(--s1)" onchange="praxisWlEffortOverride(${w.id},+this.value)">d</td>
+            <td><input type="number" value="${svc.perWL[i]||0}" min="0" max="200" style="width:60px;font-size:12px;padding:5px 6px;padding:5px 6px 3px;font-weight:700;color:var(--s1)" onchange="praxisWlEffortOverride(${w.id},+this.value)">d</td>
           </tr>`;}).join('')}
           <tr style="font-weight:700;background:var(--bg)"><td colspan="6">Total Per-Workload Effort</td><td style="color:var(--p2)">${svc.perWLTotal}d</td></tr>
         </tbody></table>
