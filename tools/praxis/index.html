@@ -1964,7 +1964,13 @@ function toIFWorkload(wl, type) {
     scaleUp: true,
     isGeo: false,
     commercialSla: wl.commercialSla || 'bronze',
-    provisionedGpus: wl.provisionedGpus || null
+    provisionedGpus: wl.provisionedGpus || null,
+    // Block-type fields (GPUaaS / BMaaS) — passed through for block sizing
+    gpuCount: wl.gpuCount || 0,
+    serverCount: wl.serverCount || 0,
+    gpusPerServer: wl.gpusPerServer || (gpuConf.gpus_in_unit || 8),
+    rateTier: wl.rateTier || '12mo',
+    guestOs: wl.guestOs || 'ubuntu'
   };
 }
 
@@ -2122,8 +2128,34 @@ function praxisSizing(){
   var cpuK='Turin_9965',rackK='dlc_260kw';
   var det=[];
   wls.forEach(w=>{
-    var est=estimate(w),p=getPROC(w.proc),m=getMDL(w.md);
+    var p=getPROC(w.proc),m=getMDL(w.md);
     if(!p)return;
+
+    // ── BLOCK TYPES: GPUaaS / BMaaS — raw GPU allocation, no token sizing ──
+    if(w.tp==='gpuaas'||w.tp==='bmaas'){
+      var gpusPerU=p.mx||8;
+      var blockGPUs, blockServers;
+      if(w.tp==='gpuaas'){
+        blockGPUs=w.gpuCount||0;
+        blockServers=Math.ceil(blockGPUs/gpusPerU);
+      } else { // bmaas
+        blockServers=w.serverCount||0;
+        blockGPUs=blockServers*(w.gpusPerServer||gpusPerU);
+      }
+      var cpuPb=getPROC(cpuK);
+      var blockPow=blockGPUs>0?(blockGPUs*(p.tdp||700)+blockServers*2*((cpuPb||{}).tdp||350)+blockGPUs*50)*1.1/1000:0;
+      var secMultB=((SEC_TIERS[w.securityTier]||{}).cost_mult)||1;
+      var blockCost=blockGPUs*price(w.proc)*1.8*secMultB;
+      tGPU+=blockGPUs; gCost+=blockCost; tPow+=blockPow;
+      det.push({...w,gpus:blockGPUs,gpusPer:gpusPerU,servers:blockServers,cost:blockCost,pw:blockPow,
+        totalTPS:0,estTTFT:0,estTBT:0,estE2E:0,ttftOk:true,tbtOk:true,e2eOk:true,
+        kvGB:0,peakConc:0,dailyReqs:0,dailyTok:0,moTok:0,avgRPS:0,peakRPS:0,
+        need:blockGPUs,decGPUs:0,decCost:0,decPow:0,apiMoCost:0,cascadeGPUs:0,batchUsed:0,
+        bmSource:'block',recDisagg:false,recLight:false,isBlock:true});
+      return;
+    }
+
+    var est=estimate(w);
     var gpusPer=Math.min(w.gpuCfg||8,p.mx||8);
     var gpus=est.gpus;
     if(false){
