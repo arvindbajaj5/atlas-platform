@@ -289,17 +289,21 @@ textarea{resize:vertical;min-height:72px;}
     <input type="text" id="ne-name" placeholder="e.g. Border Surveillance AI Platform">
     <div class="form-grid">
       <div>
-        <label>Archetype</label>
-        <select id="ne-archetype">
-          <option value="territory_coe">Territory / AI CoE</option>
-          <option value="govt_sectorial">Govt Sectorial</option>
-          <option value="enterprise">Enterprise</option>
-          <option value="defence">Defence</option>
+        <label>Entity Type</label>
+        <select id="ne-entity-type">
+          <option value="tsap">TSAP — Territory Sovereign AI</option>
+          <option value="csp">CSP — Commercial aaS Supplier</option>
+          <option value="enterprise">Enterprise (Private)</option>
+          <option value="public">Public Enterprise / PSU</option>
+          <option value="govt">Government / Central</option>
+          <option value="defence">Defence / Armed Forces</option>
+          <option value="vertical">Domain Vertical</option>
+          <option value="generic">Generic / Other</option>
         </select>
       </div>
       <div>
-        <label>Type</label>
-        <select id="ne-type">
+        <label>Deal Type</label>
+        <select id="ne-deal-type">
           <option value="new">New</option>
           <option value="expansion">Expansion</option>
           <option value="renewal">Renewal</option>
@@ -957,7 +961,7 @@ function switchCustTab(tab){
         +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
         +'<div style="font-size:13px;font-weight:600">'+esc(e.name)+'</div>'
         +'<span class="pill pill-'+e.status+'">'+e.status+'</span></div>'
-        +'<div style="font-size:10px;color:var(--mid)">'+esc(e.phase)+' \u00B7 '+esc(e.archetype||'')+' \u00B7 '+esc(e.value||'')+' '+esc(e.currency||'')+'</div>'
+        +'<div style="font-size:10px;color:var(--mid)">'+esc(e.phase)+' \u00B7 '+esc(e.type||'')+' \u00B7 '+esc(e.value||'')+' '+esc(e.currency||'')+'</div>'
         +'</div>'
     }).join('') : '<div class="empty" style="padding:24px"><div class="empty-icon">\uD83D\uDCBC</div><div class="empty-title">No engagements</div></div>'
   }
@@ -1012,7 +1016,7 @@ async function openEngagement(engId){
   CURRENT_DOCKET_ID = docket.id
   CURRENT_ITEMS = await sbFetch('docket_items','docket_id=eq.'+docket.id+'&order=created_at.asc',200)
 
-  var isL1 = eng.archetype === 'tsap' || eng.type === 'new' && eng.domain === 'REG-AIP'
+  var isL1 = eng.type === 'tsap' || eng.domain === 'REG-AIP'
 
   var html = '<div style="background:var(--navy);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;color:var(--white)">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
@@ -1022,7 +1026,7 @@ async function openEngagement(engId){
     +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'
     +'<span class="pill pill-'+eng.status+'">'+eng.status+'</span>'
     +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.phase)+'</span>'
-    +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.archetype||'')+'</span>'
+    +'<span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8)">'+esc(eng.type||'')+'</span>'
     +(eng.value?'<span class="pill" style="background:rgba(0,178,144,0.2);color:var(--teal)">\uD83D\uDCB0 '+esc(eng.value)+' '+esc(eng.currency||'')+'</span>':'')
     +'</div></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">'
@@ -1258,8 +1262,8 @@ async function createEngagement(){
     id: engId,
     customer_id: custId,
     name: name,
-    archetype: document.getElementById('ne-archetype').value,
-    type: document.getElementById('ne-type').value,
+    type: document.getElementById('ne-entity-type').value,
+    deal_type: document.getElementById('ne-deal-type').value,
     phase: document.getElementById('ne-phase').value,
     status: 'active',
     domain: domain,
