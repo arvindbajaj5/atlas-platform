@@ -128,7 +128,7 @@ body{font-family:var(--font);background:var(--light);color:var(--dark);min-heigh
   border-radius:8px;font-size:9px;font-weight:700;margin-left:4px;padding:0 4px}
 
 /* ── PAGE ── */
-.page{padding:16px 20px;max-width:1440px;margin:0 auto}
+.page{padding:18px 28px;max-width:1520px;margin:0 auto}
 
 /* ── WORKLOAD CATEGORY ── */
 .wl-category{background:#fff;border:1px solid var(--border);
@@ -282,11 +282,11 @@ body{font-family:var(--font);background:var(--light);color:var(--dark);min-heigh
 .version-dirty{color:var(--amber);font-weight:600}
 
 /* ── IF-compatible CSS classes ─────────────────────────────────────── */
-.card{background:#fff;border-radius:10px;border:1px solid var(--border);padding:20px;margin-bottom:16px}
+.card{background:#fff;border-radius:10px;border:1px solid var(--border);padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,40,112,.05)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
 .st{text-align:center;padding:6px 3px}
 .v{font-size:20px;font-weight:700}
 .l{font-size:9px;color:var(--mid);margin-top:2px}
@@ -689,10 +689,11 @@ var V = {
     })
     h += '<th></th></tr></thead><tbody>'
 
+    var cc = (typeof catColor === 'function') ? catColor(type) : 'var(--navy)'
     items.forEach(function(wl) {
       var isOpen = !!M.openRows[wl.id]
       var cells  = V._getTableCells(type, wl, isDeep)
-      h += '<tr class="row-main' + (isOpen?' open':'') + '" onclick="C.toggleRow(\'' + wl.id + '\')">'
+      h += '<tr class="row-main' + (isOpen?' open':'') + '" style="box-shadow:inset 3px 0 0 ' + cc + '" onclick="C.toggleRow(\'' + wl.id + '\')">'
       cells.forEach(function(cell) {
         h += '<td' + (cell.num ? ' class="num"' : '') + '>' + cell.html + '</td>'
       })
@@ -1204,18 +1205,19 @@ var V = {
     var gpuConf = M.gpuMap[sz.gpu||wl.gpu]
     var gpuName = (gpuConf && gpuConf.name) || '—'
     var provGpus = wl.provisionedGpus || sz.total || 0
-    return '<div class="derived"><div class="derived-row">'
-      + V._di(sz.total||0, 'Min GPUs')
-      + (wl.provisionedGpus && wl.provisionedGpus > sz.total ? V._di(wl.provisionedGpus, 'Provisioned ⬆') : '')
-      + V._di(Math.round((sz.powerKw||0)*10)/10 + ' kW', 'Power')
-      + V._di('$' + Math.round((provGpus)*30000/1000) + 'K', 'Capex est.')
-      + V._di(gpuName, 'GPU')
+    var cc = (typeof catColor === 'function') ? catColor(type) : 'var(--navy)'
+    return '<div class="derived" style="border-left:3px solid ' + cc + '"><div class="derived-row">'
+      + V._di(sz.total||0, 'Min GPUs', cc)
+      + (wl.provisionedGpus && wl.provisionedGpus > sz.total ? V._di(wl.provisionedGpus, 'Provisioned ⬆', cc) : '')
+      + V._di(Math.round((sz.powerKw||0)*10)/10 + ' kW', 'Power', cc)
+      + V._di('$' + Math.round((provGpus)*30000/1000) + 'K', 'Capex est.', cc)
+      + V._di(gpuName, 'GPU', 'var(--mid)')
       + '</div></div>'
   },
 
-  _di: function(val, lbl) {
+  _di: function(val, lbl, color) {
     return '<div class="derived-item">'
-      + '<div class="derived-val">' + val + '</div>'
+      + '<div class="derived-val"' + (color ? ' style="color:' + color + '"' : '') + '>' + val + '</div>'
       + '<div class="derived-lbl">' + lbl + '</div>'
       + '</div>'
   },
@@ -1521,8 +1523,12 @@ var C = {
 
   loadActions: async function(engId) {
     try {
+      // docket_items links via docket_id, not engagement_id — resolve docket first
+      var dockets = await atlasDB.get('dockets', 'engagement_id=eq.' + engId + '&limit=5')
+      if (!dockets || !dockets.length) { M.actions = []; V.renderActionDropdown && V.renderActionDropdown(); return }
+      var docketId = dockets[0].id
       var data = await atlasDB.get('docket_items',
-        'engagement_id=eq.' + engId + '&item_type=eq.action&status=eq.open&order=created_at.desc')
+        'docket_id=eq.' + docketId + '&item_type=eq.action&status=eq.open&order=created_at.desc')
       M.actions = (data||[]).filter(function(a) {
         return a.content && (a.content.type === 'presales_handover' || a.item_subtype === 'presales_handover')
       })
@@ -3439,8 +3445,6 @@ V.renderScopeTab = function(){
   var sz=praxisSizing(); if(!sz)sz={det:[],tGPU:0,total:0,srvTotal:0};
   var showP=true;
   var svc=calcServices(sz);
-  //removed:sizing();
-  var showP=document.getElementById('togPrice').checked;
   var onPremWLs=sz.det.filter(d=>d.src!=='api');
   
   // Calculate services effort
