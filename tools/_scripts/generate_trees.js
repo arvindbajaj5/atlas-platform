@@ -1,156 +1,91 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   ATLAS — 5-ENGAGEMENT TREE GENERATOR
-   ---------------------------------------------------------------------------
-   Creates 5 full client trees end-to-end:
-     Customer → Engagement → Docket → Solution Version (sized workloads)
-
-   Clients:
-     1. NATGRID          — 12 UCs, sovereign air-gapped (no aaS)
-     2. Army Signals     — 12 UCs, tactical edge (no aaS)
-     3. Rajasthan Grid   — 10MW, stranded-solar hook, aaS + 5 UCs
-     4. UP Grid          — 20MW, DC-Policy-2026 hook, aaS + 5 UCs
-     5. Uttarakhand Grid — 2MW, hydro+cool hook, aaS + 5 special UCs
-
-   HOW TO USE
-   1. Open ANY ATLAS tool while logged in (e.g. Engagement Management or PRAXIS)
-      so Supabase credentials are loaded in localStorage.
-   2. F12 → Console. Paste this ENTIRE script. Press Enter.
-   3. It resolves real GPU/model IDs from your catalogue, then creates each tree.
-   4. Watch the log. Re-runnable (uses ignore-duplicates).
-
-   SAFE: writes only. Does not delete anything. Uses your logged-in session.
+   ATLAS — 5-ENGAGEMENT TREE GENERATOR  (v2 — schema-corrected)
+   Customer → Engagement → Docket → Solution Version
+   Clients: NATGRID (12 UC), Army Signals (12 UC), Rajasthan (10MW),
+            UP (20MW), Uttarakhand (2MW).
+   Paste in PRAXIS/Engagement-Mgmt console (logged in). Re-runnable, write-only.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 (async function () {
   'use strict';
 
-  // ── Supabase credentials from localStorage (same as all ATLAS tools) ──────
   function getSB() {
-    try {
-      var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}');
-      return { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' };
-    } catch (e) { return { url: '', key: '' }; }
+    try { var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}');
+      return { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }; }
+    catch (e) { return { url: '', key: '' }; }
   }
   var SB = getSB();
-  if (!SB.url || !SB.key) {
-    console.error('[GEN] No Supabase credentials in localStorage. Open a logged-in ATLAS tool first.');
-    return;
-  }
+  if (!SB.url || !SB.key) { console.error('[GEN] No Supabase credentials.'); return; }
   console.log('[GEN] Supabase:', SB.url.replace(/https?:\/\//, '').split('.')[0] + '.supabase.co');
 
-  function sbHeaders(extra) {
-    var h = { apikey: SB.key, Authorization: 'Bearer ' + SB.key, 'Content-Type': 'application/json' };
-    if (extra) for (var k in extra) h[k] = extra[k];
-    return h;
+  function H(extra){ var h={apikey:SB.key,Authorization:'Bearer '+SB.key,'Content-Type':'application/json'};
+    if(extra) for(var k in extra) h[k]=extra[k]; return h; }
+  async function sbGet(t,p){ var r=await fetch(SB.url+'/rest/v1/'+t+'?'+(p||''),{headers:H()}); return r.ok?await r.json():[]; }
+  // Returns {ok, status, error} — HONEST success/failure
+  async function sbInsert(t,d){
+    var r=await fetch(SB.url+'/rest/v1/'+t,{method:'POST',
+      headers:H({Prefer:'resolution=ignore-duplicates,return=minimal'}),body:JSON.stringify(d)});
+    if(r.ok) return {ok:true, status:r.status};
+    var txt=await r.text();
+    return {ok:false, status:r.status, error:txt.slice(0,160)};
   }
-  async function sbGet(table, params) {
-    var r = await fetch(SB.url + '/rest/v1/' + table + '?' + (params || ''), { headers: sbHeaders() });
-    return r.ok ? await r.json() : [];
-  }
-  async function sbInsert(table, data) {
-    var r = await fetch(SB.url + '/rest/v1/' + table, {
-      method: 'POST',
-      headers: sbHeaders({ Prefer: 'resolution=ignore-duplicates,return=minimal' }),
-      body: JSON.stringify(data)
-    });
-    if (!r.ok) { var t = await r.text(); console.warn('[GEN]   insert ' + table + ' → HTTP ' + r.status + ' ' + t.slice(0,120)); }
-    return r.ok;
-  }
+  function genId(prefix){ return prefix+'-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+Math.floor(Math.random()*9999); }
 
-  function genId(prefix) {
-    return prefix + '-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.floor(Math.random()*9999);
-  }
-
-  // ── Load GPU + model catalogues to resolve real IDs ───────────────────────
-  var gpus   = await sbGet('gpu_configs', 'active=eq.true&order=tier.asc,name.asc');
-  var models = await sbGet('model_catalogue', 'order=name.asc');
-  if (!gpus.length)   { console.error('[GEN] No gpu_configs found. Check catalogue.'); return; }
-  if (!models.length) { console.warn('[GEN] No model_catalogue found — using model hints as-is.'); }
+  var gpus   = await sbGet('gpu_configs','active=eq.true&order=tier.asc,name.asc');
+  var models = await sbGet('model_catalogue','order=name.asc');
+  if(!gpus.length){ console.error('[GEN] No gpu_configs.'); return; }
   console.log('[GEN] Catalogue:', gpus.length, 'GPUs,', models.length, 'models');
 
-  function resolveGpu(hint) {
-    var h = (hint||'').toLowerCase();
-    var hit = gpus.find(function(g){ return (g.name||'').toLowerCase().indexOf(h) >= 0; });
-    if (hit) return hit.id;
-    // fallbacks by tier
-    if (h.indexOf('l40')>=0 || h.indexOf('l4')>=0) {
-      var light = gpus.find(function(g){ return (g.tier||'')==='light' || (g.tdp_kw||1)<=0.4; });
-      if (light) return light.id;
-    }
+  function resolveGpu(hint){ var h=(hint||'').toLowerCase();
+    var hit=gpus.find(function(g){return (g.name||'').toLowerCase().indexOf(h)>=0;});
+    if(hit) return hit.id;
+    if(h.indexOf('l40')>=0||h.indexOf('l4')>=0){ var lt=gpus.find(function(g){return (g.tier||'')==='light'||(g.tdp_kw||1)<=0.4;}); if(lt) return lt.id; }
     return gpus[0].id;
   }
-  function resolveModel(hint) {
-    if (!models.length) return hint;
-    var h = (hint||'').toLowerCase();
-    var hit = models.find(function(m){
-      return (m.name||'').toLowerCase().indexOf(h) >= 0 || (m.model_id||'').toLowerCase().indexOf(h) >= 0;
-    });
-    if (hit) return hit.model_id;
-    // sensible fallback: first general LLM
-    var llm = models.find(function(m){ return (m.family||'').toLowerCase().indexOf('llama')>=0; });
-    return llm ? llm.model_id : models[0].model_id;
+  function resolveModel(hint){ if(!models.length) return hint; var h=(hint||'').toLowerCase();
+    var hit=models.find(function(m){return (m.name||'').toLowerCase().indexOf(h)>=0||(m.model_id||'').toLowerCase().indexOf(h)>=0;});
+    if(hit) return hit.model_id;
+    var llm=models.find(function(m){return (m.family||'').toLowerCase().indexOf('llama')>=0;});
+    return llm?llm.model_id:models[0].model_id;
   }
 
-  // ── Build a PRAXIS workload object from a template ────────────────────────
-  function buildWorkload(tpl, idx) {
-    var ts = Date.now() + idx;
-    if (tpl.kind === 'uc') {
-      return {
-        id: 'uc-' + ts, name: tpl.name,
-        model: resolveModel(tpl.model_hint), gpu: resolveGpu(tpl.gpu_hint),
-        precision: tpl.precision || 'fp8',
-        dau: tpl.dau, reqPerDay: tpl.reqPerDay, peakMult: 3, peakConcPct: 6,
-        contextPct: 'p95', commercialSla: tpl.commercialSla || 'gold',
-        engine: 'vllm', securityTier: tpl.securityTier || 'enhanced',
-        isAgentic: !!tpl.isAgentic, agentSteps: tpl.agentSteps || 5, toolWait: 200,
-        isMultimodal: !!tpl.isMultimodal, src: 'onprem', chargeoutModel: 'per_token',
-        avgInputTokens: tpl.avgInputTokens, avgOutputTokens: tpl.avgOutputTokens,
-        gpuUtilTarget: 72, ttft: tpl.ttft || 800, tbt: tpl.tbt || 40, e2e: tpl.e2e || 4000
-      };
-    }
-    if (tpl.kind === 'maas') {
-      return {
-        id: 'maas-' + ts, name: tpl.name,
-        model: resolveModel(tpl.model_hint), gpu: resolveGpu(tpl.gpu_hint),
-        precision: tpl.precision || 'int4',
-        dau: tpl.dau, reqPerDay: 20, peakMult: 3, peakConcPct: 5,
-        contextPct: 'p95', commercialSla: tpl.commercialSla || 'bronze', engine: 'vllm',
-        pricePerMtok: tpl.pricePerMtok, provisionedGpus: null, provisioningReason: '',
-        demandSources: [], src: 'onprem', chargeoutModel: 'per_token',
-        avgInputTokens: tpl.avgInputTokens, avgOutputTokens: tpl.avgOutputTokens,
-        gpuUtilTarget: 80, ttft: 500, tbt: 30, e2e: 2000
-      };
-    }
-    if (tpl.kind === 'gpuaas') {
-      return { id: 'gpuaas-' + ts, name: tpl.name, gpu: resolveGpu(tpl.gpu_hint),
-               gpuCount: tpl.gpuCount, rateTier: tpl.rateTier || '12mo', commercialSla: tpl.commercialSla || 'gold' };
-    }
-    if (tpl.kind === 'bmaas') {
-      return { id: 'bmaas-' + ts, name: tpl.name, gpu: resolveGpu(tpl.gpu_hint),
-               serverCount: tpl.serverCount, gpusPerServer: tpl.gpusPerServer || 8,
-               commercialSla: tpl.commercialSla || 'gold', guestOs: 'ubuntu', interconnect: 'standalone' };
-    }
+  function buildWorkload(tpl, idx){ var ts=Date.now()+idx;
+    if(tpl.kind==='uc') return { id:'uc-'+ts, name:tpl.name, model:resolveModel(tpl.model_hint), gpu:resolveGpu(tpl.gpu_hint),
+      precision:tpl.precision||'fp8', dau:tpl.dau, reqPerDay:tpl.reqPerDay, peakMult:3, peakConcPct:6, contextPct:'p95',
+      commercialSla:tpl.commercialSla||'gold', engine:'vllm', securityTier:tpl.securityTier||'enhanced',
+      isAgentic:!!tpl.isAgentic, agentSteps:tpl.agentSteps||5, toolWait:200, isMultimodal:!!tpl.isMultimodal,
+      src:'onprem', chargeoutModel:'per_token', avgInputTokens:tpl.avgInputTokens, avgOutputTokens:tpl.avgOutputTokens,
+      gpuUtilTarget:72, ttft:tpl.ttft||800, tbt:tpl.tbt||40, e2e:tpl.e2e||4000 };
+    if(tpl.kind==='maas') return { id:'maas-'+ts, name:tpl.name, model:resolveModel(tpl.model_hint), gpu:resolveGpu(tpl.gpu_hint),
+      precision:tpl.precision||'int4', dau:tpl.dau, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95',
+      commercialSla:tpl.commercialSla||'bronze', engine:'vllm', pricePerMtok:tpl.pricePerMtok, provisionedGpus:null,
+      provisioningReason:'', demandSources:[], src:'onprem', chargeoutModel:'per_token',
+      avgInputTokens:tpl.avgInputTokens, avgOutputTokens:tpl.avgOutputTokens, gpuUtilTarget:80, ttft:500, tbt:30, e2e:2000 };
+    if(tpl.kind==='gpuaas') return { id:'gpuaas-'+ts, name:tpl.name, gpu:resolveGpu(tpl.gpu_hint),
+      gpuCount:tpl.gpuCount, rateTier:tpl.rateTier||'12mo', commercialSla:tpl.commercialSla||'gold' };
+    if(tpl.kind==='bmaas') return { id:'bmaas-'+ts, name:tpl.name, gpu:resolveGpu(tpl.gpu_hint),
+      serverCount:tpl.serverCount, gpusPerServer:tpl.gpusPerServer||8, commercialSla:tpl.commercialSla||'gold',
+      guestOs:'ubuntu', interconnect:'standalone' };
   }
 
-  // ── The 5 client definitions ──────────────────────────────────────────────
   var CLIENTS = [
   {
     "customer": {
       "name": "National Intelligence Grid (NATGRID)",
       "short_name": "NATGRID",
       "tier": "strategic",
-      "ownership": "government",
+      "ownership": "GOV",
       "sector": "Intelligence / Internal Security",
       "state": "Delhi",
-      "ai_maturity": "scaling",
+      "ai_maturity": "piloting",
       "notes": "MHA counter-terrorism data-integration platform. 21 databases, 11+ agencies, ~45k queries/mo. Indigenous Gandiva analytics engine. Sovereign air-gapped requirement."
     },
     "engagement": {
       "name": "NATGRID Sovereign AI Intelligence Platform",
-      "archetype": "Q4 Enterprise Transformer",
-      "type": "solution",
-      "phase": "solutioning",
-      "domain": "INT",
+      "archetype": "govt_sectorial",
+      "type": "new",
+      "phase": "presales",
+      "domain": "GEN",
       "currency": "INR",
       "value": "Sovereign AI compute for Gandiva-class entity resolution & inference"
     },
@@ -392,18 +327,18 @@
       "name": "Indian Army \u2014 Corps of Signals",
       "short_name": "Army Signals",
       "tier": "strategic",
-      "ownership": "government",
-      "sector": "Defence / Tactical Communications",
+      "ownership": "MIL",
+      "sector": "Defence & Armed Forces",
       "state": "Delhi",
-      "ai_maturity": "emerging",
+      "ai_maturity": "exploring",
       "notes": "Battlefield comms, SIGINT, EW, secure tactical networks. Requires ruggedised edge AI running disconnected at forward locations."
     },
     "engagement": {
       "name": "Army Signals Tactical Edge AI",
-      "archetype": "Q4 Enterprise Transformer",
-      "type": "solution",
-      "phase": "solutioning",
-      "domain": "DEF",
+      "archetype": "govt_sectorial",
+      "type": "new",
+      "phase": "presales",
+      "domain": "GEN",
       "currency": "INR",
       "value": "Ruggedised tactical edge AI for SIGINT / EW / secure comms"
     },
@@ -644,18 +579,18 @@
     "customer": {
       "name": "Rajasthan Rajya Vidyut Prasaran Nigam (RVPNL)",
       "short_name": "Rajasthan Grid",
-      "tier": "key",
-      "ownership": "government",
+      "tier": "strategic",
+      "ownership": "GOV",
       "sector": "Power / State Transmission Utility",
       "state": "Rajasthan",
-      "ai_maturity": "emerging",
+      "ai_maturity": "exploring",
       "notes": "38GW+ solar. Curtailment hit 51.5% in Aug 2025 during 11am-2pm peak \u2014 power being wasted. Ideal for AI DC soaking curtailed daytime solar at near-zero marginal cost."
     },
     "engagement": {
       "name": "Rajasthan Solar-AI Compute Park (10MW)",
-      "archetype": "Q2 Hyperscale AI Builder",
-      "type": "solution",
-      "phase": "solutioning",
+      "archetype": "territory_coe",
+      "type": "new",
+      "phase": "presales",
       "domain": "GEN",
       "currency": "INR",
       "value": "10MW AI DC monetising curtailed solar \u2192 cheapest GPUaaS/MaaS in India"
@@ -813,17 +748,17 @@
       "name": "Uttar Pradesh Power Corporation (UPPCL)",
       "short_name": "UP Grid",
       "tier": "strategic",
-      "ownership": "government",
+      "ownership": "GOV",
       "sector": "Power / State Utility",
       "state": "Uttar Pradesh",
-      "ai_maturity": "scaling",
+      "ai_maturity": "piloting",
       "notes": "New Data Centre Policy 2026: Rs2L cr target, 2GW, GPU-specific AI Compute Booster incentives, state funds one of two power grids, stamp-duty waivers. Noida/Greater Noida demand centre."
     },
     "engagement": {
       "name": "UP AI Data Centre Park \u2014 Noida (20MW)",
-      "archetype": "Q2 Hyperscale AI Builder",
-      "type": "solution",
-      "phase": "solutioning",
+      "archetype": "territory_coe",
+      "type": "new",
+      "phase": "presales",
       "domain": "GEN",
       "currency": "INR",
       "value": "20MW GPUaaS/MaaS anchor leveraging DC Policy 2026 capex subsidy + dual-grid"
@@ -992,18 +927,18 @@
     "customer": {
       "name": "Uttarakhand Power Corporation (UPCL)",
       "short_name": "UK Grid",
-      "tier": "key",
-      "ownership": "government",
+      "tier": "strategic",
+      "ownership": "GOV",
       "sector": "Power / State Utility",
       "state": "Uttarakhand",
-      "ai_maturity": "emerging",
+      "ai_maturity": "exploring",
       "notes": "25GW hydro potential, surplus exported to other states, cool Himalayan climate \u2192 sub-1.2 PUE with free-cooling. Greenest, lowest-PUE sovereign inference in India. HAICE-lite analogue."
     },
     "engagement": {
       "name": "Uttarakhand Green Hydro-AI Node (2MW)",
-      "archetype": "Q3 Enterprise Explorer",
-      "type": "solution",
-      "phase": "solutioning",
+      "archetype": "territory_coe",
+      "type": "new",
+      "phase": "presales",
       "domain": "GEN",
       "currency": "INR",
       "value": "2MW pilot \u2014 greenest sovereign inference, hydro-powered, free-cooled sub-1.2 PUE"
@@ -1138,88 +1073,60 @@
   }
 ];
 
-  // ── Generate each tree ────────────────────────────────────────────────────
-  var year = new Date().getFullYear();
-  var summary = [];
+  var year=new Date().getFullYear(), summary=[];
 
-  for (var ci = 0; ci < CLIENTS.length; ci++) {
-    var C = CLIENTS[ci];
-    console.log('\n[GEN] ═══ ' + C.customer.short_name + ' ═══');
+  for(var ci=0; ci<CLIENTS.length; ci++){
+    var C=CLIENTS[ci];
+    console.log('%c[GEN] ═══ '+C.customer.short_name+' ═══','color:#1C38F5;font-weight:bold');
 
     // 1. Customer
-    var custId = genId('CUST');
-    var cust = Object.assign({ id: custId, country: 'India', contacts: [], divisions: [] }, C.customer);
-    await sbInsert('customers', cust);
-    console.log('[GEN]   ✓ Customer: ' + cust.name);
+    var custId=genId('CUST');
+    var cust=Object.assign({id:custId, country:'India', contacts:[], divisions:[]}, C.customer);
+    var rC=await sbInsert('customers', cust);
+    if(!rC.ok){ console.error('[GEN]   ✗ Customer FAILED ('+rC.status+'): '+rC.error); console.warn('[GEN]   → skipping rest of '+C.customer.short_name+' tree (FK would cascade)'); continue; }
+    console.log('[GEN]   ✓ Customer:', cust.name);
 
     // 2. Engagement
-    var seq = String(Math.floor(Math.random()*9000)+1000);
-    var engId = 'ENG-' + year + '-' + (C.engagement.domain||'GEN') + '-' + seq;
-    var eng = Object.assign({
-      id: engId, customer_id: custId, status: 'active', owner: ''
-    }, C.engagement);
-    await sbInsert('engagements', eng);
-    console.log('[GEN]   ✓ Engagement: ' + engId);
+    var seq=String(Math.floor(Math.random()*9000)+1000);
+    var engId='ENG-'+year+'-'+(C.engagement.domain||'GEN')+'-'+seq;
+    var eng=Object.assign({id:engId, customer_id:custId, status:'active', owner:''}, C.engagement);
+    var rE=await sbInsert('engagements', eng);
+    if(!rE.ok){ console.error('[GEN]   ✗ Engagement FAILED ('+rE.status+'): '+rE.error); continue; }
+    console.log('[GEN]   ✓ Engagement:', engId);
 
     // 3. Docket
-    var docketId = genId('ENG');
-    var docket = {
-      id: docketId, type: 'customer',
-      name: cust.name + ' — ' + eng.name,
-      customer_name: cust.name, customer_id: custId, engagement_id: engId,
-      owner: '', status: 'active', sector: eng.domain || '', metadata: { hook: C.hook, mw: C.mw }
-    };
-    await sbInsert('engagement_dockets', docket);
-    console.log('[GEN]   ✓ Docket: ' + docketId);
+    var docketId=genId('ENG');
+    var docket={ id:docketId, type:'customer', name:cust.name+' — '+eng.name, customer_name:cust.name,
+      customer_id:custId, engagement_id:engId, owner:'', status:'active', sector:eng.domain||'',
+      metadata:{hook:C.hook, mw:C.mw} };
+    var rD=await sbInsert('engagement_dockets', docket);
+    if(!rD.ok){ console.error('[GEN]   ✗ Docket FAILED ('+rD.status+'): '+rD.error); }
+    else console.log('[GEN]   ✓ Docket:', docketId);
 
-    // 4. Build + size workloads → solution_version
-    var wl = { uc: [], maas: [], gpuaas: [], bmaas: [] };
-    C.workloads.forEach(function(tpl, idx) {
-      var w = buildWorkload(tpl, ci*100 + idx);
-      wl[tpl.kind].push(w);
-    });
+    // 4. Solution version
+    var wl={uc:[],maas:[],gpuaas:[],bmaas:[]};
+    C.workloads.forEach(function(tpl,idx){ wl[tpl.kind].push(buildWorkload(tpl, ci*100+idx)); });
+    var totalGpus=0;
+    wl.gpuaas.forEach(function(w){ totalGpus+=w.gpuCount||0; });
+    wl.bmaas.forEach(function(w){ totalGpus+=(w.serverCount||0)*(w.gpusPerServer||8); });
+    totalGpus += (wl.uc.length+wl.maas.length)*8;
 
-    // Compute rough key metrics (block types + simple estimate for token types)
-    var totalGpus = 0;
-    wl.gpuaas.forEach(function(w){ totalGpus += w.gpuCount||0; });
-    wl.bmaas.forEach(function(w){ totalGpus += (w.serverCount||0)*(w.gpusPerServer||8); });
-    // token workloads: rough 8 GPUs each as placeholder (PRAXIS recomputes on open)
-    var tokenCount = wl.uc.length + wl.maas.length;
-    var estTokenGpus = tokenCount * 8;
-    totalGpus += estTokenGpus;
+    var solId='sv-'+engId+'-'+Date.now();
+    var sol={ id:solId, engagement_id:engId, version_number:1, version_label:'v1 Generated', status:'draft',
+      bom_snapshot:{ tool:'SSP', tool_name:'Solution, Size & Price', mode:'deep', workload_configs:wl,
+        price_overrides:{}, key_metrics:{ total_gpus:totalGpus, capex_usd:totalGpus*30000,
+        power_kw:Math.round(totalGpus*0.7*1.1*10)/10, workloads:C.workloads.length },
+        generated:true, hook:C.hook, target_mw:C.mw } };
+    var rS=await sbInsert('solution_versions', sol);
+    if(!rS.ok){ console.error('[GEN]   ✗ Solution FAILED ('+rS.status+'): '+rS.error); }
+    else console.log('[GEN]   ✓ Solution v1:', C.workloads.length, 'workloads, ~'+totalGpus+' GPUs');
 
-    var solId = null;
-    var solPayload = {
-      engagement_id: engId,
-      version_number: 1,
-      version_label: 'v1 Generated',
-      status: 'draft',
-      bom_snapshot: {
-        tool: 'SSP', tool_name: 'Solution, Size & Price', mode: 'deep',
-        workload_configs: wl,
-        price_overrides: {},
-        key_metrics: {
-          total_gpus: totalGpus,
-          capex_usd: totalGpus * 30000,
-          power_kw: Math.round(totalGpus * 0.7 * 1.1 * 10) / 10,
-          workloads: C.workloads.length
-        },
-        generated: true,
-        hook: C.hook,
-        target_mw: C.mw
-      }
-    };
-    await sbInsert('solution_versions', solPayload);
-    console.log('[GEN]   ✓ Solution v1: ' + C.workloads.length + ' workloads, ~' + totalGpus + ' GPUs');
-
-    summary.push({
-      client: C.customer.short_name, engagement: engId,
-      workloads: C.workloads.length, gpus: totalGpus, mw: C.mw || 'UC-led'
-    });
+    summary.push({ client:C.customer.short_name, engagement:engId, customer:rC.ok?'ok':'FAIL',
+      docket:rD.ok?'ok':'FAIL', solution:rS.ok?'ok':'FAIL', workloads:C.workloads.length, gpus:totalGpus, mw:C.mw||'UC-led' });
   }
 
-  console.log('\n[GEN] ═══════════ COMPLETE ═══════════');
+  console.log('%c[GEN] ═══════════ COMPLETE ═══════════','color:#00B290;font-weight:bold');
   console.table(summary);
-  console.log('[GEN] Open Engagement Management or PRAXIS and select any of these engagements.');
-  console.log('[GEN] Note: PRAXIS recomputes exact sizing when you open each solution — the GPU counts above are rough estimates for the token workloads (block types are exact).');
+  var allOk = summary.every(function(s){ return s.customer==='ok'&&s.docket==='ok'&&s.solution==='ok'; });
+  console.log(allOk ? '[GEN] ✓ All 5 trees created cleanly.' : '[GEN] ⚠ Some inserts failed — see table + errors above.');
 })();
