@@ -1765,6 +1765,29 @@ const MIG_PROFILES={
 var storageConfig = { vendor:'ddn', replication_factor:2, nvme_pct:70, hdd_pct:30, obj_pct:0, nvme_price_per_tb:280, hdd_price_per_tb:40, obj_price_per_tb:0, appliance_cost:120000 };
 var priceOverrides = {};
 var benchmarks = {};
+var softwareStack=[
+  {id:1,name:'RHEL / Ubuntu Pro',cat:'OS',license:'per_server',unitCost:1500,annual:true,enabled:true},
+  {id:2,name:'NVIDIA AI Enterprise (NVAIE)',cat:'AI Platform',license:'per_gpu',unitCost:4500,annual:true,enabled:true},
+  {id:3,name:'NVIDIA Base Command Manager',cat:'AI Platform',license:'per_node',unitCost:2000,annual:true,enabled:false},
+  {id:4,name:'VMware vSphere / KVM',cat:'Virtualization',license:'per_server',unitCost:1200,annual:true,enabled:false},
+  {id:5,name:'Kubernetes (upstream)',cat:'Orchestration',license:'flat',unitCost:0,annual:true,enabled:true},
+  {id:6,name:'Red Hat OpenShift',cat:'Orchestration',license:'per_node',unitCost:3000,annual:true,enabled:false},
+  {id:7,name:'Cumulus Linux / SONiC',cat:'Network Mgmt',license:'per_switch',unitCost:500,annual:true,enabled:true},
+  {id:8,name:'NVIDIA UFM (IB Fabric Mgr)',cat:'Network Mgmt',license:'flat',unitCost:15000,annual:true,enabled:true},
+  {id:9,name:'Prometheus + Grafana (OSS)',cat:'Monitoring',license:'flat',unitCost:0,annual:false,enabled:true},
+  {id:10,name:'Datadog / Dynatrace',cat:'Monitoring',license:'per_server',unitCost:600,annual:true,enabled:false},
+  {id:11,name:'MLflow / W&B (Model Registry)',cat:'MLOps',license:'flat',unitCost:12000,annual:true,enabled:true},
+  {id:12,name:'Milvus / Weaviate (Vector DB)',cat:'Data Platform',license:'flat',unitCost:0,annual:false,enabled:true},
+  {id:13,name:'Elasticsearch / Loki (Logging)',cat:'Data Platform',license:'flat',unitCost:0,annual:false,enabled:true},
+  {id:14,name:'Kubecost (FinOps)',cat:'FinOps',license:'flat',unitCost:5000,annual:true,enabled:true},
+  {id:15,name:'Vault (Secrets Mgmt)',cat:'Security',license:'flat',unitCost:0,annual:false,enabled:true},
+  {id:16,name:'Ansible / Terraform',cat:'Automation',license:'flat',unitCost:0,annual:false,enabled:true},
+  {id:17,name:'DCIM / IPMI Mgmt',cat:'Facilities',license:'flat',unitCost:8000,annual:true,enabled:true},
+  {id:18,name:'Backup & DR Agent',cat:'Data Protection',license:'per_server',unitCost:400,annual:true,enabled:true},
+];
+
+var edgeCfg={enabled:false,sites:3,gpuModel:"L40S",model:"llama3.1_8b",gpusPerSite:1,pue:1.5,localLB:true,globalRouter:true,fallbackToDC:true,fallbackToAPI:false};
+
 
 
 // ── PRAXIS ADAPTER LAYER ─────────────────────────────────────────────────
@@ -2009,7 +2032,7 @@ function estimate(w){
 }
 
 
-// ── Fleet sizing (ported from IF sizing()) ───────────────────────────────
+// ── Fleet sizing (ported from IF praxisSizing()) ───────────────────────────────
 function praxisSizing(){
   var wls = getIFWorkloads();
   var tGPU=0,gCost=0,tPow=0,slaAll=true;
@@ -2051,7 +2074,7 @@ function praxisSizing(){
       dailyTok:est.dailyTok,moTok:est.moTok,avgRPS:est.avgRPS,peakRPS:est.peakRPS,
       need:est.need,decGPUs:est.decGPUs,decCost:est.decCost*secMult,decPow:est.decPow,
       apiMoCost,cascadeGPUs:est.cascadeGPUs,batchUsed:est.bSz,bmSource,
-      recDisagg:shouldDisagg(w),recLight:shouldLightGPU(w)});
+      recDisagg:praxisShouldDisagg(w),recLight:praxisShouldLightGPU(w)});
   });
   
   // Common infra
@@ -2104,7 +2127,7 @@ function praxisSizing(){
   var rackDLCCost=85000+0+3500;
   var rackACCost=35000+3500;
   var rackCost=dlcRacks*rackDLCCost+acRacks*rackACCost+0;
-  var dramCost=srvTotal*8*(priceOverridesverrides._dimm||300),chassisCost=srvTotal*(priceOverridesverrides._chassis||12000);
+  var dramCost=srvTotal*8*(priceOverrides._dimm||300),chassisCost=srvTotal*(priceOverrides._chassis||12000);
   
   // Software stack cost (annual)
   var enabledSW=softwareStack.filter(s=>s.enabled);
@@ -2282,7 +2305,7 @@ V.renderArchTab = function(){
   
   // Roadmap
   var groups={NVIDIA:[],AMD:[],ASIC:[],Custom:[]};
-  Object.values(PROC).forEach(v=>{if(v._custom)groups.Custom.push(v);else if(v.t==='ASIC')groups.ASIC.push(v);else if(v.v==='NVIDIA'&&v.t!=='CPU')groups.NVIDIA.push(v);else if(v.v==='AMD'&&v.t!=='CPU')groups.AMD.push(v);});
+  Object.values(M.gpuConfigs||[]).map(function(g){return getPROC(g.id)}).filter(Boolean).forEach(v=>{if(v._custom)groups.Custom.push(v);else if(v.t==='ASIC')groups.ASIC.push(v);else if(v.v==='NVIDIA'&&v.t!=='CPU')groups.NVIDIA.push(v);else if(v.v==='AMD'&&v.t!=='CPU')groups.AMD.push(v);});
   document.getElementById('roadmap').innerHTML=Object.entries(groups).filter(([,ps])=>ps.length>0).map(([vn,ps])=>`<div style="margin-bottom:8px"><b style="font-size:11px;color:${vn==='NVIDIA'?'var(--s2)':vn==='AMD'?'var(--p1)':vn==='Custom'?'var(--s3)':'var(--s1)'}">${vn}</b><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${ps.map(v=>`<div style="padding:3px 6px;border-radius:4px;background:var(--bg);border:1px solid var(--bdr);font-size:9px"><b>${v.n}</b> ${v.hbm?v.hbm+'GB':''} ${v.av?'<span class="badge" style="background:rgba(255,182,0,.15);color:#B8860B">'+v.av+'</span>':''}</div>`).join('')}</div></div>`).join('');
 }
 
@@ -2395,6 +2418,7 @@ V.renderTokTab = function(){
 
 // ── renderBOM (ported from IF) ──────────────────────────────────────────
 V.renderBOMTab = function(){
+  var aggStrategy = M._bomAggStrategy || 'dedicated';
   var el=document.getElementById("tab-bom");
   if(!el)return;
   var sz=praxisSizing();
@@ -2568,6 +2592,9 @@ var showP=true;
 
 // ── Charts (ported from IF rebuildCharts) ────────────────────────────────
 function praxisRebuildCharts(){
+  var timeline = getScopeState().timeline;
+  var wls = getIFWorkloads();
+  var scenarios = M.scenarios || [];
   var sz=praxisSizing(); if(!sz||!sz.det)return;
   // Latency chart
   var lc=document.getElementById('cLat');
