@@ -35,6 +35,10 @@
 .tabbar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:var(--sp-5);background:#fff;border-radius:var(--r) var(--r) 0 0;padding:0 var(--sp-4)}
 .tabbtn{padding:var(--sp-3) var(--sp-4);font-size:13px;font-weight:600;color:var(--mid);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;font-family:var(--font);margin-bottom:-2px;transition:color .15s}
 .tabbtn.active{color:var(--navy);border-bottom-color:var(--orange)}
+.tabbtn{display:inline-flex;align-items:center;gap:6px}
+.tabdot{width:7px;height:7px;border-radius:50%;opacity:.55;transition:opacity .15s}
+.tabbtn.active .tabdot{opacity:1}
+.tabbtn:hover .tabdot{opacity:.85}
 .tabbtn-soon{color:var(--mid);border-bottom:2px solid transparent;font-style:italic;opacity:.65}
 .tabbtn-soon:hover{opacity:1;color:var(--navy)}
 .coming-soon-panel{padding:40px 32px;text-align:center;background:#fff;border-radius:var(--r);border:1.5px dashed var(--border);margin:var(--sp-4)}
@@ -642,22 +646,25 @@ var V = {
     html += '<div><div style="font-size:var(--text-xs);color:var(--mid);margin-bottom:var(--sp-1)">' + atlasDB.esc(cust.name) + (eng.territory ? ' · ' + atlasDB.esc(eng.territory) : '') + '</div>'
     html += '<div style="font-size:var(--text-xl);font-weight:var(--fw-bold);color:var(--navy);margin-bottom:var(--sp-2)">' + atlasDB.esc(eng.name) + '</div>'
     html += '<div style="display:flex;gap:var(--sp-1);flex-wrap:wrap">' + badges + '</div></div>'
-    html += '<button class="btn btn-orange btn-sm" onclick="C.switchTab(\'solution\')">Build Solution &#8594;</button>'
     html += '</div>'
 
     // Tab bar — revised structure (no Pipeline/RAC)
     var tabs = [
-      { key:'customer',      label:'Customer' },
-      { key:'requirements',  label:'Requirements' },
-      { key:'portfolio',     label:'Portfolio' },
-      { key:'solution',      label:'Solution' },
-      { key:'actions',       label:'Actions' },
-      { key:'outputs',       label:'Outputs' },
-      { key:'history',       label:'History' },
+      { key:'customer',      label:'Customer',           color:'var(--navy)' },
+      { key:'requirements',  label:'Requirements',        color:'var(--blue)' },
+      { key:'portfolio',     label:'Portfolio',           color:'var(--teal)' },
+      { key:'techsolution',  label:'Technical Solution',  color:'var(--orange)' },
+      { key:'finsolution',   label:'Financial Solution',  color:'var(--blue)' },
+      { key:'outputs',       label:'Outputs',             color:'var(--amber)' },
+      { key:'actions',       label:'Actions',             color:'var(--navy)' },
+      { key:'history',       label:'History',             color:'var(--navy)' },
     ]
-    html += '<div class="tab-bar">'
+    html += '<div class="tabbar">'
     tabs.forEach(function(t) {
-      html += '<button class="tab-btn' + (M.activeTab===t.key?' active':'') + '" onclick="C.switchTab(\'' + t.key + '\')">' + t.label + '</button>'
+      var isActive = M.activeTab===t.key
+      var style = 'style="--tab-color:' + t.color + (isActive ? ';border-bottom-color:'+t.color+';color:'+t.color : '') + '"'
+      html += '<button class="tabbtn' + (isActive?' active':'') + '" ' + style + ' onclick="C.switchTab(\'' + t.key + '\')">'
+        + '<span class="tabdot" style="background:'+t.color+'"></span>' + t.label + '</button>'
     })
     html += '</div>'
     html += '<div class="tab-body" id="tab-body">' + V.renderTab(M.activeTab) + '</div>'
@@ -670,7 +677,8 @@ var V = {
       case 'customer':     return V.renderCustomerTab()
       case 'requirements': return V.renderRequirementsTab()
       case 'portfolio':    return V.renderPortfolioTab()
-      case 'solution':     return V.renderSolutionTab()
+      case 'techsolution': return V.renderTechSolutionTab()
+      case 'finsolution':  return V.renderFinSolutionTab()
       case 'actions':      return V.renderActionsTab()
       case 'outputs':      return V.renderOutputsTab()
       case 'history':      return V.renderHistoryTab()
@@ -970,34 +978,81 @@ var V = {
   },
 
   // ── TAB 4: SOLUTION (agent UX) ────────────────────────────────────────
-  renderSolutionTab: function() {
-    var sel = M.portfolioItems
+  renderTechSolutionTab: function() {
+    var eng = M.currentEng
+    if (!eng) return '<div class="card"><div class="warn-panel"><div class="warn-body">Open an engagement to build its technical solution.</div></div></div>'
 
-    if (!sel.length) {
-      var html = '<div class="card"><div class="card-title">Solution Building</div>'
-      html += '<div class="warn-panel"><div class="warn-title">⚠ No portfolio selected</div>'
-      html += '<div class="warn-body">Select items in the Portfolio tab first, then size each workload here.</div></div>'
-      html += '<button class="btn btn-primary" onclick="C.switchTab(\'portfolio\')">Go to Portfolio &#8594;</button>'
-      html += '</div>'
-      return html
+    var km = M.solutionKeyMetrics
+    var h = '<div class="card" style="margin-bottom:var(--sp-4)">'
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">'
+    h += '<div><div class="card-title" style="margin:0">Technical Solution</div>'
+    h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">Sizing, architecture and BOM — built and versioned in PRAXIS.</div></div>'
+    h += '<button class="btn btn-primary" onclick="C.openPraxis()" style="white-space:nowrap">&#128296; Open in PRAXIS &#8594;</button>'
+    h += '</div></div>'
+
+    if (!km) {
+      h += '<div class="card"><div class="warn-panel"><div class="warn-body">No technical solution yet. Click <b>Open in PRAXIS</b> to size this engagement — your saved version will then summarise here.</div></div></div>'
+      return h
     }
 
-    // GPU default + tab shell — actual UC/MaaS/GPUaaS content renders into
-    // #soltabbar/#soltabbody by V.renderSolTabs()/renderSolTabBody(), called
-    // from C.switchTab() right after this HTML is inserted into the DOM
-    // (see Solution Builder Spec Section 5 — folded in from
-    // workload-profiler-prototype.html, single Docket M/V/C, no separate tool)
-    var html = '<div class="gpu-default" style="display:flex;align-items:center;gap:var(--sp-3);background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-4);font-size:12px">'
-    html += '<label style="font-weight:700;color:var(--mid);text-transform:uppercase;font-size:10px;letter-spacing:.4px">Engagement default GPU</label>'
-    html += AtlasSolution.renderGpuDropdown(M.defaultGpu, M, 'C.setDefaultGpu(this.value)')
-    html += '<span style="font-size:11px;color:var(--mid)">Pre-fills every new workload row — override per row anytime</span>'
-    html += '</div>'
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">'
-      + '<div id="soltabbar" style="display:flex;border-bottom:2px solid var(--border);flex:1;background:var(--white);border-radius:var(--r) var(--r) 0 0"></div>'
-      + '<button onclick="C.saveSolution(true)" class="btn btn-primary btn-sm" style="margin-left:12px;white-space:nowrap">&#128190; Save Solution</button>'
+    // Version summary card
+    h += '<div class="card">'
+    h += '<div class="card-title">Current Version</div>'
+    h += '<div style="font-size:12px;color:var(--mid);margin-bottom:12px">Solution v' + (M.solutionVersionNumber||1)
+      + (M.solutionVersionLabel ? ' \u2014 ' + M.solutionVersionLabel : '')
+      + (M.solutionUpdatedAt ? ' \u00b7 updated ' + new Date(M.solutionUpdatedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '')
       + '</div>'
-    html += '<div id="soltabbody"></div>'
-    return html
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">'
+    ;[
+      ['Workloads', km.workloads||0],
+      ['Total GPUs', km.total_gpus||0],
+      ['Total Power', (Math.round((km.power_kw||0)*10)/10)+' kW'],
+      ['Capex est.', '$'+((km.capex_usd||0)/1e6).toFixed(1)+'M']
+    ].forEach(function(kpi){
+      h += '<div style="background:var(--light);border-radius:var(--r);padding:14px;text-align:center">'
+        + '<div style="font-size:22px;font-weight:900;color:var(--orange)">'+kpi[1]+'</div>'
+        + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+kpi[0]+'</div></div>'
+    })
+    h += '</div>'
+    h += '<div style="margin-top:12px"><button class="btn btn-outline btn-sm" onclick="C.openPraxis()">Edit / re-size in PRAXIS &#8594;</button></div>'
+    h += '</div>'
+    return h
+  },
+
+  renderFinSolutionTab: function() {
+    var eng = M.currentEng
+    if (!eng) return '<div class="card"><div class="warn-panel"><div class="warn-body">Open an engagement to build its financial solution.</div></div></div>'
+
+    var h = '<div class="card" style="margin-bottom:var(--sp-4)">'
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">'
+    h += '<div><div class="card-title" style="margin:0">Financial Solution</div>'
+    h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">Programme cost, funding, revenue and cash flow \u2014 modelled in the TSAP Financial Model.</div></div>'
+    h += '<button class="btn btn-primary" onclick="C.openFM()" style="white-space:nowrap;background:var(--teal);border-color:var(--teal)">&#128200; Open in FM &#8594;</button>'
+    h += '</div></div>'
+
+    // FM reads the same solution_version; show what will feed it
+    var km = M.solutionKeyMetrics
+    h += '<div class="card">'
+    h += '<div class="card-title">Model Inputs (from Technical Solution)</div>'
+    if (!km) {
+      h += '<div class="warn-panel"><div class="warn-body">The financial model is driven by the technical solution. Size the engagement in PRAXIS first (Technical Solution tab), then open FM to model the economics.</div></div>'
+    } else {
+      h += '<div style="font-size:12px;color:var(--mid);margin-bottom:12px">FM will size capex/opex/revenue from these figures plus territory cost data.</div>'
+      h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'
+      ;[
+        ['Total GPUs', km.total_gpus||0],
+        ['Total Power', (Math.round((km.power_kw||0)*10)/10)+' kW'],
+        ['Capex basis', '$'+((km.capex_usd||0)/1e6).toFixed(1)+'M']
+      ].forEach(function(kpi){
+        h += '<div style="background:var(--light);border-radius:var(--r);padding:14px;text-align:center">'
+          + '<div style="font-size:22px;font-weight:900;color:var(--teal)">'+kpi[1]+'</div>'
+          + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+kpi[0]+'</div></div>'
+      })
+      h += '</div>'
+      h += '<div style="margin-top:12px"><button class="btn btn-outline btn-sm" onclick="C.openFM()">Open financial model &#8594;</button></div>'
+    }
+    h += '</div>'
+    return h
   },
 
 
@@ -2894,18 +2949,14 @@ var C = {
 
   switchTab: function(tab) {
     M.activeTab = tab
-    var body = document.getElementById('tab-body')
-    if (body) body.innerHTML = V.renderTab(tab)
-    // Sync active class on tab buttons
-    document.querySelectorAll('.tab-btn').forEach(function(btn) {
-      btn.classList.toggle('active', btn.getAttribute('onclick') && btn.getAttribute('onclick').includes("'" + tab + "'"))
-    })
-    // Solution tab has its own UC/MaaS/GPUaaS/BMaaS sub-tabs — render them
-    // into the shell once the shell HTML above is actually in the DOM
-    if (tab === 'solution' && M.portfolioItems.length) {
-      V.renderSolTabs()
-      V.renderSolTabBody()
-    }
+    // Re-render the whole docket area so tab-bar active colours update too
+    V.renderDocket ? V.renderDocket() : (function(){
+      var body = document.getElementById('tab-body')
+      if (body) body.innerHTML = V.renderTab(tab)
+      document.querySelectorAll('.tabbtn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('onclick') && btn.getAttribute('onclick').includes("'" + tab + "'"))
+      })
+    })()
   },
 
   newEngagement: function(custId) {
