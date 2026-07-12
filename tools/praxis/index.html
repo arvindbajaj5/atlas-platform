@@ -1604,7 +1604,7 @@ var C = {
 
     // Load central Settings (app_config) — hardware costs, storage, software stack
     try {
-      var cfg = await atlasDB.get('app_config', 'key=in.(software_stack,storage_vendor,storage_replication_factor,storage_nvme_pct,storage_hdd_pct,storage_obj_pct,storage_nvme_price_per_tb,storage_hdd_price_per_tb,storage_obj_price_per_tb,storage_appliance_cost)&limit=30')
+      var cfg = await atlasDB.get('app_config', 'key=in.(software_stack,storage_vendor,storage_replication_factor,storage_nvme_pct,storage_hdd_pct,storage_obj_pct,storage_nvme_price_per_tb,storage_hdd_price_per_tb,storage_obj_price_per_tb,storage_appliance_cost,rack_dlc_cost,rack_ac_cost,rack_install,dram_per_dimm,chassis_per_server,switch_cost,switch_spine_cost,nic_per_port,edge_cpu,edge_dram,edge_ssd,edge_nic,edge_rack,edge_lb,geo_cost,rack_power_dlc_kw,rack_power_ac_kw)&limit=60')
       ;(cfg||[]).forEach(function(row){
         if (row.key === 'software_stack') {
           try { softwareStack = JSON.parse(row.value) } catch(e){}
@@ -1612,6 +1612,10 @@ var C = {
           var sk = row.key.replace('storage_','')
           var nv = parseFloat(row.value)
           storageConfig[sk] = isNaN(nv) ? row.value : nv
+        } else {
+          // Hardware cost + standard config → global HWCFG
+          var hv = parseFloat(row.value)
+          if (!isNaN(hv)) HWCFG[row.key] = hv
         }
       })
     } catch(e) { console.warn('loadRefData app_config:', e) }
@@ -1910,6 +1914,15 @@ const MIG_PROFILES={
     features:['Open source','Commodity hardware','Full customization','Community support','No vendor lock-in']},
 };
 var storageConfig = { vendor:'ddn', replication_factor:2, nvme_pct:70, hdd_pct:30, obj_pct:0, nvme_price_per_tb:280, hdd_price_per_tb:40, obj_price_per_tb:0, appliance_cost:120000 };
+// Hardware cost + standard config — seeded defaults, overridden by app_config on load. No hardcoded values in engine.
+var HWCFG = {
+  rack_dlc_cost:85000, rack_ac_cost:35000, rack_install:3500,
+  dram_per_dimm:300, chassis_per_server:12000,
+  switch_cost:45000, switch_spine_cost:65000, nic_per_port:3000,
+  edge_cpu:15000, edge_dram:1200, edge_ssd:1600, edge_nic:1000, edge_rack:5000, edge_lb:500,
+  geo_cost:250000,
+  rack_power_dlc_kw:260, rack_power_ac_kw:90
+};
 var priceOverrides = {};
 var benchmarks = {};
 var softwareStack=[
@@ -2276,15 +2289,15 @@ function praxisSizing(){
   }
   
   // Aggregation
-  var rackPow=260,rackPowAC=90;
+  var rackPow=HWCFG.rack_power_dlc_kw,rackPowAC=HWCFG.rack_power_ac_kw;
   var dlcPow=tPow*0.8,acPow=tPow*0.2+commonPow+agentOrcPow;
   var dlcRacks=Math.ceil(dlcPow/rackPow),acRacks=Math.ceil(acPow/rackPowAC);
   var totalRacks=dlcRacks+acRacks;
   var srvTotal=det.reduce((s,d)=>s+d.servers+(d.decGPUs?Math.ceil(d.decGPUs/(d.gpusPer||8)):0),0)+commonSrv+agentOrcSrv;
   var cpuCnt=srvTotal*2,cpuCost=price('Turin_9965')*cpuCnt;
   var netPorts=Math.ceil(tGPU/2);
-  var netCost=det.reduce((s,d)=>{var n=(NET[d.netChoice]||{cpp:3000});return s+Math.ceil(d.gpus/2)*((n||{}).cpp||3000);},0);
-  var swCost=Math.ceil(netPorts/64)*45000;
+  var netCost=det.reduce((s,d)=>{var n=(NET[d.netChoice]||{cpp:HWCFG.nic_per_port});return s+Math.ceil(d.gpus/2)*((n||{}).cpp||HWCFG.nic_per_port);},0);
+  var swCost=Math.ceil(netPorts/64)*HWCFG.switch_cost;
   
   // Model-aware storage (raw TB needed)
   var stoTB=50;
@@ -2303,10 +2316,10 @@ function praxisSizing(){
   var objTB=Math.ceil(stoTB*(storageConfig.obj_pct||0)/100);
   var stoCost=nvmeTB*(storageConfig.nvme_price_per_tb||280)+hddTB*(storageConfig.hdd_price_per_tb||40)+objTB*(storageConfig.obj_price_per_tb||0)+(storageConfig.appliance_cost||120000);
   
-  var rackDLCCost=85000+0+3500;
-  var rackACCost=35000+3500;
+  var rackDLCCost=HWCFG.rack_dlc_cost+HWCFG.rack_install;
+  var rackACCost=HWCFG.rack_ac_cost+HWCFG.rack_install;
   var rackCost=dlcRacks*rackDLCCost+acRacks*rackACCost+0;
-  var dramCost=srvTotal*8*(priceOverrides._dimm||300),chassisCost=srvTotal*(priceOverrides._chassis||12000);
+  var dramCost=srvTotal*8*(priceOverrides._dimm||HWCFG.dram_per_dimm),chassisCost=srvTotal*(priceOverrides._chassis||HWCFG.chassis_per_server);
   
   // Software stack cost (annual)
   var enabledSW=softwareStack.filter(s=>s.enabled);
@@ -2326,7 +2339,7 @@ function praxisSizing(){
   
   // Geo infra
   var geoCost=0;
-  if(geoWLs.length>0)geoCost=250000; // baseline geo infra
+  if(geoWLs.length>0)geoCost=HWCFG.geo_cost; // baseline geo infra
   
   var sparePct=det.some(d=>d.criticality==='mission_critical')?10:det.some(d=>d.criticality==='business')?5:0;
   var spareCost=gCost*sparePct/100;
@@ -2336,7 +2349,7 @@ function praxisSizing(){
   if(edgeCfg.enabled){
     var ep=getPROC(edgeCfg.gpuModel);
     var perSiteGPUCost=edgeCfg.gpusPerSite*price(edgeCfg.gpuModel)*1.8;
-    var perSiteCPU=15000; var perSiteDRAM=1200; var perSiteSSD=1600; var perSiteNIC=1000; var perSiteRack=5000; var perSiteLB=500;
+    var perSiteCPU=HWCFG.edge_cpu; var perSiteDRAM=HWCFG.edge_dram; var perSiteSSD=HWCFG.edge_ssd; var perSiteNIC=HWCFG.edge_nic; var perSiteRack=HWCFG.edge_rack; var perSiteLB=HWCFG.edge_lb;
     var perSiteCost=perSiteGPUCost+perSiteCPU+perSiteDRAM+perSiteSSD+perSiteNIC+perSiteRack+perSiteLB;
     var perSitePow=(edgeCfg.gpusPerSite*((ep||{}).tdp||350)+500)*edgeCfg.pue/1000;
     edgeTotalCost=perSiteCost*edgeCfg.sites;
@@ -2734,8 +2747,8 @@ var showP=true;
       <div style="padding:10px;background:var(--ibg);border-radius:6px;border-left:3px solid var(--s1)">
         <div style="font-weight:700;font-size:11px;color:var(--p2);margin-bottom:6px">East-West (GPU Scale-Out)</div>
         <table style="font-size:12px"><tbody>
-          <tr><td><b>Leaf Switches</b></td><td>${ewLeafSw}× 64-port (${NET[sz.det[0]?.netChoice]?.n||'IB NDR'})</td>${showP?`<td>${fmt$(ewLeafSw*45000)}</td>`:''}</tr>
-          <tr><td><b>Spine Switches</b></td><td>${ewSpineSw}× (${ewLeafSw>4?'fat-tree':'leaf-spine'})</td>${showP?`<td>${fmt$(ewSpineSw*65000)}</td>`:''}</tr>
+          <tr><td><b>Leaf Switches</b></td><td>${ewLeafSw}× 64-port (${NET[sz.det[0]?.netChoice]?.n||'IB NDR'})</td>${showP?`<td>${fmt$(ewLeafSw*HWCFG.switch_cost)}</td>`:''}</tr>
+          <tr><td><b>Spine Switches</b></td><td>${ewSpineSw}× (${ewLeafSw>4?'fat-tree':'leaf-spine'})</td>${showP?`<td>${fmt$(ewSpineSw*HWCFG.switch_spine_cost)}</td>`:''}</tr>
           <tr><td><b>Server→Leaf Cables</b></td><td>${ewCablesDAC}× DAC/AOC</td>${showP?`<td>${fmt$(ewCablesDAC*80)}</td>`:''}</tr>
           <tr><td><b>Leaf→Spine ISL</b></td><td>${ewCablesISL}× AOC</td>${showP?`<td>${fmt$(ewCablesISL*120)}</td>`:''}</tr>
         </tbody></table>
