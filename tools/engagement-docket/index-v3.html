@@ -984,83 +984,122 @@ var V = {
 
     var km = M.solutionKeyMetrics
     var wc = M.workloadConfigs || {}
+
+    // ── Header with launch ──
     var h = '<div class="card" style="margin-bottom:var(--sp-4)">'
     h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">'
     h += '<div><div class="card-title" style="margin:0">Technical Solution</div>'
-    h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">Solution architecture and sizing \u2014 built and versioned in PRAXIS.</div></div>'
-    h += '<button class="btn btn-primary" onclick="C.openPraxis()" style="white-space:nowrap;background:var(--orange);border-color:var(--orange)">&#128296; Open in PRAXIS &#8594;</button>'
+    h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">Read-only summary of the solution engineered in PRAXIS. Edit or re-size there.</div></div>'
+    h += '<button class="btn btn-primary" onclick="C.openPraxis()" style="white-space:nowrap;background:var(--orange);border-color:var(--orange)">Open in PRAXIS &#8594;</button>'
     h += '</div></div>'
 
     if (!km) {
-      h += '<div class="card"><div class="warn-panel"><div class="warn-body">No technical solution yet. Click <b>Open in PRAXIS</b> to size this engagement \u2014 the saved version will then summarise here.</div></div></div>'
+      h += '<div class="card"><div class="warn-panel"><div class="warn-body">No technical solution yet. Open PRAXIS to size this engagement \u2014 the saved version will summarise here.</div></div></div>'
       return h
     }
 
-    // ── Headline metrics ──
-    h += '<div class="card">'
-    h += '<div class="card-title">Solution Summary \u2014 v' + (M.solutionVersionNumber||1)
-      + (M.solutionUpdatedAt ? ' <span style="font-weight:400;font-size:11px;color:var(--mid)">(updated ' + new Date(M.solutionUpdatedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) + ')</span>' : '')
-      + '</div>'
-    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">'
+    // ── Headline band ──
+    h += '<div class="card" style="background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff;margin-bottom:var(--sp-4)">'
+    h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">'
+    h += '<div style="font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;opacity:.75">Solution v' + (M.solutionVersionNumber||1)
+      + (M.solutionUpdatedAt ? ' \u00b7 ' + new Date(M.solutionUpdatedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '') + '</div>'
+    h += '</div>'
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:12px">'
     ;[
-      ['Workloads', km.workloads||0],
-      ['Total GPUs', km.total_gpus||0],
-      ['Total Power', (Math.round((km.power_kw||0)*10)/10)+' kW'],
-      ['Capex est.', '$'+((km.capex_usd||0)/1e6).toFixed(1)+'M']
+      [km.total_gpus||0, 'Total GPUs'],
+      [(Math.round((km.power_kw||0)*10)/10), 'Power (kW)'],
+      ['$'+((km.capex_usd||0)/1e6).toFixed(2)+'M', 'Capex estimate'],
+      [km.workloads||0, 'Workloads']
     ].forEach(function(kpi){
-      h += '<div style="background:var(--light);border-radius:var(--r);padding:14px;text-align:center">'
-        + '<div style="font-size:24px;font-weight:900;color:var(--orange)">'+kpi[1]+'</div>'
-        + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+kpi[0]+'</div></div>'
+      h += '<div><div style="font-size:30px;font-weight:900;line-height:1">'+kpi[0]+'</div>'
+        + '<div style="font-size:11px;opacity:.8;margin-top:4px">'+kpi[1]+'</div></div>'
     })
-    h += '</div>'
-
-    // ── Workload mix (read-only from saved config) ──
-    var types = [['uc','Use Cases','var(--navy)'],['maas','MaaS Pools','var(--teal)'],['gpuaas','GPUaaS Blocks','var(--blue)'],['bmaas','BMaaS Clusters','var(--orange)']]
-    var anyWl = types.some(function(t){ return (wc[t[0]]||[]).length })
-    if (anyWl) {
-      h += '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Workload Mix</div>'
-      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'
-      types.forEach(function(t){
-        var n = (wc[t[0]]||[]).length
-        if (n) h += '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--light);border-left:3px solid '+t[2]+';border-radius:4px;padding:6px 12px;font-size:12px">'
-          + '<b style="color:'+t[2]+'">'+n+'</b> '+t[1]+'</span>'
-      })
-      h += '</div>'
-
-      // ── GPU types + models used (distinct, from config) ──
-      var gpus = {}, models = {}, secTiers = {}
-      ;['uc','maas','gpuaas','bmaas'].forEach(function(tp){
-        (wc[tp]||[]).forEach(function(w){
-          if (w.gpu) gpus[w.gpu] = (gpus[w.gpu]||0)+1
-          if (w.model) models[w.model] = (models[w.model]||0)+1
-          if (w.securityTier) secTiers[w.securityTier] = (secTiers[w.securityTier]||0)+1
-        })
-      })
-      function chips(obj, color){
-        return Object.keys(obj).map(function(k){
-          return '<span style="background:var(--light);border-radius:4px;padding:4px 10px;font-size:11px;color:'+color+'">'+k+' <span style="color:var(--mid)">\u00d7'+obj[k]+'</span></span>'
-        }).join(' ')
-      }
-      if (Object.keys(gpus).length) {
-        h += '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">GPU Selection</div>'
-        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">' + chips(gpus,'var(--orange)') + '</div>'
-      }
-      if (Object.keys(models).length) {
-        h += '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">Models Deployed</div>'
-        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">' + chips(models,'var(--blue)') + '</div>'
-      }
-      if (Object.keys(secTiers).length) {
-        h += '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">Security Tiers</div>'
-        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">' + chips(secTiers,'var(--teal)') + '</div>'
-      }
-    }
-
-    // ── Pointer to full BOM ──
-    h += '<div class="warn-panel" style="background:#f0f4ff;border-color:var(--blue)"><div class="warn-body" style="font-size:12px">'
-    h += '<b>Full infrastructure BOM</b> \u2014 racks (DLC/AC), CPU nodes, storage, network fabric (spine/leaf, L1/L2), and software stack \u2014 are detailed in PRAXIS. '
-    h += '<a href="#" onclick="C.openPraxis();return false" style="color:var(--blue);font-weight:600">Open full BOM in PRAXIS &#8594;</a>'
     h += '</div></div>'
-    h += '</div>'
+
+    // ── Helpers ──
+    function sla(v){ return v ? v.charAt(0).toUpperCase()+v.slice(1) : '\u2014' }
+    function sec(v){ return v ? v.charAt(0).toUpperCase()+v.slice(1) : '\u2014' }
+    function tok(v){ return v ? (v>=1000 ? (v/1000).toFixed(1)+'k' : v) : '\u2014' }
+    function num(v){ return v!=null ? Number(v).toLocaleString('en-IN') : '\u2014' }
+    var CAT = { uc:['Use Cases','var(--navy)'], maas:['MaaS Pools','var(--teal)'], gpuaas:['GPUaaS Blocks','var(--blue)'], bmaas:['BMaaS Clusters','var(--orange)'] }
+
+    function sectionCard(type, cols, rowFn){
+      var list = wc[type]||[]
+      if (!list.length) return ''
+      var meta = CAT[type]
+      var s = '<div class="card" style="margin-bottom:var(--sp-3);border-top:3px solid '+meta[1]+'">'
+      s += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+      s += '<span style="font-size:13px;font-weight:800;color:'+meta[1]+'">'+meta[0]+'</span>'
+      s += '<span style="background:'+meta[1]+';color:#fff;border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700">'+list.length+'</span></div>'
+      s += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      s += '<thead><tr style="text-align:left;color:var(--mid);border-bottom:2px solid var(--border)">'
+      cols.forEach(function(c){ s += '<th style="padding:7px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap">'+c+'</th>' })
+      s += '</tr></thead><tbody>'
+      list.forEach(function(w, ix){
+        s += '<tr style="border-bottom:1px solid var(--border)'+(ix%2?';background:var(--light)':'')+'">' + rowFn(w) + '</tr>'
+      })
+      s += '</tbody></table></div></div>'
+      return s
+    }
+    function td(v, opts){ opts=opts||{}; return '<td style="padding:8px 10px;'+(opts.bold?'font-weight:700;':'')+(opts.color?'color:'+opts.color+';':'')+'white-space:nowrap">'+v+'</td>' }
+
+    // ── UC table ──
+    h += sectionCard('uc',
+      ['Use Case','GPU','DAU','In/Out tok','SLA','Security','Precision','Agentic'],
+      function(w){
+        return td(w.name||'\u2014',{bold:true})
+          + td(gpuLabel(w.gpu))
+          + td(num(w.dau))
+          + td(tok(w.avgInputTokens)+' / '+tok(w.avgOutputTokens))
+          + td(sla(w.commercialSla))
+          + td(sec(w.securityTier),{color:'var(--teal)'})
+          + td((w.precision||'\u2014').toUpperCase())
+          + td(w.isAgentic?'Yes':'No', {color:w.isAgentic?'var(--orange)':'var(--mid)'})
+      })
+
+    // ── MaaS table ──
+    h += sectionCard('maas',
+      ['Pool','GPU','DAU','Price/Mtok','Provisioned','SLA','Precision'],
+      function(w){
+        return td(w.name||'\u2014',{bold:true})
+          + td(gpuLabel(w.gpu))
+          + td(num(w.dau))
+          + td(w.pricePerMtok!=null?'$'+w.pricePerMtok:'\u2014')
+          + td(w.provisionedGpus!=null?w.provisionedGpus+' GPUs':'On-demand')
+          + td(sla(w.commercialSla))
+          + td((w.precision||'\u2014').toUpperCase())
+      })
+
+    // ── GPUaaS table ──
+    h += sectionCard('gpuaas',
+      ['Block','GPU','GPU count','Rate tier','SLA'],
+      function(w){
+        return td(w.name||'\u2014',{bold:true})
+          + td(gpuLabel(w.gpu))
+          + td((w.gpuCount||0)+' GPUs',{bold:true,color:'var(--blue)'})
+          + td(w.rateTier||'\u2014')
+          + td(sla(w.commercialSla))
+      })
+
+    // ── BMaaS table ──
+    h += sectionCard('bmaas',
+      ['Cluster','GPU','Servers \u00d7 GPUs','Total GPUs','Interconnect','Guest OS','SLA'],
+      function(w){
+        var srv=w.serverCount||0, gps=w.gpusPerServer||8
+        return td(w.name||'\u2014',{bold:true})
+          + td(gpuLabel(w.gpu))
+          + td(srv+' \u00d7 '+gps)
+          + td((srv*gps)+' GPUs',{bold:true,color:'var(--orange)'})
+          + td(w.interconnect||'\u2014')
+          + td(w.guestOs||'\u2014')
+          + td(sla(w.commercialSla))
+      })
+
+    // ── Infra BOM pointer ──
+    h += '<div class="card" style="background:#f0f4ff;border:1px solid var(--blue)">'
+    h += '<div style="font-size:12px;color:var(--dark)"><b>Full infrastructure BOM</b> \u2014 racks (DLC/AC), CPU nodes, storage, network fabric (spine/leaf, L1/L2) and software stack \u2014 is detailed in PRAXIS. '
+    h += '<a href="#" onclick="C.openPraxis();return false" style="color:var(--blue);font-weight:700">Open full BOM &#8594;</a></div></div>'
+
     return h
   },
 
@@ -1068,49 +1107,65 @@ var V = {
     var eng = M.currentEng
     if (!eng) return '<div class="card"><div class="warn-panel"><div class="warn-body">Open an engagement to view its financial solution.</div></div></div>'
 
+    var km = M.solutionKeyMetrics
+    var fs = M.finScenario
+
+    // ── Header with launch ──
     var h = '<div class="card" style="margin-bottom:var(--sp-4)">'
     h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">'
     h += '<div><div class="card-title" style="margin:0">Financial Solution</div>'
     h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">Programme cost, funding, revenue and returns \u2014 modelled in the TSAP Financial Model.</div></div>'
-    h += '<button class="btn btn-primary" onclick="C.openFM()" style="white-space:nowrap;background:var(--blue);border-color:var(--blue)">&#128200; Open in FM &#8594;</button>'
+    h += '<button class="btn btn-primary" onclick="C.openFM()" style="white-space:nowrap;background:var(--blue);border-color:var(--blue)">Open in FM &#8594;</button>'
     h += '</div></div>'
 
-    // Read-only: latest saved FM scenario for this engagement
-    var fs = M.finScenario
-    if (!fs) {
-      var km = M.solutionKeyMetrics
-      h += '<div class="card"><div class="card-title">Not yet modelled</div>'
-      if (km) {
-        h += '<div style="font-size:12px;color:var(--mid);margin-bottom:10px">A technical solution exists (' + (km.total_gpus||0) + ' GPUs, $' + ((km.capex_usd||0)/1e6).toFixed(1) + 'M capex basis). Open FM to build the financial model \u2014 it will size capex/opex/revenue from the technical solution plus territory cost data.</div>'
-      } else {
-        h += '<div class="warn-panel"><div class="warn-body">Size the engagement in PRAXIS first, then model its economics in FM.</div></div>'
-      }
-      h += '<button class="btn btn-outline btn-sm" onclick="C.openFM()">Open Financial Model &#8594;</button>'
-      h += '</div>'
+    // ── Saved scenario present → show it (future path, once FM persists) ──
+    if (fs && fs.results_json) {
+      var r = fs.results_json, gap=r.gap||{}, cf=r.cf||{}, rev=r.rev||{}
+      function cr(v){ return v!=null ? 'Rs ' + Math.round(v).toLocaleString('en-IN') + ' Cr' : '\u2014' }
+      h += '<div class="card" style="background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff;margin-bottom:var(--sp-4)">'
+      h += '<div style="font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;opacity:.75">' + (fs.label||fs.name||'Scenario') + '</div>'
+      h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:12px">'
+      ;[
+        [gap.demand!=null?cr(gap.demand):'\u2014','Total demand'],
+        [gap.coverage_pct!=null?Math.round(gap.coverage_pct)+'%':'\u2014','Funding coverage'],
+        [cf.irr!=null?cf.irr+'%':'\u2014','IRR'],
+        [rev.totalRev!=null?cr(rev.totalRev):'\u2014','5-yr revenue']
+      ].forEach(function(kpi){
+        h += '<div><div style="font-size:26px;font-weight:900;line-height:1">'+kpi[0]+'</div><div style="font-size:11px;opacity:.8;margin-top:4px">'+kpi[1]+'</div></div>'
+      })
+      h += '</div></div>'
+      h += '<div style="text-align:center"><button class="btn btn-outline btn-sm" onclick="C.openFM()">Open full model in FM &#8594;</button></div>'
       return h
     }
 
-    // Show saved scenario headline
-    var r = fs.results_json || {}
-    var gap = r.gap || {}, cf = r.cf || {}, rev = r.rev || {}
-    function cr(v){ return v!=null ? 'Rs ' + Math.round(v).toLocaleString('en-IN') + ' Cr' : '\u2014' }
+    // ── No saved model → honest, useful placeholder ──
     h += '<div class="card">'
-    h += '<div class="card-title">Financial Summary \u2014 ' + (fs.label||fs.name||'Scenario')
-      + (fs.updated_at ? ' <span style="font-weight:400;font-size:11px;color:var(--mid)">(updated ' + new Date(fs.updated_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) + ')</span>' : '')
-      + '</div>'
-    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">'
-    ;[
-      ['Total Demand', gap.demand!=null ? cr(gap.demand) : '\u2014'],
-      ['Funding Coverage', gap.coverage_pct!=null ? Math.round(gap.coverage_pct)+'%' : '\u2014'],
-      ['IRR', cf.irr!=null ? cf.irr+'%' : '\u2014'],
-      ['5yr Revenue', rev.totalRev!=null ? cr(rev.totalRev) : '\u2014']
-    ].forEach(function(kpi){
-      h += '<div style="background:var(--light);border-radius:var(--r);padding:14px;text-align:center">'
-        + '<div style="font-size:22px;font-weight:900;color:var(--blue)">'+kpi[1]+'</div>'
-        + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+kpi[0]+'</div></div>'
+    h += '<div class="card-title">Financial model not saved yet</div>'
+    if (km) {
+      h += '<div style="font-size:12px;color:var(--mid);margin-bottom:16px">A technical solution exists. Its capex basis feeds the financial model \u2014 open FM to build funding, opex, revenue and cash-flow projections.</div>'
+      // Show the one real number available: capex basis from the technical solution
+      h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">'
+      ;[
+        ['$'+((km.capex_usd||0)/1e6).toFixed(2)+'M','Capex basis (from PRAXIS)','var(--orange)'],
+        [(km.total_gpus||0)+' GPUs','Fleet size','var(--navy)'],
+        [(Math.round((km.power_kw||0)*10)/10)+' kW','Connected load','var(--teal)']
+      ].forEach(function(kpi){
+        h += '<div style="background:var(--light);border-radius:var(--r);padding:16px;text-align:center">'
+          + '<div style="font-size:22px;font-weight:900;color:'+kpi[2]+'">'+kpi[0]+'</div>'
+          + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+kpi[1]+'</div></div>'
+      })
+      h += '</div>'
+    } else {
+      h += '<div class="warn-panel" style="margin-bottom:16px"><div class="warn-body">Size the engagement in PRAXIS first, then model its economics in FM.</div></div>'
+    }
+    // What FM will produce (sets expectation)
+    h += '<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">The financial model will produce</div>'
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'
+    ;['Programme capex & opex','Funding mix & gap','Revenue ramp','Cash flow by quarter','IRR & payback','Territory cost overrides'].forEach(function(t){
+      h += '<span style="background:var(--light);border-left:3px solid var(--blue);border-radius:4px;padding:6px 12px;font-size:12px;color:var(--dark)">'+t+'</span>'
     })
     h += '</div>'
-    h += '<div style="margin-top:12px"><button class="btn btn-outline btn-sm" onclick="C.openFM()">Open full model in FM &#8594;</button></div>'
+    h += '<button class="btn btn-primary btn-sm" onclick="C.openFM()" style="background:var(--blue);border-color:var(--blue)">Build financial model in FM &#8594;</button>'
     h += '</div>'
     return h
   },
