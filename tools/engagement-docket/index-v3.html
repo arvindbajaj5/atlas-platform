@@ -983,123 +983,58 @@ var V = {
     if (!eng) return '<div class="card"><div class="warn-panel"><div class="warn-body">Open an engagement to view its technical solution.</div></div></div>'
 
     var km = M.solutionKeyMetrics
-    var wc = M.workloadConfigs || {}
 
     // ── Header with launch ──
     var h = '<div class="card" style="margin-bottom:var(--sp-4)">'
     h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">'
     h += '<div><div class="card-title" style="margin:0">Technical Solution</div>'
-    h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">Read-only summary of the solution engineered in PRAXIS. Edit or re-size there.</div></div>'
+    h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">The engineered bill of materials \u2014 built in PRAXIS from the requirements.</div></div>'
     h += '<button class="btn btn-primary" onclick="C.openPraxis()" style="white-space:nowrap;background:var(--orange);border-color:var(--orange)">Open in PRAXIS &#8594;</button>'
     h += '</div></div>'
 
     if (!km) {
-      h += '<div class="card"><div class="warn-panel"><div class="warn-body">No technical solution yet. Open PRAXIS to size this engagement \u2014 the saved version will summarise here.</div></div></div>'
+      h += '<div class="card"><div class="warn-panel"><div class="warn-body">No technical solution yet. Open PRAXIS to size this engagement \u2014 the saved BOM will summarise here.</div></div></div>'
       return h
     }
 
-    // ── Headline band ──
+    // ── Headline band (what IS persisted today) ──
     h += '<div class="card" style="background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff;margin-bottom:var(--sp-4)">'
-    h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">'
     h += '<div style="font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;opacity:.75">Solution v' + (M.solutionVersionNumber||1)
       + (M.solutionUpdatedAt ? ' \u00b7 ' + new Date(M.solutionUpdatedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '') + '</div>'
-    h += '</div>'
     h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:12px">'
     ;[
       [km.total_gpus||0, 'Total GPUs'],
       [(Math.round((km.power_kw||0)*10)/10), 'Power (kW)'],
       ['$'+((km.capex_usd||0)/1e6).toFixed(2)+'M', 'Capex estimate'],
-      [km.workloads||0, 'Workloads']
+      [km.workloads||0, 'Workloads sized']
     ].forEach(function(kpi){
       h += '<div><div style="font-size:30px;font-weight:900;line-height:1">'+kpi[0]+'</div>'
         + '<div style="font-size:11px;opacity:.8;margin-top:4px">'+kpi[1]+'</div></div>'
     })
     h += '</div></div>'
 
-    // ── Helpers ──
-    function sla(v){ return v ? v.charAt(0).toUpperCase()+v.slice(1) : '\u2014' }
-    function sec(v){ return v ? v.charAt(0).toUpperCase()+v.slice(1) : '\u2014' }
-    function tok(v){ return v ? (v>=1000 ? (v/1000).toFixed(1)+'k' : v) : '\u2014' }
-    function num(v){ return v!=null ? Number(v).toLocaleString('en-IN') : '\u2014' }
-    var CAT = { uc:['Use Cases','var(--navy)'], maas:['MaaS Pools','var(--teal)'], gpuaas:['GPUaaS Blocks','var(--blue)'], bmaas:['BMaaS Clusters','var(--orange)'] }
-
-    function sectionCard(type, cols, rowFn){
-      var list = wc[type]||[]
-      if (!list.length) return ''
-      var meta = CAT[type]
-      var s = '<div class="card" style="margin-bottom:var(--sp-3);border-top:3px solid '+meta[1]+'">'
-      s += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
-      s += '<span style="font-size:13px;font-weight:800;color:'+meta[1]+'">'+meta[0]+'</span>'
-      s += '<span style="background:'+meta[1]+';color:#fff;border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700">'+list.length+'</span></div>'
-      s += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-      s += '<thead><tr style="text-align:left;color:var(--mid);border-bottom:2px solid var(--border)">'
-      cols.forEach(function(c){ s += '<th style="padding:7px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap">'+c+'</th>' })
-      s += '</tr></thead><tbody>'
-      list.forEach(function(w, ix){
-        s += '<tr style="border-bottom:1px solid var(--border)'+(ix%2?';background:var(--light)':'')+'">' + rowFn(w) + '</tr>'
-      })
-      s += '</tbody></table></div></div>'
-      return s
-    }
-    function td(v, opts){ opts=opts||{}; return '<td style="padding:8px 10px;'+(opts.bold?'font-weight:700;':'')+(opts.color?'color:'+opts.color+';':'')+'white-space:nowrap">'+v+'</td>' }
-
-    // ── UC table ──
-    h += sectionCard('uc',
-      ['Use Case','GPU','DAU','In/Out tok','SLA','Security','Precision','Agentic'],
-      function(w){
-        return td(w.name||'\u2014',{bold:true})
-          + td(gpuLabel(w.gpu))
-          + td(num(w.dau))
-          + td(tok(w.avgInputTokens)+' / '+tok(w.avgOutputTokens))
-          + td(sla(w.commercialSla))
-          + td(sec(w.securityTier),{color:'var(--teal)'})
-          + td((w.precision||'\u2014').toUpperCase())
-          + td(w.isAgentic?'Yes':'No', {color:w.isAgentic?'var(--orange)':'var(--mid)'})
-      })
-
-    // ── MaaS table ──
-    h += sectionCard('maas',
-      ['Pool','GPU','DAU','Price/Mtok','Provisioned','SLA','Precision'],
-      function(w){
-        return td(w.name||'\u2014',{bold:true})
-          + td(gpuLabel(w.gpu))
-          + td(num(w.dau))
-          + td(w.pricePerMtok!=null?'$'+w.pricePerMtok:'\u2014')
-          + td(w.provisionedGpus!=null?w.provisionedGpus+' GPUs':'On-demand')
-          + td(sla(w.commercialSla))
-          + td((w.precision||'\u2014').toUpperCase())
-      })
-
-    // ── GPUaaS table ──
-    h += sectionCard('gpuaas',
-      ['Block','GPU','GPU count','Rate tier','SLA'],
-      function(w){
-        return td(w.name||'\u2014',{bold:true})
-          + td(gpuLabel(w.gpu))
-          + td((w.gpuCount||0)+' GPUs',{bold:true,color:'var(--blue)'})
-          + td(w.rateTier||'\u2014')
-          + td(sla(w.commercialSla))
-      })
-
-    // ── BMaaS table ──
-    h += sectionCard('bmaas',
-      ['Cluster','GPU','Servers \u00d7 GPUs','Total GPUs','Interconnect','Guest OS','SLA'],
-      function(w){
-        var srv=w.serverCount||0, gps=w.gpusPerServer||8
-        return td(w.name||'\u2014',{bold:true})
-          + td(gpuLabel(w.gpu))
-          + td(srv+' \u00d7 '+gps)
-          + td((srv*gps)+' GPUs',{bold:true,color:'var(--orange)'})
-          + td(w.interconnect||'\u2014')
-          + td(w.guestOs||'\u2014')
-          + td(sla(w.commercialSla))
-      })
-
-    // ── Infra BOM pointer ──
-    h += '<div class="card" style="background:#f0f4ff;border:1px solid var(--blue)">'
-    h += '<div style="font-size:12px;color:var(--dark)"><b>Full infrastructure BOM</b> \u2014 racks (DLC/AC), CPU nodes, storage, network fabric (spine/leaf, L1/L2) and software stack \u2014 is detailed in PRAXIS. '
-    h += '<a href="#" onclick="C.openPraxis();return false" style="color:var(--blue);font-weight:700">Open full BOM &#8594;</a></div></div>'
-
+    // ── Full BOM — pending PRAXIS persistence (honest placeholder) ──
+    h += '<div class="card">'
+    h += '<div class="card-title">Full Bill of Materials</div>'
+    h += '<div style="font-size:12px;color:var(--mid);margin-bottom:16px">PRAXIS computes the complete engineered BOM from the requirements. Once saved, the full breakdown will appear here. Open PRAXIS to view or build it now.</div>'
+    h += '<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">The BOM will detail</div>'
+    h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px">'
+    ;[
+      ['GPU selection & counts','Architecture chosen, per-model quantities'],
+      ['Compute servers','Server type and node counts'],
+      ['Racks','DLC and air-cooled rack counts'],
+      ['Storage','Capacity tiers and sizing'],
+      ['Network fabric','Spine/leaf switches, L1/L2, east-west'],
+      ['Software stack','Products and license counts'],
+      ['Manpower','Total effort (days) across roles']
+    ].forEach(function(t){
+      h += '<div style="background:var(--light);border-left:3px solid var(--orange);border-radius:4px;padding:10px 12px">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--dark)">'+t[0]+'</div>'
+        + '<div style="font-size:11px;color:var(--mid);margin-top:1px">'+t[1]+'</div></div>'
+    })
+    h += '</div>'
+    h += '<button class="btn btn-primary btn-sm" onclick="C.openPraxis()" style="background:var(--orange);border-color:var(--orange)">Open full BOM in PRAXIS &#8594;</button>'
+    h += '</div>'
     return h
   },
 
