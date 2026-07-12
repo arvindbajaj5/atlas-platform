@@ -1083,9 +1083,7 @@ var V = {
         + '</div>'
     })
     h += '</div>'
-    h += '<div style="font-size:11px;color:var(--mid)">'+savedAt
-      + ' · <a href="#" onclick="C.openPraxis();return false" style="color:var(--blue)">Open in PRAXIS &#8594;</a>'
-      + '</div>'
+    h += '<div style="font-size:11px;color:var(--mid)">'+savedAt+'</div>'
     h += '</div>'
 
     // ── ROM Export ────────────────────────────────────────────────────
@@ -1118,10 +1116,9 @@ var V = {
       h += '</div>'
       h += '<div style="margin-top:10px;font-size:11px;color:var(--mid)">Headline ROM from the latest PRAXIS solution version. Full per-workload BOM lives in PRAXIS; full financials in the TSAP Financial Model. Accuracy ±40% at this stage.</div>'
       h += '<div style="margin-top:12px;display:flex;gap:8px">'
-      h += '<button class="btn btn-primary btn-sm" onclick="C.openPraxis()">&#128202; Open full BOM in PRAXIS</button>'
-      h += '<button class="btn btn-outline btn-sm" onclick="C.openFM()">&#128200; Open Financial Model</button>'
-      h += '<button class="btn btn-outline btn-sm" onclick="C.exportRomText()">&#128196; Copy ROM</button>'
+      h += '<button class="btn btn-primary btn-sm" onclick="C.exportRomText()">&#128196; Copy ROM to clipboard</button>'
       h += '</div>'
+      h += '<div style="margin-top:8px;font-size:11px;color:var(--mid)">Full per-workload BOM and financials are built in the Solution tab (PRAXIS / FM). This is the record view.</div>'
     }
     // ── Documents ─────────────────────────────────────────────────────
     h += '<div class="card">'
@@ -1131,7 +1128,6 @@ var V = {
       {icon:'&#9881;', title:'Vision Document', desc:'AI capability vision for this engagement — generated via AI using territory intel + requirements.', btn:'Generate', action:'C.generateVisionDoc()'},
       {icon:'&#128196;', title:'ROM Summary', desc:'Customer-facing one-pager: workloads, GPU counts, power, capex estimate. Ready to share.', btn:'Copy to clipboard', action:'C.exportRomText()'},
       {icon:'&#128221;', title:'BOM Export', desc:'Full internal bill of materials with all line items. For internal pricing and procurement.', btn:'Coming soon', action:'V.toast("BOM export — coming soon","info")'},
-      {icon:'&#128200;', title:'TSAP Financial Model', desc:'Open the territory financial model for this engagement — programme cost, funding sources, revenue model and cash flow.', btn:'Open FM', action:'C.openFM()'},
     ].forEach(function(doc){
       h += '<div style="border:1px solid var(--border);border-radius:var(--r);padding:14px">'
         + '<div style="font-size:20px;margin-bottom:6px">'+doc.icon+'</div>'
