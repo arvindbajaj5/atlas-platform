@@ -1660,7 +1660,71 @@ var C = {
           capex_usd:   totalCapex,
           power_kw:    Math.round(totalPower*10)/10,
           workloads:   wlCount
-        }
+        },
+        infra_bom: (function(){
+          try {
+            var sz = praxisSizing()
+            var svc = (typeof calcServices === 'function') ? calcServices(sz) : null
+            if (!sz || sz.error) return null
+            // Per-model GPU breakdown from det[]
+            var gpuBreakdown = {}
+            ;(sz.det||[]).forEach(function(d){
+              var gid = d.gpu || d.gp
+              var name = (M.gpuMap && M.gpuMap[gid] && M.gpuMap[gid].name) || gid || 'GPU'
+              gpuBreakdown[name] = (gpuBreakdown[name]||0) + (d.gpus||0)
+            })
+            return {
+              // Compute
+              total_gpus:   sz.tGPU || 0,
+              gpu_breakdown: gpuBreakdown,
+              servers:      sz.srvTotal || 0,
+              cpu_count:    sz.cpuCnt || 0,
+              // Facility
+              dlc_racks:    sz.dlcRacks || 0,
+              ac_racks:     sz.acRacks || 0,
+              total_racks:  sz.totalRacks || 0,
+              power_kw:     Math.round((sz.tPow||0)*10)/10,
+              // Storage
+              storage_tb:       sz.stoTB || 0,
+              storage_nvme_tb:  sz.nvmeTB || 0,
+              storage_hdd_tb:   sz.hddTB || 0,
+              storage_obj_tb:   sz.objTB || 0,
+              // Network
+              network_ports:    sz.netPorts || 0,
+              network_switches: Math.ceil((sz.netPorts||0)/64) || 0,
+              // Software (name, category, license type, qty)
+              software: (sz.swDetail||[]).map(function(s){
+                return { name:s.name, category:s.cat, license:s.license, qty:s.qty }
+              }),
+              // Manpower — total days across roles (services layer)
+              manpower: svc ? {
+                total_days:  svc.totalDays || 0,
+                total_weeks: svc.totalWeeks || 0,
+                by_role: {
+                  data_engineer: svc.deDay||0,
+                  ml_engineer:   svc.mlDay||0,
+                  devops:        svc.doDay||0,
+                  pm:            svc.pmDay||0,
+                  qa:            svc.qaDay||0
+                },
+                services_cost_usd: svc.totalServicesCost || 0
+              } : null,
+              // Cost breakdown (component-level, from current prices incl overrides)
+              costs: {
+                gpu:      Math.round(sz.gCost||0),
+                cpu:      Math.round(sz.cpuCost||0),
+                network:  Math.round((sz.netCost||0)+(sz.swCost||0)),
+                storage:  Math.round(sz.stoCost||0),
+                racks:    Math.round(sz.rackCost||0),
+                dram:     Math.round(sz.dramCost||0),
+                chassis:  Math.round(sz.chassisCost||0),
+                software: Math.round(sz.swLicenseCost||0),
+                total:    Math.round(sz.total||0)
+              },
+              computed_at: new Date().toISOString()
+            }
+          } catch(e) { console.warn('[PRAXIS] infra_bom build failed:', e); return null }
+        })()
       }
     }
 
