@@ -651,13 +651,13 @@ var V = {
     // Tab bar — revised structure (no Pipeline/RAC)
     var tabs = [
       { key:'customer',      label:'Customer',           color:'var(--navy)' },
-      { key:'requirements',  label:'Requirements',        color:'var(--blue)' },
+      { key:'requirements',  label:'Requirements',        color:'var(--amber)' },
       { key:'portfolio',     label:'Portfolio',           color:'var(--teal)' },
       { key:'techsolution',  label:'Technical Solution',  color:'var(--orange)' },
       { key:'finsolution',   label:'Financial Solution',  color:'var(--blue)' },
       { key:'outputs',       label:'Outputs',             color:'var(--amber)' },
-      { key:'actions',       label:'Actions',             color:'var(--navy)' },
-      { key:'history',       label:'History',             color:'var(--navy)' },
+      { key:'actions',       label:'Actions',             color:'var(--teal)' },
+      { key:'history',       label:'History',             color:'var(--orange)' },
     ]
     html += '<div class="tabbar">'
     tabs.forEach(function(t) {
@@ -980,29 +980,28 @@ var V = {
   // ── TAB 4: SOLUTION (agent UX) ────────────────────────────────────────
   renderTechSolutionTab: function() {
     var eng = M.currentEng
-    if (!eng) return '<div class="card"><div class="warn-panel"><div class="warn-body">Open an engagement to build its technical solution.</div></div></div>'
+    if (!eng) return '<div class="card"><div class="warn-panel"><div class="warn-body">Open an engagement to view its technical solution.</div></div></div>'
 
     var km = M.solutionKeyMetrics
+    var wc = M.workloadConfigs || {}
     var h = '<div class="card" style="margin-bottom:var(--sp-4)">'
     h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">'
     h += '<div><div class="card-title" style="margin:0">Technical Solution</div>'
-    h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">Sizing, architecture and BOM — built and versioned in PRAXIS.</div></div>'
-    h += '<button class="btn btn-primary" onclick="C.openPraxis()" style="white-space:nowrap">&#128296; Open in PRAXIS &#8594;</button>'
+    h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">Solution architecture and sizing \u2014 built and versioned in PRAXIS.</div></div>'
+    h += '<button class="btn btn-primary" onclick="C.openPraxis()" style="white-space:nowrap;background:var(--orange);border-color:var(--orange)">&#128296; Open in PRAXIS &#8594;</button>'
     h += '</div></div>'
 
     if (!km) {
-      h += '<div class="card"><div class="warn-panel"><div class="warn-body">No technical solution yet. Click <b>Open in PRAXIS</b> to size this engagement — your saved version will then summarise here.</div></div></div>'
+      h += '<div class="card"><div class="warn-panel"><div class="warn-body">No technical solution yet. Click <b>Open in PRAXIS</b> to size this engagement \u2014 the saved version will then summarise here.</div></div></div>'
       return h
     }
 
-    // Version summary card
+    // ── Headline metrics ──
     h += '<div class="card">'
-    h += '<div class="card-title">Current Version</div>'
-    h += '<div style="font-size:12px;color:var(--mid);margin-bottom:12px">Solution v' + (M.solutionVersionNumber||1)
-      + (M.solutionVersionLabel ? ' \u2014 ' + M.solutionVersionLabel : '')
-      + (M.solutionUpdatedAt ? ' \u00b7 updated ' + new Date(M.solutionUpdatedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '')
+    h += '<div class="card-title">Solution Summary \u2014 v' + (M.solutionVersionNumber||1)
+      + (M.solutionUpdatedAt ? ' <span style="font-weight:400;font-size:11px;color:var(--mid)">(updated ' + new Date(M.solutionUpdatedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) + ')</span>' : '')
       + '</div>'
-    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">'
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">'
     ;[
       ['Workloads', km.workloads||0],
       ['Total GPUs', km.total_gpus||0],
@@ -1010,47 +1009,108 @@ var V = {
       ['Capex est.', '$'+((km.capex_usd||0)/1e6).toFixed(1)+'M']
     ].forEach(function(kpi){
       h += '<div style="background:var(--light);border-radius:var(--r);padding:14px;text-align:center">'
-        + '<div style="font-size:22px;font-weight:900;color:var(--orange)">'+kpi[1]+'</div>'
+        + '<div style="font-size:24px;font-weight:900;color:var(--orange)">'+kpi[1]+'</div>'
         + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+kpi[0]+'</div></div>'
     })
     h += '</div>'
-    h += '<div style="margin-top:12px"><button class="btn btn-outline btn-sm" onclick="C.openPraxis()">Edit / re-size in PRAXIS &#8594;</button></div>'
+
+    // ── Workload mix (read-only from saved config) ──
+    var types = [['uc','Use Cases','var(--navy)'],['maas','MaaS Pools','var(--teal)'],['gpuaas','GPUaaS Blocks','var(--blue)'],['bmaas','BMaaS Clusters','var(--orange)']]
+    var anyWl = types.some(function(t){ return (wc[t[0]]||[]).length })
+    if (anyWl) {
+      h += '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">Workload Mix</div>'
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'
+      types.forEach(function(t){
+        var n = (wc[t[0]]||[]).length
+        if (n) h += '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--light);border-left:3px solid '+t[2]+';border-radius:4px;padding:6px 12px;font-size:12px">'
+          + '<b style="color:'+t[2]+'">'+n+'</b> '+t[1]+'</span>'
+      })
+      h += '</div>'
+
+      // ── GPU types + models used (distinct, from config) ──
+      var gpus = {}, models = {}, secTiers = {}
+      ;['uc','maas','gpuaas','bmaas'].forEach(function(tp){
+        (wc[tp]||[]).forEach(function(w){
+          if (w.gpu) gpus[w.gpu] = (gpus[w.gpu]||0)+1
+          if (w.model) models[w.model] = (models[w.model]||0)+1
+          if (w.securityTier) secTiers[w.securityTier] = (secTiers[w.securityTier]||0)+1
+        })
+      })
+      function chips(obj, color){
+        return Object.keys(obj).map(function(k){
+          return '<span style="background:var(--light);border-radius:4px;padding:4px 10px;font-size:11px;color:'+color+'">'+k+' <span style="color:var(--mid)">\u00d7'+obj[k]+'</span></span>'
+        }).join(' ')
+      }
+      if (Object.keys(gpus).length) {
+        h += '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">GPU Selection</div>'
+        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">' + chips(gpus,'var(--orange)') + '</div>'
+      }
+      if (Object.keys(models).length) {
+        h += '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">Models Deployed</div>'
+        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">' + chips(models,'var(--blue)') + '</div>'
+      }
+      if (Object.keys(secTiers).length) {
+        h += '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">Security Tiers</div>'
+        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">' + chips(secTiers,'var(--teal)') + '</div>'
+      }
+    }
+
+    // ── Pointer to full BOM ──
+    h += '<div class="warn-panel" style="background:#f0f4ff;border-color:var(--blue)"><div class="warn-body" style="font-size:12px">'
+    h += '<b>Full infrastructure BOM</b> \u2014 racks (DLC/AC), CPU nodes, storage, network fabric (spine/leaf, L1/L2), and software stack \u2014 are detailed in PRAXIS. '
+    h += '<a href="#" onclick="C.openPraxis();return false" style="color:var(--blue);font-weight:600">Open full BOM in PRAXIS &#8594;</a>'
+    h += '</div></div>'
     h += '</div>'
     return h
   },
 
   renderFinSolutionTab: function() {
     var eng = M.currentEng
-    if (!eng) return '<div class="card"><div class="warn-panel"><div class="warn-body">Open an engagement to build its financial solution.</div></div></div>'
+    if (!eng) return '<div class="card"><div class="warn-panel"><div class="warn-body">Open an engagement to view its financial solution.</div></div></div>'
 
     var h = '<div class="card" style="margin-bottom:var(--sp-4)">'
     h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">'
     h += '<div><div class="card-title" style="margin:0">Financial Solution</div>'
-    h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">Programme cost, funding, revenue and cash flow \u2014 modelled in the TSAP Financial Model.</div></div>'
-    h += '<button class="btn btn-primary" onclick="C.openFM()" style="white-space:nowrap;background:var(--teal);border-color:var(--teal)">&#128200; Open in FM &#8594;</button>'
+    h += '<div style="font-size:12px;color:var(--mid);margin-top:2px">Programme cost, funding, revenue and returns \u2014 modelled in the TSAP Financial Model.</div></div>'
+    h += '<button class="btn btn-primary" onclick="C.openFM()" style="white-space:nowrap;background:var(--blue);border-color:var(--blue)">&#128200; Open in FM &#8594;</button>'
     h += '</div></div>'
 
-    // FM reads the same solution_version; show what will feed it
-    var km = M.solutionKeyMetrics
-    h += '<div class="card">'
-    h += '<div class="card-title">Model Inputs (from Technical Solution)</div>'
-    if (!km) {
-      h += '<div class="warn-panel"><div class="warn-body">The financial model is driven by the technical solution. Size the engagement in PRAXIS first (Technical Solution tab), then open FM to model the economics.</div></div>'
-    } else {
-      h += '<div style="font-size:12px;color:var(--mid);margin-bottom:12px">FM will size capex/opex/revenue from these figures plus territory cost data.</div>'
-      h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'
-      ;[
-        ['Total GPUs', km.total_gpus||0],
-        ['Total Power', (Math.round((km.power_kw||0)*10)/10)+' kW'],
-        ['Capex basis', '$'+((km.capex_usd||0)/1e6).toFixed(1)+'M']
-      ].forEach(function(kpi){
-        h += '<div style="background:var(--light);border-radius:var(--r);padding:14px;text-align:center">'
-          + '<div style="font-size:22px;font-weight:900;color:var(--teal)">'+kpi[1]+'</div>'
-          + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+kpi[0]+'</div></div>'
-      })
+    // Read-only: latest saved FM scenario for this engagement
+    var fs = M.finScenario
+    if (!fs) {
+      var km = M.solutionKeyMetrics
+      h += '<div class="card"><div class="card-title">Not yet modelled</div>'
+      if (km) {
+        h += '<div style="font-size:12px;color:var(--mid);margin-bottom:10px">A technical solution exists (' + (km.total_gpus||0) + ' GPUs, $' + ((km.capex_usd||0)/1e6).toFixed(1) + 'M capex basis). Open FM to build the financial model \u2014 it will size capex/opex/revenue from the technical solution plus territory cost data.</div>'
+      } else {
+        h += '<div class="warn-panel"><div class="warn-body">Size the engagement in PRAXIS first, then model its economics in FM.</div></div>'
+      }
+      h += '<button class="btn btn-outline btn-sm" onclick="C.openFM()">Open Financial Model &#8594;</button>'
       h += '</div>'
-      h += '<div style="margin-top:12px"><button class="btn btn-outline btn-sm" onclick="C.openFM()">Open financial model &#8594;</button></div>'
+      return h
     }
+
+    // Show saved scenario headline
+    var r = fs.results_json || {}
+    var gap = r.gap || {}, cf = r.cf || {}, rev = r.rev || {}
+    function cr(v){ return v!=null ? 'Rs ' + Math.round(v).toLocaleString('en-IN') + ' Cr' : '\u2014' }
+    h += '<div class="card">'
+    h += '<div class="card-title">Financial Summary \u2014 ' + (fs.label||fs.name||'Scenario')
+      + (fs.updated_at ? ' <span style="font-weight:400;font-size:11px;color:var(--mid)">(updated ' + new Date(fs.updated_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) + ')</span>' : '')
+      + '</div>'
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">'
+    ;[
+      ['Total Demand', gap.demand!=null ? cr(gap.demand) : '\u2014'],
+      ['Funding Coverage', gap.coverage_pct!=null ? Math.round(gap.coverage_pct)+'%' : '\u2014'],
+      ['IRR', cf.irr!=null ? cf.irr+'%' : '\u2014'],
+      ['5yr Revenue', rev.totalRev!=null ? cr(rev.totalRev) : '\u2014']
+    ].forEach(function(kpi){
+      h += '<div style="background:var(--light);border-radius:var(--r);padding:14px;text-align:center">'
+        + '<div style="font-size:22px;font-weight:900;color:var(--blue)">'+kpi[1]+'</div>'
+        + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+kpi[0]+'</div></div>'
+    })
+    h += '</div>'
+    h += '<div style="margin-top:12px"><button class="btn btn-outline btn-sm" onclick="C.openFM()">Open full model in FM &#8594;</button></div>'
     h += '</div>'
     return h
   },
@@ -2903,6 +2963,7 @@ var C = {
     M.solutionVersionNumber = null
     M.solutionVersionLabel = null
     M.solutionUpdatedAt = null
+    M.finScenario = null
 
     if (atlasDB.isConfigured()) {
       try {
@@ -2932,6 +2993,12 @@ var C = {
         var dummySeed2 = DUMMY.workloadConfigs && DUMMY.workloadConfigs[eng.id]
         if (dummySeed2) M.workloadConfigs = dummySeed2
       }
+      // Load latest FM scenario (read-only) for the Financial Solution tab
+      M.finScenario = null
+      try {
+        var scs = await atlasDB.get('tsap_scenarios', 'engagement_id=eq.' + eng.id + '&order=updated_at.desc&limit=1')
+        M.finScenario = (scs && scs.length) ? scs[0] : null
+      } catch(e2) { M.finScenario = null }
     } else {
       var dummySeed3 = DUMMY.workloadConfigs && DUMMY.workloadConfigs[eng.id]
       if (dummySeed3) M.workloadConfigs = dummySeed3
