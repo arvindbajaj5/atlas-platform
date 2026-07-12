@@ -983,8 +983,8 @@ var V = {
     if (!eng) return '<div class="card"><div class="warn-panel"><div class="warn-body">Open an engagement to view its technical solution.</div></div></div>'
 
     var km = M.solutionKeyMetrics
+    var bom = M.solutionInfraBom
 
-    // ── Header with launch ──
     var h = '<div class="card" style="margin-bottom:var(--sp-4)">'
     h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">'
     h += '<div><div class="card-title" style="margin:0">Technical Solution</div>'
@@ -997,7 +997,7 @@ var V = {
       return h
     }
 
-    // ── Headline band (what IS persisted today) ──
+    // ── Headline band ──
     h += '<div class="card" style="background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff;margin-bottom:var(--sp-4)">'
     h += '<div style="font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;opacity:.75">Solution v' + (M.solutionVersionNumber||1)
       + (M.solutionUpdatedAt ? ' \u00b7 ' + new Date(M.solutionUpdatedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '') + '</div>'
@@ -1006,35 +1006,118 @@ var V = {
       [km.total_gpus||0, 'Total GPUs'],
       [(Math.round((km.power_kw||0)*10)/10), 'Power (kW)'],
       ['$'+((km.capex_usd||0)/1e6).toFixed(2)+'M', 'Capex estimate'],
-      [km.workloads||0, 'Workloads sized']
+      [km.workloads||0, 'Workloads']
     ].forEach(function(kpi){
       h += '<div><div style="font-size:30px;font-weight:900;line-height:1">'+kpi[0]+'</div>'
         + '<div style="font-size:11px;opacity:.8;margin-top:4px">'+kpi[1]+'</div></div>'
     })
     h += '</div></div>'
 
-    // ── Full BOM — pending PRAXIS persistence (honest placeholder) ──
-    h += '<div class="card">'
-    h += '<div class="card-title">Full Bill of Materials</div>'
-    h += '<div style="font-size:12px;color:var(--mid);margin-bottom:16px">PRAXIS computes the complete engineered BOM from the requirements. Once saved, the full breakdown will appear here. Open PRAXIS to view or build it now.</div>'
-    h += '<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">The BOM will detail</div>'
-    h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px">'
-    ;[
-      ['GPU selection & counts','Architecture chosen, per-model quantities'],
-      ['Compute servers','Server type and node counts'],
-      ['Racks','DLC and air-cooled rack counts'],
-      ['Storage','Capacity tiers and sizing'],
-      ['Network fabric','Spine/leaf switches, L1/L2, east-west'],
-      ['Software stack','Products and license counts'],
-      ['Manpower','Total effort (days) across roles']
-    ].forEach(function(t){
-      h += '<div style="background:var(--light);border-left:3px solid var(--orange);border-radius:4px;padding:10px 12px">'
-        + '<div style="font-size:12px;font-weight:700;color:var(--dark)">'+t[0]+'</div>'
-        + '<div style="font-size:11px;color:var(--mid);margin-top:1px">'+t[1]+'</div></div>'
-    })
-    h += '</div>'
-    h += '<button class="btn btn-primary btn-sm" onclick="C.openPraxis()" style="background:var(--orange);border-color:var(--orange)">Open full BOM in PRAXIS &#8594;</button>'
-    h += '</div>'
+    // ── No infra_bom yet (older version saved before BOM persistence) ──
+    if (!bom) {
+      h += '<div class="card"><div class="warn-panel"><div class="warn-body">This solution version predates full BOM capture. Re-save it in PRAXIS to generate the complete bill of materials (racks, storage, network, software, manpower).</div></div></div>'
+      return h
+    }
+
+    // ── Helper: a spec row group ──
+    function specCard(title, color, rows){
+      var s = '<div class="card" style="margin-bottom:var(--sp-3);border-top:3px solid '+color+'">'
+      s += '<div style="font-size:13px;font-weight:800;color:'+color+';margin-bottom:10px">'+title+'</div>'
+      s += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">'
+      rows.forEach(function(r){
+        if (r[1]==null || r[1]==='' ) return
+        s += '<div style="background:var(--light);border-radius:6px;padding:10px 12px">'
+          + '<div style="font-size:18px;font-weight:800;color:var(--dark)">'+r[1]+'</div>'
+          + '<div style="font-size:10px;color:var(--mid);margin-top:1px">'+r[0]+'</div></div>'
+      })
+      s += '</div></div>'
+      return s
+    }
+    function n(v){ return v!=null ? Number(v).toLocaleString('en-IN') : '\u2014' }
+
+    // ── Compute ──
+    var gpuRows = [['Total GPUs', n(bom.total_gpus)], ['Compute servers', n(bom.servers)], ['CPU nodes', n(bom.cpu_count)]]
+    // add per-model GPU breakdown
+    if (bom.gpu_breakdown) Object.keys(bom.gpu_breakdown).forEach(function(k){ gpuRows.push([k, n(bom.gpu_breakdown[k])+' GPUs']) })
+    h += specCard('Compute', 'var(--orange)', gpuRows)
+
+    // ── Facility ──
+    h += specCard('Facility', 'var(--navy)', [
+      ['DLC racks', n(bom.dlc_racks)],
+      ['Air-cooled racks', n(bom.ac_racks)],
+      ['Total racks', n(bom.total_racks)],
+      ['Connected load', (Math.round((bom.power_kw||0)*10)/10)+' kW']
+    ])
+
+    // ── Storage ──
+    h += specCard('Storage', 'var(--teal)', [
+      ['Total capacity', n(bom.storage_tb)+' TB'],
+      ['NVMe tier', bom.storage_nvme_tb?n(bom.storage_nvme_tb)+' TB':null],
+      ['HDD tier', bom.storage_hdd_tb?n(bom.storage_hdd_tb)+' TB':null],
+      ['Object tier', bom.storage_obj_tb?n(bom.storage_obj_tb)+' TB':null]
+    ])
+
+    // ── Network ──
+    h += specCard('Network Fabric', 'var(--blue)', [
+      ['Switches', n(bom.network_switches)],
+      ['Ports', n(bom.network_ports)]
+    ])
+
+    // ── Software ──
+    if (bom.software && bom.software.length) {
+      var sw = '<div class="card" style="margin-bottom:var(--sp-3);border-top:3px solid var(--amber)">'
+      sw += '<div style="font-size:13px;font-weight:800;color:var(--amber);margin-bottom:10px">Software Stack &amp; Licenses</div>'
+      sw += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      sw += '<thead><tr style="text-align:left;color:var(--mid);border-bottom:2px solid var(--border)">'
+      sw += '<th style="padding:7px 10px;font-size:11px;text-transform:uppercase">Product</th>'
+      sw += '<th style="padding:7px 10px;font-size:11px;text-transform:uppercase">Category</th>'
+      sw += '<th style="padding:7px 10px;font-size:11px;text-transform:uppercase">Licensing</th>'
+      sw += '<th style="padding:7px 10px;font-size:11px;text-transform:uppercase;text-align:right">Qty</th></tr></thead><tbody>'
+      bom.software.forEach(function(s,ix){
+        sw += '<tr style="border-bottom:1px solid var(--border)'+(ix%2?';background:var(--light)':'')+'">'
+          + '<td style="padding:8px 10px;font-weight:700">'+(s.name||'\u2014')+'</td>'
+          + '<td style="padding:8px 10px">'+(s.category||'\u2014')+'</td>'
+          + '<td style="padding:8px 10px">'+((s.license||'').replace(/_/g,' ')||'\u2014')+'</td>'
+          + '<td style="padding:8px 10px;text-align:right;font-weight:700">'+n(s.qty)+'</td></tr>'
+      })
+      sw += '</tbody></table></div></div>'
+      h += sw
+    }
+
+    // ── Manpower ──
+    if (bom.manpower && bom.manpower.total_days) {
+      var mp = bom.manpower
+      var mpRows = [['Total effort', n(mp.total_days)+' days']]
+      if (mp.total_weeks) mpRows.push(['Timeline', n(mp.total_weeks)+' weeks'])
+      if (mp.by_role){
+        var rl = mp.by_role
+        if (rl.data_engineer) mpRows.push(['Data Engineering', n(rl.data_engineer)+'d'])
+        if (rl.ml_engineer)   mpRows.push(['ML Engineering', n(rl.ml_engineer)+'d'])
+        if (rl.devops)        mpRows.push(['DevOps', n(rl.devops)+'d'])
+        if (rl.pm)            mpRows.push(['Project Mgmt', n(rl.pm)+'d'])
+        if (rl.qa)            mpRows.push(['QA', n(rl.qa)+'d'])
+      }
+      h += specCard('Services Manpower', 'var(--teal)', mpRows)
+    }
+
+    // ── Cost breakdown ──
+    if (bom.costs) {
+      var c = bom.costs
+      var costCard = '<div class="card" style="border-top:3px solid var(--navy)">'
+      costCard += '<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">Capex Breakdown</div>'
+      costCard += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">'
+      ;[['GPU',c.gpu],['CPU',c.cpu],['Network',c.network],['Storage',c.storage],['Racks',c.racks],['DRAM',c.dram],['Chassis',c.chassis],['Software',c.software]].forEach(function(r){
+        if (!r[1]) return
+        costCard += '<div style="background:var(--light);border-radius:6px;padding:10px 12px">'
+          + '<div style="font-size:16px;font-weight:800;color:var(--dark)">$'+(r[1]/1e6).toFixed(2)+'M</div>'
+          + '<div style="font-size:10px;color:var(--mid)">'+r[0]+'</div></div>'
+      })
+      costCard += '</div>'
+      if (c.total) costCard += '<div style="margin-top:12px;padding-top:12px;border-top:2px solid var(--border);font-size:15px;font-weight:800;color:var(--navy)">Total: $'+(c.total/1e6).toFixed(2)+'M</div>'
+      costCard += '</div>'
+      h += costCard
+    }
+
     return h
   },
 
@@ -2950,6 +3033,7 @@ var C = {
     M.workloadConfigs = { uc: [], maas: [], gpuaas: [], bmaas: [] }
     M.currentSolutionVersionId = null
     M.solutionKeyMetrics = null
+    M.solutionInfraBom = null
     M.solutionVersionNumber = null
     M.solutionVersionLabel = null
     M.solutionUpdatedAt = null
@@ -2967,6 +3051,7 @@ var C = {
           }
           // Capture PRAXIS-persisted key metrics (single source of truth for Outputs)
           M.solutionKeyMetrics = (sv.bom_snapshot && sv.bom_snapshot.key_metrics) || null
+          M.solutionInfraBom = (sv.bom_snapshot && sv.bom_snapshot.infra_bom) || null
           M.solutionVersionNumber = sv.version_number || null
           M.solutionVersionLabel = sv.version_label || null
           M.solutionUpdatedAt = sv.updated_at || sv.created_at || null
