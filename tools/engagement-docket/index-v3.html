@@ -1046,21 +1046,17 @@ var V = {
       return h
     }
 
-    // Summary KPIs from sizing
-    var totalGpus=0, totalPowerKw=0, totalCapexEst=0
-    ;(M.workloadConfigs.uc||[]).concat(M.workloadConfigs.maas||[]).forEach(function(wl){
-      var type = (M.workloadConfigs.maas||[]).indexOf(wl)>=0?'maas':'uc'
-      var sz = AtlasSolution.sizeWorkload(wl,type,M)
-      totalGpus += sz.total||0; totalPowerKw += sz.powerKw||0
-      totalCapexEst += (sz.total||0)*30000
-    })
-    ;(M.workloadConfigs.gpuaas||[]).forEach(function(wl){ totalGpus+=wl.gpuCount||0 })
-    ;(M.workloadConfigs.bmaas||[]).forEach(function(wl){
-      var g=M.gpuMap&&M.gpuMap[wl.gpu]
-      totalGpus+=wl.serverCount*(wl.gpusPerServer||(g&&g.gpus_in_unit)||8)
-    })
+    // Summary KPIs — read PRAXIS-persisted metrics (single source of truth).
+    // The Docket no longer sizes; PRAXIS computes and persists to solution_versions.
+    var km = M.solutionKeyMetrics || {}
+    var totalGpus    = km.total_gpus || 0
+    var totalPowerKw = km.power_kw   || 0
+    var totalCapexEst= km.capex_usd  || 0
+    var wlCount      = km.workloads  || wls.length
 
-    var savedAt = M.currentSolutionVersionId ? 'Auto-saved' : 'Not yet saved'
+    var savedAt = M.currentSolutionVersionId
+      ? ('Solution v' + (M.solutionVersionNumber||1) + (M.solutionVersionLabel?' — '+M.solutionVersionLabel:'') + ' (from PRAXIS)')
+      : 'No solution version yet — size this engagement in PRAXIS'
     var portfolio = (M.docketItems||[]).filter(function(i){
       return i.item_type==='solution' && i.item_subtype==='portfolio_selection'
     })
@@ -1075,9 +1071,9 @@ var V = {
 
     h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px">'
     ;[
-      ['Workloads', wls.length, ''],
+      ['Workloads', wlCount, ''],
       ['Portfolio items', portCount, ''],
-      ['Total GPUs sized', totalGpus, ''],
+      ['Total GPUs', totalGpus, ''],
       ['Total power', Math.round(totalPowerKw*10)/10+'kW', ''],
       ['Capex est.', '$'+(totalCapexEst/1e6).toFixed(1)+'M', '']
     ].forEach(function(kpi){
@@ -1088,7 +1084,7 @@ var V = {
     })
     h += '</div>'
     h += '<div style="font-size:11px;color:var(--mid)">'+savedAt
-      + (M.currentSolutionVersionId ? ' · <a href="#" onclick="C.saveSolution(true);return false" style="color:var(--blue)">Save now</a>' : '')
+      + ' · <a href="#" onclick="C.openPraxis();return false" style="color:var(--blue)">Open in PRAXIS &#8594;</a>'
       + '</div>'
     h += '</div>'
 
@@ -1097,91 +1093,36 @@ var V = {
     h += '<div class="card-title">ROM — Rough Order of Magnitude</div>'
     h += '<p style="font-size:12px;color:var(--mid);margin-bottom:12px">Customer-facing cost summary. Based on current sizing + standard rate card. Excludes SI fees (add separately). Use for initial budget discussions — ±40% accuracy at this stage.</p>'
 
-    if (!hasWl) {
-      h += '<div class="warn-panel"><div class="warn-body">Add workloads in the UC / MaaS / GPUaaS / BMaaS tabs to generate a ROM.</div></div>'
+    if (!M.solutionKeyMetrics) {
+      h += '<div class="warn-panel"><div class="warn-body">No solution version yet. Size this engagement in PRAXIS, then return here for the ROM summary.</div></div>'
     } else {
-      // Build ROM table
-      var rows = []
-      ;(M.workloadConfigs.uc||[]).forEach(function(wl){
-        try {
-        var sz = AtlasSolution.sizeWorkload(wl,'uc',M)
-        if (!sz||sz.error) return
-        var gpuConf = M.gpuMap&&M.gpuMap[sz.gpu||M.defaultGpu]
-        var gpuName = (gpuConf&&gpuConf.name)||'GPU'
-        var capex = (sz.total||0)*30000
-        rows.push({name:wl.name, type:'UC', gpus:sz.total||0, gpu:gpuName,
-          powerKw:sz.powerKw||0, capex:capex, monthly:0, note:'On-prem UC'})
-        } catch(e) {}
-      })
-      ;(M.workloadConfigs.maas||[]).forEach(function(wl){
-        try {
-        var sz = AtlasSolution.sizeWorkload(wl,'maas',M)
-        if (!sz||sz.error) return
-        var gpuConf = M.gpuMap&&M.gpuMap[sz.gpu||M.defaultGpu]
-        var gpuName = (gpuConf&&gpuConf.name)||'GPU'
-        var capex = (sz.total||0)*30000
-        var monthly = (sz.total||0)*8000*0.70*3600*730/1e6*(wl.pricePerMtok||0.75)
-        rows.push({name:wl.name, type:'MaaS', gpus:sz.total||0, gpu:gpuName,
-          powerKw:sz.powerKw||0, capex:capex, monthly:Math.round(monthly), note:'MaaS API'})
-        } catch(e) {}
-      })
-      ;(M.workloadConfigs.gpuaas||[]).forEach(function(wl){
-        var gpuConf = M.gpuMap&&M.gpuMap[wl.gpu]
-        var gpuName = (gpuConf&&gpuConf.name)||'GPU'
-        var capex = (wl.gpuCount||0)*30000
-        var monthly = (wl.gpuCount||0)*3.5*730
-        rows.push({name:wl.name, type:'GPUaaS', gpus:wl.gpuCount||0, gpu:gpuName,
-          powerKw:Math.round((wl.gpuCount||0)*0.7*10)/10, capex:capex,
-          monthly:Math.round(monthly), note:'GPU/hr × 730hrs'})
-      })
-      ;(M.workloadConfigs.bmaas||[]).forEach(function(wl){
-        var g=M.gpuMap&&M.gpuMap[wl.gpu]
-        var gpuName=(g&&g.name)||'GPU'
-        var gpus=wl.serverCount*(wl.gpusPerServer||(g&&g.gpus_in_unit)||8)
-        var capex=gpus*30000
-        var monthly=wl.serverCount*35000
-        rows.push({name:wl.name,type:'BMaaS',gpus:gpus,gpu:gpuName,
-          powerKw:Math.round(wl.serverCount*(g&&g.tdp_kw||5.6)*10)/10,
-          capex:capex,monthly:Math.round(monthly),note:'$/server/mo'})
-      })
+      var km2 = M.solutionKeyMetrics
+      var gGpus = km2.total_gpus || 0
+      var gPow  = km2.power_kw   || 0
+      var gCapex= km2.capex_usd  || 0
+      // Rough monthly opex proxy (power-based) — headline only, full model in FM
+      var gMonthly = Math.round(gPow * 24 * 30 * 7.5 / 83)  // kW × hrs × Rs7.5/kWh → ~USD
 
-      var totalCapex=0, totalMonthly=0, totalGpusRom=0
-      rows.forEach(function(r){totalCapex+=r.capex;totalMonthly+=r.monthly;totalGpusRom+=r.gpus})
-
-      h += '<table class="tbl"><thead><tr>'
-        + '<th>Workload</th><th>Type</th><th>GPU</th><th class="num">GPUs</th>'
-        + '<th class="num">Power</th><th class="num">Capex est.</th>'
-        + '<th class="num">Monthly est.</th><th>Basis</th></tr></thead><tbody>'
-      rows.forEach(function(r){
-        h += '<tr>'
-          + '<td style="font-weight:600">'+r.name+'</td>'
-          + '<td><span style="font-size:10px;font-weight:700;background:var(--light);padding:1px 6px;border-radius:10px">'+r.type+'</span></td>'
-          + '<td style="font-size:11px">'+r.gpu+'</td>'
-          + '<td class="num">'+r.gpus+'</td>'
-          + '<td class="num">'+r.powerKw+'kW</td>'
-          + '<td class="num">$'+(r.capex/1000).toFixed(0)+'K</td>'
-          + '<td class="num">'+(r.monthly?'$'+r.monthly.toLocaleString():'—')+'</td>'
-          + '<td style="font-size:10px;color:var(--mid)">'+r.note+'</td>'
-          + '</tr>'
+      h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">'
+      ;[
+        ['Total GPUs', gGpus],
+        ['Total Power', Math.round(gPow*10)/10 + ' kW'],
+        ['Capex est.', '$' + (gCapex/1e6).toFixed(1) + 'M'],
+        ['Indicative opex', '~$' + gMonthly.toLocaleString() + '/mo']
+      ].forEach(function(kpi){
+        h += '<div style="background:var(--light);border-radius:var(--r);padding:14px;text-align:center">'
+          + '<div style="font-size:22px;font-weight:900;color:var(--navy)">'+kpi[1]+'</div>'
+          + '<div style="font-size:10px;color:var(--mid);margin-top:2px">'+kpi[0]+'</div>'
+          + '</div>'
       })
-      h += '<tr style="font-weight:700;background:var(--light)">'
-        + '<td>TOTAL</td><td></td><td></td>'
-        + '<td class="num">'+totalGpusRom+'</td>'
-        + '<td class="num">'+Math.round(totalPowerKw*10)/10+'kW</td>'
-        + '<td class="num">$'+(totalCapex/1e6).toFixed(1)+'M</td>'
-        + '<td class="num">$'+totalMonthly.toLocaleString()+'/mo</td>'
-        + '<td></td></tr>'
-      h += '</tbody></table>'
-      h += '<div style="margin-top:8px;font-size:11px;color:var(--mid)">Estimates: $30k/GPU capex, $3.50/GPU/hr GPUaaS reserved, $35k/server/mo BMaaS, 70% MaaS utilisation at pricing rate. Accuracy ±40%.</div>'
-
-      // Export button
+      h += '</div>'
+      h += '<div style="margin-top:10px;font-size:11px;color:var(--mid)">Headline ROM from the latest PRAXIS solution version. Full per-workload BOM lives in PRAXIS; full financials in the TSAP Financial Model. Accuracy ±40% at this stage.</div>'
       h += '<div style="margin-top:12px;display:flex;gap:8px">'
-      h += '<button class="btn btn-primary btn-sm" onclick="C.exportRomText()">&#128196; Copy ROM to clipboard</button>'
-      h += '<button class="btn btn-outline btn-sm" onclick="C.generateVisionDoc()">&#9881; Generate Vision Document</button>'
+      h += '<button class="btn btn-primary btn-sm" onclick="C.openPraxis()">&#128202; Open full BOM in PRAXIS</button>'
+      h += '<button class="btn btn-outline btn-sm" onclick="C.openFM()">&#128200; Open Financial Model</button>'
+      h += '<button class="btn btn-outline btn-sm" onclick="C.exportRomText()">&#128196; Copy ROM</button>'
       h += '</div>'
     }
-    h += '</div>'
-
     // ── Documents ─────────────────────────────────────────────────────
     h += '<div class="card">'
     h += '<div class="card-title">Documents</div>'
@@ -2907,6 +2848,10 @@ var C = {
     M.tenantsList = Object.assign({}, AtlasSolution.defaultTenants)
     M.workloadConfigs = { uc: [], maas: [], gpuaas: [], bmaas: [] }
     M.currentSolutionVersionId = null
+    M.solutionKeyMetrics = null
+    M.solutionVersionNumber = null
+    M.solutionVersionLabel = null
+    M.solutionUpdatedAt = null
 
     if (atlasDB.isConfigured()) {
       try {
@@ -2918,6 +2863,11 @@ var C = {
           if (sv.bom_snapshot && sv.bom_snapshot.workload_configs) {
             M.workloadConfigs = sv.bom_snapshot.workload_configs
           }
+          // Capture PRAXIS-persisted key metrics (single source of truth for Outputs)
+          M.solutionKeyMetrics = (sv.bom_snapshot && sv.bom_snapshot.key_metrics) || null
+          M.solutionVersionNumber = sv.version_number || null
+          M.solutionVersionLabel = sv.version_label || null
+          M.solutionUpdatedAt = sv.updated_at || sv.created_at || null
           if (sv.assumptions && sv.assumptions.tenants) {
             M.tenantsList = Object.assign({}, AtlasSolution.defaultTenants, sv.assumptions.tenants)
           }
@@ -3337,6 +3287,14 @@ var C = {
     // WHEN C WIRED: await atlasExport.generateVisionDoc(M.currentEng.id)
   },
 
+  openPraxis: function() {
+    var eng = M.currentEng
+    if (!eng) { V.toast('Open an engagement first','warning'); return }
+    var url = '../praxis/index.html'
+    if (eng.id) url += '?eng=' + eng.id
+    window.open(url, '_blank')
+  },
+
   openFM: function() {
     var eng = M.currentEng
     var url = '../tsap-financial-model/index.html'
@@ -3347,65 +3305,32 @@ var C = {
   exportRomText: function() {
     var eng = M.currentEng
     if (!eng) { V.toast('Open an engagement first','warning'); return }
+    var km = M.solutionKeyMetrics
+    if (!km) { V.toast('No solution version yet — size in PRAXIS first','warning'); return }
+    var gPow = km.power_kw || 0
+    var gMonthly = Math.round(gPow * 24 * 30 * 7.5 / 83)
     var lines = []
     lines.push('ROM — ROUGH ORDER OF MAGNITUDE')
     lines.push('Engagement: ' + eng.name)
     lines.push('Date: ' + new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}))
-    lines.push('Accuracy: ±40% at this stage')
+    lines.push('Source: PRAXIS solution v' + (M.solutionVersionNumber||1))
+    lines.push('Accuracy: \u00b140% at this stage')
     lines.push('')
-    lines.push('WORKLOAD SUMMARY')
-    lines.push('─'.repeat(60))
-    var totalGpus=0, totalCapex=0, totalMonthly=0
-    var addWl = function(wl, type) {
-      var sz = type==='gpuaas'
-        ? {total:wl.gpuCount||0, powerKw:Math.round((wl.gpuCount||0)*0.7*10)/10}
-        : AtlasSolution.sizeWorkload(wl, type, M)
-      var gpus = type==='bmaas'
-        ? wl.serverCount*(wl.gpusPerServer||8)
-        : (sz.total||0)
-      var capex = gpus*30000
-      var monthly = type==='gpuaas' ? (wl.gpuCount||0)*3.5*730
-        : type==='bmaas' ? wl.serverCount*35000 : 0
-      totalGpus+=gpus; totalCapex+=capex; totalMonthly+=monthly
-      var gpuConf = M.gpuMap&&M.gpuMap[wl.gpu||sz.gpu||M.defaultGpu]
-      var gpuName = (gpuConf&&gpuConf.name)||'GPU'
-      lines.push('['+type.toUpperCase()+'] '+wl.name)
-      lines.push('  GPU: '+gpuName+' × '+gpus+' | Power: '+(sz.powerKw||0)+'kW')
-      lines.push('  Capex est: $'+(capex/1000).toFixed(0)+'K'+(monthly?' | Monthly est: $'+monthly.toLocaleString():''))
-      lines.push('')
-    }
-    ;(M.workloadConfigs.uc||[]).forEach(function(w){ addWl(w,'uc') })
-    ;(M.workloadConfigs.maas||[]).forEach(function(w){ addWl(w,'maas') })
-    ;(M.workloadConfigs.gpuaas||[]).forEach(function(w){ addWl(w,'gpuaas') })
-    ;(M.workloadConfigs.bmaas||[]).forEach(function(w){ addWl(w,'bmaas') })
-    lines.push('─'.repeat(60))
-    lines.push('TOTAL GPUs: '+totalGpus)
-    lines.push('TOTAL CAPEX EST: $'+(totalCapex/1e6).toFixed(2)+'M')
-    if (totalMonthly) lines.push('TOTAL MONTHLY EST: $'+totalMonthly.toLocaleString()+'/mo')
+    lines.push('HEADLINE SUMMARY')
+    lines.push('\u2500'.repeat(60))
+    lines.push('Workloads:      ' + (km.workloads||0))
+    lines.push('Total GPUs:     ' + (km.total_gpus||0))
+    lines.push('Total Power:    ' + (Math.round(gPow*10)/10) + ' kW')
+    lines.push('Capex estimate: $' + ((km.capex_usd||0)/1e6).toFixed(1) + 'M')
+    lines.push('Indicative opex: ~$' + gMonthly.toLocaleString() + '/mo (power-based proxy)')
     lines.push('')
-    lines.push('Notes:')
-    lines.push('• Capex estimate: $30k/GPU (adjust for actual procurement cost)')
-    lines.push('• GPUaaS: $3.50/GPU/hr × 730hrs/month (12-mo reserved rate)')
-    lines.push('• BMaaS: $35,000/server/month (VR NVL72 full server)')
-    lines.push('• Accuracy ±40% — for budget discussion only, not for contract')
-    lines.push('• SI fees, networking, MDC civil works not included above')
-    lines.push('')
-    lines.push('Generated by ATLAS | Bull India | ' + new Date().toISOString().split('T')[0])
+    lines.push('Full per-workload BOM: PRAXIS. Full financials: TSAP Financial Model.')
+    lines.push('Note: Excludes SI fees. For initial budget discussion only.')
     var text = lines.join('\n')
-    try {
-      navigator.clipboard.writeText(text).then(function(){
-        V.toast('ROM copied to clipboard','success')
-      })
-    } catch(e) {
-      // Fallback
-      var ta = document.createElement('textarea')
-      ta.value = text
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-      V.toast('ROM copied to clipboard','success')
-    }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(function(){ V.toast('ROM copied to clipboard','success') })
+        .catch(function(){ V.toast('Copy failed','warning') })
+    } else { V.toast('Clipboard not available','warning') }
   },
 
   // ── Solution tab controller functions (folded in from workload-profiler-prototype) ──
