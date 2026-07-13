@@ -2221,75 +2221,119 @@ function praxisRowSize(wl) {
   } catch(e) { return null }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRAXIS CALCULATION MODULES (MVC Model layer)
+// Three independent sizing domains + shared Unit/MOQ utility.
+// BOM and all views AGGREGATE from these — they never calculate.
+// Each module returns a `det`-shaped result; praxisSizing() loops + aggregates.
+// Behaviour-preserving extraction from the former inline praxisSizing branches.
+// Calculation rules are documented in standards/calc-modules.md
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Shared Unit / MOQ utility ────────────────────────────────────────────
+// The single place unit rounding happens. Unit = gpus_in_unit from catalogue.
+// Used by all modules AND (later) by post-yield BOM rebuild.
+function unitRound(demandGpus, gpuId) {
+  var g = M.gpuMap && M.gpuMap[gpuId];
+  var unit = (g && g.gpus_in_unit) || 8;
+  var d = demandGpus || 0;
+  var units = d > 0 ? Math.ceil(d / unit) : 0;
+  var provisioned = units * unit;
+  return { demand: d, unit: unit, units: units, provisioned: provisioned,
+           moqRounded: (provisioned !== d && d > 0) };
+}
+
+// ── MODULE 1: BLOCK (BM + GPUaaS) — raw GPU/server allocation, no token sizing ──
+function calcBlock(w) {
+  var p = getPROC(w.proc);
+  if (!p) return null;
+  var gpusPerU = p.mx || 8;
+  var blockGPUs, blockServers;
+  if (w.tp === 'gpuaas') {
+    blockGPUs = w.gpuCount || 0;
+    blockServers = Math.ceil(blockGPUs / gpusPerU);
+  } else { // bmaas
+    blockServers = w.serverCount || 0;
+    blockGPUs = blockServers * (w.gpusPerServer || gpusPerU);
+  }
+  var cpuPb = getPROC(cpuK);
+  var blockPow = blockGPUs > 0 ? (blockGPUs*(p.tdp||700) + blockServers*2*((cpuPb||{}).tdp||350) + blockGPUs*50)*1.1/1000 : 0;
+  var secMultB = ((SEC_TIERS[w.securityTier]||{}).cost_mult) || 1;
+  var blockCost = blockGPUs * price(w.proc) * 1.8 * secMultB;
+  return {
+    det: {...w, gpus:blockGPUs, gpusPer:gpusPerU, servers:blockServers, cost:blockCost, pw:blockPow,
+      totalTPS:0, estTTFT:0, estTBT:0, estE2E:0, ttftOk:true, tbtOk:true, e2eOk:true,
+      kvGB:0, peakConc:0, dailyReqs:0, dailyTok:0, moTok:0, avgRPS:0, peakRPS:0,
+      need:blockGPUs, decGPUs:0, decCost:0, decPow:0, apiMoCost:0, cascadeGPUs:0, batchUsed:0,
+      bmSource:'block', recDisagg:false, recLight:false, isBlock:true,
+      moqDemand:blockGPUs, moqProvisioned:blockGPUs, moqRounded:false},
+    tGPU: blockGPUs, gCost: blockCost, tPow: blockPow
+  };
+}
+
+// ── Shared inference sizing core (used by UC and MaaS until they diverge) ──
+// NOTE: UC and MaaS are SEPARATE modules by design (batch vs streaming tokens,
+// tenancy, differing latency/throughput rules). They share this core today but
+// will diverge — keep changes in the respective module, not here.
+function _calcInferenceCore(w) {
+  var p = getPROC(w.proc), m = getMDL(w.md);
+  if (!p) return null;
+  var est = estimate(w);
+  var gpusPer = Math.min(w.gpuCfg||8, p.mx||8);
+  var gpus = est.gpus;
+  var servers = gpus > 0 ? Math.ceil(gpus/gpusPer) : 0, actual = servers * gpusPer;
+  var moqDemand = gpus, moqProvisioned = actual, moqRounded = (actual !== gpus && gpus > 0);
+  var cpuP = getPROC(cpuK), pw = actual > 0 ? (actual*(p.tdp||700) + servers*2*((cpuP||{}).tdp||350) + actual*50)*1.1/1000 : 0;
+  var cost = actual * price(w.proc) * 1.8;
+  var tpsG = est.tpsG||1, totalTPS = tpsG*Math.max(actual,1);
+  var estTTFT = est.bmTTFT>0 ? est.bmTTFT : (tpsG>0 ? Math.round((est.effAI/(tpsG*0.8))*1000) : 9999);
+  var estTBT = est.bmTBT>0 ? est.bmTBT : (tpsG>0 ? Math.round(1000/tpsG*est.tbtPenalty) : 9999);
+  var estE2E = estTTFT + (w.ao||0)*estTBT;
+  var ttftOk = estTTFT<=w.ttft, tbtOk = estTBT<=w.tbt||(w.tbt===0), e2eOk = estE2E<=w.e2e;
+  var bmSource = est.bmSource||'estimated';
+  var slaFail = ((!ttftOk||!tbtOk||!e2eOk) && w.src!=='api');
+  var apiMoCost = 0;
+  if (w.src==='api' && (m||{}).tp==='closed') apiMoCost = est.moTok*0.5*((m.ai||1)+(m.ao||1))/1e6;
+  else if (w.src==='hybrid' && w.apiProvider) { var ap=getMDL(w.apiProvider); if((ap||{}).tp==='closed') apiMoCost=est.moTok*(1-est.onPremFrac)*0.5*((ap.ai||1)+(ap.ao||1))/1e6; }
+  var secMult = ((SEC_TIERS[w.securityTier]||{}).cost_mult) || 1;
+  return {
+    det: {...w, gpus:actual, gpusPer, servers, cost:cost*secMult, pw, totalTPS, estTTFT, estTBT, estE2E,
+      moqDemand, moqProvisioned, moqRounded, ttftOk, tbtOk, e2eOk, kvGB:est.kv, peakConc:est.peakConc,
+      dailyReqs:est.dailyReqs, dailyTok:est.dailyTok, moTok:est.moTok, avgRPS:est.avgRPS, peakRPS:est.peakRPS,
+      need:est.need, decGPUs:est.decGPUs, decCost:est.decCost*secMult, decPow:est.decPow,
+      apiMoCost, cascadeGPUs:est.cascadeGPUs, batchUsed:est.bSz, bmSource,
+      recDisagg:praxisShouldDisagg(w), recLight:praxisShouldLightGPU(w)},
+    tGPU: actual + est.decGPUs, gCost: (cost + est.decCost)*secMult, tPow: pw + est.decPow,
+    slaFail: slaFail
+  };
+}
+
+// ── MODULE 2: INFERENCING (UC) — may use batch tokens; UC latency/throughput rules ──
+function calcInferencing(w) { return _calcInferenceCore(w); }
+
+// ── MODULE 3: MaaS — streaming/online tokens, tenancy, consumption model ──
+// Currently mirrors the inference core; will diverge (streaming latency, tenancy,
+// $/Mtok economics, provisioned-GPU overrides). Keep MaaS-specific rules HERE.
+function calcMaaS(w) { return _calcInferenceCore(w); }
+
+
 function praxisSizing(){
   var wls = getIFWorkloads();
   var tGPU=0,gCost=0,tPow=0,slaAll=true;
   var cpuK='Turin_9965',rackK='dlc_260kw';
   var det=[];
   wls.forEach(w=>{
-    var p=getPROC(w.proc),m=getMDL(w.md);
-    if(!p)return;
-
-    // ── BLOCK TYPES: GPUaaS / BMaaS — raw GPU allocation, no token sizing ──
-    if(w.tp==='gpuaas'||w.tp==='bmaas'){
-      var gpusPerU=p.mx||8;
-      var blockGPUs, blockServers;
-      if(w.tp==='gpuaas'){
-        blockGPUs=w.gpuCount||0;
-        blockServers=Math.ceil(blockGPUs/gpusPerU);
-      } else { // bmaas
-        blockServers=w.serverCount||0;
-        blockGPUs=blockServers*(w.gpusPerServer||gpusPerU);
-      }
-      var cpuPb=getPROC(cpuK);
-      var blockPow=blockGPUs>0?(blockGPUs*(p.tdp||700)+blockServers*2*((cpuPb||{}).tdp||350)+blockGPUs*50)*1.1/1000:0;
-      var secMultB=((SEC_TIERS[w.securityTier]||{}).cost_mult)||1;
-      var blockCost=blockGPUs*price(w.proc)*1.8*secMultB;
-      tGPU+=blockGPUs; gCost+=blockCost; tPow+=blockPow;
-      det.push({...w,gpus:blockGPUs,gpusPer:gpusPerU,servers:blockServers,cost:blockCost,pw:blockPow,
-        totalTPS:0,estTTFT:0,estTBT:0,estE2E:0,ttftOk:true,tbtOk:true,e2eOk:true,
-        kvGB:0,peakConc:0,dailyReqs:0,dailyTok:0,moTok:0,avgRPS:0,peakRPS:0,
-        need:blockGPUs,decGPUs:0,decCost:0,decPow:0,apiMoCost:0,cascadeGPUs:0,batchUsed:0,
-        bmSource:'block',recDisagg:false,recLight:false,isBlock:true});
-      return;
-    }
-
-    var est=estimate(w);
-    var gpusPer=Math.min(w.gpuCfg||8,p.mx||8);
-    var gpus=est.gpus;
-    if(false){
-      var share=budget*(w.wt/100);
-      var maxBdg=Math.floor(share/(price(w.proc)*1.8));
-      gpus=Math.min(gpus,Math.max(maxBdg,w.src==='api'?0:1));
-    }
-    var servers=gpus>0?Math.ceil(gpus/gpusPer):0,actual=servers*gpusPer;
-    var moqDemand=gpus, moqProvisioned=actual, moqRounded=(actual!==gpus && gpus>0);
-    var cpuP=getPROC(cpuK),pw=actual>0?(actual*(p.tdp||700)+servers*2*((cpuP||{}).tdp||350)+actual*50)*1.1/1000:0;
-    var cost=actual*price(w.proc)*1.8;
-    var tpsG=est.tpsG||1,totalTPS=tpsG*Math.max(actual,1);
-    // Use benchmark latency if available, otherwise estimate
-    var estTTFT=est.bmTTFT>0?est.bmTTFT:(tpsG>0?Math.round((est.effAI/(tpsG*0.8))*1000):9999);
-    var estTBT=est.bmTBT>0?est.bmTBT:(tpsG>0?Math.round(1000/tpsG*est.tbtPenalty):9999);
-    var estE2E=estTTFT+(w.ao||0)*estTBT;
-    var ttftOk=estTTFT<=w.ttft,tbtOk=estTBT<=w.tbt||(w.tbt===0),e2eOk=estE2E<=w.e2e;
-    var bmSource=est.bmSource||'estimated';
-    if((!ttftOk||!tbtOk||!e2eOk)&&w.src!=='api')slaAll=false;
-    
-    // API cost
-    var apiMoCost=0;
-    if(w.src==='api'&&(m||{}).tp==='closed')apiMoCost=est.moTok*0.5*((m.ai||1)+(m.ao||1))/1e6;
-    else if(w.src==='hybrid'&&w.apiProvider){ var ap=getMDL(w.apiProvider);if((ap||{}).tp==='closed')apiMoCost=est.moTok*(1-est.onPremFrac)*0.5*((ap.ai||1)+(ap.ao||1))/1e6;}
-    
-    // Security cost multiplier
-    var secMult=((SEC_TIERS[w.securityTier]||{}).cost_mult)||1;
-    
-    tGPU+=actual+est.decGPUs;gCost+=(cost+est.decCost)*secMult;tPow+=pw+est.decPow;
-    det.push({...w,gpus:actual,gpusPer,servers,cost:cost*secMult,pw,totalTPS,estTTFT,estTBT,estE2E,moqDemand,moqProvisioned,moqRounded,
-      ttftOk,tbtOk,e2eOk,kvGB:est.kv,peakConc:est.peakConc,dailyReqs:est.dailyReqs,
-      dailyTok:est.dailyTok,moTok:est.moTok,avgRPS:est.avgRPS,peakRPS:est.peakRPS,
-      need:est.need,decGPUs:est.decGPUs,decCost:est.decCost*secMult,decPow:est.decPow,
-      apiMoCost,cascadeGPUs:est.cascadeGPUs,batchUsed:est.bSz,bmSource,
-      recDisagg:praxisShouldDisagg(w),recLight:praxisShouldLightGPU(w)});
+    // Dispatch to the correct calc module (MVC Model layer). Modules own the math;
+    // this loop only aggregates. See calcBlock / calcInferencing / calcMaaS above.
+    var r;
+    if (w.tp==='gpuaas' || w.tp==='bmaas') r = calcBlock(w);
+    else if (w.tp==='maas')                r = calcMaaS(w);
+    else                                    r = calcInferencing(w);
+    if (!r) return;
+    tGPU += r.tGPU; gCost += r.gCost; tPow += r.tPow;
+    if (r.slaFail) slaAll = false;
+    det.push(r.det);
   });
   
   // Common infra
@@ -3365,12 +3409,12 @@ V.renderScopeTab=function(){
       <div class="card">
         <h3>⚙️ Per-Workload Data & MLOps Profile</h3>
         <p style="font-size:11px;color:var(--txM);margin-bottom:6px">Configure RAG, embeddings, fine-tuning, and customization per workload. Effort auto-calculates but is editable.</p>
-        <div style="max-height:400px;overflow-y:auto">
-        <table style="font-size:11px"><thead><tr><th>Workload</th><th>Data Sources</th><th>RAG Type</th><th>Embed Model</th><th>Fine-tune</th><th>Custom Level</th><th style="min-width:50px">Effort</th></tr></thead><tbody>
+        <div style="max-height:440px;overflow:auto">
+        <table style="font-size:11px;min-width:820px;width:100%"><thead><tr><th style="min-width:130px">Workload</th><th style="min-width:150px">Data Sources</th><th style="min-width:95px">RAG Type</th><th style="min-width:140px">Embed Model</th><th style="min-width:80px">Fine-tune</th><th style="min-width:95px">Custom Level</th><th style="min-width:70px">Effort</th></tr></thead><tbody>
           ${getIFWorkloads().map(function(w,i){ var wp=(WP[w.tp]||{n:w.name||w.tp,ic:'📋'}); return `<tr>
             <td><b>${(wp||{}).ic||''} ${(wp||{}).n||''}</b></td>
-            <td><select multiple style="font-size:11px;width:90px;height:40px" onchange="praxisWlUpdDataSrc('${w.id}',this)">${dataSources.map(ds=>`<option value="${ds.id}"${(w.dataSrcIds||[]).includes(ds.id)?' selected':''}>${ds.name}</option>`).join('')}</select></td>
-            <td><select style="font-size:11px;padding:1px" onchange="praxisWlUpdScope(${w.id},'ragType',this.value)">
+            <td><select multiple style="font-size:11px;width:100%;min-width:140px;height:44px" onchange="praxisWlUpdDataSrc('${w.id}',this)">${dataSources.map(ds=>`<option value="${ds.id}"${(w.dataSrcIds||[]).includes(ds.id)?' selected':''}>${ds.name}</option>`).join('')}</select></td>
+            <td><select style="font-size:11px;padding:3px;width:100%;min-width:88px" onchange="praxisWlUpdScope(${w.id},'ragType',this.value)">
               <option value="none"${w.ragType==='none'?' selected':''}>None</option>
               <option value="simple"${w.ragType==='simple'?' selected':''}>Simple</option>
               <option value="multi_stage"${w.ragType==='multi_stage'?' selected':''}>Multi-stage</option>
@@ -3378,17 +3422,17 @@ V.renderScopeTab=function(){
               <option value="graph"${w.ragType==='graph'?' selected':''}>Graph RAG</option>
               <option value="hybrid"${w.ragType==='hybrid'?' selected':''}>Hybrid</option>
             </select></td>
-            <td><select style="font-size:11px;padding:1px;width:80px" onchange="praxisWlUpdScope(${w.id},'embedModel',this.value)"${w.ragType==='none'?' disabled':''}>
+            <td><select style="font-size:11px;padding:3px;width:100%;min-width:135px" onchange="praxisWlUpdScope(${w.id},'embedModel',this.value)"${w.ragType==='none'?' disabled':''}>
               ${(M.modelCatalogue||[]).filter(function(m){return (m.family||'').toLowerCase().includes('embed');}).map(function(m){return '<option value="'+m.model_id+'"'+(w.embedModel===m.model_id?' selected':'')+'>'+m.name+'</option>';}).join('')}
             </select></td>
-            <td><select style="font-size:11px;padding:1px" onchange="praxisWlUpdScope(${w.id},'fineTune',this.value)">
+            <td><select style="font-size:11px;padding:3px;width:100%;min-width:72px" onchange="praxisWlUpdScope(${w.id},'fineTune',this.value)">
               <option value="none"${w.fineTune==='none'?' selected':''}>None</option>
               <option value="prompt"${w.fineTune==='prompt'?' selected':''}>Prompt Eng</option>
               <option value="few_shot"${w.fineTune==='few_shot'?' selected':''}>Few-shot</option>
               <option value="lora"${w.fineTune==='lora'?' selected':''}>LoRA FT</option>
               <option value="full"${w.fineTune==='full'?' selected':''}>Full FT</option>
             </select></td>
-            <td><select style="font-size:11px;padding:1px" onchange="praxisWlUpdScope(${w.id},'customLevel',this.value)">
+            <td><select style="font-size:11px;padding:3px;width:100%;min-width:88px" onchange="praxisWlUpdScope(${w.id},'customLevel',this.value)">
               <option value="oob"${w.customLevel==='oob'?' selected':''}>OOB</option>
               <option value="light"${w.customLevel==='light'?' selected':''}>Light</option>
               <option value="medium"${w.customLevel==='medium'?' selected':''}>Medium</option>
