@@ -1295,7 +1295,7 @@ var V = {
       Object.keys(families).sort().forEach(function(fam) {
         h += '<optgroup label="' + fam + '">'
         families[fam].forEach(function(m) {
-          h += '<option value="' + m.model_id + '"' + (m.model_id === currentModel || m.id === currentModel ? ' selected' : '') + '>'
+          h += '<option value="' + m.id + '"' + (m.id === currentModel ? ' selected' : '') + '>'
             + m.name + (m.params_b ? ' (' + m.params_b + 'B)' : '')
             + '</option>'
         })
