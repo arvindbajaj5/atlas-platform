@@ -2233,6 +2233,7 @@ function praxisRowSize(wl) {
 
 // ── Shared Unit / MOQ utility ────────────────────────────────────────────
 // The single place unit rounding happens. Unit = gpus_in_unit from catalogue.
+var cpuK = 'Turin_9965';
 function unitRound(demandGpus, gpuId) {
   var g = M.gpuMap && M.gpuMap[gpuId];
   var unit = (g && g.gpus_in_unit) || 8;
@@ -2345,7 +2346,7 @@ function calcMaaS(w) { return _calcInferenceCore(w); }
 function praxisSizing(){
   var wls = getIFWorkloads();
   var tGPU=0,gCost=0,tPow=0,slaAll=true;
-  var cpuK='Turin_9965',rackK='dlc_260kw';
+  var rackK='dlc_260kw';
   var det=[];
   wls.forEach(w=>{
     // Dispatch to the correct calc module (MVC Model layer). Modules own the math;
