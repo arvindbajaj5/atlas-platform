@@ -323,6 +323,24 @@ table tr:last-child td{border-bottom:none}
   --p1:#FF5539; --p2:#002870; --s1:#1C38F5; --s2:#00B290; --s3:#FFB600;
   --ibg:rgba(28,56,245,.06); --sbg:rgba(0,178,144,.08); --dbg:rgba(255,85,57,.07); --wbg:rgba(255,182,0,.10);
 }
+
+.po-head{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 24px;border-bottom:1px solid #e5e7eb}
+.po-title{font-size:18px;font-weight:900;color:#002870}
+.po-sub{font-size:12px;color:#6b7280;margin-top:4px;max-width:520px}
+.po-x{background:none;border:none;font-size:26px;color:#9ca3af;cursor:pointer;line-height:1}
+.po-body{padding:12px 24px;overflow-y:auto;flex:1}
+.po-grp{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1C38F5;margin:16px 0 8px}
+.po-row{display:grid;grid-template-columns:1.6fr 1fr 1.1fr .8fr auto;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6}
+.po-name{font-size:13px;font-weight:700;color:#111827}
+.po-unit{display:block;font-size:10px;font-weight:400;color:#9ca3af}
+.po-def{font-size:12px;color:#6b7280}
+.po-in{width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-family:inherit}
+.po-in:focus{outline:none;border-color:#1C38F5}
+.po-disc{font-size:11px;font-weight:700;color:#00B290}
+.po-clr{background:none;border:none;color:#FF5539;font-size:11px;cursor:pointer;text-decoration:underline}
+.po-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid #e5e7eb}
+.po-cancel{padding:9px 18px;border:1px solid #d1d5db;background:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+.po-apply{padding:9px 18px;border:none;background:#FF5539;color:#fff;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
@@ -1559,6 +1577,9 @@ var C = {
         var snap = sv.bom_snapshot || {}
         // Restore mode
         if (snap.mode) M.mode = snap.mode
+        // Restore deal-specific price overrides
+        priceOverrides = snap.price_overrides || {}
+        M.priceOverrides = priceOverrides
         // Restore workloads
         if (snap.workload_configs) {
           M.workloads = {
@@ -1658,7 +1679,7 @@ var C = {
         tool_name:   TOOL_NAME,
         mode:        M.mode,
         workload_configs: M.workloads,
-        price_overrides:  M.priceOverrides,
+        price_overrides:  priceOverrides,
         key_metrics: {
           total_gpus:  totalGpus,
           capex_usd:   totalCapex,
@@ -2078,6 +2099,10 @@ function price(key) {
   var p = getPROC(key);
   return (priceOverrides[key] || (p && p.usd) || 30000);
 }
+// Override-aware hardware price: deal override _key ?? global HWCFG default
+function hwPrice(key) {
+  return (priceOverrides['_'+key] != null ? priceOverrides['_'+key] : HWCFG[key]);
+}
 function currSym() { return '$'; }
 
 
@@ -2296,8 +2321,8 @@ function praxisSizing(){
   var srvTotal=det.reduce((s,d)=>s+d.servers+(d.decGPUs?Math.ceil(d.decGPUs/(d.gpusPer||8)):0),0)+commonSrv+agentOrcSrv;
   var cpuCnt=srvTotal*2,cpuCost=price('Turin_9965')*cpuCnt;
   var netPorts=Math.ceil(tGPU/2);
-  var netCost=det.reduce((s,d)=>{var n=(NET[d.netChoice]||{cpp:HWCFG.nic_per_port});return s+Math.ceil(d.gpus/2)*((n||{}).cpp||HWCFG.nic_per_port);},0);
-  var swCost=Math.ceil(netPorts/64)*HWCFG.switch_cost;
+  var netCost=det.reduce((s,d)=>{var n=(NET[d.netChoice]||{cpp:HWCFG.nic_per_port});return s+Math.ceil(d.gpus/2)*hwPrice("nic_per_port");},0);
+  var swCost=Math.ceil(netPorts/64)*hwPrice("switch_cost");
   
   // Model-aware storage (raw TB needed)
   var stoTB=50;
@@ -2316,10 +2341,10 @@ function praxisSizing(){
   var objTB=Math.ceil(stoTB*(storageConfig.obj_pct||0)/100);
   var stoCost=nvmeTB*(storageConfig.nvme_price_per_tb||280)+hddTB*(storageConfig.hdd_price_per_tb||40)+objTB*(storageConfig.obj_price_per_tb||0)+(storageConfig.appliance_cost||120000);
   
-  var rackDLCCost=HWCFG.rack_dlc_cost+HWCFG.rack_install;
-  var rackACCost=HWCFG.rack_ac_cost+HWCFG.rack_install;
+  var rackDLCCost=hwPrice("rack_dlc_cost")+hwPrice("rack_install");
+  var rackACCost=hwPrice("rack_ac_cost")+hwPrice("rack_install");
   var rackCost=dlcRacks*rackDLCCost+acRacks*rackACCost+0;
-  var dramCost=srvTotal*8*(priceOverrides._dimm||HWCFG.dram_per_dimm),chassisCost=srvTotal*(priceOverrides._chassis||HWCFG.chassis_per_server);
+  var dramCost=srvTotal*8*hwPrice("dram_per_dimm"),chassisCost=srvTotal*hwPrice("chassis_per_server");
   
   // Software stack cost (annual)
   var enabledSW=softwareStack.filter(s=>s.enabled);
@@ -2622,7 +2647,12 @@ V.renderBOMTab = function(){
   var showP=true;
   if(!sz||!sz.det||!sz.det.length){el.innerHTML='<div class="coming-soon-tab"><h3>No workloads sized yet</h3><p>Add workloads in the Workloads tab first.</p></div>';return;}
 var showP=true;
-  var h=`<div class="card" style="background:linear-gradient(135deg,rgba(0,40,112,.02),rgba(28,56,245,.02))"><h3>BOM — Per-Workload Configs & Aggregation</h3>
+  var ovCount = Object.keys(priceOverrides||{}).length
+  var h=`<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button onclick="PriceOverride.open()" style="padding:8px 16px;background:${ovCount?'#FF5539':'#fff'};color:${ovCount?'#fff':'#FF5539'};border:1px solid #FF5539;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">
+      &#128176; Deal Pricing${ovCount?' ('+ovCount+' set)':''}
+    </button></div>`
+  h+=`<div class="card" style="background:linear-gradient(135deg,rgba(0,40,112,.02),rgba(28,56,245,.02))"><h3>BOM — Per-Workload Configs & Aggregation</h3>
     <div class="g5" style="margin-bottom:16px">
       <div class="st"><div class="v" style="color:var(--p1)">${sz.tGPU}</div><div class="l">GPUs</div></div>
       <div class="st"><div class="v" style="color:var(--p2)">${sz.srvTotal}</div><div class="l">Servers</div></div>
@@ -2747,8 +2777,8 @@ var showP=true;
       <div style="padding:10px;background:var(--ibg);border-radius:6px;border-left:3px solid var(--s1)">
         <div style="font-weight:700;font-size:11px;color:var(--p2);margin-bottom:6px">East-West (GPU Scale-Out)</div>
         <table style="font-size:12px"><tbody>
-          <tr><td><b>Leaf Switches</b></td><td>${ewLeafSw}× 64-port (${NET[sz.det[0]?.netChoice]?.n||'IB NDR'})</td>${showP?`<td>${fmt$(ewLeafSw*HWCFG.switch_cost)}</td>`:''}</tr>
-          <tr><td><b>Spine Switches</b></td><td>${ewSpineSw}× (${ewLeafSw>4?'fat-tree':'leaf-spine'})</td>${showP?`<td>${fmt$(ewSpineSw*HWCFG.switch_spine_cost)}</td>`:''}</tr>
+          <tr><td><b>Leaf Switches</b></td><td>${ewLeafSw}× 64-port (${NET[sz.det[0]?.netChoice]?.n||'IB NDR'})</td>${showP?`<td>${fmt$(ewLeafSw*hwPrice("switch_cost"))}</td>`:''}</tr>
+          <tr><td><b>Spine Switches</b></td><td>${ewSpineSw}× (${ewLeafSw>4?'fat-tree':'leaf-spine'})</td>${showP?`<td>${fmt$(ewSpineSw*hwPrice("switch_spine_cost"))}</td>`:''}</tr>
           <tr><td><b>Server→Leaf Cables</b></td><td>${ewCablesDAC}× DAC/AOC</td>${showP?`<td>${fmt$(ewCablesDAC*80)}</td>`:''}</tr>
           <tr><td><b>Leaf→Spine ISL</b></td><td>${ewCablesISL}× AOC</td>${showP?`<td>${fmt$(ewCablesISL*120)}</td>`:''}</tr>
         </tbody></table>
@@ -3758,6 +3788,130 @@ V.renderScopeTab = function(){
 
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// DEAL PRICING OVERRIDES — Step C
+// Per-version special prices on main components. override ?? default.
+// ═══════════════════════════════════════════════════════════════════════════
+var PriceOverride = {
+  // Build the list of overridable components (active in this solution + standard hardware)
+  components: function() {
+    var list = []
+    // GPUs/CPUs actually used in workloads
+    var usedGpus = {}
+    ;['uc','maas','gpuaas','bmaas'].forEach(function(tp){
+      (M.workloads[tp]||[]).forEach(function(w){ if(w.gpu) usedGpus[w.gpu]=true })
+    })
+    Object.keys(usedGpus).forEach(function(gid){
+      var g = M.gpuMap && M.gpuMap[gid]
+      if (!g) return
+      list.push({ key:gid, group:'Compute', name:g.name, unit:'per GPU', def:(g.price_usd||30000), isGpu:true, gpusPerUnit:(g.gpus_in_unit||1) })
+    })
+    // Hardware components (keyed with _ prefix, default from HWCFG)
+    var hw = [
+      ['_rack_dlc_cost','Facility','DLC Rack','per rack'],
+      ['_rack_ac_cost','Facility','Air-cooled Rack','per rack'],
+      ['_dram_per_dimm','Compute','DRAM','per DIMM'],
+      ['_chassis_per_server','Compute','Server Chassis','per server'],
+      ['_switch_cost','Network','Leaf Switch','per switch'],
+      ['_switch_spine_cost','Network','Spine Switch','per switch'],
+      ['_nic_per_port','Network','NIC / Port','per port']
+    ]
+    hw.forEach(function(h){
+      var baseKey = h[0].substring(1)
+      list.push({ key:h[0], group:h[1], name:h[2], unit:h[3], def:(HWCFG[baseKey]||0), isGpu:false })
+    })
+    // Storage tiers
+    ;[['_storage_nvme_price_per_tb','Storage','NVMe Storage','per TB','nvme_price_per_tb'],
+      ['_storage_hdd_price_per_tb','Storage','HDD Storage','per TB','hdd_price_per_tb']].forEach(function(s){
+      list.push({ key:s[0], group:s[1], name:s[2], unit:s[3], def:(storageConfig[s[4]]||0), isGpu:false })
+    })
+    return list
+  },
+
+  open: function() {
+    var comps = this.components()
+    var groups = {}
+    comps.forEach(function(c){ (groups[c.group]=groups[c.group]||[]).push(c) })
+
+    var h = '<div class="po-head"><div><div class="po-title">Deal Pricing</div>'
+    h += '<div class="po-sub">Set a special price for this deal. Unchanged components use the standard price. Applies to this solution version only.</div></div>'
+    h += '<button class="po-x" onclick="PriceOverride.close()">&times;</button></div>'
+    h += '<div class="po-body">'
+    Object.keys(groups).forEach(function(grp){
+      h += '<div class="po-grp">'+grp+'</div>'
+      groups[grp].forEach(function(c){
+        var cur = priceOverrides[c.key]
+        var hasOv = (cur != null)
+        var eff = hasOv ? cur : c.def
+        h += '<div class="po-row" data-key="'+c.key+'">'
+        h += '<div class="po-name">'+c.name+'<span class="po-unit">'+c.unit+'</span></div>'
+        h += '<div class="po-def">Std: $'+Number(c.def).toLocaleString()+'</div>'
+        h += '<input class="po-in" type="number" placeholder="$'+Number(c.def).toLocaleString()+'" value="'+(hasOv?cur:'')+'" '
+        h += 'data-def="'+c.def+'" oninput="PriceOverride.onInput(this)">'
+        h += '<div class="po-disc" id="disc-'+c.key.replace(/[^a-z0-9_]/gi,'')+'">'+(hasOv?PriceOverride.discTxt(c.def,cur):'')+'</div>'
+        h += '<button class="po-clr" onclick="PriceOverride.clear(\''+c.key+'\')" '+(hasOv?'':'style="visibility:hidden"')+'>clear</button>'
+        h += '</div>'
+      })
+    })
+    h += '</div>'
+    h += '<div class="po-foot"><button class="po-cancel" onclick="PriceOverride.close()">Cancel</button>'
+    h += '<button class="po-apply" onclick="PriceOverride.apply()">Apply &amp; Recompute</button></div>'
+
+    document.getElementById('po-modal-body').innerHTML = h
+    document.getElementById('po-modal').style.display = 'flex'
+  },
+
+  discTxt: function(def, val){
+    if (val==null || !def) return ''
+    var pct = Math.round((1 - val/def)*1000)/10
+    if (pct>0) return '\u2193 '+pct+'% off'
+    if (pct<0) return '\u2191 '+Math.abs(pct)+'% up'
+    return 'same'
+  },
+
+  onInput: function(el){
+    var row = el.closest('.po-row')
+    var key = row.getAttribute('data-key')
+    var def = parseFloat(el.getAttribute('data-def'))
+    var val = el.value===''? null : parseFloat(el.value)
+    var disc = document.getElementById('disc-'+key.replace(/[^a-z0-9_]/gi,''))
+    if (disc) disc.textContent = (val!=null) ? this.discTxt(def,val) : ''
+  },
+
+  clear: function(key){
+    delete priceOverrides[key]
+    this.open()  // re-render modal
+  },
+
+  apply: function(){
+    var rows = document.querySelectorAll('#po-modal-body .po-row')
+    rows.forEach(function(row){
+      var key = row.getAttribute('data-key')
+      var inp = row.querySelector('.po-in')
+      var val = inp.value===''? null : parseFloat(inp.value)
+      if (val==null || isNaN(val)) { delete priceOverrides[key] }
+      else { priceOverrides[key] = val }
+    })
+    M.priceOverrides = priceOverrides
+    this.close()
+    // Re-render current tab + KPIs so new prices flow through
+    if (V.switchTab) V.switchTab(M.activeTab)
+    if (V.updateKpiBar) V.updateKpiBar()
+    V.toast('Deal pricing applied \u2014 recomputed', 'success')
+  },
+
+  close: function(){
+    document.getElementById('po-modal').style.display = 'none'
+  }
+}
+
 </script>
+
+<!-- Deal Pricing modal -->
+<div id="po-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+  <div id="po-modal-inner" style="background:#fff;border-radius:12px;width:min(680px,92vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div id="po-modal-body" style="display:flex;flex-direction:column;overflow:hidden;max-height:88vh"></div>
+  </div>
+</div>
 </body>
 </html>
