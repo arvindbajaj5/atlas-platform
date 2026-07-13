@@ -19,8 +19,23 @@ On-prem/hybrid inference sizing. May use **batch** tokens. UC-specific latency/t
 ### 3. `calcBlock(w)` — BM + GPUaaS
 Raw GPU/server allocation, **no token sizing**. GPUaaS = GPU count → servers; BMaaS = server count → GPUs. Both round to the GPU unit (`gpus_in_unit`).
 
-### Shared: `unitRound(demandGpus, gpuId)` — Unit / MOQ
-The **single** place unit rounding happens. `unit = gpus_in_unit` from the GPU catalogue (8 SXM, 72 NVL72, 144 future). Rounds demand **up** to whole units: `provisioned = ceil(demand/unit) × unit`. Flags `moqRounded` when `provisioned ≠ demand` (i.e. demand not a clean multiple) → drives the `*` marker + BOM footnote. Used by all modules AND (later) the post-yield BOM rebuild.
+### Shared: Unit / MOQ + single provisioning point
+
+**`unitRound(demandGpus, gpuId)`** — the **single** place unit rounding happens. `unit = gpus_in_unit` **from the GPU catalogue (the database)** — the packaging granularity of that specific architecture: 72 (VR NVL72 rack), 8 (SXM server), 4 (VR NVL4 blade), 2 (2-GPU server), etc. **Always follow the DB unit** — never hardcode 8 or assume. Rounds **up**: `provisioned = ceil(demand/unit) × unit`. Flags `moqRounded` when `provisioned ≠ demand` → drives the `*` marker + BOM footnote.
+
+**`provisionGpus(rawDemand, gpuId, w)`** — the single provisioning pipeline: `rawDemand × yieldFactor(w) → unitRound (ONCE)`. Modules pass **raw (unrounded) demand**; this applies yield then rounds exactly once.
+
+**`gpusPer` (server/unit size) also = `gpus_in_unit`** — the same DB unit drives both MOQ rounding and the server/power/cost math. No separate capped assumption.
+
+#### ⚠️ ROUND ONCE — never twice
+Rounding happens **once, AFTER yield**, on the yield-adjusted demand:
+```
+raw demand 38  →  × yield 1.2  →  45.6  →  unitRound(72-unit)  →  72   ✓
+```
+NOT:
+```
+38 → round → 72 → × 1.2 → 86.4 → round again → 144   ✗ (double rounding, wrong)
+```
 
 ## BOM = Aggregator
 

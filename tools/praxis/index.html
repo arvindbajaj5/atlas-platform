@@ -2233,7 +2233,6 @@ function praxisRowSize(wl) {
 
 // ── Shared Unit / MOQ utility ────────────────────────────────────────────
 // The single place unit rounding happens. Unit = gpus_in_unit from catalogue.
-// Used by all modules AND (later) by post-yield BOM rebuild.
 function unitRound(demandGpus, gpuId) {
   var g = M.gpuMap && M.gpuMap[gpuId];
   var unit = (g && g.gpus_in_unit) || 8;
@@ -2242,6 +2241,27 @@ function unitRound(demandGpus, gpuId) {
   var provisioned = units * unit;
   return { demand: d, unit: unit, units: units, provisioned: provisioned,
            moqRounded: (provisioned !== d && d > 0) };
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// ⚠️  YIELD PLACEHOLDER — REPLACE WHEN YIELD MODULE IS BUILT
+// Per-workload yield factor. MUST be applied to RAW demand BEFORE the single
+// unitRound. Rounding happens ONCE, on the yield-adjusted demand — never twice.
+// Today returns 1.0 (no-op) so numbers are unchanged. When yield is built:
+//   1. return the real per-workload yield factor here
+//   2. keep the order: rawDemand × yieldFactor → provisionGpus() → round ONCE
+//   3. see standards/calc-modules.md "Yield" section
+// ════════════════════════════════════════════════════════════════════════
+function yieldFactor(w) {
+  return 1.0; // TODO(yield): replace with real per-workload yield calc
+}
+
+// ── Final provisioning: raw demand → yield → round ONCE ──────────────────
+// This is the SINGLE rounding point. Modules pass RAW demand; this applies the
+// yield factor then rounds to the ordering unit exactly once.
+function provisionGpus(rawDemandGpus, gpuId, w) {
+  var yielded = (rawDemandGpus || 0) * yieldFactor(w);
+  return unitRound(yielded, gpuId);
 }
 
 // ── MODULE 1: BLOCK (BM + GPUaaS) — raw GPU/server allocation, no token sizing ──
@@ -2280,10 +2300,14 @@ function _calcInferenceCore(w) {
   var p = getPROC(w.proc), m = getMDL(w.md);
   if (!p) return null;
   var est = estimate(w);
-  var gpusPer = Math.min(w.gpuCfg||8, p.mx||8);
-  var gpus = est.gpus;
-  var servers = gpus > 0 ? Math.ceil(gpus/gpusPer) : 0, actual = servers * gpusPer;
-  var moqDemand = gpus, moqProvisioned = actual, moqRounded = (actual !== gpus && gpus > 0);
+  // Unit granularity comes from the DB (gpus_in_unit): 72 VR NVL72, 8 SXM, 4 VR NVL4, 2 for 2-GPU servers.
+  var gpusPer = p.mx || 8;
+  var rawDemand = est.gpus;                          // RAW demand (unrounded) from the module
+  // Single provisioning point: raw demand → yield → unit-round ONCE (no double rounding)
+  var prov = provisionGpus(rawDemand, w.proc, w);
+  var actual = prov.provisioned;
+  var servers = actual > 0 ? Math.ceil(actual/gpusPer) : 0;
+  var moqDemand = Math.round(prov.demand), moqProvisioned = actual, moqRounded = prov.moqRounded;
   var cpuP = getPROC(cpuK), pw = actual > 0 ? (actual*(p.tdp||700) + servers*2*((cpuP||{}).tdp||350) + actual*50)*1.1/1000 : 0;
   var cost = actual * price(w.proc) * 1.8;
   var tpsG = est.tpsG||1, totalTPS = tpsG*Math.max(actual,1);
