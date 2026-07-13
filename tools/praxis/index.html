@@ -564,38 +564,16 @@ var V = {
     var totalWl = w.uc.length + w.maas.length + w.gpuaas.length + w.bmaas.length
     var totalGpus = 0, totalPower = 0, totalCapex = 0
 
-    w.uc.forEach(function(wl) {
-      try {
-        var sz = (typeof AtlasSolution !== 'undefined') ? AtlasSolution.sizeWorkload(wl,'uc',M) : null
-        if (sz && !sz.error) {
-          totalGpus  += sz.total||0
-          totalPower += sz.powerKw||0
-          totalCapex += (sz.total||0) * 30000
-        }
-      } catch(e) {}
-    })
-    w.maas.forEach(function(wl) {
-      try {
-        var provGpus = wl.provisionedGpus || 0
-        var sz = (typeof AtlasSolution !== 'undefined') ? AtlasSolution.sizeWorkload(wl,'maas',M) : null
-        var gpus = provGpus || (sz && !sz.error ? sz.total||0 : 0)
-        totalGpus  += gpus
-        totalPower += (sz && !sz.error ? sz.powerKw||0 : 0)
-        totalCapex += gpus * 30000
-      } catch(e) {}
-    })
-    w.gpuaas.forEach(function(wl) {
-      totalGpus  += wl.gpuCount||0
-      totalPower += (wl.gpuCount||0) * 0.7
-      totalCapex += (wl.gpuCount||0) * 30000
-    })
-    w.bmaas.forEach(function(wl) {
-      var g = M.gpuMap[wl.gpu]
-      var gpus = wl.serverCount * (wl.gpusPerServer||(g&&g.gpus_in_unit)||8)
-      totalGpus  += gpus
-      totalPower += wl.serverCount * ((g&&g.tdp_kw)||5.6)
-      totalCapex += gpus * 30000
-    })
+    // Single source of truth: praxisSizing (the fleet engine that also drives BOM/Arch/etc)
+    // Ensures KPI bar always matches the BOM instead of using a separate old sizer.
+    try {
+      var szAll = praxisSizing()
+      if (szAll && !szAll.error) {
+        totalGpus  = szAll.tGPU || 0
+        totalPower = szAll.tPow || 0
+        totalCapex = szAll.total || 0
+      }
+    } catch(e) { console.warn('[PRAXIS] KPI sizing failed:', e) }
 
     document.getElementById('kpi-wl').textContent    = totalWl
     document.getElementById('kpi-gpus').textContent  = totalGpus
@@ -760,13 +738,11 @@ var V = {
       + (wl.commercialSla||wl.sla||'bronze').slice(1) + '</span>'
 
     if (type === 'uc' || type === 'maas') {
-      var sz = null
-      try {
-        if (typeof AtlasSolution !== 'undefined') sz = AtlasSolution.sizeWorkload(wl, type, M)
-      } catch(e) {}
-      var gpus  = (sz && !sz.error) ? (sz.total||0) : '—'
-      var power = (sz && !sz.error) ? (Math.round((sz.powerKw||0)*10)/10 + ' kW') : '—'
-      var capex = (sz && !sz.error && sz.total) ? ('$' + Math.round(sz.total*30000/1000) + 'K') : '—'
+      var sz = praxisRowSize(wl)
+      var gpus  = (sz) ? (sz.gpus||0) : '—'
+      if (sz && sz.moqRounded) gpus = (sz.gpus||0) + '*'
+      var power = (sz) ? (Math.round((sz.powerKw||0)*10)/10 + ' kW') : '—'
+      var capex = (sz && sz.capex) ? ('$' + Math.round(sz.capex/1000) + 'K') : '—'
       if (wl.provisionedGpus) gpus = wl.provisionedGpus + ' ⬆'
       var cells = [
         { html: '<span class="wl-name">' + atlasDB.esc(wl.name) + '</span>' },
@@ -1216,11 +1192,8 @@ var V = {
 
 
   _renderDerived: function(type, wl) {
-    var sz = null
-    try {
-      if (typeof AtlasSolution !== 'undefined') sz = AtlasSolution.sizeWorkload(wl, type, M)
-    } catch(e) {}
-    if (!sz || sz.error) return ''
+    var sz = praxisRowSize(wl)
+    if (!sz) return ''
     var gpuConf = M.gpuMap[sz.gpu||wl.gpu]
     var gpuName = (gpuConf && gpuConf.name) || '—'
     var provGpus = wl.provisionedGpus || sz.total || 0
@@ -1379,6 +1352,7 @@ var C = {
     var wl = M.workloads[type].find(function(w){ return w.id === id })
     if (!wl) return
     wl[field] = val
+    _praxisSizeCache = null  // invalidate row-size cache
     // Auto-update gpus per server when GPU changes on BMaaS
     if (field === 'gpu' && type === 'bmaas') {
       var g = M.gpuMap[val]
@@ -1657,11 +1631,10 @@ var C = {
     var totalGpus = 0, totalPower = 0, totalCapex = 0
     M.workloads.uc.concat(M.workloads.maas).forEach(function(wl) {
       try {
-        var t = M.workloads.maas.indexOf(wl) >= 0 ? 'maas' : 'uc'
-        var sz = (typeof AtlasSolution !== 'undefined') ? AtlasSolution.sizeWorkload(wl, t, M) : null
-        if (sz && !sz.error) {
-          var gpus = wl.provisionedGpus || sz.total || 0
-          totalGpus += gpus; totalPower += sz.powerKw||0; totalCapex += gpus*30000
+        var sz = praxisRowSize(wl)
+        if (sz) {
+          var gpus = sz.gpus || 0
+          totalGpus += gpus; totalPower += sz.powerKw||0; totalCapex += sz.capex||0
         }
       } catch(e) {}
     })
@@ -2230,6 +2203,24 @@ function estimate(w){
 
 
 // ── Fleet sizing (ported from IF praxisSizing()) ───────────────────────────────
+
+// Row-level sizing from the fleet engine (single source of truth, matches BOM)
+var _praxisSizeCache = null, _praxisSizeCacheKey = null
+function praxisRowSize(wl) {
+  try {
+    // cache per workload-set snapshot so we don't recompute for every row
+    var key = (M.workloads.uc.length+'-'+M.workloads.maas.length+'-'+M.workloads.gpuaas.length+'-'+M.workloads.bmaas.length)
+    if (_praxisSizeCacheKey !== key || !_praxisSizeCache) {
+      _praxisSizeCache = praxisSizing(); _praxisSizeCacheKey = key
+    }
+    var sz = _praxisSizeCache
+    if (!sz || sz.error || !sz.det) return null
+    var d = sz.det.find(function(x){ return x.id === wl.id })
+    if (!d) return null
+    return { gpus: d.gpus||0, total: d.gpus||0, gpu: d.gpu||wl.gpu, powerKw: d.pw||0, capex: d.cost||0, moqRounded: !!d.moqRounded, moqDemand: d.moqDemand, gpusPer: d.gpusPer }
+  } catch(e) { return null }
+}
+
 function praxisSizing(){
   var wls = getIFWorkloads();
   var tGPU=0,gCost=0,tPow=0,slaAll=true;
@@ -2272,6 +2263,7 @@ function praxisSizing(){
       gpus=Math.min(gpus,Math.max(maxBdg,w.src==='api'?0:1));
     }
     var servers=gpus>0?Math.ceil(gpus/gpusPer):0,actual=servers*gpusPer;
+    var moqDemand=gpus, moqProvisioned=actual, moqRounded=(actual!==gpus && gpus>0);
     var cpuP=getPROC(cpuK),pw=actual>0?(actual*(p.tdp||700)+servers*2*((cpuP||{}).tdp||350)+actual*50)*1.1/1000:0;
     var cost=actual*price(w.proc)*1.8;
     var tpsG=est.tpsG||1,totalTPS=tpsG*Math.max(actual,1);
@@ -2292,7 +2284,7 @@ function praxisSizing(){
     var secMult=((SEC_TIERS[w.securityTier]||{}).cost_mult)||1;
     
     tGPU+=actual+est.decGPUs;gCost+=(cost+est.decCost)*secMult;tPow+=pw+est.decPow;
-    det.push({...w,gpus:actual,gpusPer,servers,cost:cost*secMult,pw,totalTPS,estTTFT,estTBT,estE2E,
+    det.push({...w,gpus:actual,gpusPer,servers,cost:cost*secMult,pw,totalTPS,estTTFT,estTBT,estE2E,moqDemand,moqProvisioned,moqRounded,
       ttftOk,tbtOk,e2eOk,kvGB:est.kv,peakConc:est.peakConc,dailyReqs:est.dailyReqs,
       dailyTok:est.dailyTok,moTok:est.moTok,avgRPS:est.avgRPS,peakRPS:est.peakRPS,
       need:est.need,decGPUs:est.decGPUs,decCost:est.decCost*secMult,decPow:est.decPow,
@@ -2673,7 +2665,7 @@ var showP=true;
     if(d.src==='api'){h+=`<div style="margin-bottom:10px;padding:8px;background:var(--wbg);border-radius:6px;border-left:3px solid var(--s3);font-size:12px"><b>WL${i+1}: ${(wp||{}).n||''}</b> — ☁️ API · ${(m||{}).n||''} · ~${showP?fmt$(d.apiMoCost):'—'}/mo</div>`;return;}
     var nicPer=Math.ceil(d.gpusPer/2),diskPer=d.gpusPer*2;
     h+=`<div style="margin-bottom:10px;padding:10px;background:var(--bg);border-radius:6px;border-left:3px solid ${['var(--p1)','var(--s1)','var(--s2)','var(--s3)','var(--p2)'][i%5]}">
-      <div style="font-weight:700;font-size:11px;color:var(--p2);display:flex;justify-content:space-between"><span>${(wp||{}).ic||''} WL${i+1}: ${(wp||{}).n||''}</span><span style="font-size:12px;color:var(--txM)">${d.servers}srv × ${d.gpusPer}GPU${d.scaleUp?' + NVLink':''} · ${HA_TIERS[d.criticality]?.n} · ${SEC_TIERS[d.securityTier]?.n}</span></div>
+      <div style="font-weight:700;font-size:11px;color:var(--p2);display:flex;justify-content:space-between"><span>${(wp||{}).ic||''} WL${i+1}: ${(wp||{}).n||''}</span><span style="font-size:12px;color:var(--txM)">${d.servers}srv × ${d.gpusPer}GPU${d.scaleUp?' + NVLink':''}${d.moqRounded?'<span style="color:var(--s1)" title="Rounded up to ordering unit">*</span>':''} · ${HA_TIERS[d.criticality]?.n} · ${SEC_TIERS[d.securityTier]?.n}</span></div>
       <table style="font-size:12px;margin-top:4px"><thead><tr><th>Component</th><th>Spec</th><th>/Srv</th><th>Total</th>${showP?'<th>Cost</th>':''}</tr></thead><tbody>
         <tr><td><b>GPU${d.disaggAccepted?' (Prefill)':''}</b></td><td>${(p||{}).n||''} ${d.qt.toUpperCase()} ${d.migProfile!=='full'?'MIG:'+d.migProfile:''}</td><td>${d.gpusPer}</td><td>${d.gpus}</td>${showP?`<td>${fmt$(d.gpus*price(d.proc))}</td>`:''}</tr>
         ${d.decGPUs?`<tr style="background:var(--ibg)"><td><b>GPU (Decode)</b></td><td>${getPROC(d.decodeProc)?.n||''}</td><td>${d.gpusPer}</td><td>${d.decGPUs}</td>${showP?`<td>${fmt$(d.decCost)}</td>`:''}</tr>`:''}
@@ -2820,6 +2812,18 @@ var showP=true;
     <div class="pc" style="background:var(--sbg)"><div class="v" style="color:var(--s2)">${ppu}<span class="u">kW/rack</span></div><div class="l">Avg Power/Rack</div></div></div>`;
   
   h+=`</div><div class="card"><h3>Cost Breakdown</h3><div class="cc"><canvas id="cCost"></canvas></div></div>`;
+  // MOQ rounding footnote
+  var moqItems = (sz.det||[]).filter(function(d){ return d.moqRounded });
+  if (moqItems.length) {
+    h += '<div style="margin-top:16px;padding:12px 16px;background:var(--light);border-left:3px solid var(--s1);border-radius:6px;font-size:12px;color:var(--txM)">';
+    h += '<b style="color:var(--s1)">*</b> Quantity rounded up to the nearest ordering unit (you cannot procure a partial unit):<br>';
+    moqItems.forEach(function(d){
+      var unit = d.gpusPer || 8;
+      h += '&nbsp;&nbsp;• <b>' + (d.name||'Workload') + '</b>: ' + d.moqProvisioned + ' GPUs provisioned vs ' + d.moqDemand + ' demanded ('
+        + Math.ceil(d.moqDemand/unit) + '× ' + unit + '-GPU unit)<br>';
+    });
+    h += '</div>';
+  }
   el.innerHTML=h;
 }
 
