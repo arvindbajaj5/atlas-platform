@@ -1612,8 +1612,14 @@ var C = {
       M.modelCatalogue = mods || []
       M.modelMap = {}; M.modelById = {}
       M.modelCatalogue.forEach(function(m) {
-        M.modelMap[m.model_id] = m   // lookup by slug e.g. 'llama-3.1-8b'
-        M.modelById[m.id]      = m   // lookup by UUID (from saved solution_versions)
+        // model_catalogue has no slug/model_id column — key by UUID id (the only identifier)
+        M.modelMap[m.id]  = m
+        M.modelById[m.id] = m
+        // also key by name and slugified name for convenience/back-compat
+        if (m.name) {
+          M.modelMap[m.name] = m
+          M.modelMap[m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')] = m
+        }
       })
     } catch(e) { console.warn('loadRefData models:', e) }
 
