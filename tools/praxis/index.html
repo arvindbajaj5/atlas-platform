@@ -1966,7 +1966,8 @@ function getPROC(gpuId) {
     bw:  g.hbm_bw_tbps || 3.35,
     fp8: g.fp8_tflops || 1979,
     fp16:g.bf16_tflops || 1000,
-    tdp: (g.tdp_kw || 0.7) * 1000,
+    tdp: g.tdp_kw ? (g.tdp_kw*1000) / (g.gpus_in_unit || 1) : 700,  // per-GPU avg, derived from SKU-level kW
+    skuTdpKw: g.tdp_kw || 0,   // raw SKU-level kW, for BOM-authoritative power calc
     usd: g.price_usd || 30000,
     mx:  g.gpus_in_unit || 8,
     mig: g.mig_supported || false,
@@ -2302,7 +2303,7 @@ function skuRollup(det) {
     bySku[b.sku].rawTotal += b.yieldedTotal;
     bySku[b.sku].workloadTypes[b.wlType] = (bySku[b.sku].workloadTypes[b.wlType]||0) + b.deployRounded;
   });
-  var totalProvisioned = 0;
+  var totalProvisioned = 0, totalPowerKw = 0;
   Object.keys(bySku).forEach(function(sku) {
     var g = bySku[sku];
     var r = unitRound(g.deployRoundedTotal, g.skuUnit);  // round ONCE more, on Stage-2's rounded sum
@@ -2311,9 +2312,15 @@ function skuRollup(det) {
     g.unit = r.unit;
     g.moqRounded = r.moqRounded;
     g.headroom = r.provisioned - Math.round(g.deployRoundedTotal); // idle GPUs (cull/fill signal)
+    // BOM-authoritative power: SKU units PROCURED (rounded) × the SKU's own kW rating.
+    // This is the real draw — you power the racks you buy, not raw demand.
+    var gpuCfg = M.gpuMap && M.gpuMap[sku];
+    g.skuTdpKw = (gpuCfg && gpuCfg.tdp_kw) || 0;
+    g.powerKw = g.units * g.skuTdpKw;
     totalProvisioned += r.provisioned;
+    totalPowerKw += g.powerKw;
   });
-  return { stage2: stage2, bySku: bySku, totalProvisioned: totalProvisioned };
+  return { stage2: stage2, bySku: bySku, totalProvisioned: totalProvisioned, totalPowerKw: totalPowerKw };
 }
 
 function calcBlock(w) {
@@ -2412,7 +2419,12 @@ function praxisSizing(){
     if (r.slaFail) slaAll = false;
     det.push(r.det);
   });
-  
+
+  // ── BOM SKU rollup (two-stage rounding) — computed EARLY so racks/power below use it ──
+  var skuBom = skuRollup(det);
+  var bomGpuTotal = skuBom.totalProvisioned;
+  var bomPowerKw = skuBom.totalPowerKw || 0;   // SKU units PROCURED x SKU's own kW rating
+
   // Common infra
   var commonSrv=12; // router(3)+LB(2)+k8s(5)+monitoring(2)
   var commonCost=commonSrv*15000;
@@ -2434,7 +2446,7 @@ function praxisSizing(){
   
   // Aggregation
   var rackPow=HWCFG.rack_power_dlc_kw,rackPowAC=HWCFG.rack_power_ac_kw;
-  var dlcPow=tPow*0.8,acPow=tPow*0.2+commonPow+agentOrcPow;
+  var dlcPow=bomPowerKw*0.8,acPow=bomPowerKw*0.2+commonPow+agentOrcPow;
   var dlcRacks=Math.ceil(dlcPow/rackPow),acRacks=Math.ceil(acPow/rackPowAC);
   var totalRacks=dlcRacks+acRacks;
   var srvTotal=det.reduce((s,d)=>s+d.servers+(d.decGPUs?Math.ceil(d.decGPUs/(d.gpusPer||8)):0),0)+commonSrv+agentOrcSrv;
@@ -2504,9 +2516,8 @@ function praxisSizing(){
   
   var total=gCost+cpuCost+netCost+swCost+stoCost+rackCost+dramCost+chassisCost+commonCost+geoCost+spareCost+edgeTotalCost+agentOrcCost+swLicenseCost;
   
-  var skuBom = skuRollup(det);
-  var bomGpuTotal = skuBom.totalProvisioned;
-  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,gCost,tPow:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,srvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
+  var tPowBom = bomPowerKw + commonPow + edgeTotalPow + agentOrcPow;
+  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,gCost,tPow:tPowBom,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,srvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
 }
 
 
