@@ -1605,7 +1605,7 @@ var C = {
 
     // Load central Settings (app_config) — hardware costs, storage, software stack
     try {
-      var cfg = await atlasDB.get('app_config', 'key=in.(software_stack,storage_vendor,storage_replication_factor,storage_nvme_pct,storage_hdd_pct,storage_obj_pct,storage_nvme_price_per_tb,storage_hdd_price_per_tb,storage_obj_price_per_tb,storage_appliance_cost,rack_dlc_cost,rack_ac_cost,rack_install,dram_per_dimm,chassis_per_server,switch_cost,switch_spine_cost,nic_per_port,edge_cpu,edge_dram,edge_ssd,edge_nic,edge_rack,edge_lb,geo_cost,rack_power_dlc_kw,rack_power_ac_kw)&limit=60')
+      var cfg = await atlasDB.get('app_config', 'key=in.(software_stack,storage_vendor,storage_replication_factor,storage_nvme_pct,storage_hdd_pct,storage_obj_pct,storage_nvme_price_per_tb,storage_hdd_price_per_tb,storage_obj_price_per_tb,storage_appliance_cost,rack_dlc_cost,rack_ac_cost,rack_install,dram_per_dimm,chassis_per_server,switch_cost,switch_spine_cost,nic_per_port,edge_cpu,edge_dram,edge_ssd,edge_nic,edge_rack,edge_lb,geo_cost,rack_power_dlc_kw,rack_power_ac_kw,pue,switches_per_rack,service_node_kw)&limit=60')
       ;(cfg||[]).forEach(function(row){
         if (row.key === 'software_stack') {
           try { softwareStack = JSON.parse(row.value) } catch(e){}
@@ -1895,22 +1895,22 @@ const MIG_PROFILES={
   tts_bot:{n:"Text-to-Speech",ic:"🔊",ai:200,ao:0,ttft:200,tbt:0,e2e:1000,dau:10000,rpud:5,pk:3,sla:99.9,batch:8},
 }; var STORAGE_VENDORS={
   ddn:{n:'DDN',full:'DDN AI400X2 / EXAScaler',arch:'parallel_fs',desc:'High-performance parallel filesystem. GPU-direct storage via GPUDirect Storage (GDS). Optimized for AI/HPC workloads with NVMe-oF fabric.',
-    nvme_price:280,hdd_price:40,obj_price:0,nvme_pct:70,hdd_pct:30,obj_pct:0,appliance_cost:120000,repl:2,
+    nvme_price:280,hdd_price:40,obj_price:0,nvme_pct:70,hdd_pct:30,obj_pct:0,appliance_cost:120000,repl:2,tb_per_rack:4000,
     features:['GPUDirect Storage (GDS)','NVMe-oF fabric','EXAScaler Lustre','AI-optimized caching','Multi-tier auto-tiering']},
   ibm:{n:'IBM',full:'IBM Storage Scale (Spectrum Scale / GPFS)',arch:'parallel_fs',desc:'Enterprise-grade parallel filesystem with decades of HPC heritage. Strong data management, encryption, compression, and multi-site replication.',
-    nvme_price:320,hdd_price:35,obj_price:20,nvme_pct:50,hdd_pct:30,obj_pct:20,appliance_cost:150000,repl:2,
+    nvme_price:320,hdd_price:35,obj_price:20,nvme_pct:50,hdd_pct:30,obj_pct:20,appliance_cost:150000,repl:2,tb_per_rack:3500,
     features:['GPFS/Spectrum Scale','AFM (Active File Management)','Transparent cloud tiering','Built-in encryption','Multi-site replication']},
   vast:{n:'VAST Data',full:'VAST Data Platform',arch:'parallel_fs',desc:'Disaggregated shared everything (DASE) architecture. All-flash NVMe with erasure coding — no HDD tier. Universal storage for AI pipelines.',
-    nvme_price:180,hdd_price:0,obj_price:0,nvme_pct:100,hdd_pct:0,obj_pct:0,appliance_cost:80000,repl:1,
+    nvme_price:180,hdd_price:0,obj_price:0,nvme_pct:100,hdd_pct:0,obj_pct:0,appliance_cost:80000,repl:1,tb_per_rack:5000,
     features:['All-NVMe (no HDD)','DASE architecture','S3 + NFS + SMB unified','Erasure coding (no replication needed)','Inline dedup + compression']},
   weka:{n:'WEKA',full:'WEKA Data Platform',arch:'parallel_fs',desc:'Software-defined parallel filesystem optimized for GPU workloads. Highest IOPS/throughput density for AI training and inference. Runs on commodity NVMe servers.',
-    nvme_price:200,hdd_price:25,obj_price:12,nvme_pct:50,hdd_pct:30,obj_pct:20,appliance_cost:50000,repl:2,
+    nvme_price:200,hdd_price:25,obj_price:12,nvme_pct:50,hdd_pct:30,obj_pct:20,appliance_cost:50000,repl:2,tb_per_rack:2000,
     features:['POSIX + S3 unified','GPUDirect Storage','Tiered to object storage','Software-defined (commodity HW)','Snap-to-object backup']},
   scality:{n:'Scality',full:'Scality ARTESCA / RING',arch:'object_only',desc:'Object storage at scale. S3-compatible with strong consistency. Ideal for geospatial archive, data lakes, and cold storage tiers. Geo-distributed replication.',
-    nvme_price:0,hdd_price:25,obj_price:10,nvme_pct:0,hdd_pct:40,obj_pct:60,appliance_cost:30000,repl:3,
+    nvme_price:0,hdd_price:25,obj_price:10,nvme_pct:0,hdd_pct:40,obj_pct:60,appliance_cost:30000,repl:3,tb_per_rack:2000,
     features:['S3-native (ARTESCA)','Geo-distributed (RING)','Erasure coding','Metadata search','100PB+ proven scale']},
   generic:{n:'Generic',full:'Custom / Open Source (MinIO, Ceph, Lustre)',arch:'parallel_fs',desc:'Build-your-own storage layer. Use open-source components with commodity hardware. Maximum flexibility, requires more integration effort.',
-    nvme_price:200,hdd_price:30,obj_price:15,nvme_pct:40,hdd_pct:40,obj_pct:20,appliance_cost:50000,repl:2,
+    nvme_price:200,hdd_price:30,obj_price:15,nvme_pct:40,hdd_pct:40,obj_pct:20,appliance_cost:50000,repl:2,tb_per_rack:2000,
     features:['Open source','Commodity hardware','Full customization','Community support','No vendor lock-in']},
 };
 var storageConfig = { vendor:'ddn', replication_factor:2, nvme_pct:70, hdd_pct:30, obj_pct:0, nvme_price_per_tb:280, hdd_price_per_tb:40, obj_price_per_tb:0, appliance_cost:120000 };
@@ -1921,7 +1921,8 @@ var HWCFG = {
   switch_cost:45000, switch_spine_cost:65000, nic_per_port:3000,
   edge_cpu:15000, edge_dram:1200, edge_ssd:1600, edge_nic:1000, edge_rack:5000, edge_lb:500,
   geo_cost:250000,
-  rack_power_dlc_kw:260, rack_power_ac_kw:90
+  rack_power_dlc_kw:260, rack_power_ac_kw:30,
+  pue:1.2, switches_per_rack:38, service_node_kw:1.2
 };
 var priceOverrides = {};
 var benchmarks = {};
@@ -2444,11 +2445,8 @@ function praxisSizing(){
     agentOrcPow=agentOrcSrv*0.6; // kW per server
   }
   
-  // Aggregation
-  var rackPow=HWCFG.rack_power_dlc_kw,rackPowAC=HWCFG.rack_power_ac_kw;
-  var dlcPow=bomPowerKw*0.8,acPow=bomPowerKw*0.2+commonPow+agentOrcPow;
-  var dlcRacks=Math.ceil(dlcPow/rackPow),acRacks=Math.ceil(acPow/rackPowAC);
-  var totalRacks=dlcRacks+acRacks;
+  // Rack composition + facility power computed below, after storage/edge are finalized
+  // (rack calc needs stoTB; facility power needs edgeTotalPow — both defined later).
   var srvTotal=det.reduce((s,d)=>s+d.servers+(d.decGPUs?Math.ceil(d.decGPUs/(d.gpusPer||8)):0),0)+commonSrv+agentOrcSrv;
   var cpuCnt=srvTotal*2,cpuCost=price('Turin_9965')*cpuCnt;
   var netPorts=Math.ceil(tGPU/2);
@@ -2471,7 +2469,47 @@ function praxisSizing(){
   var hddTB=Math.ceil(stoTB*(storageConfig.hdd_pct||30)/100);
   var objTB=Math.ceil(stoTB*(storageConfig.obj_pct||0)/100);
   var stoCost=nvmeTB*(storageConfig.nvme_price_per_tb||280)+hddTB*(storageConfig.hdd_price_per_tb||40)+objTB*(storageConfig.obj_price_per_tb||0)+(storageConfig.appliance_cost||120000);
-  
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RACK COMPOSITION — component-aware, not a blended-power/generic-capacity guess.
+  // Each rack SOURCE computed on its own terms, then summed:
+  //   - Rack-scale GPU SKUs (rack_scale=true: NVL72/NVL4/Helios) -> SKU units = racks, directly.
+  //   - Server-scale GPU SKUs (rack_scale=false: SXM 8x) -> grouped into AC-capacity racks
+  //     using that SKU's own kW draw (servers_per_rack = floor(AC_kW / server_kW)).
+  //   - Storage -> stoTB (finalized, post-replication) / vendor's tb_per_rack.
+  //   - Switches -> BOM-based switch estimate / switches_per_rack (38).
+  //   - Common CPU/service nodes -> commonSrv / servers_per_rack (AC_kW / service_node_kw).
+  //   - Agentic orchestrator nodes: NOT YET folded in (deferred per explicit scope decision).
+  // Edge deployment power/cost stays fully separate (per-site), not part of these racks.
+  // ═══════════════════════════════════════════════════════════════════════
+  var rackPowAC=HWCFG.rack_power_ac_kw;
+  var dlcRacksGPU=0, acRacksGPU=0;
+  Object.keys(skuBom.bySku||{}).forEach(function(sku){
+    var g = skuBom.bySku[sku];
+    var gpuCfg = M.gpuMap && M.gpuMap[sku];
+    var isRackScale = !!(gpuCfg && gpuCfg.rack_scale);
+    if (isRackScale) {
+      // SKU unit IS the rack (NVL72/NVL4/Helios) — use the exact procured unit count.
+      dlcRacksGPU += g.units;
+    } else {
+      // SKU unit is a SERVER (SXM 8x) — group into AC-capacity racks by that SKU's own draw.
+      var serverKw = g.skuTdpKw || 15;
+      var serversPerRack = Math.max(1, Math.floor(rackPowAC / serverKw));
+      acRacksGPU += Math.ceil(g.units / serversPerRack);
+    }
+  });
+  var stoVendorCfg = STORAGE_VENDORS[storageConfig.vendor] || STORAGE_VENDORS.ddn || {tb_per_rack:2000};
+  var storageRacks = stoTB>0 ? Math.ceil(stoTB / (stoVendorCfg.tb_per_rack||2000)) : 0;
+  var bomNetPorts = Math.ceil(bomGpuTotal/2);
+  var bomSwitchCount = Math.ceil(bomNetPorts/64);
+  var switchRacks = bomSwitchCount>0 ? Math.ceil(bomSwitchCount / HWCFG.switches_per_rack) : 0;
+  var serviceNodesPerRack = Math.max(1, Math.floor(rackPowAC / (HWCFG.service_node_kw||1.2)));
+  var commonRacks = commonSrv>0 ? Math.ceil(commonSrv / serviceNodesPerRack) : 0;
+
+  var dlcRacks = dlcRacksGPU;
+  var acRacks = acRacksGPU + storageRacks + switchRacks + commonRacks;
+  var totalRacks = dlcRacks + acRacks;
+
   var rackDLCCost=hwPrice("rack_dlc_cost")+hwPrice("rack_install");
   var rackACCost=hwPrice("rack_ac_cost")+hwPrice("rack_install");
   var rackCost=dlcRacks*rackDLCCost+acRacks*rackACCost+0;
@@ -2516,8 +2554,9 @@ function praxisSizing(){
   
   var total=gCost+cpuCost+netCost+swCost+stoCost+rackCost+dramCost+chassisCost+commonCost+geoCost+spareCost+edgeTotalCost+agentOrcCost+swLicenseCost;
   
-  var tPowBom = bomPowerKw + commonPow + edgeTotalPow + agentOrcPow;
-  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,gCost,tPow:tPowBom,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,srvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
+  var itPowerKw = bomPowerKw + commonPow + edgeTotalPow + agentOrcPow;   // raw IT load, no PUE
+  var facilityPowerKw = itPowerKw * (HWCFG.pue||1.2);                     // PUE-uplifted (what's shown)
+  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,gCost,tPow:facilityPowerKw,itPowerKw:itPowerKw,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,storageRacks,switchRacks,commonRacks,dlcRacksGPU,acRacksGPU,srvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
 }
 
 
@@ -2638,8 +2677,8 @@ V.renderArchTab = function(){
 
         <div style="font-size:11px;font-weight:700;color:var(--p2);margin-bottom:4px">Cooling Layout</div>
         <div class="g2" style="gap:6px">
-          <div class="ib i" style="text-align:center"><b style="font-size:14px">🧊 ${sz.dlcRacks}</b><br><span style="font-size:11px">DLC Racks (${priceOverrides._rackDLCkw||260}kW, PUE <1.1)</span></div>
-          <div class="ib w" style="text-align:center"><b style="font-size:14px">💨 ${sz.acRacks}</b><br><span style="font-size:11px">AC Racks (${priceOverrides._rackACkw||90}kW, PUE 1.3)</span></div>
+          <div class="ib i" style="text-align:center"><b style="font-size:14px">🧊 ${sz.dlcRacks}</b><br><span style="font-size:11px">DLC Racks (rack-scale SKU units, PUE ${HWCFG.pue||1.2}×)</span></div>
+          <div class="ib w" style="text-align:center"><b style="font-size:14px">💨 ${sz.acRacks}</b><br><span style="font-size:11px">AC Racks (${HWCFG.rack_power_ac_kw||30}kW cap: GPU+storage+switch+CPU)</span></div>
         </div>
       </div>
     </div>
