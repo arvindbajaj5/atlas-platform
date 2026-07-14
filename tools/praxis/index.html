@@ -2775,7 +2775,7 @@ var showP=true;
     </button></div>`
   h+=`<div class="card" style="background:linear-gradient(135deg,rgba(0,40,112,.02),rgba(28,56,245,.02))"><h3>BOM — Per-Workload Configs & Aggregation</h3>
     <div class="g5" style="margin-bottom:16px">
-      <div class="st"><div class="v" style="color:var(--p1)">${sz.tGPU}</div><div class="l">GPUs</div></div>
+      <div class="st"><div class="v" style="color:var(--p1)">${sz.bomGpuTotal||sz.tGPU}</div><div class="l">GPUs (BOM)</div></div>
       <div class="st"><div class="v" style="color:var(--p2)">${sz.srvTotal}</div><div class="l">Servers</div></div>
       <div class="st"><div class="v" style="color:var(--s1)">${sz.dlcRacks}+${sz.acRacks}</div><div class="l">DLC+AC Racks</div></div>
       <div class="st"><div class="v" style="color:var(--s2)">${sz.stoTB}TB</div><div class="l">Storage</div></div>
@@ -2813,10 +2813,17 @@ var showP=true;
     </tbody></table></div>`;
 
   // Aggregated
-  var gpuTotals={};sz.det.filter(d=>d.src!=='api').forEach(d=>{gpuTotals[d.proc]=(gpuTotals[d.proc]||0)+d.gpus;if(d.decGPUs)gpuTotals[d.decodeProc]=(gpuTotals[d.decodeProc]||0)+d.decGPUs;});
+  // Aggregated BOM GPU rows come from skuBom — the TWO-STAGE ROUNDED procurement
+  // count per SKU (yield -> deploy-unit round within workload type -> SKU-unit
+  // round ACROSS workload types). NEVER the raw sum of per-workload demand.
+  var skuBomAgg = sz.skuBom || skuRollup(sz.det);
   
   h+=`<h3 style="margin-top:16px;color:var(--p2)">Aggregated BOM</h3><table><thead><tr><th>Category</th><th>Spec</th><th>Qty</th>${showP?'<th>Total</th>':''}</tr></thead><tbody>`;
-  Object.entries(gpuTotals).forEach(([k,c])=>{h+=`<tr><td><b>GPU</b></td><td>${((getPROC(k)||{}).n||k)}</td><td>${c}</td>${showP?`<td><b>${fmt$(c*price(k))}</b></td>`:''}</tr>`;});
+  Object.entries(skuBomAgg.bySku||{}).forEach(function(entry){
+    var k=entry[0], g=entry[1];
+    var qty=g.provisioned;  // rounded procurement count, not raw demand
+    h+=`<tr><td><b>GPU</b></td><td>${((getPROC(k)||{}).n||k)}${g.moqRounded?' <span style="color:var(--s1)" title="Rounded up from '+Math.round(g.deployRoundedTotal)+' demanded">*</span>':''}</td><td>${qty}</td>${showP?`<td><b>${fmt$(qty*price(k))}</b></td>`:''}</tr>`;
+  });
   h+=`<tr><td><b>Chassis</b></td><td>DLC/AC-ready</td><td>${sz.srvTotal}</td>${showP?`<td><b>${fmt$(sz.chassisCost)}</b></td>`:''}</tr>`;
   h+=`<tr><td><b>CPUs</b></td><td>EPYC 9965</td><td>${sz.cpuCnt}</td>${showP?`<td><b>${fmt$(sz.cpuCost)}</b></td>`:''}</tr>`;
   h+=`<tr><td><b>DRAM</b></td><td>DDR5 128GB DIMMs</td><td>${sz.srvTotal*8}</td>${showP?`<td><b>${fmt$(sz.dramCost)}</b></td>`:''}</tr>`;
