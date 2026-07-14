@@ -1434,7 +1434,7 @@ var C = {
     M.isDirty = true; C._refreshDemandPlanner(wlId, wl); C.scheduleSave()
   },
 
-  selectEngagement: function(engId) {
+  selectEngagement: async function(engId) {
     if (!engId) {
       M.currentEng = null
       M.actions = []
@@ -1451,7 +1451,7 @@ var C = {
     // Load actions for this engagement
     C.loadActions(engId)
     // Load existing solution version if any
-    C.loadLatestVersion(engId)
+    await C.loadLatestVersion(engId)
   },
 
   selectAction: function(actionId) {
@@ -1509,7 +1509,7 @@ var C = {
       var engParam = params.get('eng')
       if (engParam) {
         document.getElementById('eng-select').value = engParam
-        C.selectEngagement(engParam)
+        await C.selectEngagement(engParam)
       }
     } catch(e) { console.warn('loadEngagements:', e) }
   },
@@ -1798,12 +1798,19 @@ var C = {
 // INIT — called after shared scripts load
 // ════════════════════════════════════════════════════════════════════════════
 
-function onScriptsReady() {
+async function onScriptsReady() {
   V.init()
-  C.loadEngagements()
-  C.loadRefData()
-  // Default to scope tab on load
+  // Render the default tab immediately for responsiveness, but AWAIT data loads
+  // and RE-RENDER once ref data (models/gpus) + engagement (workloads) are in,
+  // otherwise data-dependent sections (timeline, per-workload effort, env/testing
+  // GPU-derived days) show blank/zero. (This fix regressed once before — verify
+  // it survives future edits by checking for 'async function onScriptsReady'.)
   C.switchTab('scope')
+  try {
+    await Promise.all([ C.loadRefData(), C.loadEngagements() ])
+  } catch(e) { console.warn('[PRAXIS] init load:', e) }
+  if (typeof _praxisSizeCache !== 'undefined') _praxisSizeCache = null
+  C.switchTab(M.activeTab || 'scope')
 
   // ── Event delegation for demand planner (data-action pattern) ──────────
   // Handles addSource / updSource / removeSource without inline event handlers
