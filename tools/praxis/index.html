@@ -2447,7 +2447,9 @@ function praxisSizing(){
   
   // Rack composition + facility power computed below, after storage/edge are finalized
   // (rack calc needs stoTB; facility power needs edgeTotalPow — both defined later).
-  var srvTotal=det.reduce((s,d)=>s+d.servers+(d.decGPUs?Math.ceil(d.decGPUs/(d.gpusPer||8)):0),0)+commonSrv+agentOrcSrv;
+  var computeSrvTotal=det.reduce((s,d)=>s+d.servers+(d.decGPUs?Math.ceil(d.decGPUs/(d.gpusPer||8)):0),0);
+  var serviceSrvTotal=commonSrv+agentOrcSrv;  // router/LB/k8s/monitoring/agentic — NOT compute
+  var srvTotal=computeSrvTotal+serviceSrvTotal;
   var cpuCnt=srvTotal*2,cpuCost=price('Turin_9965')*cpuCnt;
   var netPorts=Math.ceil(tGPU/2);
   var netCost=det.reduce((s,d)=>{var n=(NET[d.netChoice]||{cpp:HWCFG.nic_per_port});return s+Math.ceil(d.gpus/2)*hwPrice("nic_per_port");},0);
@@ -2482,7 +2484,7 @@ function praxisSizing(){
   //   - Agentic orchestrator nodes: NOT YET folded in (deferred per explicit scope decision).
   // Edge deployment power/cost stays fully separate (per-site), not part of these racks.
   // ═══════════════════════════════════════════════════════════════════════
-  var rackPowAC=HWCFG.rack_power_ac_kw;
+  var rackPowAC=hwPrice("rack_power_ac_kw");
   var dlcRacksGPU=0, acRacksGPU=0;
   Object.keys(skuBom.bySku||{}).forEach(function(sku){
     var g = skuBom.bySku[sku];
@@ -2502,8 +2504,8 @@ function praxisSizing(){
   var storageRacks = stoTB>0 ? Math.ceil(stoTB / (stoVendorCfg.tb_per_rack||2000)) : 0;
   var bomNetPorts = Math.ceil(bomGpuTotal/2);
   var bomSwitchCount = Math.ceil(bomNetPorts/64);
-  var switchRacks = bomSwitchCount>0 ? Math.ceil(bomSwitchCount / HWCFG.switches_per_rack) : 0;
-  var serviceNodesPerRack = Math.max(1, Math.floor(rackPowAC / (HWCFG.service_node_kw||1.2)));
+  var switchRacks = bomSwitchCount>0 ? Math.ceil(bomSwitchCount / hwPrice("switches_per_rack")) : 0;
+  var serviceNodesPerRack = Math.max(1, Math.floor(rackPowAC / (hwPrice("service_node_kw")||1.2)));
   var commonRacks = commonSrv>0 ? Math.ceil(commonSrv / serviceNodesPerRack) : 0;
 
   var dlcRacks = dlcRacksGPU;
@@ -2555,8 +2557,8 @@ function praxisSizing(){
   var total=gCost+cpuCost+netCost+swCost+stoCost+rackCost+dramCost+chassisCost+commonCost+geoCost+spareCost+edgeTotalCost+agentOrcCost+swLicenseCost;
   
   var itPowerKw = bomPowerKw + commonPow + edgeTotalPow + agentOrcPow;   // raw IT load, no PUE
-  var facilityPowerKw = itPowerKw * (HWCFG.pue||1.2);                     // PUE-uplifted (what's shown)
-  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,gCost,tPow:facilityPowerKw,itPowerKw:itPowerKw,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,storageRacks,switchRacks,commonRacks,dlcRacksGPU,acRacksGPU,srvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
+  var facilityPowerKw = itPowerKw * (hwPrice("pue")||1.2);                     // PUE-uplifted (what's shown)
+  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,gCost,tPow:facilityPowerKw,itPowerKw:itPowerKw,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,storageRacks,switchRacks,commonRacks,dlcRacksGPU,acRacksGPU,srvTotal,computeSrvTotal,serviceSrvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
 }
 
 
@@ -2677,8 +2679,8 @@ V.renderArchTab = function(){
 
         <div style="font-size:11px;font-weight:700;color:var(--p2);margin-bottom:4px">Cooling Layout</div>
         <div class="g2" style="gap:6px">
-          <div class="ib i" style="text-align:center"><b style="font-size:14px">🧊 ${sz.dlcRacks}</b><br><span style="font-size:11px">DLC Racks (rack-scale SKU units, PUE ${HWCFG.pue||1.2}×)</span></div>
-          <div class="ib w" style="text-align:center"><b style="font-size:14px">💨 ${sz.acRacks}</b><br><span style="font-size:11px">AC Racks (${HWCFG.rack_power_ac_kw||30}kW cap: GPU+storage+switch+CPU)</span></div>
+          <div class="ib i" style="text-align:center"><b style="font-size:14px">🧊 ${sz.dlcRacks}</b><br><span style="font-size:11px">DLC Racks (rack-scale SKU units, PUE ${hwPrice('pue')||1.2}×)</span></div>
+          <div class="ib w" style="text-align:center"><b style="font-size:14px">💨 ${sz.acRacks}</b><br><span style="font-size:11px">AC Racks (${hwPrice('rack_power_ac_kw')||30}kW cap: GPU+storage+switch+CPU)</span></div>
         </div>
       </div>
     </div>
@@ -2826,7 +2828,7 @@ var showP=true;
   h+=`<div class="card" style="background:linear-gradient(135deg,rgba(0,40,112,.02),rgba(28,56,245,.02))"><h3>BOM — Per-Workload Configs & Aggregation</h3>
     <div class="g5" style="margin-bottom:16px">
       <div class="st"><div class="v" style="color:var(--p1)">${sz.bomGpuTotal||sz.tGPU}</div><div class="l">GPUs (BOM)</div></div>
-      <div class="st"><div class="v" style="color:var(--p2)">${sz.srvTotal}</div><div class="l">Servers</div></div>
+      <div class="st"><div class="v" style="color:var(--p2)">${sz.srvTotal}</div><div class="l">Servers</div><div style="font-size:10px;color:var(--txM);margin-top:2px">${sz.computeSrvTotal} compute + ${sz.serviceSrvTotal} service</div></div>
       <div class="st"><div class="v" style="color:var(--s1)">${sz.dlcRacks}+${sz.acRacks}</div><div class="l">DLC+AC Racks</div></div>
       <div class="st"><div class="v" style="color:var(--s2)">${sz.stoTB}TB</div><div class="l">Storage</div></div>
       <div class="st"><div class="v" style="color:var(--s3)">${sz.tPow.toFixed(0)}kW</div><div class="l">Power</div></div>
@@ -4017,6 +4019,13 @@ var PriceOverride = {
     ;[['_storage_nvme_price_per_tb','Storage','NVMe Storage','per TB','nvme_price_per_tb'],
       ['_storage_hdd_price_per_tb','Storage','HDD Storage','per TB','hdd_price_per_tb']].forEach(function(s){
       list.push({ key:s[0], group:s[1], name:s[2], unit:s[3], def:(storageConfig[s[4]]||0), isGpu:false })
+    })
+    // Facility config (not a price, but editable the same way — PUE, rack capacity, densities)
+    ;[['_pue','Facility','PUE (Power Usage Effectiveness)','multiplier','pue'],
+      ['_rack_power_ac_kw','Facility','AC Rack Capacity','kW/rack','rack_power_ac_kw'],
+      ['_switches_per_rack','Facility','Switches per Rack','count','switches_per_rack'],
+      ['_service_node_kw','Facility','Service Node Draw','kW/server','service_node_kw']].forEach(function(f){
+      list.push({ key:f[0], group:f[1], name:f[2], unit:f[3], def:(HWCFG[f[4]]||0), isGpu:false })
     })
     return list
   },
