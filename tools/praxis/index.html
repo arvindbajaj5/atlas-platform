@@ -1554,20 +1554,35 @@ var C = {
         // Restore deal-specific price overrides
         priceOverrides = snap.price_overrides || {}
         M.priceOverrides = priceOverrides
-        // Restore workloads
-        if (snap.workload_configs) {
-          M.workloads = {
-            uc:     snap.workload_configs.uc     || [],
-            maas:   snap.workload_configs.maas   || [],
-            gpuaas: snap.workload_configs.gpuaas || [],
-            bmaas:  snap.workload_configs.bmaas  || []
-          }
+        // Restore workloads — ALWAYS reset M.workloads on engagement switch, even when
+        // the new engagement has no saved workload_configs, so switching engagements
+        // never silently leaves the PREVIOUS engagement's workloads showing (stale data bug).
+        M.workloads = {
+          uc:     (snap.workload_configs && snap.workload_configs.uc)     || [],
+          maas:   (snap.workload_configs && snap.workload_configs.maas)   || [],
+          gpuaas: (snap.workload_configs && snap.workload_configs.gpuaas) || [],
+          bmaas:  (snap.workload_configs && snap.workload_configs.bmaas)  || []
         }
         M.isDirty = false
         C.setMode(M.mode)
         V.renderWorkloadsTab()
         V.updateKpiBar()
+        if (typeof _praxisSizeCache !== 'undefined') _praxisSizeCache = null
+        // Explicitly refresh whichever tab is active — previously only Workloads/KPI
+        // refreshed here, so Scope (and others) could show stale data until something
+        // else happened to trigger a re-render.
+        if (M.activeTab && V.switchTab) V.switchTab(M.activeTab)
+        else if (M.activeTab === 'scope' && V.renderScopeTab) V.renderScopeTab()
         V.toast('Loaded ' + M.versionLabel, 'info')
+      } else {
+        // No saved version for this engagement at all — reset workloads so switching
+        // TO a fresh engagement doesn't keep showing the PREVIOUS engagement's data.
+        M.workloads = { uc:[], maas:[], gpuaas:[], bmaas:[] }
+        M.solutionVersionId = null; M.versionLabel = null; M.versionNumber = null
+        M.isDirty = false
+        V.renderWorkloadsTab()
+        V.updateKpiBar()
+        if (M.activeTab && V.switchTab) V.switchTab(M.activeTab)
       }
     } catch(e) { console.warn('loadLatestVersion:', e) }
   },
