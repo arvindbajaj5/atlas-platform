@@ -1799,18 +1799,24 @@ var C = {
 // ════════════════════════════════════════════════════════════════════════════
 
 async function onScriptsReady() {
+  console.log('[DIAG] onScriptsReady START, t=' + Date.now())
   V.init()
+  console.log('[DIAG] V.init() done, t=' + Date.now())
   // Render the default tab immediately for responsiveness, but AWAIT data loads
   // and RE-RENDER once ref data (models/gpus) + engagement (workloads) are in,
   // otherwise data-dependent sections (timeline, per-workload effort, env/testing
   // GPU-derived days) show blank/zero. (This fix regressed once before — verify
   // it survives future edits by checking for 'async function onScriptsReady'.)
   C.switchTab('scope')
+  console.log('[DIAG] first switchTab(scope) done, t=' + Date.now())
   try {
     await Promise.all([ C.loadRefData(), C.loadEngagements() ])
-  } catch(e) { console.warn('[PRAXIS] init load:', e) }
+    console.log('[DIAG] Promise.all RESOLVED, t=' + Date.now())
+  } catch(e) { console.warn('[PRAXIS] init load:', e); console.log('[DIAG] Promise.all THREW, t=' + Date.now()) }
   if (typeof _praxisSizeCache !== 'undefined') _praxisSizeCache = null
+  console.log('[DIAG] about to call SECOND switchTab, M.activeTab=' + M.activeTab + ', t=' + Date.now())
   C.switchTab(M.activeTab || 'scope')
+  console.log('[DIAG] SECOND switchTab(' + (M.activeTab||'scope') + ') CALLED, t=' + Date.now())
 
   // ── Event delegation for demand planner (data-action pattern) ──────────
   // Handles addSource / updSource / removeSource without inline event handlers
