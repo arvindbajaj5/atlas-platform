@@ -1814,9 +1814,15 @@ async function onScriptsReady() {
     console.log('[DIAG] Promise.all RESOLVED, t=' + Date.now())
   } catch(e) { console.warn('[PRAXIS] init load:', e); console.log('[DIAG] Promise.all THREW, t=' + Date.now()) }
   if (typeof _praxisSizeCache !== 'undefined') _praxisSizeCache = null
-  console.log('[DIAG] about to call SECOND switchTab, M.activeTab=' + M.activeTab + ', t=' + Date.now())
   C.switchTab(M.activeTab || 'scope')
-  console.log('[DIAG] SECOND switchTab(' + (M.activeTab||'scope') + ') CALLED, t=' + Date.now())
+  // Safety-net re-render: the S5 (Per-Workload Data & MLOps Profile) table has shown
+  // a narrow race where the first automated render catches workload data mid-settle
+  // and produces 0 rows, even though the data is confirmed present microseconds later
+  // (works every time on manual re-render/tab-switch). A short deferred re-render
+  // closes that window without needing the user to navigate away and back.
+  setTimeout(function(){
+    if (M.activeTab === 'scope') V.renderScopeTab()
+  }, 150)
 
   // ── Event delegation for demand planner (data-action pattern) ──────────
   // Handles addSource / updSource / removeSource without inline event handlers
