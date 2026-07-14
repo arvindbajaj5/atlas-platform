@@ -739,8 +739,8 @@ var V = {
 
     if (type === 'uc' || type === 'maas') {
       var sz = praxisRowSize(wl)
+      // Row shows RAW exact demand — no rounding, no * here (rounding is BOM-only)
       var gpus  = (sz) ? (sz.gpus||0) : '—'
-      if (sz && sz.moqRounded) gpus = (sz.gpus||0) + '*'
       var power = (sz) ? (Math.round((sz.powerKw||0)*10)/10 + ' kW') : '—'
       var capex = (sz && sz.capex) ? ('$' + Math.round(sz.capex/1000) + 'K') : '—'
       if (wl.provisionedGpus) gpus = wl.provisionedGpus + ' ⬆'
@@ -2217,7 +2217,7 @@ function praxisRowSize(wl) {
     if (!sz || sz.error || !sz.det) return null
     var d = sz.det.find(function(x){ return x.id === wl.id })
     if (!d) return null
-    return { gpus: d.gpus||0, total: d.gpus||0, gpu: d.gpu||wl.gpu, powerKw: d.pw||0, capex: d.cost||0, moqRounded: !!d.moqRounded, moqDemand: d.moqDemand, gpusPer: d.gpusPer }
+    return { gpus: d.gpus||0, total: d.gpus||0, gpu: d.gpu||wl.gpu, powerKw: d.pw||0, capex: d.cost||0, rawGpus: d.rawGpus, gpusPer: d.gpusPer }
   } catch(e) { return null }
 }
 
@@ -2234,38 +2234,88 @@ function praxisRowSize(wl) {
 // ── Shared Unit / MOQ utility ────────────────────────────────────────────
 // The single place unit rounding happens. Unit = gpus_in_unit from catalogue.
 var cpuK = 'Turin_9965';
-function unitRound(demandGpus, gpuId) {
-  var g = M.gpuMap && M.gpuMap[gpuId];
-  var unit = (g && g.gpus_in_unit) || 8;
+function unitRound(demandGpus, unit) {
+  var u = unit || 8;
   var d = demandGpus || 0;
-  var units = d > 0 ? Math.ceil(d / unit) : 0;
-  var provisioned = units * unit;
-  return { demand: d, unit: unit, units: units, provisioned: provisioned,
+  var units = d > 0 ? Math.ceil(d / u) : 0;
+  var provisioned = units * u;
+  return { demand: d, unit: u, units: units, provisioned: provisioned,
            moqRounded: (provisioned !== d && d > 0) };
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// ⚠️  YIELD PLACEHOLDER — REPLACE WHEN YIELD MODULE IS BUILT
-// Per-workload yield factor. MUST be applied to RAW demand BEFORE the single
-// unitRound. Rounding happens ONCE, on the yield-adjusted demand — never twice.
-// Today returns 1.0 (no-op) so numbers are unchanged. When yield is built:
-//   1. return the real per-workload yield factor here
-//   2. keep the order: rawDemand × yieldFactor → provisionGpus() → round ONCE
-//   3. see standards/calc-modules.md "Yield" section
+// ⚠️  YIELD — per-WORKLOAD, per-MODEL/config factor (NOT a GPU property).
+// Applied to a workload's raw SKU-portions BEFORE cross-workload aggregation.
+// Today returns 1.0 (no-op). Replace when the yield module is built.
+// See standards/calc-modules.md "Yield" section.
 // ════════════════════════════════════════════════════════════════════════
 function yieldFactor(w) {
   return 1.0; // TODO(yield): replace with real per-workload yield calc
 }
 
-// ── Final provisioning: raw demand → yield → round ONCE ──────────────────
-// This is the SINGLE rounding point. Modules pass RAW demand; this applies the
-// yield factor then rounds to the ordering unit exactly once.
-function provisionGpus(rawDemandGpus, gpuId, w) {
-  var yielded = (rawDemandGpus || 0) * yieldFactor(w);
-  return unitRound(yielded, gpuId);
+// ═══════════════════════════════════════════════════════════════════════
+// TWO-STAGE SKU ROUNDING — the single place BOM procurement counts happen.
+// Modules pass RAW demand; workload tabs show raw (never rounded).
+//
+// Stage 1: yieldFactor(workload) applied to each of that workload's SKU
+//          portions (main/decode/cascade) — yield is per-workload, applied
+//          to ALL its SKU allocations before any cross-workload aggregation.
+// Stage 2: group by (workloadType, SKU) -> sum yield-adjusted -> round UP to
+//          DEPLOYMENT unit (deployment_unit_gpus: server/blade).
+// Stage 3: sum Stage-2's ROUNDED amounts across workload types, by SKU only
+//          -> round UP to SKU/ordering unit (sku_unit_gpus: rack).
+// Round-then-sum-then-round: Stage 3 operates on Stage-2 ROUNDED output.
+// ═══════════════════════════════════════════════════════════════════════
+function skuRollup(det) {
+  // ── Stage 1+2: yield per workload-portion, then group+round by (wlType, SKU) ──
+  var stage2 = {}; // key: wlType|sku -> { sku, wlType, yieldedTotal, deployUnit, skuUnit }
+  function addPortion(wlType, sku, gpus, yf) {
+    if (!sku || !gpus) return;
+    var g = M.gpuMap && M.gpuMap[sku];
+    var deployUnit = (g && (g.deployment_unit_gpus || g.gpus_in_unit)) || 8;
+    var skuUnit = (g && (g.sku_unit_gpus || g.gpus_in_unit)) || 8;
+    var key = wlType + '|' + sku;
+    if (!stage2[key]) stage2[key] = { sku:sku, wlType:wlType, yieldedTotal:0, deployUnit:deployUnit, skuUnit:skuUnit, workloads:[] };
+    var yielded = gpus * (yf != null ? yf : 1.0);
+    stage2[key].yieldedTotal += yielded;
+  }
+  (det || []).forEach(function(d) {
+    var yf = yieldFactor(d);           // per-workload, applied to ALL its SKU portions
+    var wlType = d.tp || 'uc';
+    addPortion(wlType, d.sku || d.proc, d.rawGpus || 0, yf);           // main allocation
+    if (d.decGPUs)     addPortion(wlType, d.decodeProc || d.proc, d.decGPUs, yf);     // disaggregated decode
+    if (d.cascadeGPUs) addPortion(wlType, d.cascadeProc || d.proc, d.cascadeGPUs, yf); // cascade split
+  });
+  // Round Stage 2: each (workloadType, SKU) bucket rounds to the DEPLOYMENT unit
+  Object.keys(stage2).forEach(function(k) {
+    var b = stage2[k];
+    var r = unitRound(b.yieldedTotal, b.deployUnit);
+    b.deployRounded = r.provisioned;
+  });
+
+  // ── Stage 3: sum Stage-2's ROUNDED amounts across workload types, by SKU only ──
+  var bySku = {};
+  Object.keys(stage2).forEach(function(k) {
+    var b = stage2[k];
+    if (!bySku[b.sku]) bySku[b.sku] = { rawTotal:0, deployRoundedTotal:0, skuUnit:b.skuUnit, workloadTypes:{} };
+    bySku[b.sku].deployRoundedTotal += b.deployRounded;
+    bySku[b.sku].rawTotal += b.yieldedTotal;
+    bySku[b.sku].workloadTypes[b.wlType] = (bySku[b.sku].workloadTypes[b.wlType]||0) + b.deployRounded;
+  });
+  var totalProvisioned = 0;
+  Object.keys(bySku).forEach(function(sku) {
+    var g = bySku[sku];
+    var r = unitRound(g.deployRoundedTotal, g.skuUnit);  // round ONCE more, on Stage-2's rounded sum
+    g.provisioned = r.provisioned;
+    g.units = r.units;
+    g.unit = r.unit;
+    g.moqRounded = r.moqRounded;
+    g.headroom = r.provisioned - Math.round(g.deployRoundedTotal); // idle GPUs (cull/fill signal)
+    totalProvisioned += r.provisioned;
+  });
+  return { stage2: stage2, bySku: bySku, totalProvisioned: totalProvisioned };
 }
 
-// ── MODULE 1: BLOCK (BM + GPUaaS) — raw GPU/server allocation, no token sizing ──
 function calcBlock(w) {
   var p = getPROC(w.proc);
   if (!p) return null;
@@ -2288,7 +2338,7 @@ function calcBlock(w) {
       kvGB:0, peakConc:0, dailyReqs:0, dailyTok:0, moTok:0, avgRPS:0, peakRPS:0,
       need:blockGPUs, decGPUs:0, decCost:0, decPow:0, apiMoCost:0, cascadeGPUs:0, batchUsed:0,
       bmSource:'block', recDisagg:false, recLight:false, isBlock:true,
-      moqDemand:blockGPUs, moqProvisioned:blockGPUs, moqRounded:false},
+      rawGpus:blockGPUs, sku:w.proc, yf:yieldFactor(w), decodeProc:null, cascadeProc:null},
     tGPU: blockGPUs, gCost: blockCost, tPow: blockPow
   };
 }
@@ -2301,14 +2351,14 @@ function _calcInferenceCore(w) {
   var p = getPROC(w.proc), m = getMDL(w.md);
   if (!p) return null;
   var est = estimate(w);
-  // Unit granularity comes from the DB (gpus_in_unit): 72 VR NVL72, 8 SXM, 4 VR NVL4, 2 for 2-GPU servers.
-  var gpusPer = p.mx || 8;
-  var rawDemand = est.gpus;                          // RAW demand (unrounded) from the module
-  // Single provisioning point: raw demand → yield → unit-round ONCE (no double rounding)
-  var prov = provisionGpus(rawDemand, w.proc, w);
-  var actual = prov.provisioned;
+  // Modules return RAW exact demand — NO rounding here. Workload tabs show this
+  // exact count. BOM procurement rounding happens ONLY in skuRollup (two-stage,
+  // post-yield, grouped by SKU). Unit granularity (server/SKU) lives on the SKU
+  // row in the DB (deployment_unit_gpus / sku_unit_gpus), read by skuRollup.
+  var gpusPer = p.mx || 8;              // display-only server grouping for this tab
+  var rawGpus = est.gpus;               // exact demand, unrounded — shown as-is
+  var actual = rawGpus;
   var servers = actual > 0 ? Math.ceil(actual/gpusPer) : 0;
-  var moqDemand = Math.round(prov.demand), moqProvisioned = actual, moqRounded = prov.moqRounded;
   var cpuP = getPROC(cpuK), pw = actual > 0 ? (actual*(p.tdp||700) + servers*2*((cpuP||{}).tdp||350) + actual*50)*1.1/1000 : 0;
   var cost = actual * price(w.proc) * 1.8;
   var tpsG = est.tpsG||1, totalTPS = tpsG*Math.max(actual,1);
@@ -2324,10 +2374,12 @@ function _calcInferenceCore(w) {
   var secMult = ((SEC_TIERS[w.securityTier]||{}).cost_mult) || 1;
   return {
     det: {...w, gpus:actual, gpusPer, servers, cost:cost*secMult, pw, totalTPS, estTTFT, estTBT, estE2E,
-      moqDemand, moqProvisioned, moqRounded, ttftOk, tbtOk, e2eOk, kvGB:est.kv, peakConc:est.peakConc,
+      rawGpus, sku:w.proc, yf:yieldFactor(w),
+      ttftOk, tbtOk, e2eOk, kvGB:est.kv, peakConc:est.peakConc,
       dailyReqs:est.dailyReqs, dailyTok:est.dailyTok, moTok:est.moTok, avgRPS:est.avgRPS, peakRPS:est.peakRPS,
-      need:est.need, decGPUs:est.decGPUs, decCost:est.decCost*secMult, decPow:est.decPow,
-      apiMoCost, cascadeGPUs:est.cascadeGPUs, batchUsed:est.bSz, bmSource,
+      need:est.need, decGPUs:est.decGPUs, decodeProc:w.decodeProc, decCost:est.decCost*secMult, decPow:est.decPow,
+      cascadeGPUs:est.cascadeGPUs, cascadeProc:w.cascadeModel,
+      apiMoCost, batchUsed:est.bSz, bmSource,
       recDisagg:praxisShouldDisagg(w), recLight:praxisShouldLightGPU(w)},
     tGPU: actual + est.decGPUs, gCost: (cost + est.decCost)*secMult, tPow: pw + est.decPow,
     slaFail: slaFail
@@ -2452,7 +2504,9 @@ function praxisSizing(){
   
   var total=gCost+cpuCost+netCost+swCost+stoCost+rackCost+dramCost+chassisCost+commonCost+geoCost+spareCost+edgeTotalCost+agentOrcCost+swLicenseCost;
   
-  return{det,tGPU:tGPU+edgeTotalGPUs,gCost,tPow:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,srvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
+  var skuBom = skuRollup(det);
+  var bomGpuTotal = skuBom.totalProvisioned;
+  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,gCost,tPow:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,srvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
 }
 
 
@@ -2734,7 +2788,7 @@ var showP=true;
     if(d.src==='api'){h+=`<div style="margin-bottom:10px;padding:8px;background:var(--wbg);border-radius:6px;border-left:3px solid var(--s3);font-size:12px"><b>WL${i+1}: ${(wp||{}).n||''}</b> — ☁️ API · ${(m||{}).n||''} · ~${showP?fmt$(d.apiMoCost):'—'}/mo</div>`;return;}
     var nicPer=Math.ceil(d.gpusPer/2),diskPer=d.gpusPer*2;
     h+=`<div style="margin-bottom:10px;padding:10px;background:var(--bg);border-radius:6px;border-left:3px solid ${['var(--p1)','var(--s1)','var(--s2)','var(--s3)','var(--p2)'][i%5]}">
-      <div style="font-weight:700;font-size:11px;color:var(--p2);display:flex;justify-content:space-between"><span>${(wp||{}).ic||''} WL${i+1}: ${(wp||{}).n||''}</span><span style="font-size:12px;color:var(--txM)">${d.servers}srv × ${d.gpusPer}GPU${d.scaleUp?' + NVLink':''}${d.moqRounded?'<span style="color:var(--s1)" title="Rounded up to ordering unit">*</span>':''} · ${HA_TIERS[d.criticality]?.n} · ${SEC_TIERS[d.securityTier]?.n}</span></div>
+      <div style="font-weight:700;font-size:11px;color:var(--p2);display:flex;justify-content:space-between"><span>${(wp||{}).ic||''} WL${i+1}: ${(wp||{}).n||''}</span><span style="font-size:12px;color:var(--txM)">${d.servers}srv × ${d.gpusPer}GPU${d.scaleUp?' + NVLink':''} · ${HA_TIERS[d.criticality]?.n} · ${SEC_TIERS[d.securityTier]?.n}</span></div>
       <table style="font-size:12px;margin-top:4px"><thead><tr><th>Component</th><th>Spec</th><th>/Srv</th><th>Total</th>${showP?'<th>Cost</th>':''}</tr></thead><tbody>
         <tr><td><b>GPU${d.disaggAccepted?' (Prefill)':''}</b></td><td>${(p||{}).n||''} ${d.qt.toUpperCase()} ${d.migProfile!=='full'?'MIG:'+d.migProfile:''}</td><td>${d.gpusPer}</td><td>${d.gpus}</td>${showP?`<td>${fmt$(d.gpus*price(d.proc))}</td>`:''}</tr>
         ${d.decGPUs?`<tr style="background:var(--ibg)"><td><b>GPU (Decode)</b></td><td>${getPROC(d.decodeProc)?.n||''}</td><td>${d.gpusPer}</td><td>${d.decGPUs}</td>${showP?`<td>${fmt$(d.decCost)}</td>`:''}</tr>`:''}
@@ -2881,15 +2935,18 @@ var showP=true;
     <div class="pc" style="background:var(--sbg)"><div class="v" style="color:var(--s2)">${ppu}<span class="u">kW/rack</span></div><div class="l">Avg Power/Rack</div></div></div>`;
   
   h+=`</div><div class="card"><h3>Cost Breakdown</h3><div class="cc"><canvas id="cCost"></canvas></div></div>`;
-  // MOQ rounding footnote
-  var moqItems = (sz.det||[]).filter(function(d){ return d.moqRounded });
-  if (moqItems.length) {
+  // SKU rounding footnote — two-stage: server(deploy) round within workload type,
+  // then SKU(rack) round across workload types, on the ALREADY-rounded Stage-2 sum.
+  var skuBom = sz.skuBom || skuRollup(sz.det);
+  var skuMoqItems = Object.keys(skuBom.bySku||{}).filter(function(k){ return skuBom.bySku[k].moqRounded; });
+  if (skuMoqItems.length) {
     h += '<div style="margin-top:16px;padding:12px 16px;background:var(--light);border-left:3px solid var(--s1);border-radius:6px;font-size:12px;color:var(--txM)">';
     h += '<b style="color:var(--s1)">*</b> Quantity rounded up to the nearest ordering unit (you cannot procure a partial unit):<br>';
-    moqItems.forEach(function(d){
-      var unit = d.gpusPer || 8;
-      h += '&nbsp;&nbsp;• <b>' + (d.name||'Workload') + '</b>: ' + d.moqProvisioned + ' GPUs provisioned vs ' + d.moqDemand + ' demanded ('
-        + Math.ceil(d.moqDemand/unit) + '× ' + unit + '-GPU unit)<br>';
+    skuMoqItems.forEach(function(sku){
+      var g = skuBom.bySku[sku];
+      var gpuName = (M.gpuMap && M.gpuMap[sku] && M.gpuMap[sku].name) || sku;
+      h += '&nbsp;&nbsp;• <b>' + gpuName + '</b>: ' + g.provisioned + ' GPUs provisioned vs ' + Math.round(g.deployRoundedTotal) + ' demanded ('
+        + g.units + '× ' + g.unit + '-GPU unit)' + (g.headroom>0?' — ' + g.headroom + ' idle (consider culling/filling workloads)':'') + '<br>';
     });
     h += '</div>';
   }
