@@ -1,6 +1,6 @@
 # blacklist-whitelist.md
 # ATLAS Content & Technology Control List
-# Version: 1.0 | Last Updated: 2026-05-20
+# Version: 1.1 | Last Updated: 2026-07-15
 
 ---
 
@@ -12,16 +12,20 @@ This file is read by Claude before generating any customer-facing document, pitc
 
 ## BLACKLIST
 
-### Models — Do Not Reference, Recommend, or Position
+### Models — Control Rules (updated 2026-07-15)
 
-The following AI models must not be mentioned, suggested, benchmarked against, or referenced in any customer-facing content or internal tool output:
+**Rule 1 — Krutrim: banned everywhere.** Krutrim / Krutrim-2 must never be mentioned, offered, recommended, benchmarked, or referenced in any content — customer-facing or internal — under any circumstances.
 
-| Category        | Blacklisted Items                                                              |
-|-----------------|--------------------------------------------------------------------------------|
-| Indian models   | Krutrim, Krutrim-2                                                             |
-| Chinese models  | DeepSeek (all versions), Qwen (all versions), Baichuan, Yi, Moonshot, Ernie, GLM, MiniMax, InternLM, ChatGLM |
+**Rule 2 — Chinese models: offerable to END CUSTOMERS, never used INTERNALLY.**
+Chinese open-weight models (DeepSeek, Qwen, Kimi/Moonshot, GLM, Yi, Baichuan, MiniMax, InternLM, Ernie, etc.):
+- MAY be listed, offered, sized, and served to end customers as part of MaaS / AI-factory model catalogues (customer choice, sovereign deployment)
+- MUST NOT be used for the OEM's own internal work, internal tooling, internal document generation, or as OEM-recommended defaults
+- When recommending a default or OEM-preferred model, use US/EU/approved-Indian open weights (Llama, Mistral, Falcon, Gemma, approved Indian models)
 
-*If a customer asks about these models, redirect to open-weight alternatives (Llama, Mistral, Falcon) or OEM-recommended models.*
+| Category        | Rule                                                                            |
+|-----------------|----------------------------------------------------------------------------------|
+| Krutrim family  | BANNED — all contexts, all uses                                                  |
+| Chinese models  | OFFERABLE to end customers in catalogues; NOT for internal OEM use or as defaults |
 
 ---
 
