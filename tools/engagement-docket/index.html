@@ -1224,6 +1224,20 @@ async function savePortfolioSelection(silent) {
 
 async function renderSvcModelTab() {
   var eng = CURRENT_ENG || {}
+  // Retired as a parallel config surface (Phase 1 restructuring): this tab used
+  // to duplicate a slice of PRAXIS's own workload configuration via a separate
+  // docket_items wishlist. Docket now stays Sales-stage (Portfolio branch + UC
+  // labels); real technical sizing happens once, in PRAXIS.
+  var praxisUrl = '../../tools/praxis/index.html?eng=' + (eng.id||'') + (CURRENT_DOCKET_ID?'&docket='+CURRENT_DOCKET_ID:'')
+  return '<div class="card" style="background:#EFF3FF;border-color:#BDD7FF;max-width:560px">'
+    + '<div class="card-title" style="color:var(--blue)">Service Model Configuration</div>'
+    + '<div style="font-size:12px;color:var(--mid);margin-bottom:14px;line-height:1.6">MaaS, GPUaaS and BMaaS technical configuration and sizing now live entirely in PRAXIS — no separate wishlist here. Set the Portfolio scope first, then configure and size the real workloads in PRAXIS.</div>'
+    + '<a href="' + praxisUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Configure &amp; Size in PRAXIS &rarr;</a>'
+    + '</div>'
+}
+
+async function renderSvcModelTab_RETIRED() {
+  var eng = CURRENT_ENG || {}
   var hasMaas   = PORTFOLIO_SELECTION.includes('L2-MAAS')
   var hasGpuaas = PORTFOLIO_SELECTION.includes('L2-GPUAAS')
   var hasBmaas  = PORTFOLIO_SELECTION.includes('L2-BMAAS')
@@ -1636,7 +1650,8 @@ function renderTerritoryTab() {
   var eng = CURRENT_ENG || {}
   var territory = eng.territory || ''
   var engType = eng.engagement_type || eng.type || ''
-  var fmUrl = '../../tools/tsap-financial-model/index.html?eng=' + (eng.id||'')
+  var aiServiceUrl = '../../tools/ai-service-model/index.html?eng=' + (eng.id||'')
+  var financeUrl    = '../../tools/finance/index.html?eng=' + (eng.id||'')
 
   if (!['TSAP','tsap'].includes(engType)) {
     return '<div class="empty"><div class="empty-icon">🗺️</div>'
@@ -1706,11 +1721,18 @@ function renderTerritoryTab() {
     + '<div style="margin-top:10px;font-size:11px;color:var(--mid)">Leave blank to use national average. Changes apply immediately to the TSAP Financial Model.</div>'
     + '</div>'
 
-    // Financial Model link
+    // AI Service Model + Finance links (split from the former single Financial Model tool)
+    + '<div class="g2" style="gap:14px">'
     + '<div class="card" style="background:#EFF3FF;border-color:#BDD7FF">'
-    + '<div class="card-title" style="color:var(--blue)">TSAP Financial Model</div>'
-    + '<div style="font-size:12px;color:var(--mid);margin-bottom:12px;line-height:1.5">The financial model reads the territory profile and cost configuration above to calculate programme cost, funding structure and revenue model.</div>'
-    + '<a href="' + fmUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open Financial Model →</a>'
+    + '<div class="card-title" style="color:var(--blue)">AI Service Model</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px;line-height:1.5">Operator economics — fine per-tenant demand, service margin, utilisation.</div>'
+    + '<a href="' + aiServiceUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open AI Service Model →</a>'
+    + '</div>'
+    + '<div class="card" style="background:#FFF3F1;border-color:#FECFC5">'
+    + '<div class="card-title" style="color:var(--orange)">Finance</div>'
+    + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px;line-height:1.5">Investor returns — NPV/IRR on built capacity, funding stack.</div>'
+    + '<a href="' + financeUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open Finance →</a>'
+    + '</div>'
     + '</div>'
 }
 
@@ -4229,7 +4251,12 @@ function renderDocket() {
     + '</div></div>'
     + '<div class="docket-hdr-actions">'
     + '<button class="btn btn-sm btn-outline" onclick="openSASC()">&#9881; SASC</button>'
-    + '<button class="btn btn-sm btn-teal" onclick="openFM()">&#128184; Financial Model</button>'
+    // Financial Model shortcut only makes sense for TSAP engagements (non-TSAP
+    // terminates after PRAXIS per architecture). Routes to Territory tab, where
+    // the real AI Service Model / Finance choice lives — no duplicate URL here.
+    + (['TSAP','tsap'].includes(eng.engagement_type||eng.type||'')
+        ? '<button class="btn btn-sm btn-teal" onclick="switchTab(\'territory\')">&#128184; Financial Model</button>'
+        : '')
     + '</div></div>'
 
     // Cover note
