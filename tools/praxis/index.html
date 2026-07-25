@@ -497,6 +497,9 @@ var M = {
   // Mode
   mode: 'express',   // 'express' | 'deep'
 
+  // Entry-mode anchor (Phase 1.1): 1=top-down (MW budget), 2=bottom-up (build to demand)
+  entryMode: { mode: 2, mwBudget: 6.7667 },
+
   // Active tab
   activeTab: 'workloads',
 
@@ -2490,58 +2493,6 @@ function calcInferencing(w) { return _calcInferenceCore(w); }
 function calcMaaS(w) { return _calcInferenceCore(w); }
 
 
-function computeEntryAnchor(bomGpuTotal, bomPowerKw, det, skuBom) {
-  // ── Entry-mode anchor (ports Excel Req-Global mode 1/2 + Sizing anchor) ────
-  // Mode 1 = top-down (MW budget -> how many GPUs fit)
-  // Mode 2 = bottom-up (build to meet configured demand) — DEFAULT, matches
-  //          PRAXIS's existing behavior exactly (no behavior change unless
-  //          M.entryMode.mode is explicitly set to 1).
-  var cfg = (typeof M !== 'undefined' && M.entryMode) || {};
-  var mode = cfg.mode || 2;
-
-  // Deploy/SKU unit from the dominant SKU actually configured (fallback 8).
-  var skuKeys = (skuBom && skuBom.bySku) ? Object.keys(skuBom.bySku) : [];
-  var dominant = skuKeys.length ? skuBom.bySku[skuKeys[0]] : null;
-  var skuUnit = (dominant && dominant.skuUnit) || 8;
-
-  // Blended actual kW/GPU from the real configured BOM (better than a flat
-  // TDP guess — reflects the actual SKU mix and overheads already priced in).
-  var kwPerGpu = bomGpuTotal > 0 ? (bomPowerKw / bomGpuTotal) : 1.4;
-
-  var anchorGpus;
-  if (mode === 1) {
-    var mwBudget = cfg.mwBudget || 6.7667;   // default matches the 6.7MW reference deal
-    var rawFit = Math.floor((mwBudget * 1000) / kwPerGpu);
-    anchorGpus = skuUnit ? Math.floor(rawFit / skuUnit) * skuUnit : rawFit;
-  } else {
-    anchorGpus = bomGpuTotal;   // bottom-up: built capacity = configured demand (today's behavior)
-  }
-
-  // Blended fleet yield (GPU-weighted across workloads) — the supply-first
-  // derate view: what does the anchored physical fleet actually deliver?
-  var totalRaw = 0, totalYieldedRaw = 0;
-  (det || []).forEach(function(d) {
-    var g = d.rawGpus || 0;
-    if (!g) return;
-    var y = workloadYield(d);
-    totalRaw += g;
-    totalYieldedRaw += g * y;
-  });
-  var blendedYield = totalRaw > 0 ? (totalYieldedRaw / totalRaw) : 1.0;
-  var effectiveCapacity = anchorGpus * blendedYield;
-
-  var utilization = anchorGpus > 0 ? (bomGpuTotal / anchorGpus) : 0;
-  var headroom = anchorGpus - bomGpuTotal;
-
-  return {
-    mode: mode, anchorGpus: anchorGpus, demandGpus: bomGpuTotal,
-    kwPerGpu: kwPerGpu, skuUnit: skuUnit,
-    blendedYield: blendedYield, effectiveCapacity: effectiveCapacity,
-    utilization: utilization, headroom: headroom,
-    fitsWithinBudget: mode === 1 ? (bomGpuTotal <= anchorGpus) : true
-  };
-}
-
 function praxisSizing(){
   var wls = getIFWorkloads();
   var tGPU=0,gCost=0,tPow=0,slaAll=true;
@@ -2697,8 +2648,7 @@ function praxisSizing(){
   
   var itPowerKw = bomPowerKw + commonPow + edgeTotalPow + agentOrcPow;   // raw IT load, no PUE
   var facilityPowerKw = itPowerKw * (hwPrice("pue")||1.2);                     // PUE-uplifted (what's shown)
-  var entryAnchor=computeEntryAnchor(bomGpuTotal,facilityPowerKw,det,skuBom);
-  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,entryAnchor:entryAnchor,gCost,tPow:facilityPowerKw,itPowerKw:itPowerKw,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,storageRacks,switchRacks,commonRacks,dlcRacksGPU,acRacksGPU,srvTotal,computeSrvTotal,serviceSrvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
+  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,gCost,tPow:facilityPowerKw,itPowerKw:itPowerKw,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,storageRacks,switchRacks,commonRacks,dlcRacksGPU,acRacksGPU,srvTotal,computeSrvTotal,serviceSrvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
 }
 
 
@@ -3351,6 +3301,18 @@ function praxisRebuildCharts(){
   }}
 
 
+
+window.praxisSetEntryMode = function(mode) {
+  M.entryMode = M.entryMode || {mode:2, mwBudget:6.7667};
+  M.entryMode.mode = mode;
+  V.renderYieldTab();
+};
+window.praxisSetMwBudget = function(mw) {
+  M.entryMode = M.entryMode || {mode:2, mwBudget:6.7667};
+  M.entryMode.mwBudget = mw > 0 ? mw : 6.7667;
+  V.renderYieldTab();
+};
+
 V.renderYieldTab = function() {
   var el = document.getElementById('tab-yield');
   if (!el) return;
@@ -3360,7 +3322,30 @@ V.renderYieldTab = function() {
     return;
   }
   var det = sz.det;
-  var h = '<div class="card"><h3>Scenario 1 — SLA Performance</h3>';
+var ea = sz.entryAnchor || {};
+  var emCfg = M.entryMode || {mode:2, mwBudget:6.7667};
+  var h0 = '<div class="card" style="border-left:4px solid var(--p1)">'
+    + '<h3>&#9878; Entry Mode &amp; Capacity Anchor</h3>'
+    + '<p style="font-size:12px;color:var(--txM);margin-bottom:8px">Choose whether this deal is sized top-down from a power budget, or bottom-up to meet configured demand. The anchor drives Capex/Opex/Power downstream.</p>'
+    + '<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">'
+    + '<div><label style="font-size:11px;color:var(--txM);display:block;margin-bottom:3px">Entry mode</label>'
+    + '<select style="font-size:13px;padding:6px 8px" onchange="praxisSetEntryMode(+this.value)">'
+    + '<option value="2"' + (emCfg.mode===2?' selected':'') + '>Bottom-up (build to meet demand)</option>'
+    + '<option value="1"' + (emCfg.mode===1?' selected':'') + '>Top-down (fit a power budget)</option>'
+    + '</select></div>'
+    + (emCfg.mode===1 ? ('<div><label style="font-size:11px;color:var(--txM);display:block;margin-bottom:3px">Power budget (MW)</label>'
+        + '<input type="number" step="0.01" value="' + emCfg.mwBudget + '" style="font-size:13px;padding:6px 8px;width:100px" onchange="praxisSetMwBudget(+this.value)"></div>') : '')
+    + '</div>'
+    + '<div class="g5">'
+    + '<div style="border-left:4px solid var(--p1);padding:8px 10px"><div style="font-size:18px;font-weight:900;color:var(--p1)">' + fmtN(ea.anchorGpus||0) + '</div><div class="l">Anchor GPUs' + (emCfg.mode===1?' (physical, fits budget)':' (= demand)') + '</div></div>'
+    + '<div style="border-left:4px solid var(--s1);padding:8px 10px"><div style="font-size:18px;font-weight:900;color:var(--s1)">' + fmtN(ea.demandGpus||0) + '</div><div class="l">Demand GPUs</div></div>'
+    + '<div style="border-left:4px solid var(--s2);padding:8px 10px"><div style="font-size:18px;font-weight:900;color:var(--s2)">' + Math.round((ea.blendedYield||1)*100) + '%</div><div class="l">Blended Yield</div></div>'
+    + '<div style="border-left:4px solid var(--s3);padding:8px 10px"><div style="font-size:18px;font-weight:900;color:var(--s3)">' + fmtN(Math.round(ea.effectiveCapacity||0)) + '</div><div class="l">Effective Capacity</div></div>'
+    + '<div style="border-left:4px solid ' + ((ea.headroom||0)>=0?'var(--s2)':'var(--p1)') + ';padding:8px 10px"><div style="font-size:18px;font-weight:900;color:' + ((ea.headroom||0)>=0?'var(--s2)':'var(--p1)') + '">' + fmtN(ea.headroom||0) + '</div><div class="l">Headroom</div></div>'
+    + '</div>'
+    + (emCfg.mode===1 && !ea.fitsWithinBudget ? '<div style="margin-top:10px;padding:8px 12px;background:var(--dbg);border-radius:6px;font-size:12px;color:var(--p1)">&#9888; Configured demand exceeds the power budget by ' + fmtN(-(ea.headroom||0)) + ' GPUs. Reduce workloads or raise the MW budget.</div>' : '')
+    + '</div>';
+  var h = h0 + '<div class="card"><h3>Scenario 1 — SLA Performance</h3>';
   h += '<table><thead><tr><th>Workload</th><th>Model</th><th>GPU</th><th>Count</th><th>TPS</th><th>TTFT</th><th>TBT</th><th>E2E</th><th>SLA</th></tr></thead><tbody>';
   var slaPass=0;
   det.forEach(function(d){
