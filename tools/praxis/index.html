@@ -2285,37 +2285,40 @@ function unitRound(demandGpus, unit) {
 // Today returns 1.0 (no-op). Replace when the yield module is built.
 // See standards/calc-modules.md "Yield" section.
 // ════════════════════════════════════════════════════════════════════════
-function yieldFactor(w) {
-  // ── Production-yield multiplier (Blueprint §30) ─────────────────────────────
-  // Returns 1/effective_yield  (a multiplier ≥1 that inflates raw GPU demand,
-  // per standards/calc-modules.md: raw × yieldFactor → unitRound ONCE).
+function workloadYield(w) {
+  // ── Production yield fraction (Blueprint §30) ───────────────────────────────
+  // Returns effective_yield ∈ (0,1] — the fraction of theoretical throughput a
+  // workload actually delivers in production (successful compliant outputs ÷
+  // invocations). This is the RAW yield number; DIRECTION is applied by the
+  // caller, so one definition serves both entry modes:
+  //   • demand-first (size up):   required_gpus = demand_gpus / workloadYield(w)
+  //   • supply-first (derate):    effective_gpus = installed_gpus * workloadYield(w)
   // effective_yield = base_yield(workload) compounded for agentic multi-step.
-  // Base-yield bands are the researched benchmark values documented in
-  // Blueprint §30 (HHEM leaderboard 2026); a later step can source per-model
-  // yield from model_catalogue when those columns exist — this is the hook.
+  // Base bands are the researched benchmark values documented in Blueprint §30
+  // (HHEM leaderboard 2026); a later step can source per-model yield from
+  // model_catalogue when those columns exist — this is the hook.
 
   if (!w) return 1.0;
   var tp = w.tp || 'uc';
 
-  // Raw-capacity products carry NO production-yield loss: you provision the
-  // physical GPUs/servers; there is no inference success/failure to adjust for.
+  // Raw-capacity products carry NO production-yield loss: physical GPUs/servers
+  // are provisioned directly; there is no inference success/failure to adjust.
   if (tp === 'gpuaas' || tp === 'bmaas' || tp === 'closed') return 1.0;
 
   // ── 1. Base yield from workload character ─────────────────────────────────
   // Documented bands: RAG/grounded 0.96-0.98 · structured 0.88-0.95 ·
-  // conversational/open-domain 0.67-0.84. We pick representative mid-band
-  // values by the strongest available signal (ragType), else a sane default.
-  var base;
+  // conversational/open-domain 0.67-0.84. Keyed off the strongest available
+  // signal (ragType); falls back to the structured band.
   var rag = w.ragType || 'none';
   var RAG_YIELD = {
     simple:      0.97,   // grounded single-hop RAG — top of the documented band
     hybrid:      0.95,   // grounded, some routing overhead
     multi_stage: 0.92,   // pipeline retrieval, more compliance surface
     graph:       0.90,   // graph traversal, structured joins
-    agentic:     0.85,   // agentic retrieval (compounding handled separately below)
+    agentic:     0.85,   // agentic retrieval (compounding handled below)
     none:        0.88    // no RAG grounding → default to structured-output band
   };
-  base = (rag in RAG_YIELD) ? RAG_YIELD[rag] : 0.88;
+  var base = (rag in RAG_YIELD) ? RAG_YIELD[rag] : 0.88;
 
   // MaaS streaming/open-domain traffic (no RAG grounding) is more drift-prone
   // than an internal structured UC — nudge toward the conversational band.
@@ -2327,25 +2330,23 @@ function yieldFactor(w) {
   var steps = w.steps || w.agentSteps || 0;
   var effective;
   if (w.isAgentic && steps > 1) {
-    // Guard against absurd step counts inflating the fleet without bound.
-    var s = Math.min(steps, 50);
+    var s = Math.min(steps, 50);   // guard runaway step counts
     effective = Math.pow(base, s);
   } else {
     effective = base;
   }
 
-  // ── 3. Floor + convert to multiplier ──────────────────────────────────────
-  // Never let effective yield collapse so far that the fleet explodes; the
-  // documented worst realistic bands sit ~0.35-0.60. Floor at 0.30.
-  effective = Math.max(0.30, Math.min(1.0, effective));
-  return 1 / effective;
+  // ── 3. Floor ──────────────────────────────────────────────────────────────
+  // Below ~0.30 the workload should be flagged for hybrid routing rather than
+  // brute-forced; clamp so the derate/inflate stays bounded either direction.
+  return Math.max(0.30, Math.min(1.0, effective));
 }
 
 // ═══════════════════════════════════════════════════════════════════════
 // TWO-STAGE SKU ROUNDING — the single place BOM procurement counts happen.
 // Modules pass RAW demand; workload tabs show raw (never rounded).
 //
-// Stage 1: yieldFactor(workload) applied to each of that workload's SKU
+// Stage 1: workloadYield(workload) applied to each of that workload's SKU
 //          portions (main/decode/cascade) — yield is per-workload, applied
 //          to ALL its SKU allocations before any cross-workload aggregation.
 // Stage 2: group by (workloadType, SKU) -> sum yield-adjusted -> round UP to
@@ -2357,22 +2358,22 @@ function yieldFactor(w) {
 function skuRollup(det) {
   // ── Stage 1+2: yield per workload-portion, then group+round by (wlType, SKU) ──
   var stage2 = {}; // key: wlType|sku -> { sku, wlType, yieldedTotal, deployUnit, skuUnit }
-  function addPortion(wlType, sku, gpus, yf) {
+  function addPortion(wlType, sku, gpus, yldF) {
     if (!sku || !gpus) return;
     var g = M.gpuMap && M.gpuMap[sku];
     var deployUnit = (g && (g.deployment_unit_gpus || g.gpus_in_unit)) || 8;
     var skuUnit = (g && (g.sku_unit_gpus || g.gpus_in_unit)) || 8;
     var key = wlType + '|' + sku;
     if (!stage2[key]) stage2[key] = { sku:sku, wlType:wlType, yieldedTotal:0, deployUnit:deployUnit, skuUnit:skuUnit, workloads:[] };
-    var yielded = gpus * (yf != null ? yf : 1.0);
+    var yielded = gpus / (yldF != null && yldF > 0 ? yldF : 1.0);  // demand-first: size UP by 1/yield
     stage2[key].yieldedTotal += yielded;
   }
   (det || []).forEach(function(d) {
-    var yf = yieldFactor(d);           // per-workload, applied to ALL its SKU portions
+    var yldF = workloadYield(d);       // per-workload yield fraction; demand path divides by it
     var wlType = d.tp || 'uc';
-    addPortion(wlType, d.sku || d.proc, d.rawGpus || 0, yf);           // main allocation
-    if (d.decGPUs)     addPortion(wlType, d.decodeProc || d.proc, d.decGPUs, yf);     // disaggregated decode
-    if (d.cascadeGPUs) addPortion(wlType, d.cascadeProc || d.proc, d.cascadeGPUs, yf); // cascade split
+    addPortion(wlType, d.sku || d.proc, d.rawGpus || 0, yldF);           // main allocation
+    if (d.decGPUs)     addPortion(wlType, d.decodeProc || d.proc, d.decGPUs, yldF);     // disaggregated decode
+    if (d.cascadeGPUs) addPortion(wlType, d.cascadeProc || d.proc, d.cascadeGPUs, yldF); // cascade split
   });
   // Round Stage 2: each (workloadType, SKU) bucket rounds to the DEPLOYMENT unit
   Object.keys(stage2).forEach(function(k) {
@@ -2432,7 +2433,7 @@ function calcBlock(w) {
       kvGB:0, peakConc:0, dailyReqs:0, dailyTok:0, moTok:0, avgRPS:0, peakRPS:0,
       need:blockGPUs, decGPUs:0, decCost:0, decPow:0, apiMoCost:0, cascadeGPUs:0, batchUsed:0,
       bmSource:'block', recDisagg:false, recLight:false, isBlock:true,
-      rawGpus:blockGPUs, sku:w.proc, yf:yieldFactor(w), decodeProc:null, cascadeProc:null},
+      rawGpus:blockGPUs, sku:w.proc, yieldFrac:workloadYield(w), decodeProc:null, cascadeProc:null},
     tGPU: blockGPUs, gCost: blockCost, tPow: blockPow
   };
 }
@@ -2468,7 +2469,7 @@ function _calcInferenceCore(w) {
   var secMult = ((SEC_TIERS[w.securityTier]||{}).cost_mult) || 1;
   return {
     det: {...w, gpus:actual, gpusPer, servers, cost:cost*secMult, pw, totalTPS, estTTFT, estTBT, estE2E,
-      rawGpus, sku:w.proc, yf:yieldFactor(w),
+      rawGpus, sku:w.proc, yieldFrac:workloadYield(w),
       ttftOk, tbtOk, e2eOk, kvGB:est.kv, peakConc:est.peakConc,
       dailyReqs:est.dailyReqs, dailyTok:est.dailyTok, moTok:est.moTok, avgRPS:est.avgRPS, peakRPS:est.peakRPS,
       need:est.need, decGPUs:est.decGPUs, decodeProc:w.decodeProc, decCost:est.decCost*secMult, decPow:est.decPow,
