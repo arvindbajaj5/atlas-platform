@@ -2524,6 +2524,18 @@ function computeOemPricing(costLines) {
   };
 }
 
+function computeOemRecurring(totalCapex) {
+  // ── Ongoing maintenance & support (ports Excel Opex maint_pct/support_pct) ──
+  // Annual, % of capex — hardware break-fix (5%) + vendor support contracts (3%).
+  // Same gross-margin engine as the one-time equipment sale, distinct line keys
+  // so overrides don't collide with equipment-side margin overrides.
+  var lines = [
+    { key: 'maintenance', label: 'Hardware Maintenance (annual)', cost: totalCapex * 0.05 },
+    { key: 'support',     label: 'Vendor Support (annual)',        cost: totalCapex * 0.03 }
+  ];
+  return computeOemPricing(lines);
+}
+
 function computeEntryAnchor(bomGpuTotal, bomPowerKw, det, skuBom) {
   // ── Entry-mode anchor (ports Excel Req-Global mode 1/2 + Sizing anchor) ────
   // Mode 1 = top-down (MW budget -> how many GPUs fit)
@@ -2732,16 +2744,19 @@ function praxisSizing(){
   var itPowerKw = bomPowerKw + commonPow + edgeTotalPow + agentOrcPow;   // raw IT load, no PUE
   var facilityPowerKw = itPowerKw * (hwPrice("pue")||1.2);                     // PUE-uplifted (what's shown)
   var entryAnchor=computeEntryAnchor(bomGpuTotal,facilityPowerKw,det,skuBom);
+  var svcEffort=(typeof calcServices==='function')?calcServices({det:det}):null;
   var oemCostLines=[
     {key:'gpu',      label:'GPUs',              cost:gCost},
     {key:'compute',  label:'Compute/Network',   cost:cpuCost+netCost+swCost},
     {key:'storage',  label:'Storage',           cost:stoCost},
     {key:'software', label:'Software',          cost:swLicenseCost},
     {key:'facility', label:'Facility/Infra',    cost:rackCost+dramCost+chassisCost+commonCost},
-    {key:'other',    label:'Edge/Agentic/Spare',cost:edgeTotalCost+agentOrcCost+geoCost+spareCost}
+    {key:'other',    label:'Edge/Agentic/Spare',cost:edgeTotalCost+agentOrcCost+geoCost+spareCost},
+    {key:'services', label:'Implementation & Delivery Services', cost:(svcEffort&&svcEffort.totalServicesCost)||0}
   ];
   var oemPricing=computeOemPricing(oemCostLines);
-  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,entryAnchor:entryAnchor,oemPricing:oemPricing,gCost,tPow:facilityPowerKw,itPowerKw:itPowerKw,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,storageRacks,switchRacks,commonRacks,dlcRacksGPU,acRacksGPU,srvTotal,computeSrvTotal,serviceSrvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
+  var oemRecurring=computeOemRecurring(total);
+  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,entryAnchor:entryAnchor,oemPricing:oemPricing,oemRecurring:oemRecurring,gCost,tPow:facilityPowerKw,itPowerKw:itPowerKw,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,storageRacks,switchRacks,commonRacks,dlcRacksGPU,acRacksGPU,srvTotal,computeSrvTotal,serviceSrvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
 }
 
 
@@ -3130,6 +3145,24 @@ var showP=true;
     <td style="font-size:15px;padding:8px;color:var(--s2)"><b>${fmt$(op.totalPrice)}</b></td></tr>
     </tbody></table>
     <div style="margin-top:8px;font-size:11px;color:var(--txM)">Gross-margin convention: Sell Price = Cost / (1 − Margin%). Margin $ on this deal: <b style="color:var(--s2)">${fmt$(op.marginDollars)}</b></div>
+    </div>`;
+  var orc = sz.oemRecurring || {rows:[],totalCost:0,totalPrice:0,marginDollars:0,weightedMarginPct:0};
+  h+=`<div class="card" style="margin-top:12px;border-left:4px solid var(--p2)">
+    <h3 style="margin:0 0 10px">&#128260; Ongoing Maintenance &amp; Support <span style="font-size:11px;font-weight:400;color:var(--txM)">(annual, own-operated deals)</span></h3>
+    <table style="font-size:12px"><thead><tr><th>Category</th><th>Cost/yr</th><th>Margin %</th><th>Price/yr</th></tr></thead><tbody>`;
+  orc.rows.forEach(function(r){
+    var isOv = mCfg.overrides && mCfg.overrides[r.key]!=null;
+    h+=`<tr><td><b>${r.label}</b></td><td>${fmt$(r.cost)}</td>
+      <td><input type="number" min="0" max="90" step="1" value="${Math.round(r.marginPct*100)}"
+        style="width:55px;font-size:12px;padding:4px 6px;${isOv?'color:var(--p1);font-weight:700':''}"
+        onchange="praxisSetMarginOverride('${r.key}',+this.value)">%${isOv?' <button onclick="praxisClearMarginOverride(\''+r.key+'\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--txL)" title="Clear override">&times;</button>':''}</td>
+      <td><b>${fmt$(r.price)}</b></td></tr>`;
+  });
+  h+=`<tr class="bt"><td style="font-size:13px;padding:8px">TOTAL ANNUAL</td><td style="padding:8px">${fmt$(orc.totalCost)}</td>
+    <td style="padding:8px">${(orc.weightedMarginPct*100).toFixed(1)}%</td>
+    <td style="font-size:15px;padding:8px;color:var(--p2)"><b>${fmt$(orc.totalPrice)}/yr</b></td></tr>
+    </tbody></table>
+    <div style="margin-top:8px;font-size:11px;color:var(--txM)">Hardware maintenance (5% of capex) + vendor support (3% of capex), annually. For TSAP/operator deals, ongoing operations shift to the Operator — see AI Service Model.</div>
     </div>`;
 
   // Three-way aggregation comparison
