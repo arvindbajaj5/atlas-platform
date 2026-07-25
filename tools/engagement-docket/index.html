@@ -551,6 +551,8 @@ var ALL_ENGAGEMENTS = []
 var CURRENT_ENG = null       // current engagement object
 var CURRENT_DOCKET_ID = null // current docket_id
 var DOCKET_ITEMS = []        // all items for current engagement
+var PORTFOLIO_CATALOGUE = [] // live portfolio_catalogue rows (Phase 1.3 — was hardcoded)
+var PORTFOLIO_CAT_LOAD = ''  // '' | 'loading' | 'loaded' | 'error'
 var UC_LIBRARY = []          // all active UCs
 var ACTIVE_TAB = 'overview'
 var UC_MODAL_FILTER = 'all'
@@ -1038,41 +1040,22 @@ function renderPortfolioTab() {
     + '<button class="btn btn-sm btn-outline" onclick="savePortfolioSelection()">&#8593; Save</button></div></div>'
     + '<div id="ai-map-note" class="ai-map-note">✨ <strong>AI suggested items</strong> based on requirement. Blue = suggested, Green = confirmed. Deselect anything that doesn\'t apply.</div>'
 
-  var sections = [
-    { title: 'L1 — TSAP Programme', note: 'Territory engagements', items: [
-      ['L1-TSAP','L1-TSAP Territory Programme','XL'],['L1.1','L1.1 Programme Management','L'],
-      ['L1.2','L1.2 Governance Framework','M'],['L1.3','L1.3 Ecosystem Development','M'],
-      ['L1.4','L1.4 Policy & Regulatory','M'],['L1.5','L1.5 Financing & Structuring','M']
-    ]},
-    { title: 'L2 — AI Infrastructure', items: [
-      ['L2-AIC','L2-AIC AI Centre (Flagship)','XL'],['L2-GIB','L2-GIB GenAI-in-a-Box','S/M'],
-      ['L2-MDC','L2-MDC Modular Datacenter','L'],['L2-TRC','L2-TRC GPU Training Cluster','L'],
-      ['L2-HPC','L2-HPC HPC Cluster','XL'],['L2-EDG','L2-EDG Edge AI Node','XS'],['L2-AIF','L2-AIF AI Factory','XL']
-    ]},
-    { title: 'L2.x — Domain AI Centre', note:'UCs defined in Use Cases tab', items: [
-      ['L2-DAC','L2.x Domain AI Centre (UCs define scope)','M/L']
-    ]},
-    { title: 'L2 — Managed AI Services', badge: 'Services', items: [
-      ['L2-MAAS',   'MaaS — Model as a Service',   '—'],
-      ['L2-GPUAAS', 'GPUaaS — GPU as a Service',   '—'],
-      ['L2-BMAAS',  'BMaaS — Bare Metal as a Service','—']
-    ]},
-    { title: 'L3 — Lifecycle Services', items: [
-      ['L3-DEP','L3-DEP Deployment & Integration','L'],['L3-SKL','L3-SKL AI Skills Academy','M'],
-      ['L3-GOV','L3-GOV AI Governance','M'],['L3-SEC','L3-SEC AI Security','M'],
-      ['L3-OPS','L3-OPS Managed Operations','L'],['L3-AMC','L3-AMC AMC & Refresh','L'],
-      ['L3-RAG','L3-RAG RAG Platform Setup','M'],['L3-INT','L3-INT System Integration','L'],
-      ['L3-TRN','L3-TRN Training & Capacity','M']
-    ]}
-  ]
+  // Phase 1.3: live from portfolio_catalogue (was hardcoded — AIF/MDC were
+  // wrongly listed as L2; real data's numeric `level` column is authoritative).
+  if (PORTFOLIO_CAT_LOAD === 'loading' || (!PORTFOLIO_CATALOGUE.length && PORTFOLIO_CAT_LOAD !== 'error')) {
+    return html + '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading portfolio catalogue…</div>'
+  }
+  if (PORTFOLIO_CAT_LOAD === 'error' || !PORTFOLIO_CATALOGUE.length) {
+    return html + '<div style="padding:12px;background:#FEE2E2;border-radius:6px;font-size:12px;color:#991B1B">⚠ Portfolio catalogue unavailable — check Settings → API Keys. <button onclick="PORTFOLIO_CAT_LOAD=\'\';PORTFOLIO_CATALOGUE=[];loadAndRenderPortfolio()" style="margin-left:8px;padding:2px 8px;background:#991B1B;color:#fff;border:none;border-radius:4px;cursor:pointer">Retry</button></div>'
+  }
 
-  sections.forEach(function(sec) {
+  var LEVEL_TITLES = { 1: 'L1 — Programme', 2: 'L2 — Infrastructure & Services', 3: 'L3 — Lifecycle Services' }
+  ;[1, 2, 3].forEach(function(lvl) {
+    var items = PORTFOLIO_CATALOGUE.filter(function(p){ return p.level === lvl })
+    if (!items.length) return
     html += '<div class="pi-sec">'
-      + '<div class="pi-sec-hdr"><span>' + sec.title + '</span>'
-      + (sec.badge ? '<span style="font-size:10px;background:#FFF3F1;color:var(--orange);padding:2px 6px;border-radius:8px;font-weight:700">' + sec.badge + '</span>' : '')
-      + (sec.note ? '<span style="font-size:10px;color:var(--teal)">' + sec.note + '</span>' : '')
-      + '</div><div class="pi-grid">'
-      + sec.items.map(function(it){ return piItem(it[0],it[1],it[2],piSel(it[0])) }).join('')
+      + '<div class="pi-sec-hdr"><span>' + (LEVEL_TITLES[lvl] || ('L' + lvl)) + '</span></div><div class="pi-grid">'
+      + items.map(function(p){ return piItem(p.code, p.code + ' ' + p.name, p.deal_size || p.category || '—', piSel(p.code)) }).join('')
       + '</div></div>'
   })
 
@@ -4424,7 +4407,7 @@ function wireTabEvents() {
 function renderTab(tab) {
   if (tab === 'overview')  return renderOverview()
   if (tab === 'profile')   { loadAndRenderProfile(); return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading profile & intelligence...</div>' }
-  if (tab === 'portfolio') return renderPortfolioTab()
+  if (tab === 'portfolio') { loadAndRenderPortfolio(); return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading portfolio catalogue...</div>' }
   if (tab === 'uc')        return renderUCTab()
   if (tab === 'svcmodel')  { loadAndRenderSvcModel(); return '<div style="padding:24px;text-align:center;color:var(--mid)">⏳ Loading service model...</div>' }
   if (tab === 'territory') return renderTerritoryTab()
@@ -4444,6 +4427,20 @@ async function loadAndRenderSvcModel() {
   var html = await renderSvcModelTab()
   var el = document.getElementById('tab-body')
   if (el && ACTIVE_TAB === 'svcmodel') el.innerHTML = html
+}
+
+async function loadAndRenderPortfolio() {
+  if (!PORTFOLIO_CATALOGUE.length && PORTFOLIO_CAT_LOAD !== 'loading' && PORTFOLIO_CAT_LOAD !== 'loaded') {
+    PORTFOLIO_CAT_LOAD = 'loading'
+    try {
+      var rows = await sbFetch('portfolio_catalogue', 'order=level.asc,code.asc', 200)
+      PORTFOLIO_CATALOGUE = rows || []
+      PORTFOLIO_CAT_LOAD = PORTFOLIO_CATALOGUE.length ? 'loaded' : 'error'
+    } catch(e) { console.warn('[Portfolio] load failed:', e); PORTFOLIO_CAT_LOAD = 'error' }
+  }
+  var html = renderPortfolioTab()
+  var el = document.getElementById('tab-body')
+  if (el && ACTIVE_TAB === 'portfolio') el.innerHTML = html
 }
 
 
