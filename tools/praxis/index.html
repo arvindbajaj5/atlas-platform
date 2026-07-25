@@ -2995,6 +2995,23 @@ V.renderTokTab = function(){
 }
 
 // ── renderBOM (ported from IF) ──────────────────────────────────────────
+
+window.praxisSetDefaultMargin = function(pct) {
+  M.marginConfig = M.marginConfig || {defaultMarginPct:0.35, overrides:{}};
+  M.marginConfig.defaultMarginPct = Math.max(0, Math.min(0.9, (pct||0)/100));
+  V.renderBOMTab();
+};
+window.praxisSetMarginOverride = function(key, pct) {
+  M.marginConfig = M.marginConfig || {defaultMarginPct:0.35, overrides:{}};
+  M.marginConfig.overrides = M.marginConfig.overrides || {};
+  M.marginConfig.overrides[key] = Math.max(0, Math.min(0.9, (pct||0)/100));
+  V.renderBOMTab();
+};
+window.praxisClearMarginOverride = function(key) {
+  if (M.marginConfig && M.marginConfig.overrides) delete M.marginConfig.overrides[key];
+  V.renderBOMTab();
+};
+
 V.renderBOMTab = function(){
   var aggStrategy = M._bomAggStrategy || 'dedicated';
   var el=document.getElementById("tab-bom");
@@ -3085,6 +3102,35 @@ var showP=true;
   });
   h+=`<tr><td><b>Software Total</b></td><td>(annual)</td><td></td>${showP?`<td><b>${fmt$(sz.swLicenseCost)}/yr</b></td>`:''}</tr>`;
   h+=`<tr class="bt"><td colspan="3" style="font-size:13px;padding:8px">TOTAL BOM (HW + SW Year 1${sz.edgeTotalCost>0?' + Edge':''})</td>${showP?`<td style="font-size:15px;padding:8px">${fmt$(sz.total)}</td>`:''}</tr></tbody></table>`;
+
+  // ── OEM Deal Pricing (Phase 1.2): cost vs sell price vs margin, gross-margin
+  // convention (Sell Price = Cost / (1 - Margin%)), per-category override. ──
+  var op = sz.oemPricing || {rows:[],totalCost:0,totalPrice:0,marginDollars:0,weightedMarginPct:0,defaultMarginPct:0.35};
+  var mCfg = M.marginConfig || {defaultMarginPct:0.35, overrides:{}};
+  h+=`<div class="card" style="margin-top:16px;border-left:4px solid var(--s2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 style="margin:0">&#128176; OEM Deal Pricing</h3>
+      <div style="display:flex;align-items:center;gap:6px">
+        <label style="font-size:11px;color:var(--txM)">Default margin</label>
+        <input type="number" min="0" max="90" step="1" value="${Math.round(mCfg.defaultMarginPct*100)}"
+          style="width:55px;font-size:12px;padding:4px 6px" onchange="praxisSetDefaultMargin(+this.value)">%
+      </div>
+    </div>
+    <table style="font-size:12px"><thead><tr><th>Category</th><th>Cost</th><th>Margin %</th><th>Sell Price</th></tr></thead><tbody>`;
+  op.rows.forEach(function(r){
+    var isOv = mCfg.overrides && mCfg.overrides[r.key]!=null;
+    h+=`<tr><td><b>${r.label}</b></td><td>${fmt$(r.cost)}</td>
+      <td><input type="number" min="0" max="90" step="1" value="${Math.round(r.marginPct*100)}"
+        style="width:55px;font-size:12px;padding:4px 6px;${isOv?'color:var(--p1);font-weight:700':''}"
+        onchange="praxisSetMarginOverride('${r.key}',+this.value)">%${isOv?' <button onclick="praxisClearMarginOverride(\''+r.key+'\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--txL)" title="Clear override">&times;</button>':''}</td>
+      <td><b>${fmt$(r.price)}</b></td></tr>`;
+  });
+  h+=`<tr class="bt"><td style="font-size:13px;padding:8px">TOTAL DEAL</td><td style="padding:8px">${fmt$(op.totalCost)}</td>
+    <td style="padding:8px">${(op.weightedMarginPct*100).toFixed(1)}%</td>
+    <td style="font-size:15px;padding:8px;color:var(--s2)"><b>${fmt$(op.totalPrice)}</b></td></tr>
+    </tbody></table>
+    <div style="margin-top:8px;font-size:11px;color:var(--txM)">Gross-margin convention: Sell Price = Cost / (1 − Margin%). Margin $ on this deal: <b style="color:var(--s2)">${fmt$(op.marginDollars)}</b></div>
+    </div>`;
 
   // Three-way aggregation comparison
   var hasSmall=sz.det.some(d=>d.recLight&&d.src!=='api');
