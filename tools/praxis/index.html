@@ -813,6 +813,20 @@ var V = {
     h += V._tenantDropdown(wl, id, type)
     h += '</div>'
 
+    // ROW 1b — Serving Engine + Quantization: core fields (ported from AI
+    // Inferencing Factory), always visible for on-prem workloads — not
+    // gated behind Deep mode. These drive real benchmark lookups downstream.
+    if ((type === 'uc' || type === 'maas') && wl.src !== 'api') {
+      h += '<div class="formgrid" style="grid-template-columns:1fr 1fr">'
+      h += V._fg('Quantization', '<select ' + V._u(id,type,'precision') + '>'
+        + V._opts([['int4','INT4 — best throughput'],['int8','INT8'],['fp8','FP8'],['fp16','FP16 — best quality']], wl.precision||'int4')
+        + '</select>')
+      h += V._fg('Inference Engine', '<select ' + V._u(id,type,'engine') + '>'
+        + V._opts([['vllm','vLLM — general, high throughput'],['trt_llm','TensorRT-LLM — NVIDIA, lowest latency (+30%)'],['sglang','SGLang — structured, agents (+10%)'],['triton','Triton — multi-model, MIG'],['lorax','LoRAX — LoRA serving']], wl.engine||'vllm')
+        + '</select>')
+      h += '</div>'
+    }
+
     // ROW 2 — Presets + data source
     if (type === 'uc' || type === 'maas') {
       h += V._renderPresetBar(wl, type)
@@ -917,12 +931,6 @@ var V = {
       h += '<div class="deep-section">'
         + '<div class="deep-section-title">Latency &amp; Performance</div>'
         + '<div class="formgrid">'
-        + V._fg('Precision', '<select ' + V._u(id,type,'precision') + '>'
-          + V._opts([['int4','INT4 — best throughput'],['int8','INT8'],['fp8','FP8'],['fp16','FP16 — best quality']], wl.precision||'int4')
-          + '</select>')
-        + V._fg('Inference Engine', '<select ' + V._u(id,type,'engine') + '>'
-          + V._opts([['vllm','vLLM (standard)'],['trt_llm','TRT-LLM (+30%)'],['sglang','SGLang (+10%)']], wl.engine||'vllm')
-          + '</select>')
         + V._fg('TTFT target (ms)', '<input type="number" min="50" step="50" value="' + (wl.ttft||500) + '" ' + V._uNum(id,type,'ttft') + '>', 'Time to first token')
         + V._fg('TBT target (ms)', '<input type="number" min="5" step="5" value="' + (wl.tbt||30) + '" ' + V._uNum(id,type,'tbt') + '>', 'Time between tokens')
         + V._fg('E2E latency (ms)', '<input type="number" min="200" step="100" value="' + (wl.e2e||2000) + '" ' + V._uNum(id,type,'e2e') + '>', 'Full round-trip target')
