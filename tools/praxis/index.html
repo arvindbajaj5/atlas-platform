@@ -500,6 +500,9 @@ var M = {
   // Entry-mode anchor (Phase 1.1): 1=top-down (MW budget), 2=bottom-up (build to demand)
   entryMode: { mode: 2, mwBudget: 6.7667 },
 
+  // OEM equipment pricing (Phase 1.2): gross-margin, default 35%, per-line override
+  marginConfig: { defaultMarginPct: 0.35, overrides: {} },
+
   // Active tab
   activeTab: 'workloads',
 
@@ -2493,6 +2496,86 @@ function calcInferencing(w) { return _calcInferenceCore(w); }
 function calcMaaS(w) { return _calcInferenceCore(w); }
 
 
+function computeOemPricing(costLines) {
+  // ── OEM equipment pricing (ports Excel Margin + Finance-OEM sheets) ────────
+  // Sell Price = Cost / (1 - Margin%)  [gross-margin convention, per Excel's
+  // own documented rule]. Default 35%, per-line override via M.marginConfig.
+  // costLines: array of {key, label, cost}.
+  var cfg = (typeof M !== 'undefined' && M.marginConfig) || {};
+  var defaultMargin = cfg.defaultMarginPct != null ? cfg.defaultMarginPct : 0.35;
+  var overrides = cfg.overrides || {};
+
+  var rows = (costLines || []).map(function(l) {
+    var m = overrides[l.key] != null ? overrides[l.key] : defaultMargin;
+    m = Math.max(0, Math.min(0.95, m));   // clamp: never 100%+ margin (div by 0/negative)
+    var price = l.cost > 0 ? l.cost / (1 - m) : 0;
+    return { key: l.key, label: l.label, cost: l.cost, marginPct: m, price: price };
+  });
+
+  var totalCost  = rows.reduce(function(s, r) { return s + r.cost;  }, 0);
+  var totalPrice = rows.reduce(function(s, r) { return s + r.price; }, 0);
+  var marginDollars    = totalPrice - totalCost;
+  var weightedMarginPct = totalPrice > 0 ? (1 - totalCost / totalPrice) : 0;
+
+  return {
+    rows: rows, totalCost: totalCost, totalPrice: totalPrice,
+    marginDollars: marginDollars, weightedMarginPct: weightedMarginPct,
+    defaultMarginPct: defaultMargin
+  };
+}
+
+function computeEntryAnchor(bomGpuTotal, bomPowerKw, det, skuBom) {
+  // ── Entry-mode anchor (ports Excel Req-Global mode 1/2 + Sizing anchor) ────
+  // Mode 1 = top-down (MW budget -> how many GPUs fit)
+  // Mode 2 = bottom-up (build to meet configured demand) — DEFAULT, matches
+  //          PRAXIS's existing behavior exactly (no behavior change unless
+  //          M.entryMode.mode is explicitly set to 1).
+  var cfg = (typeof M !== 'undefined' && M.entryMode) || {};
+  var mode = cfg.mode || 2;
+
+  // Deploy/SKU unit from the dominant SKU actually configured (fallback 8).
+  var skuKeys = (skuBom && skuBom.bySku) ? Object.keys(skuBom.bySku) : [];
+  var dominant = skuKeys.length ? skuBom.bySku[skuKeys[0]] : null;
+  var skuUnit = (dominant && dominant.skuUnit) || 8;
+
+  // Blended actual kW/GPU from the real configured BOM (better than a flat
+  // TDP guess — reflects the actual SKU mix and overheads already priced in).
+  var kwPerGpu = bomGpuTotal > 0 ? (bomPowerKw / bomGpuTotal) : 1.4;
+
+  var anchorGpus;
+  if (mode === 1) {
+    var mwBudget = cfg.mwBudget || 6.7667;   // default matches the 6.7MW reference deal
+    var rawFit = Math.floor((mwBudget * 1000) / kwPerGpu);
+    anchorGpus = skuUnit ? Math.floor(rawFit / skuUnit) * skuUnit : rawFit;
+  } else {
+    anchorGpus = bomGpuTotal;   // bottom-up: built capacity = configured demand (today's behavior)
+  }
+
+  // Blended fleet yield (GPU-weighted across workloads) — the supply-first
+  // derate view: what does the anchored physical fleet actually deliver?
+  var totalRaw = 0, totalYieldedRaw = 0;
+  (det || []).forEach(function(d) {
+    var g = d.rawGpus || 0;
+    if (!g) return;
+    var y = workloadYield(d);
+    totalRaw += g;
+    totalYieldedRaw += g * y;
+  });
+  var blendedYield = totalRaw > 0 ? (totalYieldedRaw / totalRaw) : 1.0;
+  var effectiveCapacity = anchorGpus * blendedYield;
+
+  var utilization = anchorGpus > 0 ? (bomGpuTotal / anchorGpus) : 0;
+  var headroom = anchorGpus - bomGpuTotal;
+
+  return {
+    mode: mode, anchorGpus: anchorGpus, demandGpus: bomGpuTotal,
+    kwPerGpu: kwPerGpu, skuUnit: skuUnit,
+    blendedYield: blendedYield, effectiveCapacity: effectiveCapacity,
+    utilization: utilization, headroom: headroom,
+    fitsWithinBudget: mode === 1 ? (bomGpuTotal <= anchorGpus) : true
+  };
+}
+
 function praxisSizing(){
   var wls = getIFWorkloads();
   var tGPU=0,gCost=0,tPow=0,slaAll=true;
@@ -2648,7 +2731,17 @@ function praxisSizing(){
   
   var itPowerKw = bomPowerKw + commonPow + edgeTotalPow + agentOrcPow;   // raw IT load, no PUE
   var facilityPowerKw = itPowerKw * (hwPrice("pue")||1.2);                     // PUE-uplifted (what's shown)
-  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,gCost,tPow:facilityPowerKw,itPowerKw:itPowerKw,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,storageRacks,switchRacks,commonRacks,dlcRacksGPU,acRacksGPU,srvTotal,computeSrvTotal,serviceSrvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
+  var entryAnchor=computeEntryAnchor(bomGpuTotal,facilityPowerKw,det,skuBom);
+  var oemCostLines=[
+    {key:'gpu',      label:'GPUs',              cost:gCost},
+    {key:'compute',  label:'Compute/Network',   cost:cpuCost+netCost+swCost},
+    {key:'storage',  label:'Storage',           cost:stoCost},
+    {key:'software', label:'Software',          cost:swLicenseCost},
+    {key:'facility', label:'Facility/Infra',    cost:rackCost+dramCost+chassisCost+commonCost},
+    {key:'other',    label:'Edge/Agentic/Spare',cost:edgeTotalCost+agentOrcCost+geoCost+spareCost}
+  ];
+  var oemPricing=computeOemPricing(oemCostLines);
+  return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,entryAnchor:entryAnchor,oemPricing:oemPricing,gCost,tPow:facilityPowerKw,itPowerKw:itPowerKw,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,storageRacks,switchRacks,commonRacks,dlcRacksGPU,acRacksGPU,srvTotal,computeSrvTotal,serviceSrvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
 }
 
 
