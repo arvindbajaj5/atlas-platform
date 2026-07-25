@@ -4251,7 +4251,12 @@ function renderDocket() {
     + '</div></div>'
     + '<div class="docket-hdr-actions">'
     + '<button class="btn btn-sm btn-outline" onclick="openSASC()">&#9881; SASC</button>'
-    + '<button class="btn btn-sm btn-teal" onclick="openFM()">&#128184; Financial Model</button>'
+    // Financial Model shortcut only makes sense for TSAP engagements (non-TSAP
+    // terminates after PRAXIS per architecture). Routes to Territory tab, where
+    // the real AI Service Model / Finance choice lives — no duplicate URL here.
+    + (['TSAP','tsap'].includes(eng.engagement_type||eng.type||'')
+        ? '<button class="btn btn-sm btn-teal" onclick="switchTab(\'territory\')">&#128184; Financial Model</button>'
+        : '')
     + '</div></div>'
 
     // Cover note
