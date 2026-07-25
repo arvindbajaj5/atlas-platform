@@ -1646,21 +1646,71 @@ async function saveMaasConfig() {
 }
 
 // ── TERRITORY PROFILE TAB ────────────────────────────────────────────────────
+// ── Service-economics flags (Phase 1 restructuring) ─────────────────────────
+// Flag 1: does the selected portfolio include an AI-Service item? Independent
+// of customer type — a non-TSAP commercial deal with MaaS in scope needs
+// operator economics just as much as a TSAP one does.
+// NOTE: AIF/MDC are conceptually L1 containers with MaaS/GPUaaS/BMaaS as L2
+// children underneath (per architecture review) — the Portfolio tab's flat
+// hardcoded list doesn't yet express that hierarchy (tracked separately for
+// Phase 1.3 rewiring to portfolio_catalogue). Until then, trigger on any of
+// the codes that imply an operated AI service.
+var SERVICE_ECON_TRIGGERS = ['L2-MAAS','L2-GPUAAS','L2-BMAAS','L2-AIF','L2-MDC']
+function portfolioNeedsServiceEconomics() {
+  return SERVICE_ECON_TRIGGERS.some(function(c){ return PORTFOLIO_SELECTION.includes(c) })
+}
+
+// Flag 2: same-party (operator self-funds; AI Service Model alone suffices)
+// vs different-party (separate investing agency; needs AI Service Model +
+// Finance). Defaults from customer type, but is explicitly overridable —
+// engagement_type sets a sensible starting point, not a hard rule.
+function getPartyStructure() {
+  var eng = CURRENT_ENG || {}
+  if (eng.party_structure === 'same' || eng.party_structure === 'different') return eng.party_structure
+  var engType = eng.engagement_type || eng.type || ''
+  return ['TSAP','tsap'].includes(engType) ? 'different' : 'same'
+}
+
+async function savePartyStructure(val) {
+  var eng = CURRENT_ENG
+  if (!eng) return
+  var sb = getSB()
+  if (sb.url) {
+    try {
+      await fetch(sb.url + '/rest/v1/engagements?id=eq.' + eng.id, {
+        method: 'PATCH',
+        headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key,
+          'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ party_structure: val })
+      })
+    } catch(e) { console.warn('[savePartyStructure]', e) }
+  }
+  CURRENT_ENG.party_structure = val
+  showToast('Party structure set to ' + val)
+  renderDocket()
+}
+
 function renderTerritoryTab() {
   var eng = CURRENT_ENG || {}
   var territory = eng.territory || ''
   var engType = eng.engagement_type || eng.type || ''
+  var isTSAP = ['TSAP','tsap'].includes(engType)
+  var needsEcon = portfolioNeedsServiceEconomics()
+  var party = getPartyStructure()
   var aiServiceUrl = '../../tools/ai-service-model/index.html?eng=' + (eng.id||'')
   var financeUrl    = '../../tools/finance/index.html?eng=' + (eng.id||'')
 
-  if (!['TSAP','tsap'].includes(engType)) {
+  // Equipment-only deal, no operator/investor layer applies — PRAXIS pricing
+  // is the complete answer. This replaces the old blanket "TSAP only" gate,
+  // which wrongly hid economics from non-TSAP deals that DO need them.
+  if (!isTSAP && !needsEcon) {
     return '<div class="empty"><div class="empty-icon">🗺️</div>'
-      + '<div class="empty-title">Territory — TSAP engagements only</div>'
-      + '<div class="empty-sub">Available for Territory Sovereign AI Programme engagements only.</div></div>'
+      + '<div class="empty-title">No service economics needed</div>'
+      + '<div class="empty-sub">This portfolio is equipment-only — PRAXIS pricing is the full answer. Add MaaS / GPUaaS / BMaaS / AI Factory / Modular Datacenter to Portfolio to unlock operator &amp; investor economics.</div></div>'
   }
 
-  // No territory set
-  if (!territory) {
+  // TSAP requires a territory before anything else in this tab is useful.
+  if (isTSAP && !territory) {
     return '<div class="card" style="max-width:500px">'
       + '<div class="card-title">Set Territory</div>'
       + '<div class="card-sub">This TSAP engagement needs a territory defined before financial modelling can begin.</div>'
@@ -1673,67 +1723,97 @@ function renderTerritoryTab() {
       + '</div>'
   }
 
-  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'
-    + '<div style="font-size:17px;font-weight:700;color:var(--navy)">📍 ' + esc(territory) + '</div>'
-    + '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:#FFF3F1;color:#991B1B;font-weight:700">TSAP</span>'
-    + '<button onclick="saveTerritory(true)" style="margin-left:auto;padding:5px 12px;background:transparent;border:1.5px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer">✏️ Change</button>'
-    + '</div>'
+  var html = ''
 
-    // Territory Config card
-    + '<div class="card" style="margin-bottom:14px">'
-    + '<div class="card-title">Territory Cost Configuration</div>'
-    + '<div class="card-sub">Cost multipliers and overrides for ' + esc(territory) + '. These values are used in the TSAP Financial Model to adjust national average costs for this specific territory.</div>'
-    + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-    + '<thead><tr style="background:var(--light)">'
-    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Parameter</th>'
-    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Unit</th>'
-    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Territory Override</th>'
-    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">National Avg</th>'
-    + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Source</th>'
-    + '</tr></thead><tbody>'
-    + [
-        ['Power Tariff',         'Rs/kWh',     'power_tariff',    '7.50'],
-        ['Water Cost',           'Rs/kL',      'water_cost',      '45.00'],
-        ['Land Cost',            'Rs L/acre',  'land_cost',       '80.00'],
-        ['Engineer Salary',      'Rs L/yr',    'engineer_salary', '12.00'],
-        ['Civil Cost Index',     'base 100',   'civil_index',     '100'],
-        ['Construction Cost',    'Rs Cr/MW',   'construction_cr', '8.00']
-      ].map(function(row, ri) {
-        var key = row[2]
-        var tc = getTerritoryConfig()
-        var override = tc[key] || ''
-        return '<tr style="border-bottom:1px solid var(--border);' + (ri%2===1?'background:var(--light)':'') + '">'
-          + '<td style="padding:9px 10px;font-weight:600;color:var(--navy)">' + row[0] + '</td>'
-          + '<td style="padding:9px 10px;color:var(--mid);font-size:11px">' + row[1] + '</td>'
-          + '<td style="padding:9px 10px">'
-          + '<input type="number" value="' + (override||'') + '" placeholder="' + row[3] + '" data-key="' + key + '" '
-          + 'onchange="saveTerritoryConfig(this.dataset.key, this.value)" '
-          + 'style="width:100%;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;max-width:120px">'
-          + '</td>'
-          + '<td style="padding:9px 10px;color:var(--mid);font-size:12px">' + row[3] + '</td>'
-          + '<td style="padding:9px 10px">'
-          + (override
-              ? '<span style="font-size:9px;padding:2px 7px;border-radius:8px;background:#FFF3F1;color:var(--orange);font-weight:700">OVERRIDE</span>'
-              : '<span style="font-size:9px;padding:2px 7px;border-radius:8px;background:var(--light);color:var(--mid);font-weight:700">NAT AVG</span>')
-          + '</td></tr>'
-      }).join('')
-    + '</tbody></table></div>'
-    + '<div style="margin-top:10px;font-size:11px;color:var(--mid)">Leave blank to use national average. Changes apply immediately to the TSAP Financial Model.</div>'
-    + '</div>'
+  if (isTSAP && territory) {
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'
+      + '<div style="font-size:17px;font-weight:700;color:var(--navy)">📍 ' + esc(territory) + '</div>'
+      + '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:#FFF3F1;color:#991B1B;font-weight:700">TSAP</span>'
+      + '<button onclick="saveTerritory(true)" style="margin-left:auto;padding:5px 12px;background:transparent;border:1.5px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer">✏️ Change</button>'
+      + '</div>'
 
-    // AI Service Model + Finance links (split from the former single Financial Model tool)
-    + '<div class="g2" style="gap:14px">'
-    + '<div class="card" style="background:#EFF3FF;border-color:#BDD7FF">'
-    + '<div class="card-title" style="color:var(--blue)">AI Service Model</div>'
-    + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px;line-height:1.5">Operator economics — fine per-tenant demand, service margin, utilisation.</div>'
-    + '<a href="' + aiServiceUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open AI Service Model →</a>'
-    + '</div>'
-    + '<div class="card" style="background:#FFF3F1;border-color:#FECFC5">'
-    + '<div class="card-title" style="color:var(--orange)">Finance</div>'
-    + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px;line-height:1.5">Investor returns — NPV/IRR on built capacity, funding stack.</div>'
-    + '<a href="' + financeUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open Finance →</a>'
-    + '</div>'
-    + '</div>'
+      // Territory Config card — TSAP-programme specific, unrelated to the
+      // service-economics flags below.
+      + '<div class="card" style="margin-bottom:14px">'
+      + '<div class="card-title">Territory Cost Configuration</div>'
+      + '<div class="card-sub">Cost multipliers and overrides for ' + esc(territory) + '. These values are used in the TSAP Financial Model to adjust national average costs for this specific territory.</div>'
+      + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      + '<thead><tr style="background:var(--light)">'
+      + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Parameter</th>'
+      + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Unit</th>'
+      + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Territory Override</th>'
+      + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">National Avg</th>'
+      + '<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);border-bottom:2px solid var(--border)">Source</th>'
+      + '</tr></thead><tbody>'
+      + [
+          ['Power Tariff',         'Rs/kWh',     'power_tariff',    '7.50'],
+          ['Water Cost',           'Rs/kL',      'water_cost',      '45.00'],
+          ['Land Cost',            'Rs L/acre',  'land_cost',       '80.00'],
+          ['Engineer Salary',      'Rs L/yr',    'engineer_salary', '12.00'],
+          ['Civil Cost Index',     'base 100',   'civil_index',     '100'],
+          ['Construction Cost',    'Rs Cr/MW',   'construction_cr', '8.00']
+        ].map(function(row, ri) {
+          var key = row[2]
+          var tc = getTerritoryConfig()
+          var override = tc[key] || ''
+          return '<tr style="border-bottom:1px solid var(--border);' + (ri%2===1?'background:var(--light)':'') + '">'
+            + '<td style="padding:9px 10px;font-weight:600;color:var(--navy)">' + row[0] + '</td>'
+            + '<td style="padding:9px 10px;color:var(--mid);font-size:11px">' + row[1] + '</td>'
+            + '<td style="padding:9px 10px">'
+            + '<input type="number" value="' + (override||'') + '" placeholder="' + row[3] + '" data-key="' + key + '" '
+            + 'onchange="saveTerritoryConfig(this.dataset.key, this.value)" '
+            + 'style="width:100%;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;max-width:120px">'
+            + '</td>'
+            + '<td style="padding:9px 10px;color:var(--mid);font-size:12px">' + row[3] + '</td>'
+            + '<td style="padding:9px 10px">'
+            + (override
+                ? '<span style="font-size:9px;padding:2px 7px;border-radius:8px;background:#FFF3F1;color:var(--orange);font-weight:700">OVERRIDE</span>'
+                : '<span style="font-size:9px;padding:2px 7px;border-radius:8px;background:var(--light);color:var(--mid);font-weight:700">NAT AVG</span>')
+            + '</td></tr>'
+        }).join('')
+      + '</tbody></table></div>'
+      + '<div style="margin-top:10px;font-size:11px;color:var(--mid)">Leave blank to use national average. Changes apply immediately to the TSAP Financial Model.</div>'
+      + '</div>'
+  }
+
+  // Service economics — gated by the two flags, not by TSAP status.
+  // Flag 1 (needsEcon): does the portfolio include an AI-Service item.
+  // Flag 2 (party): same-party -> AI Service Model alone; different-party
+  // (TSAP defaults here, but overridable) -> also needs Finance.
+  if (needsEcon) {
+    html += '<div class="card" style="max-width:560px;margin-bottom:14px">'
+      + '<div class="card-title">Party Structure</div>'
+      + '<div class="card-sub" style="margin-bottom:10px">Is the operator running this infrastructure the same party bearing investment risk, or a separate investing agency?</div>'
+      + '<div style="display:flex;gap:6px">'
+      + ['same','different'].map(function(p) {
+          var on = party === p
+          return '<button style="padding:6px 14px;font-size:12px;font-weight:600;border:1.5px solid ' + (on?'var(--navy)':'var(--border)')
+            + ';background:' + (on?'var(--navy)':'#fff') + ';color:' + (on?'#fff':'var(--mid)')
+            + ';border-radius:5px;cursor:pointer" onclick="savePartyStructure(\'' + p + '\')">'
+            + (p==='same' ? 'Same Party (self-funded)' : 'Different Party (separate investor)') + '</button>'
+        }).join('')
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--mid);margin-top:6px">'
+      + (eng.party_structure ? 'Manually set.' : 'Auto-set from customer type (' + (isTSAP?'TSAP → different':'non-TSAP → same') + ') — override above if this deal is structured differently.')
+      + '</div></div>'
+
+    html += '<div class="' + (party==='different' ? 'g2' : '') + '" style="gap:14px' + (party==='different' ? '' : ';max-width:280px') + '">'
+      + '<div class="card" style="background:#EFF3FF;border-color:#BDD7FF">'
+      + '<div class="card-title" style="color:var(--blue)">AI Service Model</div>'
+      + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px;line-height:1.5">Operator economics — fine per-tenant demand, service margin, utilisation.</div>'
+      + '<a href="' + aiServiceUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open AI Service Model →</a>'
+      + '</div>'
+      + (party==='different'
+          ? '<div class="card" style="background:#FFF3F1;border-color:#FECFC5">'
+            + '<div class="card-title" style="color:var(--orange)">Finance</div>'
+            + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px;line-height:1.5">Investor returns — NPV/IRR on built capacity, funding stack.</div>'
+            + '<a href="' + financeUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open Finance →</a>'
+            + '</div>'
+          : '')
+      + '</div>'
+  }
+
+  return html
 }
 
 function getTerritoryConfig() {
@@ -4251,10 +4331,10 @@ function renderDocket() {
     + '</div></div>'
     + '<div class="docket-hdr-actions">'
     + '<button class="btn btn-sm btn-outline" onclick="openSASC()">&#9881; SASC</button>'
-    // Financial Model shortcut only makes sense for TSAP engagements (non-TSAP
-    // terminates after PRAXIS per architecture). Routes to Territory tab, where
-    // the real AI Service Model / Finance choice lives — no duplicate URL here.
-    + (['TSAP','tsap'].includes(eng.engagement_type||eng.type||'')
+    // Financial Model shortcut: relevant whenever the portfolio needs operator/
+    // investor economics (any customer type), OR for TSAP (territory config).
+    // Equipment-only deals correctly get no button — they terminate at PRAXIS.
+    + (((['TSAP','tsap'].includes(eng.engagement_type||eng.type||'')) || portfolioNeedsServiceEconomics())
         ? '<button class="btn btn-sm btn-teal" onclick="switchTab(\'territory\')">&#128184; Financial Model</button>'
         : '')
     + '</div></div>'
@@ -4277,12 +4357,16 @@ function renderDocket() {
         // Service Model tab — visible when any service offering selected
         var hasSvc = ['L2-MAAS','L2-GPUAAS','L2-BMAAS'].some(function(p){ return PORTFOLIO_SELECTION.includes(p) })
         if (hasSvc) tabs.push('svcmodel')
-        // Territory tab — TSAP only
-        if (_et==='TSAP'||_et==='tsap') tabs.push('territory')
+        // Territory/Economics tab — TSAP (territory cost config), OR any
+        // customer type whose portfolio needs operator/investor economics.
+        // Not TSAP-gated alone: a non-TSAP deal with MaaS in scope needs this too.
+        var hasEconScope = ['L2-MAAS','L2-GPUAAS','L2-BMAAS','L2-AIF','L2-MDC'].some(function(p){ return PORTFOLIO_SELECTION.includes(p) })
+        if ((_et==='TSAP'||_et==='tsap') || hasEconScope) tabs.push('territory')
         tabs = tabs.concat(['actions','outputs','history'])
         return tabs
       }()).map(function(t) {
-        var labels = { overview:'Overview', profile:'Profile & Intelligence', portfolio:'Portfolio', uc:'Use Cases', svcmodel:'Service Model', territory:'Territory', actions:'Actions', outputs:'Outputs', history:'History' }
+        var _isTsapLbl = ((CURRENT_ENG&&(CURRENT_ENG.engagement_type||CURRENT_ENG.type))||'').toLowerCase()==='tsap'
+        var labels = { overview:'Overview', profile:'Profile & Intelligence', portfolio:'Portfolio', uc:'Use Cases', svcmodel:'Service Model', territory:(_isTsapLbl?'Territory':'Economics'), actions:'Actions', outputs:'Outputs', history:'History' }
         var cnt = t === 'uc' ? counts.uc : t === 'actions' ? counts.action : t === 'outputs' ? counts.output : 0
         return '<button class="tab-btn' + (ACTIVE_TAB===t?' active':'') + '" onclick="switchTab(\'' + t + '\')">'
           + labels[t]
