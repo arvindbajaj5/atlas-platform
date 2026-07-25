@@ -825,6 +825,10 @@ var V = {
         + V._opts([['vllm','vLLM — general, high throughput'],['trt_llm','TensorRT-LLM — NVIDIA, lowest latency (+30%)'],['sglang','SGLang — structured, agents (+10%)'],['triton','Triton — multi-model, MIG'],['lorax','LoRAX — LoRA serving']], wl.engine||'vllm')
         + '</select>')
       h += '</div>'
+      var qcCheck = checkQuantCompat(wl.engine||'vllm', wl.precision||'int4')
+      if (!qcCheck.compatible) {
+        h += '<div style="font-size:11px;color:#991B1B;background:#FEE2E2;border-radius:5px;padding:5px 10px;margin-top:-4px;margin-bottom:6px">&#9888; ' + qcCheck.warning + '</div>'
+      }
     }
 
     // ROW 2 — Presets + data source
@@ -2146,6 +2150,37 @@ function currSym() { return '$'; }
 
 
 // ── Benchmark lookup ─────────────────────────────────────────────────────
+function checkQuantCompat(engine, precision) {
+  // ── Quant/engine compatibility check ────────────────────────────────────
+  // Live-data hook: if serving_engine_configs.supported_precisions[] is ever
+  // confirmed and wired into M.servingEngineMap, check that FIRST. Schema for
+  // that table has no ground truth in this codebase yet (unlike
+  // benchmark_results, which was verified against shared/sasc-sizing.js) —
+  // this fallback matrix is documented public engine-capability knowledge,
+  // not verified against Supabase. Flag for review once the real table is
+  // inspectable.
+  var live = (typeof M !== 'undefined' && M.servingEngineMap) ? M.servingEngineMap[engine] : null;
+  if (live && Array.isArray(live.supported_precisions)) {
+    var ok = live.supported_precisions.indexOf(precision) !== -1;
+    return { compatible: ok, source: 'serving_engine_configs', warning: ok ? null : (precision.toUpperCase() + ' not in ' + engine + '\'s supported precisions') };
+  }
+
+  var FALLBACK_MATRIX = {
+    vllm:     ['fp16', 'fp8', 'int8', 'int4'],   // broad support, AWQ/GPTQ for int4
+    trt_llm:  ['fp16', 'fp8', 'int8', 'int4'],   // NVIDIA-optimized, broad support
+    sglang:   ['fp16', 'fp8', 'int4'],           // int8 support newer/limited
+    triton:   ['fp16', 'fp8', 'int8'],           // int4 backend-dependent, not universal
+    lorax:    ['fp16', 'int8']                   // LoRA serving — aggressive quant uncommon
+  };
+  var supported = FALLBACK_MATRIX[engine] || ['fp16', 'fp8', 'int8', 'int4'];
+  var isOk = supported.indexOf(precision) !== -1;
+  return {
+    compatible: isOk,
+    source: 'documented-fallback (unverified against Supabase)',
+    warning: isOk ? null : (precision.toUpperCase() + ' is not commonly supported on ' + engine + ' — verify before committing to this configuration')
+  };
+}
+
 function praxisBenchLookup(gpuId, modelId, engine, quant) {
   // ── Real benchmark_results lookup (ports shared/sasc-sizing.js getBenchmark) ──
   // Confirmed schema: benchmark_results is keyed by gpu_config_id x ai_model_id
