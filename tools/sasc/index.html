@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; url=../engagement-docket/index-v3.html">
-  <title>ATLAS — Solution Builder (moved)</title>
+  <title>ATLAS — redirecting to PRAXIS...</title>
   <style>
     body { font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #F0F2F5; color: #111827; }
     .box { text-align: center; padding: 32px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 420px; }
@@ -14,12 +13,17 @@
 </head>
 <body>
   <div class="box">
-    <h2>Solution Builder is now part of the Docket</h2>
-    <p>Open an engagement, then use the Solution tab — redirecting automatically...</p>
-    <p><a href="../engagement-docket/index-v3.html">Click here if you are not redirected</a></p>
+    <h2>Solution Builder is now PRAXIS</h2>
+    <p>Redirecting automatically, engagement context preserved...</p>
+    <p><a id="fallback-link" href="../praxis/index.html">Click here if you are not redirected</a></p>
   </div>
   <script>
-    window.location.replace('../engagement-docket/index-v3.html')
+    // Forward the full query string (eng, docket params etc.) — the old
+    // redirect silently dropped these. Fixed as part of Phase 1.1.
+    var qs = window.location.search || '';
+    var target = '../praxis/index.html' + qs;
+    document.getElementById('fallback-link').href = target;
+    window.location.replace(target);
   </script>
 </body>
 </html>
