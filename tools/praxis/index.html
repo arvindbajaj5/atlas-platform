@@ -469,7 +469,7 @@ document.getElementById('atlas-css-link').href = CFG.baseUrl + 'shared/atlas.css
   s.onload = function() { loadScripts(files, i+1) }
   s.onerror = function() { console.warn('Failed to load:', files[i]); loadScripts(files, i+1) }
   document.head.appendChild(s)
-})(['shared/atlas-tokens.js','shared/atlas-db.js','shared/atlas-solution.js','shared/sasc-sizing.js'], 0)
+})(['shared/atlas-tokens.js','shared/atlas-db.js','shared/atlas-solution.js','shared/sasc-sizing.js','shared/atlas-finance.js'], 0)
 </script>
 
 <script>
@@ -2098,44 +2098,17 @@ function _calcInferenceCore(w) {
 // ── MODULE 2: INFERENCING (UC) — may use batch tokens; UC latency/throughput rules ──
 function calcInferencing(w) { return _calcInferenceCore(w); }
 
-function computeOemPricing(costLines) {
-  // ── OEM equipment pricing (ports Excel Margin + Finance-OEM sheets) ────────
-  // Sell Price = Cost / (1 - Margin%)  [gross-margin convention, per Excel's
-  // own documented rule]. Default 35%, per-line override via M.marginConfig.
-  // costLines: array of {key, label, cost}.
-  var cfg = (typeof M !== 'undefined' && M.marginConfig) || {};
-  var defaultMargin = cfg.defaultMarginPct != null ? cfg.defaultMarginPct : 0.35;
-  var overrides = cfg.overrides || {};
-
-  var rows = (costLines || []).map(function(l) {
-    var m = overrides[l.key] != null ? overrides[l.key] : defaultMargin;
-    m = Math.max(0, Math.min(0.95, m));   // clamp: never 100%+ margin (div by 0/negative)
-    var price = l.cost > 0 ? l.cost / (1 - m) : 0;
-    return { key: l.key, label: l.label, cost: l.cost, marginPct: m, price: price };
-  });
-
-  var totalCost  = rows.reduce(function(s, r) { return s + r.cost;  }, 0);
-  var totalPrice = rows.reduce(function(s, r) { return s + r.price; }, 0);
-  var marginDollars    = totalPrice - totalCost;
-  var weightedMarginPct = totalPrice > 0 ? (1 - totalCost / totalPrice) : 0;
-
-  return {
-    rows: rows, totalCost: totalCost, totalPrice: totalPrice,
-    marginDollars: marginDollars, weightedMarginPct: weightedMarginPct,
-    defaultMarginPct: defaultMargin
-  };
-}
-
 function computeOemRecurring(totalCapex) {
   // ── Ongoing maintenance & support (ports Excel Opex maint_pct/support_pct) ──
   // Annual, % of capex — hardware break-fix (5%) + vendor support contracts (3%).
-  // Same gross-margin engine as the one-time equipment sale, distinct line keys
-  // so overrides don't collide with equipment-side margin overrides.
+  // Pricing math now lives in shared FinanceEngine (marginLines) — this
+  // function only computes the two aaS-independent recurring cost lines.
   var lines = [
     { key: 'maintenance', label: 'Hardware Maintenance (annual)', cost: totalCapex * 0.05 },
     { key: 'support',     label: 'Vendor Support (annual)',        cost: totalCapex * 0.03 }
   ];
-  return computeOemPricing(lines);
+  var cfg = (typeof M !== 'undefined' && M.marginConfig) || {};
+  return FinanceEngine.marginLines(lines, cfg.defaultMarginPct, cfg.overrides);
 }
 
 
@@ -2303,7 +2276,7 @@ function praxisSizing(){
     {key:'other',    label:'Edge/Agentic/Spare',cost:edgeTotalCost+agentOrcCost+geoCost+spareCost},
     {key:'services', label:'Implementation & Delivery Services', cost:(svcEffort&&svcEffort.totalServicesCost)||0}
   ];
-  var oemPricing=computeOemPricing(oemCostLines);
+  var oemPricing=FinanceEngine.marginLines(oemCostLines, M.marginConfig&&M.marginConfig.defaultMarginPct, M.marginConfig&&M.marginConfig.overrides);
   var oemRecurring=computeOemRecurring(total);
   return{det,tGPU:tGPU+edgeTotalGPUs,rawGpuTotal:tGPU+edgeTotalGPUs,bomGpuTotal:bomGpuTotal,skuBom:skuBom,bomPowerKw:bomPowerKw,entryAnchor:entryAnchor,oemPricing:oemPricing,oemRecurring:oemRecurring,gCost,tPow:facilityPowerKw,itPowerKw:itPowerKw,tPowRaw:tPow+commonPow+edgeTotalPow+agentOrcPow,dlcRacks,acRacks,totalRacks,storageRacks,switchRacks,commonRacks,dlcRacksGPU,acRacksGPU,srvTotal,computeSrvTotal,serviceSrvTotal,cpuCnt,cpuCost,netPorts,netCost,swCost,stoTB,stoTBRaw,nvmeTB,hddTB,objTB,stoCost,rackCost,dramCost,chassisCost,commonCost,geoCost,spareCost,edgeTotalCost,edgeTotalPow,edgeTotalGPUs,agentOrcSrv,agentOrcCost,agentOrcPow,swLicenseCost,swDetail,total,slaAll};
 }

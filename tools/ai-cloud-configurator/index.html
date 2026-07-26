@@ -86,6 +86,7 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
 <div class="toast" id="toast"></div>
 
 <script src="../../shared/sasc-sizing.js"></script>
+<script src="../../shared/atlas-finance.js"></script>
 <script>
 // ── State ────────────────────────────────────────────────────────────────
 var ENGAGEMENT_ID = null, CURRENT_ENG = null, ENGAGEMENTS = []
@@ -108,6 +109,10 @@ var AIC = {
 // AIC only owns the commercial/tenancy layer on top of the sized result.
 var PORTFOLIO = { maas: [], gpuaas: [], bmaas: [] }
 var SE_READY = false
+
+// Pricing (Stage D): AIC previously had no margin/price layer at all — only
+// raw cost. Now wired to shared FinanceEngine, same convention as PRAXIS.
+var AIC_MARGIN = { defaultMarginPct: 0.35, overrides: {} }
 
 function esc(s) { return (s==null?'':String(s)).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] }) }
 function showToast(msg, type) {
@@ -135,17 +140,14 @@ function computeCloudSetupBOM() {
   var CERT_COST = { 'none': 0, 'iso27001': 40000, 'soc2': 60000, 'both': 90000 } // ESTIMATE — one-time audit/cert
   var secCost = (CERT_COST[sec.compliance_certs] || 0) + 20000 // + flat perimeter tooling — ESTIMATE
 
-  var total = controlPlaneCost + drCost + netCost + monCost + secCost
-  return {
-    lines: [
-      { label: 'Control-plane / CPU nodes', cost: controlPlaneCost },
-      { label: 'DR & Resilience (' + r.dr_strategy + ')', cost: drCost },
-      { label: 'Networking & Load Balancing', cost: netCost },
-      { label: 'Monitoring & Observability (annual)', cost: monCost },
-      { label: 'Security & Compliance', cost: secCost }
-    ],
-    total: total
-  }
+  var lines = [
+    { key: 'controlplane', label: 'Control-plane / CPU nodes', cost: controlPlaneCost },
+    { key: 'dr',           label: 'DR & Resilience (' + r.dr_strategy + ')', cost: drCost },
+    { key: 'network',      label: 'Networking & Load Balancing', cost: netCost },
+    { key: 'monitoring',   label: 'Monitoring & Observability (annual)', cost: monCost },
+    { key: 'security',     label: 'Security & Compliance', cost: secCost }
+  ]
+  return FinanceEngine.marginLines(lines, AIC_MARGIN.defaultMarginPct, AIC_MARGIN.overrides)
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────
@@ -243,24 +245,39 @@ function setField(field, value, isNum) {
 function renderBomTab() {
   var cs = computeCloudSetupBOM()
   var pf = computePortfolioBOM()
-  var h = '<div class="card"><div class="card-hdr">AI Cloud BOM</div>'
+  var h = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+    + '<div class="card-hdr" style="margin:0">AI Cloud BOM</div>'
+    + '<div style="display:flex;align-items:center;gap:6px"><label style="font-size:11px;color:var(--mid)">Default margin</label>'
+    + '<input type="number" min="0" max="90" step="1" value="' + Math.round(AIC_MARGIN.defaultMarginPct*100) + '" style="width:55px;font-size:12px;padding:4px 6px" onchange="setAicDefaultMargin(this.value)">%</div>'
+    + '</div>'
     + '<div class="card-sub">Cloud Setup (global) + Portfolio (aaS-level) = AI Cloud BOM. PRAXIS BOM + AI Cloud BOM = full Operator BOM.</div>'
-    + '<table class="bom-tbl"><thead><tr><th>Line</th><th>Cost</th></tr></thead><tbody>'
-    + cs.lines.map(function(l){ return '<tr><td>' + esc(l.label) + '</td><td>' + fmt$(l.cost) + '</td></tr>' }).join('')
-    + '<tr class="total-row"><td>TOTAL — Cloud Setup</td><td>' + fmt$(cs.total) + '</td></tr>'
-    + pf.lines.map(function(l){ return '<tr><td>' + l.type.toUpperCase() + ' — ' + esc(l.sizing.notes||'').slice(0,60) + '</td><td>' + fmt$(l.cost) + '</td></tr>' }).join('')
-    + '<tr class="total-row"><td>TOTAL — Portfolio</td><td>' + fmt$(pf.total) + '</td></tr>'
-    + '<tr class="total-row" style="border-top:3px solid var(--orange)"><td>TOTAL — AI Cloud BOM</td><td>' + fmt$(cs.total + pf.total) + '</td></tr>'
+    + '<table class="bom-tbl"><thead><tr><th>Line</th><th>Cost</th><th>Margin %</th><th>Price</th></tr></thead><tbody>'
+    + cs.rows.map(function(r){ return bomRow(r) }).join('')
+    + '<tr class="total-row"><td>TOTAL — Cloud Setup</td><td>' + fmt$(cs.totalCost) + '</td><td>' + (cs.weightedMarginPct*100).toFixed(1) + '%</td><td>' + fmt$(cs.totalPrice) + '</td></tr>'
+    + pf.rows.map(function(r){ return bomRow(r) }).join('')
+    + '<tr class="total-row"><td>TOTAL — Portfolio</td><td>' + fmt$(pf.totalCost) + '</td><td>' + (pf.weightedMarginPct*100).toFixed(1) + '%</td><td>' + fmt$(pf.totalPrice) + '</td></tr>'
+    + '<tr class="total-row" style="border-top:3px solid var(--orange)"><td>TOTAL — AI Cloud BOM</td><td>' + fmt$(cs.totalCost + pf.totalCost) + '</td><td></td><td>' + fmt$(cs.totalPrice + pf.totalPrice) + '</td></tr>'
     + '</tbody></table></div>'
   return h
 }
+function bomRow(r) {
+  var isOv = AIC_MARGIN.overrides && AIC_MARGIN.overrides[r.key] != null
+  return '<tr><td>' + esc(r.label) + '</td><td>' + fmt$(r.cost) + '</td>'
+    + '<td><input type="number" min="0" max="90" step="1" value="' + Math.round(r.marginPct*100) + '" style="width:50px;font-size:12px;padding:3px 5px;' + (isOv?'color:var(--orange);font-weight:700':'') + '" onchange="setAicMarginOverride(\'' + r.key + '\',this.value)">%'
+    + (isOv ? ' <button onclick="clearAicMarginOverride(\'' + r.key + '\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--mid)" title="Clear override">&times;</button>' : '')
+    + '</td><td><b>' + fmt$(r.price) + '</b></td></tr>'
+}
 function fmt$(v) { return '$' + Math.round(v||0).toLocaleString() }
+
+function setAicDefaultMargin(pct) { AIC_MARGIN.defaultMarginPct = Math.max(0, Math.min(0.9, (+pct||0)/100)); renderTab(ACTIVE_TAB) }
+function setAicMarginOverride(key, pct) { AIC_MARGIN.overrides = AIC_MARGIN.overrides || {}; AIC_MARGIN.overrides[key] = Math.max(0, Math.min(0.9, (+pct||0)/100)); renderTab(ACTIVE_TAB) }
+function clearAicMarginOverride(key) { if (AIC_MARGIN.overrides) delete AIC_MARGIN.overrides[key]; renderTab(ACTIVE_TAB) }
 
 function updateHeaderKpis() {
   var cs = computeCloudSetupBOM()
   var pf = computePortfolioBOM()
-  document.getElementById('hdr-cloudsetup-cost').textContent = fmt$(cs.total)
-  document.getElementById('hdr-portfolio-cost').textContent = fmt$(pf.total)
+  document.getElementById('hdr-cloudsetup-cost').textContent = fmt$(cs.totalPrice)
+  document.getElementById('hdr-portfolio-cost').textContent = fmt$(pf.totalPrice)
 }
 
 
@@ -312,7 +329,7 @@ function sizePortfolioItem(item) {
 var GPU_UNIT_COST = 32000     // $/GPU, capex — ESTIMATE, matches PRAXIS ballpark
 var CPU_SERVER_COST = 12000   // $/server, capex — ESTIMATE
 function computePortfolioBOM() {
-  var lines = []
+  var rawLines = []
   ;['maas','gpuaas','bmaas'].forEach(function(type){
     PORTFOLIO[type].forEach(function(item){
       var sz = sizePortfolioItem(item)
@@ -320,11 +337,13 @@ function computePortfolioBOM() {
       var gpus = sz.total_gpus || 0
       var servers = sz.total_servers || 0
       var cost = gpus * GPU_UNIT_COST + servers * CPU_SERVER_COST
-      lines.push({ type: type, item: item, sizing: sz, cost: cost })
+      rawLines.push({ key: item.id, label: type.toUpperCase() + ' — ' + (sz.notes||'').slice(0,50), cost: cost, type: type, item: item, sizing: sz })
     })
   })
-  var total = lines.reduce(function(s,l){ return s + l.cost }, 0)
-  return { lines: lines, total: total }
+  var priced = FinanceEngine.marginLines(rawLines, AIC_MARGIN.defaultMarginPct, AIC_MARGIN.overrides)
+  // Re-attach the type/item/sizing context marginLines doesn't carry (it only knows key/label/cost)
+  priced.rows.forEach(function(row, i){ row.type = rawLines[i].type; row.item = rawLines[i].item; row.sizing = rawLines[i].sizing })
+  return priced
 }
 
 function renderPortfolioTab() {
