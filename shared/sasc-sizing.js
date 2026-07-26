@@ -994,7 +994,15 @@
       // Tier 1: dedicated pool — no sharing, additional isolation buffer
       var isolationGPUs   = dedicatedPool ? Math.ceil(baseGPUs * 0.10) : 0
 
-      var totalGPUs       = baseGPUs + peakBuffer + failoverReserve + haGPUs + drGPUs + growthGPUs + isolationGPUs
+      var rawTotalGPUs    = baseGPUs + peakBuffer + failoverReserve + haGPUs + drGPUs + growthGPUs + isolationGPUs
+
+      // ── Production yield (Blueprint Section 30) — applied ONCE, after all
+      // buffers, before unit rounding. Ports the same rule PRAXIS's skuRollup
+      // uses: yield-inflate raw demand, round to units ONCE, never twice.
+      // Consumer UCs (this function) always incur production-yield loss;
+      // raw-capacity types don't (workloadYield returns 1.0 for those).
+      var ucYield  = workloadYield({ tp: 'uc', ragType: config.rag_type || 'none', isAgentic: !!config.is_agentic, steps: config.agent_steps || 0 })
+      var totalGPUs = Math.ceil(rawTotalGPUs / ucYield)
 
       // ── Performance estimates ─────────────────────────────────────────────
       var unitCalc       = gpusToUnits(totalGPUs, gpu)
@@ -1028,6 +1036,8 @@
         dedicated_pool:         dedicatedPool,
         precision:              precision,
         engine:                 engine,
+        production_yield:       Math.round(ucYield * 1000) / 1000,
+        raw_gpus_before_yield:  rawTotalGPUs,
         speculative_decoding:   !!draftModel,
         draft_model_vram_gb:    Math.round(W_draft * 100) / 100,
         tier_warning:           tierWarning,
@@ -1094,7 +1104,8 @@
           'P95 RPS: ' + Math.round(p95RPS*100)/100 + ' | Concurrent: ' + concurrentSessions + ' (Littles Law: ' + Math.round(activeRPS*100)/100 + ' RPS × ' + responseTimeSec + 's)',
           'B_max: min(' + B_max_vram + ' VRAM, ' + B_max_sla + ' SLA, ' + tierBatchCap + ' tier) = ' + B_max + ' [' + bindingBatch + ']',
           'GPU: TP_i=' + TP_i + ' × I_i=' + I_i + ' = ' + baseGPUs + ' base | Effective VRAM: ' + Math.round(vramPerGPU) + 'GB' + (isUnifiedMem ? ' (unified)' : '') + (draftModel ? ' | Speculative decoding: +' + Math.round(W_draft) + 'GB draft (' + draftModel.name + ')' : ''),
-          'Buffers: +' + peakBuffer + ' peak +' + failoverReserve + ' failover +' + haGPUs + ' HA(' + availSLA + '%) +' + isolationGPUs + ' isolation +' + growthGPUs + ' growth = ' + totalGPUs + ' total',
+          'Buffers: +' + peakBuffer + ' peak +' + failoverReserve + ' failover +' + haGPUs + ' HA(' + availSLA + '%) +' + isolationGPUs + ' isolation +' + growthGPUs + ' growth = ' + rawTotalGPUs + ' pre-yield',
+          'Yield: ' + rawTotalGPUs + ' / ' + (Math.round(ucYield*1000)/1000) + ' = ' + totalGPUs + ' total (Blueprint §30 production yield)',
           'TTFT: ' + ttftEstimateMs + 'ms vs SLA ' + ttftSlaMs + 'ms → ' + (slaMet ? '✓ met' : '✗ breach'),
           'KV: ' + kvCacheMethod(model)
         ].join(' | '),
@@ -1258,7 +1269,15 @@
       var peakBuffer      = Math.ceil(baseGPUs * headroomPct  / 100)
       var failoverReserve = Math.ceil(baseGPUs * failoverPct  / 100)
       var multiTenancy    = Math.ceil(baseGPUs * multiTenPct  / 100)
-      var totalGPUs       = baseGPUs + peakBuffer + failoverReserve + multiTenancy
+      var rawTotalGPUs    = baseGPUs + peakBuffer + failoverReserve + multiTenancy
+
+      // ── Production yield (Blueprint Section 30) — was completely missing
+      // from sizeMaaS, unlike PRAXIS's UC pipeline (which applies it via
+      // skuRollup). MaaS items genuinely need this: not every inference
+      // attempt succeeds (schema failures, hallucination retries, agentic
+      // step compounding). Applied ONCE, after buffers, before unit rounding.
+      var maasYield = workloadYield({ tp: 'maas', ragType: config.rag_type || 'none', isAgentic: !!config.is_agentic, steps: config.agent_steps || 0 })
+      var totalGPUs = Math.ceil(rawTotalGPUs / maasYield)
 
       // Units
       var unitCalc = gpusToUnits(totalGPUs, gpu)
@@ -1286,6 +1305,8 @@
         precision:             precision,
         params_b:              params_b,
         is_lora_variant:       isLoraVariant,
+        production_yield:      Math.round(maasYield * 1000) / 1000,
+        raw_gpus_before_yield: rawTotalGPUs,
         lora_base_model_id:    config.lora_base_model_id || null,
 
         // GPU breakdown
@@ -1320,8 +1341,8 @@
           'SLA: ' + commercialSla.toUpperCase() + ' (TTFT ' + ttftTargetMs + 'ms, ' + uptimePct + '% uptime) — pool: ' + poolType,
           'DAU ' + dau + ' → ' + peakConcurrent + ' peak concurrent (' + peakConcPct + '%)',
           'Base: max(' + gpusForFit + ' fit, ' + gpusForThroughput + ' throughput) = ' + baseGPUs + ' (' + bindingConstraint + ')',
-          'Buffers: +' + peakBuffer + ' peak(' + headroomPct + '%), +' + failoverReserve + ' failover(' + failoverPct + '%), +' + multiTenancy + ' multi-tenancy(' + multiTenPct + '%)',
-          'Total: ' + totalGPUs + ' GPUs → ' + unitCalc.units + ' ' + unitCalc.unit_type + '(s)'
+          'Buffers: +' + peakBuffer + ' peak(' + headroomPct + '%), +' + failoverReserve + ' failover(' + failoverPct + '%), +' + multiTenancy + ' multi-tenancy(' + multiTenPct + '%) = ' + rawTotalGPUs + ' pre-yield',
+          'Yield: ' + rawTotalGPUs + ' / ' + (Math.round(maasYield*1000)/1000) + ' = ' + totalGPUs + ' total → ' + unitCalc.units + ' ' + unitCalc.unit_type + '(s)'
         ].join(' | ')
       }
     },
