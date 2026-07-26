@@ -89,6 +89,7 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
 
 <script src="../../shared/sasc-sizing.js"></script>
 <script src="../../shared/atlas-finance.js"></script>
+<script src="../../shared/atlas-gates.js"></script>
 <script>
 // ── State ────────────────────────────────────────────────────────────────
 var ENGAGEMENT_ID = null, CURRENT_ENG = null, ENGAGEMENTS = []
@@ -409,8 +410,9 @@ function projectDemand(itemId) {
 function renderGrowthSection() {
   var h = '<div class="card"><div class="card-hdr">Growth Projections — MaaS Volume Planning</div>'
     + '<div class="card-sub">Model multiple demand sources per MaaS product (e.g. different customer segments), project 6-year volume and revenue against sized capacity.</div>'
-  if (!PORTFOLIO.maas.length) {
-    h += '<div style="text-align:center;padding:20px;color:var(--mid);font-size:12px">Add a MaaS item in Portfolio first — growth sources attach to a specific MaaS product.</div></div>'
+  var gate2 = AtlasGates.canShow('aic.demand.needs_maas', { PORTFOLIO: PORTFOLIO })
+  if (!gate2.ok) {
+    h += AtlasGates.renderGateBanner(gate2.reason) + '</div>'
     return h
   }
   PORTFOLIO.maas.forEach(function(item){
@@ -553,9 +555,9 @@ function computePortfolioBOM() {
 
 function renderPortfolioTab() {
   var h = ''
-  if (!SE_READY) {
-    h += '<div class="card" style="background:#FFF8E7;border-color:#FFB600"><div class="card-hdr">⏳ Sizing engine loading…</div>'
-      + '<div class="card-sub">Portfolio items will size once SizingEngine is ready.</div></div>'
+  var gate1 = AtlasGates.canShow('aic.portfolio.sizing_engine', { SE_READY: SE_READY })
+  if (!gate1.ok) {
+    h += AtlasGates.renderGateBanner(gate1.reason)
   }
 
   h += '<div class="card"><div class="card-hdr">Add to Portfolio</div>'
@@ -822,6 +824,15 @@ async function selectEngagement(id) {
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────
+AtlasGates.registerGates({
+  'aic.portfolio.sizing_engine': { requires: [
+    { key: 'SE_READY', check: function(ctx){ return ctx.SE_READY === true }, reason: 'Sizing engine still loading — Portfolio items will size once SizingEngine is ready.' }
+  ]},
+  'aic.demand.needs_maas': { requires: [
+    { key: 'hasMaas', check: function(ctx){ return !!(ctx.PORTFOLIO && ctx.PORTFOLIO.maas && ctx.PORTFOLIO.maas.length > 0) }, reason: 'Add a MaaS item in Portfolio first — growth sources attach to a specific MaaS product.' }
+  ]}
+})
+
 ;(async function boot() {
   var sb = getSB()
   if (sb.url && sb.key) {
