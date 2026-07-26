@@ -535,6 +535,15 @@ function sizePortfolioItem(item) {
 // caveat as PRAXIS's computeOemPricing. Flagged, not yet moved (Stage D).
 var GPU_UNIT_COST = 32000     // $/GPU, capex — ESTIMATE, matches PRAXIS ballpark
 var CPU_SERVER_COST = 12000   // $/server, capex — ESTIMATE
+// Customer-level security cost uplift — was a decorative field (selectable,
+// but never actually affected cost anywhere). ESTIMATE multipliers, same
+// documented-assumption discipline as Cloud Setup's site-level security
+// costs — not from a proven source, flagged for later validation.
+var CUST_SECURITY_UPLIFT = {
+  'standard':      0,      // baseline, no additional infra
+  'enhanced':      0.08,   // +8% — enhanced isolation/monitoring overhead
+  'dedicated-key': 0.15    // +15% — dedicated KMS/key-management infra
+}
 function computePortfolioBOM() {
   var rawLines = []
   ;['maas','gpuaas','bmaas'].forEach(function(type){
@@ -543,8 +552,11 @@ function computePortfolioBOM() {
       if (!sz) return
       var gpus = sz.total_gpus || 0
       var servers = sz.total_servers || 0
-      var cost = gpus * GPU_UNIT_COST + servers * CPU_SERVER_COST
-      rawLines.push({ key: item.id, label: type.toUpperCase() + ' — ' + (sz.notes||'').slice(0,50), cost: cost, type: type, item: item, sizing: sz })
+      var baseCost = gpus * GPU_UNIT_COST + servers * CPU_SERVER_COST
+      var secUplift = CUST_SECURITY_UPLIFT[item.custSecurity] || 0
+      var cost = baseCost * (1 + secUplift)
+      var label = type.toUpperCase() + ' — ' + (sz.notes||'').slice(0,50) + (secUplift > 0 ? ' [' + item.custSecurity + ' security]' : '')
+      rawLines.push({ key: item.id, label: label, cost: cost, type: type, item: item, sizing: sz })
     })
   })
   var priced = FinanceEngine.marginLines(rawLines, AIC_MARGIN.defaultMarginPct, AIC_MARGIN.overrides)
