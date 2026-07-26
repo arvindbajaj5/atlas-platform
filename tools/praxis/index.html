@@ -22,9 +22,6 @@
   --sem-warn:#FFB600;     /* Gold — warning/attention/near-threshold */
   /* ── WORKLOAD CATEGORY COLOURS ── */
   --cat-uc:#002870;       /* Navy */
-  --cat-maas:#00B290;     /* Teal */
-  --cat-gpuaas:#1C38F5;   /* Blue */
-  --cat-bmaas:#FF5539;    /* Orange */
   /* soft tint backgrounds for semantic panels */
   --bg-action:rgba(255,85,57,.07);
   --bg-data:rgba(28,56,245,.06);
@@ -513,7 +510,7 @@ var M = {
   currentAction: null,
 
   // Workloads — 4 categories
-  workloads: { uc:[], maas:[], gpuaas:[], bmaas:[] },
+  workloads: { uc:[] },
 
   // GPU & model reference data (loaded from Supabase)
   gpuConfigs:     [],
@@ -567,7 +564,7 @@ var V = {
 
   updateKpiBar: function() {
     var w = M.workloads
-    var totalWl = w.uc.length + w.maas.length + w.gpuaas.length + w.bmaas.length
+    var totalWl = w.uc.length
     var totalGpus = 0, totalPower = 0, totalCapex = 0
 
     // Single source of truth: praxisSizing (the fleet engine that also drives BOM/Arch/etc)
@@ -648,9 +645,6 @@ var V = {
     }
 
     h += V._renderCategory('uc',     '🏛', 'Use Cases', 'On-prem inference workloads', M.workloads.uc)
-    h += V._renderCategory('maas',   '🔌', 'MaaS Pools', 'Shared API inference pools', M.workloads.maas)
-    h += V._renderCategory('gpuaas', '⚡', 'GPUaaS Blocks', 'Reserved raw compute blocks', M.workloads.gpuaas)
-    h += V._renderCategory('bmaas',  '🖥', 'BMaaS Blocks', 'Bare-metal server allocations', M.workloads.bmaas)
 
     el.innerHTML = h
   },
@@ -714,22 +708,13 @@ var V = {
 
   _getTableCols: function(type, isDeep) {
     var base = [{ label:'Name' }]
-    if (type === 'uc' || type === 'maas') {
+    if (type === 'uc') {
       base.push({ label:'Model' })
       base.push({ label:'GPU' })
       if (isDeep) base.push({ label:'Precision' }, { label:'Engine' })
       base.push({ label:'GPUs', num:true })
       base.push({ label:'Power', num:true })
       base.push({ label:'Capex est.', num:true })
-      if (type === 'maas') base.push({ label:'$/Mtok', num:true })
-      base.push({ label:'SLA' })
-    } else if (type === 'gpuaas') {
-      base.push({ label:'GPU' }, { label:'Count', num:true })
-      base.push({ label:'Rate tier' }, { label:'Monthly est.', num:true })
-      base.push({ label:'SLA' })
-    } else if (type === 'bmaas') {
-      base.push({ label:'GPU' }, { label:'Servers', num:true })
-      base.push({ label:'GPUs/srv', num:true }, { label:'Monthly est.', num:true })
       base.push({ label:'SLA' })
     }
     return base
@@ -743,7 +728,7 @@ var V = {
       + (wl.commercialSla||wl.sla||'bronze').charAt(0).toUpperCase()
       + (wl.commercialSla||wl.sla||'bronze').slice(1) + '</span>'
 
-    if (type === 'uc' || type === 'maas') {
+    if (type === 'uc') {
       var sz = praxisRowSize(wl)
       // Row shows RAW exact demand — no rounding, no * here (rounding is BOM-only)
       var gpus  = (sz) ? (sz.gpus||0) : '—'
@@ -762,32 +747,8 @@ var V = {
       cells.push({ html: gpus, num:true })
       cells.push({ html: power, num:true })
       cells.push({ html: capex, num:true })
-      if (type === 'maas') cells.push({ html: '$' + (wl.pricePerMtok||0.75) + '/Mtok', num:true })
       cells.push({ html: slaHtml })
       return cells
-    }
-    if (type === 'gpuaas') {
-      var monthly = Math.round((wl.gpuCount||0) * 3.5 * 730)
-      return [
-        { html: '<span class="wl-name">' + atlasDB.esc(wl.name) + '</span>' },
-        { html: gpuName.slice(0,18) },
-        { html: wl.gpuCount||0, num:true },
-        { html: wl.rateTier||'12mo' },
-        { html: '$' + monthly.toLocaleString() + '/mo', num:true },
-        { html: slaHtml }
-      ]
-    }
-    if (type === 'bmaas') {
-      var gpusPerSrv = wl.gpusPerServer || (gpuConf&&gpuConf.gpus_in_unit) || 8
-      var monthly2 = wl.serverCount * 35000
-      return [
-        { html: '<span class="wl-name">' + atlasDB.esc(wl.name) + '</span>' },
-        { html: gpuName.slice(0,18) },
-        { html: wl.serverCount||1, num:true },
-        { html: gpusPerSrv, num:true },
-        { html: '$' + monthly2.toLocaleString() + '/mo', num:true },
-        { html: slaHtml }
-      ]
     }
     return [{ html: wl.name }]
   },
@@ -801,7 +762,7 @@ var V = {
     // ROW 1 — Name + Model + GPU + SLA + Tenant
     h += '<div class="formgrid" style="grid-template-columns:1.4fr 1.4fr 1.4fr 0.8fr 0.9fr">'
     h += V._fg('Name', '<input type="text" value="' + atlasDB.esc(wl.name) + '" ' + V._u(id,type,'name') + '>')
-    if (type === 'uc' || type === 'maas') {
+    if (type === 'uc') {
       h += V._fg('Model', V._renderModelDropdown(wl.model, id, type))
       h += V._fg('GPU Architecture', V._renderGpuDropdown(wl.gpu, id, type))
     } else {
@@ -816,7 +777,7 @@ var V = {
     // ROW 1b — Serving Engine + Quantization: core fields (ported from AI
     // Inferencing Factory), always visible for on-prem workloads — not
     // gated behind Deep mode. These drive real benchmark lookups downstream.
-    if ((type === 'uc' || type === 'maas') && wl.src !== 'api') {
+    if (type === 'uc' && wl.src !== 'api') {
       h += '<div class="formgrid" style="grid-template-columns:1fr 1fr">'
       h += V._fg('Quantization', '<select ' + V._u(id,type,'precision') + '>'
         + V._opts([['int4','INT4 — best throughput'],['int8','INT8'],['fp8','FP8'],['fp16','FP16 — best quality']], wl.precision||'int4')
@@ -832,12 +793,12 @@ var V = {
     }
 
     // ROW 2 — Presets + data source
-    if (type === 'uc' || type === 'maas') {
+    if (type === 'uc') {
       h += V._renderPresetBar(wl, type)
       h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 3fr;margin-bottom:8px">'
       h += V._fg('Data source',
         '<select ' + V._u(id,type,'src') + '>'
-        + V._opts([['onprem','🏢 On-Prem inference'],['api','☁️ API / MaaS'],['hybrid','🔀 Hybrid']], wl.src||'onprem')
+        + V._opts([['onprem','🏢 On-Prem inference'],['api','☁️ External API'],['hybrid','🔀 Hybrid']], wl.src||'onprem')
         + '</select>', 'Where this workload runs')
       h += V._fg('Chargeout model',
         '<select ' + V._u(id,type,'chargeoutModel') + '>'
@@ -865,73 +826,13 @@ var V = {
       h += '</div>'
     }
 
-    // MaaS — price + provisioning + demand planner
-    if (type === 'maas') {
-      h += '<div class="formgrid" style="grid-template-columns:1fr 1fr 2fr">'
-      h += V._fg('Price $/Mtok',
-        '<input type="number" min="0.01" step="0.01" value="' + (wl.pricePerMtok||0.75) + '" ' + V._uNum(id,type,'pricePerMtok') + '>',
-        'Revenue per million tokens')
-      h += V._fg('Provisioned GPUs',
-        '<input type="number" min="1" step="1" value="' + (wl.provisionedGpus||'') + '" placeholder="Auto from sizing" ' + V._uNum(id,type,'provisionedGpus') + '>',
-        'Override to size for future demand')
-      h += V._fg('Provisioning note',
-        '<input type="text" value="' + atlasDB.esc(wl.provisioningReason||'') + '" placeholder="e.g. Sized for Year 3 demand" ' + V._u(id,type,'provisioningReason') + '>')
-      h += '</div>'
-      h += V._renderDemandPlanner(wl)
-    }
-
-    // GPUaaS fields
-    if (type === 'gpuaas') {
-      h += '<div class="formgrid">'
-      h += V._fg('GPU Architecture', V._renderGpuDropdown(wl.gpu, id, type))
-      h += V._fg('GPU Count', '<input type="number" min="1" step="1" value="' + (wl.gpuCount||8) + '" ' + V._uNum(id,type,'gpuCount') + '>')
-      h += V._fg('Rate Tier', '<select ' + V._u(id,type,'rateTier') + '>'
-        + V._opts([['ondemand','On-demand — $5.00/GPU/hr'],['12mo','12-mo reserved — $3.50/GPU/hr'],['24mo','24-mo reserved — $2.75/GPU/hr'],['spot','Spot — $1.50/GPU/hr']], wl.rateTier||'12mo')
-        + '</select>')
-      h += V._fg('Commitment period', '<select ' + V._u(id,type,'contractMonths') + '>'
-        + V._opts([['0','Month-to-month'],['6','6 months'],['12','12 months'],['24','24 months'],['36','36 months']], String(wl.contractMonths||12))
-        + '</select>')
-      h += '</div>'
-      h += '<div class="formgrid">'
-      h += V._fg('Dedication model', '<select ' + V._u(id,type,'dedicationModel') + '>'
-        + V._opts([['dedicated','Dedicated — single tenant'],['shared','Shared pool — multi-tenant']], wl.dedicationModel||'dedicated')
-        + '</select>')
-      h += V._fg('Interconnect', '<select ' + V._u(id,type,'interconnect') + '>'
-        + V._opts([['standalone','Standalone'],['nvlink','NVLink — same chassis'],['infiniband','InfiniBand — multi-server']], wl.interconnect||'standalone')
-        + '</select>')
-      h += V._tenantDropdown(wl, id, type)
-      h += '</div>'
-    }
-
-    // BMaaS fields
-    if (type === 'bmaas') {
-      var defaultGpuPerSrv = (gpuConf && gpuConf.gpus_in_unit) || 8
-      h += '<div class="formgrid">'
-      h += V._fg('GPU Architecture', V._renderGpuDropdown(wl.gpu, id, type))
-      h += V._fg('Server Count', '<input type="number" min="1" step="1" value="' + (wl.serverCount||1) + '" ' + V._uNum(id,type,'serverCount') + '>')
-      h += V._fg('GPUs per server', '<input type="number" min="1" step="1" value="' + (wl.gpusPerServer||defaultGpuPerSrv) + '" ' + V._uNum(id,type,'gpusPerServer') + '>', 'Auto from gpu_configs')
-      h += V._fg('SLA Tier', '<select ' + V._u(id,type,'commercialSla') + '>'
-        + V._opts([['gold','Gold — dedicated bare metal'],['silver','Silver — guaranteed'],['bronze','Bronze — best effort']], wl.commercialSla||'gold')
-        + '</select>')
-      h += '</div>'
-      h += '<div class="formgrid">'
-      h += V._fg('Guest OS', '<select ' + V._u(id,type,'guestOs') + '>'
-        + V._opts([['ubuntu','Ubuntu 22.04 LTS'],['rhel','RHEL 8/9'],['custom','Customer image']], wl.guestOs||'ubuntu')
-        + '</select>')
-      h += V._fg('Interconnect', '<select ' + V._u(id,type,'interconnect') + '>'
-        + V._opts([['standalone','Standalone'],['nvlink','NVLink — same chassis'],['infiniband','InfiniBand — multi-server']], wl.interconnect||'standalone')
-        + '</select>')
-      h += V._tenantDropdown(wl, id, type)
-      h += '</div>'
-    }
-
     // Derived panel
-    if (type === 'uc' || type === 'maas') {
+    if (type === 'uc') {
       h += V._renderDerived(type, wl)
     }
 
-    // Deep mode — UC + MaaS
-    if (isDeep && (type === 'uc' || type === 'maas')) {
+    // Deep mode
+    if (isDeep && type === 'uc') {
       h += '<div class="deep-section">'
         + '<div class="deep-section-title">Latency &amp; Performance</div>'
         + '<div class="formgrid">'
@@ -1100,115 +1001,6 @@ var V = {
       + '</select></div>'
   },
 
-  // Demand planner for MaaS
-  _renderDemandPlanner: function(wl) {
-    var id = wl.id
-    var sources = wl.demandSources || []
-    var tokPerSec = 15417
-    var provGpus = wl.provisionedGpus || 1
-    var supplyB = provGpus * tokPerSec * 730 * 3600 / 1e9
-
-    // All interactive elements use data-* attributes — event delegation handles clicks/changes
-    var h = '<div id="dp-' + id + '" data-wlid="' + id + '" '
-      + 'style="background:rgba(0,178,144,.05);border:1px solid rgba(0,178,144,.2);'
-      + 'border-radius:var(--r);padding:14px;margin-bottom:12px">'
-    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
-      + '<div style="font-size:11px;font-weight:700;color:var(--teal)">&#128200; Demand Planner'
-      + (wl.provisionedGpus ? ' <span style="font-size:11px;color:var(--mid);font-weight:400">Supply: '
-        + supplyB.toFixed(1) + ' B tok/mo</span>' : '') + '</div>'
-      + '<button class="btn btn-outline btn-sm" data-action="addSource" data-wlid="' + id + '">+ Source</button>'
-      + '</div>'
-
-    if (!sources.length) {
-      h += '<div style="color:var(--mid);font-size:11px;padding:4px 0">'
-        + 'No demand sources yet. Click + Source to add a customer segment.</div>'
-    } else {
-      var custTypes = [['tsap','TSAP'],['isv','ISV'],['enterprise','Enterprise'],
-                       ['gov','Government'],['consumer','Consumer'],['other','Other']]
-
-      sources.forEach(function(src) {
-        h += '<div style="background:#fff;border:1px solid var(--border);'
-          + 'border-radius:var(--r);padding:10px;margin-bottom:8px">'
-          + '<div class="formgrid" style="grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr auto">'
-
-          // All inputs use data-* for delegation — no inline event handlers
-          + '<div class="fg"><label>Label</label>'
-          + '<input type="text" value="' + atlasDB.esc(src.label||'') + '" '
-          + 'data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="label" data-isnum="0">'
-          + '</div>'
-
-          + '<div class="fg"><label>Type</label>'
-          + '<select data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="customerType" data-isnum="0">'
-          + custTypes.map(function(v) {
-              return '<option value="' + v[0] + '"' + (src.customerType===v[0]?' selected':'') + '>' + v[1] + '</option>'
-            }).join('')
-          + '</select></div>'
-
-          + '<div class="fg"><label>Customers Y1</label>'
-          + '<input type="number" min="1" value="' + (src.customersY1||10) + '" '
-          + 'data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="customersY1" data-isnum="1">'
-          + '</div>'
-
-          + '<div class="fg"><label>Growth %/yr</label>'
-          + '<input type="number" min="0" value="' + (src.customerGrowthPct||30) + '" '
-          + 'data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="customerGrowthPct" data-isnum="1">'
-          + '</div>'
-
-          + '<div class="fg"><label>Tok/cust/mo (M)</label>'
-          + '<input type="number" min="0.01" step="0.1" value="' + (src.tokensPerCustomerM||5) + '" '
-          + 'data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="tokensPerCustomerM" data-isnum="1">'
-          + '</div>'
-
-          + '<div class="fg"><label>Token growth %</label>'
-          + '<input type="number" min="0" value="' + (src.tokenGrowthPct||20) + '" '
-          + 'data-action="updSource" data-wlid="' + id + '" data-srcid="' + src.id + '" data-field="tokenGrowthPct" data-isnum="1">'
-          + '</div>'
-
-          + '<div class="fg" style="align-self:flex-end">'
-          + '<button class="btn btn-danger-text btn-sm" '
-          + 'data-action="removeSource" data-wlid="' + id + '" data-srcid="' + src.id + '">&#10005;</button>'
-          + '</div>'
-          + '</div></div>'
-      })
-
-      // 6-year projection table (read-only derived output)
-      h += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:8px">'
-        + '<thead><tr style="background:var(--light)">'
-      ;['Year','Customers','Demand B tok/mo','Supply B tok/mo','Util %','Revenue/yr','Status'].forEach(function(col){
-        h += '<th style="padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;'
-          + 'color:var(--mid);text-align:' + (col==='Year'||col==='Status'?'left':'right') + '">' + col + '</th>'
-      })
-      h += '</tr></thead><tbody id="dp-table-' + id + '">'
-      for (var yr = 1; yr <= 6; yr++) {
-        var tc = 0, tb = 0
-        sources.forEach(function(src) {
-          var custs = (src.customersY1||0) * Math.pow(1 + (src.customerGrowthPct||0)/100, yr-1)
-          tc += custs
-          tb += custs * ((src.tokensPerCustomerM||0) * Math.pow(1 + (src.tokenGrowthPct||0)/100, yr-1)) / 1000
-        })
-        var util = supplyB > 0 ? tb / supplyB : 0
-        var rev  = tb * 12 * 1000 * (wl.pricePerMtok || 0.75)
-        var col  = util > 1 ? 'var(--orange)' : util > 0.85 ? 'var(--amber)' : 'var(--teal)'
-        var st   = util > 1 ? '&#128308; Under' : util > 0.85 ? '&#129000; Near full'
-                 : util > 0.3 ? '&#128994; Healthy' : '&#9898; Low'
-        h += '<tr style="border-top:1px solid var(--border)">'
-          + '<td style="padding:5px 8px">Y' + yr + '</td>'
-          + '<td style="padding:5px 8px;text-align:right">' + Math.round(tc).toLocaleString() + '</td>'
-          + '<td style="padding:5px 8px;text-align:right">' + tb.toFixed(2) + '</td>'
-          + '<td style="padding:5px 8px;text-align:right">' + supplyB.toFixed(1) + '</td>'
-          + '<td style="padding:5px 8px;text-align:right;font-weight:700;color:' + col + '">'
-            + Math.min(util*100,999).toFixed(1) + '%</td>'
-          + '<td style="padding:5px 8px;text-align:right">$' + Math.round(rev).toLocaleString() + '</td>'
-          + '<td style="padding:5px 8px;font-size:11px">' + st + '</td>'
-          + '</tr>'
-      }
-      h += '</tbody></table>'
-    }
-    h += '</div>'
-    return h
-  },
-
-
   _renderDerived: function(type, wl) {
     var sz = praxisRowSize(wl)
     if (!sz) return ''
@@ -1353,10 +1145,7 @@ var C = {
     var id = type + '-' + Date.now()
     var defaultGpu = M.gpuConfigs.length ? M.gpuConfigs[0].id : ''
     var defaults = {
-      uc:     { id:id, name:'Use Case '     +(M.workloads.uc.length+1),     model:M.defaultModel, gpu:defaultGpu, precision:'int4', dau:10000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'gold',   engine:'vllm', securityTier:'standard', isAgentic:false, isMultimodal:false, src:'onprem', chargeoutModel:'per_token', avgInputTokens:512, avgOutputTokens:256, gpuUtilTarget:75 },
-      maas:   { id:id, name:'MaaS Pool '    +(M.workloads.maas.length+1),   model:M.defaultModel, gpu:defaultGpu, precision:'int4', dau:50000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'bronze', engine:'vllm', pricePerMtok:0.75, provisionedGpus:null, provisioningReason:'', demandSources:[], src:'onprem', chargeoutModel:'per_token', avgInputTokens:512, avgOutputTokens:256, gpuUtilTarget:75 },
-      gpuaas: { id:id, name:'GPUaaS Block ' +(M.workloads.gpuaas.length+1), gpu:defaultGpu, gpuCount:8, rateTier:'12mo', commercialSla:'gold' },
-      bmaas:  { id:id, name:'BMaaS Block '  +(M.workloads.bmaas.length+1),  gpu:defaultGpu, serverCount:1, gpusPerServer:8, commercialSla:'gold', guestOs:'ubuntu', interconnect:'standalone' }
+      uc:     { id:id, name:'Use Case '     +(M.workloads.uc.length+1),     model:M.defaultModel, gpu:defaultGpu, precision:'int4', dau:10000, reqPerDay:20, peakMult:3, peakConcPct:5, contextPct:'p95', commercialSla:'gold',   engine:'vllm', securityTier:'standard', isAgentic:false, isMultimodal:false, src:'onprem', chargeoutModel:'per_token', avgInputTokens:512, avgOutputTokens:256, gpuUtilTarget:75 }
     }
     M.workloads[type].push(defaults[type])
     M.openRows[id] = true
@@ -1371,11 +1160,6 @@ var C = {
     if (!wl) return
     wl[field] = val
     _praxisSizeCache = null  // invalidate row-size cache
-    // Auto-update gpus per server when GPU changes on BMaaS
-    if (field === 'gpu' && type === 'bmaas') {
-      var g = M.gpuMap[val]
-      if (g && g.gpus_in_unit) wl.gpusPerServer = g.gpus_in_unit
-    }
     M.isDirty = true
     V.renderWorkloadsTab()
     V.updateKpiBar()
@@ -1389,67 +1173,6 @@ var C = {
     V.renderWorkloadsTab()
     V.updateKpiBar()
     C.scheduleSave()
-  },
-
-  addDemandSource: function(wlId) {
-    var wl = M.workloads.maas.find(function(w){ return w.id === wlId })
-    if (!wl) return
-    if (!wl.demandSources) wl.demandSources = []
-    wl.demandSources.push({ id:'ds-'+Date.now(), label:'Source '+(wl.demandSources.length+1),
-      customerType:'tsap', customersY1:10, customerGrowthPct:30,
-      tokensPerCustomerM:5.0, tokenGrowthPct:20 })
-    M.isDirty = true; C._refreshDemandPlanner(wlId, wl); C.scheduleSave()
-  },
-
-  updDemandSource: function(wlId, srcId, field, val) {
-    var wl = M.workloads.maas.find(function(w){ return w.id === wlId })
-    if (!wl || !wl.demandSources) return
-    var src = wl.demandSources.find(function(s){ return s.id === srcId })
-    if (src) { src[field] = val; M.isDirty = true; C._refreshDemandPlanner(wlId, wl); C.scheduleSave() }
-  },
-
-  updDemandSourceSilent: function(wlId, srcId, field, val) {
-    var wl = M.workloads.maas.find(function(w){ return w.id === wlId })
-    if (!wl || !wl.demandSources) return
-    var src = wl.demandSources.find(function(s){ return s.id === srcId })
-    if (!src) return
-    src[field] = val
-    M.isDirty = true
-    C.scheduleSave()
-    // Update only the projection tbody — inputs stay focused
-    var tbody = document.getElementById('dp-table-' + wlId)
-    if (!tbody) return
-    var sources = wl.demandSources
-    var supplyB = (wl.provisionedGpus||1) * 15417 * 730 * 3600 / 1e9
-    var rows = ''
-    for (var yr = 1; yr <= 6; yr++) {
-      var tc=0, tb=0
-      sources.forEach(function(s){
-        var custs = (s.customersY1||0)*Math.pow(1+(s.customerGrowthPct||0)/100,yr-1)
-        tc+=custs; tb+=custs*((s.tokensPerCustomerM||0)*Math.pow(1+(s.tokenGrowthPct||0)/100,yr-1))/1000
-      })
-      var util=supplyB>0?tb/supplyB:0
-      var rev=tb*12*1000*(wl.pricePerMtok||0.75)
-      var col=util>1?'var(--orange)':util>0.85?'var(--amber)':'var(--teal)'
-      var st=util>1?'&#128308; Under':util>0.85?'&#129000; Near full':util>0.3?'&#128994; Healthy':'&#9898; Low'
-      rows+='<tr style="border-top:1px solid var(--border)">'
-        +'<td style="padding:5px 8px">Y'+yr+'</td>'
-        +'<td style="padding:5px 8px;text-align:right">'+Math.round(tc).toLocaleString()+'</td>'
-        +'<td style="padding:5px 8px;text-align:right">'+tb.toFixed(2)+'</td>'
-        +'<td style="padding:5px 8px;text-align:right">'+supplyB.toFixed(1)+'</td>'
-        +'<td style="padding:5px 8px;text-align:right;font-weight:700;color:'+col+'">'+Math.min(util*100,999).toFixed(1)+'%</td>'
-        +'<td style="padding:5px 8px;text-align:right">$'+Math.round(rev).toLocaleString()+'</td>'
-        +'<td style="padding:5px 8px;font-size:11px">'+st+'</td></tr>'
-    }
-    tbody.innerHTML = rows
-    V.updateKpiBar()
-  },
-
-  removeDemandSource: function(wlId, srcId) {
-    var wl = M.workloads.maas.find(function(w){ return w.id === wlId })
-    if (!wl || !wl.demandSources) return
-    wl.demandSources = wl.demandSources.filter(function(s){ return s.id !== srcId })
-    M.isDirty = true; C._refreshDemandPlanner(wlId, wl); C.scheduleSave()
   },
 
   selectEngagement: async function(engId) {
@@ -1498,23 +1221,11 @@ var C = {
         })
       })
     }
-    if (ctx.maas_pools && ctx.maas_pools.length) {
-      ctx.maas_pools.forEach(function(pool) {
-        var id = 'maas-' + Date.now() + '-' + Math.random().toString(36).slice(2,6)
-        M.workloads.maas.push(Object.assign({
-          id: id, model: M.defaultModel,
-          gpu: M.gpuConfigs.length ? M.gpuConfigs[0].id : '',
-          precision:'int4', dau:50000, reqPerDay:20, peakMult:3,
-          peakConcPct:5, contextPct:'p95', commercialSla:'bronze',
-          engine:'vllm', pricePerMtok:0.75, demandSources:[]
-        }, pool))
-      })
-    }
     // Set mode based on action type
     if (ctx.mode === 'deep' || action.item_subtype === 'presales_handover') C.setMode('deep')
     V.renderWorkloadsTab()
     V.updateKpiBar()
-    V.toast('Action context loaded — ' + (M.workloads.uc.length + M.workloads.maas.length) + ' workloads pre-populated', 'success')
+    V.toast('Action context loaded — ' + M.workloads.uc.length + ' workloads pre-populated', 'success')
   },
 
   loadEngagements: async function() {
@@ -1576,10 +1287,7 @@ var C = {
         // the new engagement has no saved workload_configs, so switching engagements
         // never silently leaves the PREVIOUS engagement's workloads showing (stale data bug).
         M.workloads = {
-          uc:     (snap.workload_configs && snap.workload_configs.uc)     || [],
-          maas:   (snap.workload_configs && snap.workload_configs.maas)   || [],
-          gpuaas: (snap.workload_configs && snap.workload_configs.gpuaas) || [],
-          bmaas:  (snap.workload_configs && snap.workload_configs.bmaas)  || []
+          uc:     (snap.workload_configs && snap.workload_configs.uc)     || []
         }
         M.isDirty = false
         C.setMode(M.mode)
@@ -1595,7 +1303,7 @@ var C = {
       } else {
         // No saved version for this engagement at all — reset workloads so switching
         // TO a fresh engagement doesn't keep showing the PREVIOUS engagement's data.
-        M.workloads = { uc:[], maas:[], gpuaas:[], bmaas:[] }
+        M.workloads = { uc:[] }
         M.solutionVersionId = null; M.versionLabel = null; M.versionNumber = null
         M.isDirty = false
         V.renderWorkloadsTab()
@@ -1666,7 +1374,7 @@ var C = {
     if (!M.currentEng) { V.toast('Select an engagement first', 'warning'); return }
 
     var totalGpus = 0, totalPower = 0, totalCapex = 0
-    M.workloads.uc.concat(M.workloads.maas).forEach(function(wl) {
+    M.workloads.uc.forEach(function(wl) {
       try {
         var sz = praxisRowSize(wl)
         if (sz) {
@@ -1675,13 +1383,8 @@ var C = {
         }
       } catch(e) {}
     })
-    M.workloads.gpuaas.forEach(function(w){ totalGpus+=w.gpuCount||0; totalCapex+=(w.gpuCount||0)*30000 })
-    M.workloads.bmaas.forEach(function(w){
-      var g=M.gpuMap[w.gpu]; var gpus=w.serverCount*(w.gpusPerServer||(g&&g.gpus_in_unit)||8)
-      totalGpus+=gpus; totalCapex+=gpus*30000
-    })
 
-    var wlCount = M.workloads.uc.length+M.workloads.maas.length+M.workloads.gpuaas.length+M.workloads.bmaas.length
+    var wlCount = M.workloads.uc.length
     var nextVer  = (M.versionNumber||0) + 1
     var verLabel = M.mode === 'express' ? 'v'+nextVer+' Express' : 'v'+nextVer+' Deep'
 
@@ -1810,18 +1513,7 @@ var C = {
   },
 
   // Targeted demand planner refresh — avoids full tab re-render (preserves scroll + focus)
-  _refreshDemandPlanner: function(wlId, wl) {
-    var el = document.getElementById('dp-' + wlId)
-    if (!el) { V.renderWorkloadsTab(); return }  // fallback if not found
-    var newHtml = V._renderDemandPlanner(wl)
-    // Replace just the demand planner div content
-    var tmp = document.createElement('div')
-    tmp.innerHTML = newHtml
-    var newEl = tmp.firstElementChild
-    if (newEl) el.parentNode.replaceChild(newEl, el)
-    V.updateKpiBar()
-  },
-
+  
   _saveTimer: null,
   scheduleSave: function() {
     clearTimeout(C._saveTimer)
@@ -1923,10 +1615,10 @@ var charts = {}
 function dc(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
 
 // ── Fixed semantic + category colour helpers ─────────────────────────────
-var CAT_COLORS = { uc:'#002870', maas:'#00B290', gpuaas:'#1C38F5', bmaas:'#FF5539' };
-var CAT_LABELS = { uc:'UC', maas:'MaaS', gpuaas:'GPUaaS', bmaas:'BMaaS' };
+var CAT_COLORS = { uc:'#002870' };
+var CAT_LABELS = { uc:'UC' };
 function catColor(type){ return CAT_COLORS[type] || '#002870'; }
-var CAT_TINTS = { uc:'rgba(0,40,112,.06)', maas:'rgba(0,178,144,.08)', gpuaas:'rgba(28,56,245,.06)', bmaas:'rgba(255,85,57,.07)' };
+var CAT_TINTS = { uc:'rgba(0,40,112,.06)' };
 function catTint(type){ return CAT_TINTS[type] || 'rgba(0,40,112,.05)'; }
 // Semantic hex values (for Chart.js which needs literal colors)
 var SEM = { action:'#FF5539', data:'#1C38F5', struct:'#002870', pass:'#00B290', warn:'#FFB600' };
@@ -2111,13 +1803,7 @@ function toIFWorkload(wl, type) {
     scaleUp: true,
     isGeo: false,
     commercialSla: wl.commercialSla || 'bronze',
-    provisionedGpus: wl.provisionedGpus || null,
-    // Block-type fields (GPUaaS / BMaaS) — passed through for block sizing
-    gpuCount: wl.gpuCount || 0,
-    serverCount: wl.serverCount || 0,
-    gpusPerServer: wl.gpusPerServer || (gpuConf.gpus_in_unit || 8),
-    rateTier: wl.rateTier || '12mo',
-    guestOs: wl.guestOs || 'ubuntu'
+    provisionedGpus: wl.provisionedGpus || null
   };
 }
 
@@ -2125,9 +1811,6 @@ function toIFWorkload(wl, type) {
 function getIFWorkloads() {
   var wls = [];
   (M.workloads.uc    ||[]).forEach(function(w){ wls.push(toIFWorkload(w,'uc')); });
-  (M.workloads.maas  ||[]).forEach(function(w){ wls.push(toIFWorkload(w,'maas')); });
-  (M.workloads.gpuaas||[]).forEach(function(w){ wls.push(toIFWorkload(w,'gpuaas')); });
-  (M.workloads.bmaas ||[]).forEach(function(w){ wls.push(toIFWorkload(w,'bmaas')); });
   return wls;
 }
 
@@ -2260,7 +1943,7 @@ var _praxisSizeCache = null, _praxisSizeCacheKey = null
 function praxisRowSize(wl) {
   try {
     // cache per workload-set snapshot so we don't recompute for every row
-    var key = (M.workloads.uc.length+'-'+M.workloads.maas.length+'-'+M.workloads.gpuaas.length+'-'+M.workloads.bmaas.length)
+    var key = (M.workloads.uc.length)
     if (_praxisSizeCacheKey !== key || !_praxisSizeCache) {
       _praxisSizeCache = praxisSizing(); _praxisSizeCacheKey = key
     }
@@ -2371,37 +2054,8 @@ function skuRollup(det) {
   return { stage2: stage2, bySku: bySku, totalProvisioned: totalProvisioned, totalPowerKw: totalPowerKw };
 }
 
-function calcBlock(w) {
-  var p = getPROC(w.proc);
-  if (!p) return null;
-  var gpusPerU = p.mx || 8;
-  var blockGPUs, blockServers;
-  if (w.tp === 'gpuaas') {
-    blockGPUs = w.gpuCount || 0;
-    blockServers = Math.ceil(blockGPUs / gpusPerU);
-  } else { // bmaas
-    blockServers = w.serverCount || 0;
-    blockGPUs = blockServers * (w.gpusPerServer || gpusPerU);
-  }
-  var cpuPb = getPROC(cpuK);
-  var blockPow = blockGPUs > 0 ? (blockGPUs*(p.tdp||700) + blockServers*2*((cpuPb||{}).tdp||350) + blockGPUs*50)*1.1/1000 : 0;
-  var secMultB = ((SEC_TIERS[w.securityTier]||{}).cost_mult) || 1;
-  var blockCost = blockGPUs * price(w.proc) * 1.8 * secMultB;
-  return {
-    det: {...w, gpus:blockGPUs, gpusPer:gpusPerU, servers:blockServers, cost:blockCost, pw:blockPow,
-      totalTPS:0, estTTFT:0, estTBT:0, estE2E:0, ttftOk:true, tbtOk:true, e2eOk:true,
-      kvGB:0, peakConc:0, dailyReqs:0, dailyTok:0, moTok:0, avgRPS:0, peakRPS:0,
-      need:blockGPUs, decGPUs:0, decCost:0, decPow:0, apiMoCost:0, cascadeGPUs:0, batchUsed:0,
-      bmSource:'block', recDisagg:false, recLight:false, isBlock:true,
-      rawGpus:blockGPUs, sku:w.proc, yieldFrac:SizingEngine.workloadYield(w), decodeProc:null, cascadeProc:null},
-    tGPU: blockGPUs, gCost: blockCost, tPow: blockPow
-  };
-}
 
-// ── Shared inference sizing core (used by UC and MaaS until they diverge) ──
-// NOTE: UC and MaaS are SEPARATE modules by design (batch vs streaming tokens,
-// tenancy, differing latency/throughput rules). They share this core today but
-// will diverge — keep changes in the respective module, not here.
+// ── Inference sizing core (UC only — PRAXIS has no aaS) ──
 function _calcInferenceCore(w) {
   var p = getPROC(w.proc), m = getMDL(w.md);
   if (!p) return null;
@@ -2443,12 +2097,6 @@ function _calcInferenceCore(w) {
 
 // ── MODULE 2: INFERENCING (UC) — may use batch tokens; UC latency/throughput rules ──
 function calcInferencing(w) { return _calcInferenceCore(w); }
-
-// ── MODULE 3: MaaS — streaming/online tokens, tenancy, consumption model ──
-// Currently mirrors the inference core; will diverge (streaming latency, tenancy,
-// $/Mtok economics, provisioned-GPU overrides). Keep MaaS-specific rules HERE.
-function calcMaaS(w) { return _calcInferenceCore(w); }
-
 
 function computeOemPricing(costLines) {
   // ── OEM equipment pricing (ports Excel Margin + Finance-OEM sheets) ────────
@@ -2498,12 +2146,9 @@ function praxisSizing(){
   var rackK='dlc_260kw';
   var det=[];
   wls.forEach(w=>{
-    // Dispatch to the correct calc module (MVC Model layer). Modules own the math;
-    // this loop only aggregates. See calcBlock / calcInferencing / calcMaaS above.
-    var r;
-    if (w.tp==='gpuaas' || w.tp==='bmaas') r = calcBlock(w);
-    else if (w.tp==='maas')                r = calcMaaS(w);
-    else                                    r = calcInferencing(w);
+    // Dispatch to the calc module (MVC Model layer). Module owns the math;
+    // this loop only aggregates. See calcInferencing above.
+    var r = calcInferencing(w);
     if (!r) return;
     tGPU += r.tGPU; gCost += r.gCost; tPow += r.tPow;
     if (r.slaFail) slaAll = false;
@@ -3189,7 +2834,7 @@ function praxisRebuildCharts(){
   if (lc && typeof Chart !== 'undefined') {
     dc('lat');
     var sz0 = praxisSizing();
-    var latDet = (sz0 && sz0.det) ? sz0.det.filter(function(d){ return d.tp==='uc'||d.tp==='maas'; }) : [];
+    var latDet = (sz0 && sz0.det) ? sz0.det.filter(function(d){ return d.tp==='uc'; }) : [];
     if (latDet.length) {
       charts.lat = new Chart(lc, {
         type:'bar',
@@ -3447,20 +3092,14 @@ var ea = sz.entryAnchor || {};
   h += '</tbody></table></div>';
 
   // S2: Fleet inventory stacked bar
-  var ucG=0,maasG=0,gpuaasG=0,bmaasG=0;
+  var ucG=0;
   det.forEach(function(d){
-    if(d.tp==='uc')     ucG     += d.gpus;
-    else if(d.tp==='maas')   maasG   += d.gpus;
-    else if(d.tp==='gpuaas') gpuaasG += d.gpus;
-    else if(d.tp==='bmaas')  bmaasG  += d.gpus;
+    if(d.tp==='uc') ucG += d.gpus;
   });
   var total = sz.tGPU || 1;
   var failover = Math.round(total * 0.2);
   var segs = [
     {label:'Use Cases', gpus:ucG,     color:'var(--p2)'},
-    {label:'MaaS',      gpus:maasG,   color:'var(--s2)'},
-    {label:'GPUaaS',    gpus:gpuaasG, color:'var(--s1)'},
-    {label:'BMaaS',     gpus:bmaasG,  color:'purple'},
     {label:'Failover',  gpus:failover,color:'var(--s3)'},
   ];
   h += '<div class="card"><h3>Scenario 2 — Fleet Inventory</h3>';
@@ -3535,13 +3174,13 @@ function praxisWlUpdDataSrc(wlId, selectEl){
   for (var i=0; i<selectEl.options.length; i++){
     if (selectEl.options[i].selected) ids.push(parseInt(selectEl.options[i].value,10));
   }
-  ['uc','maas','gpuaas','bmaas'].forEach(function(t){
+  ['uc'].forEach(function(t){
     var w=(M.workloads[t]||[]).find(function(w){return w.id===wlId;});
     if(w) w.dataSrcIds = ids;
   });
   V.renderScopeTab();
 }
-function praxisWlUpdScope(wlId,field,val){['uc','maas','gpuaas','bmaas'].forEach(function(t){var w=(M.workloads[t]||[]).find(function(w){return w.id===wlId;});if(w){w[field]=val;}});V.renderScopeTab();}
+function praxisWlUpdScope(wlId,field,val){['uc'].forEach(function(t){var w=(M.workloads[t]||[]).find(function(w){return w.id===wlId;});if(w){w[field]=val;}});V.renderScopeTab();}
 function praxisWlEffortOverride(wlId,days){getScopeState().wlOverrides[wlId]=days;V.renderScopeTab();}
 function praxisScopeUpd(section,key,val){
   var sc=getScopeState();
@@ -4194,7 +3833,7 @@ var PriceOverride = {
     var list = []
     // GPUs/CPUs actually used in workloads
     var usedGpus = {}
-    ;['uc','maas','gpuaas','bmaas'].forEach(function(tp){
+    ;['uc'].forEach(function(tp){
       (M.workloads[tp]||[]).forEach(function(w){ if(w.gpu) usedGpus[w.gpu]=true })
     })
     Object.keys(usedGpus).forEach(function(gid){
