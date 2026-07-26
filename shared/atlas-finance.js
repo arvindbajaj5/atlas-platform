@@ -84,12 +84,25 @@
     return out
   }
 
+  // ── Currency roles — NOT hardcoded to specific currencies ──────────────────
+  // Three roles: local (territory/deal currency), procurement (currency
+  // equipment/services are actually paid in), reporting (internal
+  // consolidation currency). For this business today that's INR/USD/EUR, but
+  // the engine never assumes that — the actual currency per role comes from
+  // caller-supplied config (Supabase-sourced, e.g. per-engagement or a global
+  // app_config default), so a different territory can use entirely different
+  // currencies without any code change.
+  var CURRENCY_ROLES = ['local', 'procurement', 'reporting']
+  function resolveRoleCurrency(currencyConfig, role) {
+    return (currencyConfig && currencyConfig[role]) || null
+  }
+
   // ── Multi-year forex ─────────────────────────────────────────────────────
-  // Live rate from Frankfurter.app (free, no key, ECB-based) when reachable
-  // (browser context — this sandbox cannot verify live network calls, only
-  // the structure and fallback path). Falls back to a stored default,
-  // always user-overridable per the confirmed design.
-  var DEFAULT_FX = { USD_INR: 87.5, USD_EUR: 0.92, EUR_INR: 95.1 } // ESTIMATE fallback — override via live fetch or user input
+  // Fallback chain, no hardcoded rate table:
+  //   1. Live rate — Frankfurter.app (free, no key, ECB-based)
+  //   2. Supabase app_config — key pattern 'fx_<from>_<to>' lowercase, same
+  //      convention already proven in tools/tsap-financial-model (fx_usd_inr)
+  //   3. null — caller must prompt for a manual rate; NEVER silently guess
   async function getLiveForexRate(fromCcy, toCcy) {
     try {
       var r = await fetch('https://api.frankfurter.app/latest?from=' + fromCcy + '&to=' + toCcy)
@@ -98,12 +111,36 @@
       return (data.rates && data.rates[toCcy]) || null
     } catch (e) { return null }
   }
-  async function getForexRate(fromCcy, toCcy, userOverride) {
+  async function getAppConfigForexRate(sbUrl, sbKey, fromCcy, toCcy) {
+    if (!sbUrl || !sbKey) return null
+    var key = 'fx_' + fromCcy.toLowerCase() + '_' + toCcy.toLowerCase()
+    try {
+      var r = await fetch(sbUrl + '/rest/v1/app_config?key=eq.' + key, { headers: { apikey: sbKey, Authorization: 'Bearer ' + sbKey } })
+      if (!r.ok) return null
+      var rows = await r.json()
+      return (rows && rows[0] && parseFloat(rows[0].value)) || null
+    } catch (e) { return null }
+  }
+  // sb: optional {url, key} for the app_config fallback tier.
+  async function getForexRate(fromCcy, toCcy, userOverride, sb) {
+    if (fromCcy === toCcy) return 1
     if (userOverride != null) return userOverride
     var live = await getLiveForexRate(fromCcy, toCcy)
     if (live != null) return live
-    var key = fromCcy + '_' + toCcy
-    return DEFAULT_FX[key] || null
+    if (sb) {
+      var stored = await getAppConfigForexRate(sb.url, sb.key, fromCcy, toCcy)
+      if (stored != null) return stored
+    }
+    return null // no silent guess — caller must handle missing rate explicitly
+  }
+  // Convert between two currency ROLES (not raw currency codes) — resolves
+  // each role to its actual currency via config, then converts.
+  async function convertBetweenRoles(amount, fromRole, toRole, currencyConfig, userOverride, sb) {
+    var fromCcy = resolveRoleCurrency(currencyConfig, fromRole)
+    var toCcy = resolveRoleCurrency(currencyConfig, toRole)
+    if (!fromCcy || !toCcy) return null
+    var rate = await getForexRate(fromCcy, toCcy, userOverride, sb)
+    return rate != null ? amount * rate : null
   }
   // Multi-year projection: flat by default (0% drift) unless an
   // appreciation/depreciation assumption is supplied — same compound-growth
@@ -127,10 +164,13 @@
     inflateCostSeries: inflateCostSeries,
     getForexRate: getForexRate,
     getLiveForexRate: getLiveForexRate,
+    getAppConfigForexRate: getAppConfigForexRate,
+    resolveRoleCurrency: resolveRoleCurrency,
+    convertBetweenRoles: convertBetweenRoles,
     projectForexRate: projectForexRate,
     projectForexSeries: projectForexSeries,
-    DEFAULT_INFLATION: DEFAULT_INFLATION,
-    DEFAULT_FX: DEFAULT_FX
+    CURRENCY_ROLES: CURRENCY_ROLES,
+    DEFAULT_INFLATION: DEFAULT_INFLATION
   }
 
   global.FinanceEngine = FinanceEngine
