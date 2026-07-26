@@ -1359,21 +1359,36 @@
       var cfg          = (archetype && archetype.config) || {}
       var reserved     = config.reserved_gpus || cfg.default_reserved_gpus || 8
       var burst        = config.burst_gpus    || cfg.default_burst_gpus    || 0
+
+      // ── Dedicated vs shared pool (INCOMPLETE — single-item approximation) ──
+      // Real packing efficiency needs visibility into ALL GPUaaS items
+      // sharing a pool simultaneously (portfolio-level, not solvable by one
+      // item's own sizing call) — flagged, not built. This applies only a
+      // documented, conservative discount to THIS item's own burst reserve
+      // when pool_type='shared', representing that a shared pool statistically
+      // needs less burst held per-tenant than a fully dedicated one. Reserved
+      // (baseline) capacity is untouched either way — only burst is affected.
+      var isShared     = config.pool_type === 'shared'
+      var SHARED_BURST_DISCOUNT = 0.30 // ESTIMATE — not from a proven source
+      var effectiveBurst = isShared ? Math.ceil(burst * (1 - SHARED_BURST_DISCOUNT)) : burst
+
       var haReserve    = Math.ceil(reserved * ((cfg.ha_reserve_pct || 10) / 100))
-      var totalGPUs    = reserved + burst + haReserve
+      var totalGPUs    = reserved + effectiveBurst + haReserve
       var unitCalc     = gpusToUnits(totalGPUs, gpu)
       var powerKW      = calcPowerKW(unitCalc.units, gpu)
 
       return {
         reserved_gpus: reserved,
-        burst_gpus:    burst,
+        burst_gpus:    effectiveBurst,
+        burst_gpus_before_pool_discount: burst,
+        pool_type:     config.pool_type || 'dedicated',
         ha_reserve:    haReserve,
         total_gpus:    totalGPUs,
         units_required: unitCalc.units,
         unit_type:     unitCalc.unit_type,
         actual_gpus:   unitCalc.actual_gpus,
         power_kw:      Math.round(powerKW * 10) / 10,
-        notes: reserved + ' reserved + ' + burst + ' burst + ' + haReserve + ' HA reserve = ' + totalGPUs + ' GPUs'
+        notes: reserved + ' reserved + ' + effectiveBurst + ' burst' + (isShared ? ' (shared pool, -' + Math.round(SHARED_BURST_DISCOUNT*100) + '% single-item approximation)' : '') + ' + ' + haReserve + ' HA reserve = ' + totalGPUs + ' GPUs'
       }
     },
 
