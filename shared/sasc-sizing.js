@@ -256,7 +256,22 @@
    *   Large 70B-80B:        0.35 MB/token
    *   XLarge 100B+:         0.50 MB/token
    */
-  function calcKVCache (model, contextLenTokens, concurrentRequests, precision) {
+  // Engine-specific KV cache paging efficiency (Enterprise_Sizing_SLA_Blueprint:
+  // "PagedAttention allows scaling the KV Cache allocation efficiency
+  // coefficient close to 0.90-0.95"). Distinct from RUNTIME_OVERHEAD (which
+  // covers activation/framework memory on weights+KV together) — this is
+  // specifically about how much of the ALLOCATED KV pool is wasted to
+  // fragmentation. Lower efficiency = more effective KV cache needed.
+  var ENGINE_KV_EFFICIENCY = {
+    vllm:     0.93,  // PagedAttention — blueprint's 0.90-0.95 range, midpoint
+    trt_llm:  0.93,  // TensorRT-LLM paged KV cache, comparable
+    sglang:   0.93,  // RadixAttention — comparable paging efficiency
+    triton:   0.80,  // varies by backend — conservative default
+    lorax:    0.85,  // LoRA-focused serving, decent but not fully paged
+    default:  0.75   // unknown/naive (non-paged) engine — conservative fallback
+  }
+
+  function calcKVCache (model, contextLenTokens, concurrentRequests, precision, engine) {
     // KV cache is always kept at FP16 regardless of weight precision
     // (this is standard practice in vLLM, TGI, TensorRT-LLM)
     var B_cache = 2  // FP16 = 2 bytes
@@ -272,14 +287,16 @@
       // M_KV = 2 × L × H_kv × D_head × C_max × N × B_cache (bytes → GB)
       var bytes  = 2 * L * H_kv * D_head * contextLenTokens * concurrentRequests * B_cache
       var gb     = bytes / (1024 * 1024 * 1024)
-      return Math.max(gb, 0.1)
+      var eff    = ENGINE_KV_EFFICIENCY[engine] || ENGINE_KV_EFFICIENCY.default
+      return Math.max(gb / eff, 0.1)
     }
 
     // Field rule fallback — calibrated for FP16 KV cache, directionally accurate
     var sizeClass  = kvCacheSizeClass(model ? model.params_b : null)
     var mbPerToken = KV_CACHE_MB_PER_TOKEN[sizeClass]
     var totalGB    = (mbPerToken * contextLenTokens * concurrentRequests) / 1024
-    return Math.max(totalGB, 0.1)
+    var eff2       = ENGINE_KV_EFFICIENCY[engine] || ENGINE_KV_EFFICIENCY.default
+    return Math.max(totalGB / eff2, 0.1)
   }
 
   /**
@@ -297,9 +314,9 @@
    * Total VRAM footprint for model at full load (GB)
    * M_total = (M_weights + M_KV_cache) × 1.20 overhead
    */
-  function calcTotalVRAM (params_b, precision, contextLenTokens, concurrentRequests, model) {
+  function calcTotalVRAM (params_b, precision, contextLenTokens, concurrentRequests, model, engine) {
     var weights = calcModelVRAM(params_b, precision)
-    var kv      = calcKVCache(model, contextLenTokens, concurrentRequests, precision)
+    var kv      = calcKVCache(model, contextLenTokens, concurrentRequests, precision, engine)
     return (weights + kv) * RUNTIME_OVERHEAD
   }
 
@@ -307,7 +324,7 @@
    * GPUs needed to fit model in VRAM
    * Considers model's gpu_memory_gb jsonb if available (more accurate)
    */
-  function calcGPUsForFit (params_b, precision, gpu, model, contextLenTokens, concurrentRequests) {
+  function calcGPUsForFit (params_b, precision, gpu, model, contextLenTokens, concurrentRequests, engine) {
     // Use effective VRAM — includes coherent CPU memory for unified memory GPUs
     // (GB200/GB300/VR NVL72/Instinct Helios with NVLink-C2C or Infinity Fabric)
     var vramPerGPU = effectiveVRAM(gpu)
@@ -331,13 +348,13 @@
     }
 
     if (modelVRAMNeeded) {
-      var kv = calcKVCache(model, contextLenTokens, concurrentRequests, precision)
+      var kv = calcKVCache(model, contextLenTokens, concurrentRequests, precision, engine)
       var total = (modelVRAMNeeded + kv) * RUNTIME_OVERHEAD
       return Math.max(1, Math.ceil(total / vramPerGPU))
     }
 
     // Fallback: estimate from params
-    var total = calcTotalVRAM(params_b, precision, contextLenTokens, concurrentRequests, model)
+    var total = calcTotalVRAM(params_b, precision, contextLenTokens, concurrentRequests, model, engine)
     return Math.max(1, Math.ceil(total / vramPerGPU))
   }
 
@@ -868,6 +885,7 @@
       var reqPerDay  = config.requests_per_day   || (ucType && ucType.requests_per_user_per_day) || 5
       var outputTok  = config.avg_output_tokens  || (ucType && ucType.avg_output_tokens) || 500
       var precision  = config.precision          || (ucType && ucType.min_precision) || 'INT4'
+      var engine     = config.engine             || 'vllm'
       var slaTier    = config.sla_tier           || 'standard'
       var haRequired = config.ha_required !== undefined ? config.ha_required
                      : (ucType && ucType.ha_required !== undefined ? ucType.ha_required : true)
@@ -922,10 +940,15 @@
       var vramPerGPU    = effectiveVRAM(gpu)
       var isUnifiedMem  = !!(gpu.unified_memory && gpu.coherent_cpu_mem_gb)
 
+      // ── Speculative decoding: draft model adds its own VRAM footprint ──────
+      // Enterprise_Sizing_SLA_Blueprint: "VRAM_instance = W_base + W_draft + KV_cache_pool"
+      var draftModel = config.draft_model_id ? getModel(config.draft_model_id) : null
+      var W_draft    = draftModel ? calcModelVRAM(draftModel.params_b, precision) : 0
+
       // ── VRAM constraint: B_max from available KV cache budget ─────────────
       var W_i           = calcModelVRAM(params_b, precision)
-      var kvPerSession  = calcKVCache(model, contextLen, 1, precision)  // per single session
-      var vramForWeights = W_i * RUNTIME_OVERHEAD
+      var kvPerSession  = calcKVCache(model, contextLen, 1, precision, engine)  // per single session
+      var vramForWeights = (W_i + W_draft) * RUNTIME_OVERHEAD
       var kvBudget      = Math.max(0, vramPerGPU - vramForWeights)
       var B_max_vram    = Math.max(1, Math.floor(kvBudget / kvPerSession))
 
@@ -943,8 +966,8 @@
                        : 'tier_cap_' + perfTier
 
       // ── GPU fit: TP_i (GPUs per model instance) ────────────────────────────
-      var kvForBmax  = calcKVCache(model, contextLen, B_max, precision)
-      var vramNeeded = (W_i + kvForBmax) * RUNTIME_OVERHEAD
+      var kvForBmax  = calcKVCache(model, contextLen, B_max, precision, engine)
+      var vramNeeded = (W_i + W_draft + kvForBmax) * RUNTIME_OVERHEAD
       var TP_i       = Math.max(1, Math.ceil(vramNeeded / vramPerGPU))
 
       // ── GPU throughput: I_i (instances needed) ────────────────────────────
@@ -1004,6 +1027,9 @@
         tier_batch_cap:         tierBatchCap,
         dedicated_pool:         dedicatedPool,
         precision:              precision,
+        engine:                 engine,
+        speculative_decoding:   !!draftModel,
+        draft_model_vram_gb:    Math.round(W_draft * 100) / 100,
         tier_warning:           tierWarning,
 
         // Context
@@ -1067,7 +1093,7 @@
           'Profile B | Tier: ' + perfTier + ' | Policy: ' + sizingPolicy,
           'P95 RPS: ' + Math.round(p95RPS*100)/100 + ' | Concurrent: ' + concurrentSessions + ' (Littles Law: ' + Math.round(activeRPS*100)/100 + ' RPS × ' + responseTimeSec + 's)',
           'B_max: min(' + B_max_vram + ' VRAM, ' + B_max_sla + ' SLA, ' + tierBatchCap + ' tier) = ' + B_max + ' [' + bindingBatch + ']',
-          'GPU: TP_i=' + TP_i + ' × I_i=' + I_i + ' = ' + baseGPUs + ' base | Effective VRAM: ' + Math.round(vramPerGPU) + 'GB' + (isUnifiedMem ? ' (unified)' : ''),
+          'GPU: TP_i=' + TP_i + ' × I_i=' + I_i + ' = ' + baseGPUs + ' base | Effective VRAM: ' + Math.round(vramPerGPU) + 'GB' + (isUnifiedMem ? ' (unified)' : '') + (draftModel ? ' | Speculative decoding: +' + Math.round(W_draft) + 'GB draft (' + draftModel.name + ')' : ''),
           'Buffers: +' + peakBuffer + ' peak +' + failoverReserve + ' failover +' + haGPUs + ' HA(' + availSLA + '%) +' + isolationGPUs + ' isolation +' + growthGPUs + ' growth = ' + totalGPUs + ' total',
           'TTFT: ' + ttftEstimateMs + 'ms vs SLA ' + ttftSlaMs + 'ms → ' + (slaMet ? '✓ met' : '✗ breach'),
           'KV: ' + kvCacheMethod(model)
