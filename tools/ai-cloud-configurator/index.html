@@ -78,14 +78,14 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
 
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="setup" onclick="switchTab('setup')">Cloud Setup</button>
-  <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')" disabled title="Coming next">Portfolio (soon)</button>
+  <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">Portfolio</button>
   <button class="tab-btn" data-tab="bom" onclick="switchTab('bom')">AI Cloud BOM</button>
 </div>
 
 <div class="main" id="tab-body"></div>
 <div class="toast" id="toast"></div>
 
-<script src="../../shared/atlas-solution.js"></script>
+<script src="../../shared/sasc-sizing.js"></script>
 <script>
 // ── State ────────────────────────────────────────────────────────────────
 var ENGAGEMENT_ID = null, CURRENT_ENG = null, ENGAGEMENTS = []
@@ -103,6 +103,11 @@ var AIC = {
   monitoring: { stack_tier: 'standard', log_retention_days: 90 },
   security: { compliance_certs: 'iso27001', perimeter: 'waf-ddos', encryption_at_rest: 'aes256-full' }
 }
+
+// Portfolio (aaS) — sizing comes from SizingEngine (shared/sasc-sizing.js),
+// AIC only owns the commercial/tenancy layer on top of the sized result.
+var PORTFOLIO = { maas: [], gpuaas: [], bmaas: [] }
+var SE_READY = false
 
 function esc(s) { return (s==null?'':String(s)).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] }) }
 function showToast(msg, type) {
@@ -150,7 +155,7 @@ function renderTab(tab) {
   var el = document.getElementById('tab-body')
   if (!CURRENT_ENG) { el.innerHTML = '<div class="empty"><div class="empty-icon">&#9729;</div><div>Select an engagement to configure its AI Cloud.</div></div>'; return }
   if (tab === 'setup') el.innerHTML = renderSetupTab()
-  else if (tab === 'portfolio') el.innerHTML = '<div class="empty"><div class="empty-icon">&#128188;</div><div>Portfolio (MaaS/GPUaaS/BMaaS) — coming next.</div></div>'
+  else if (tab === 'portfolio') el.innerHTML = renderPortfolioTab()
   else if (tab === 'bom') el.innerHTML = renderBomTab()
   updateHeaderKpis()
 }
@@ -237,12 +242,15 @@ function setField(field, value, isNum) {
 
 function renderBomTab() {
   var cs = computeCloudSetupBOM()
+  var pf = computePortfolioBOM()
   var h = '<div class="card"><div class="card-hdr">AI Cloud BOM</div>'
-    + '<div class="card-sub">Cloud Setup (global) + Portfolio (aaS-level, coming next) = AI Cloud BOM. PRAXIS BOM + AI Cloud BOM = full Operator BOM.</div>'
+    + '<div class="card-sub">Cloud Setup (global) + Portfolio (aaS-level) = AI Cloud BOM. PRAXIS BOM + AI Cloud BOM = full Operator BOM.</div>'
     + '<table class="bom-tbl"><thead><tr><th>Line</th><th>Cost</th></tr></thead><tbody>'
     + cs.lines.map(function(l){ return '<tr><td>' + esc(l.label) + '</td><td>' + fmt$(l.cost) + '</td></tr>' }).join('')
     + '<tr class="total-row"><td>TOTAL — Cloud Setup</td><td>' + fmt$(cs.total) + '</td></tr>'
-    + '<tr><td colspan="2" style="color:var(--mid);font-size:11px;padding-top:10px">Portfolio BOM (MaaS/GPUaaS/BMaaS) not yet wired — coming next.</td></tr>'
+    + pf.lines.map(function(l){ return '<tr><td>' + l.type.toUpperCase() + ' — ' + esc(l.sizing.notes||'').slice(0,60) + '</td><td>' + fmt$(l.cost) + '</td></tr>' }).join('')
+    + '<tr class="total-row"><td>TOTAL — Portfolio</td><td>' + fmt$(pf.total) + '</td></tr>'
+    + '<tr class="total-row" style="border-top:3px solid var(--orange)"><td>TOTAL — AI Cloud BOM</td><td>' + fmt$(cs.total + pf.total) + '</td></tr>'
     + '</tbody></table></div>'
   return h
 }
@@ -250,8 +258,176 @@ function fmt$(v) { return '$' + Math.round(v||0).toLocaleString() }
 
 function updateHeaderKpis() {
   var cs = computeCloudSetupBOM()
+  var pf = computePortfolioBOM()
   document.getElementById('hdr-cloudsetup-cost').textContent = fmt$(cs.total)
-  document.getElementById('hdr-portfolio-cost').textContent = '—'
+  document.getElementById('hdr-portfolio-cost').textContent = fmt$(pf.total)
+}
+
+
+// ── Portfolio tab (Phase 1.4 Stage C) ───────────────────────────────────────
+// Sizing: SizingEngine.sizeMaaS/sizeGPUaaS/sizeBMaaS (shared/sasc-sizing.js).
+// AIC owns only the commercial layer (pricing, tenancy, SLA tier, customer
+// security) on top of the sized result — no duplicate sizing math here.
+function addPortfolioItem(type) {
+  var item = { id: 'pi-' + Date.now(), type: type }
+  if (type === 'maas') Object.assign(item, { model: '', dau: 5000, precision: 'INT4', commercialSla: 'enterprise',
+    pricePerMtok: 0.75, custSecurity: 'standard' })
+  if (type === 'gpuaas') Object.assign(item, { reservedGpus: 16, burstGpus: 4,
+    rateTier: '12mo', dedicationModel: 'dedicated', custSecurity: 'standard' })
+  if (type === 'bmaas') Object.assign(item, { servers: 8,
+    slaTier: 'gold', guestOs: 'ubuntu', custSecurity: 'standard' })
+  PORTFOLIO[type].push(item)
+  renderTab('portfolio')
+}
+function removePortfolioItem(type, id) {
+  PORTFOLIO[type] = PORTFOLIO[type].filter(function(i){ return i.id !== id })
+  renderTab('portfolio')
+}
+function setPortfolioField(type, id, field, value, isNum) {
+  var item = PORTFOLIO[type].find(function(i){ return i.id === id })
+  if (!item) return
+  item[field] = isNum ? (+value || 0) : value
+  renderTab('portfolio')
+}
+
+function sizePortfolioItem(item) {
+  if (!SE_READY) return null
+  var gpuId = (SizingEngine.getGPUConfigs()[0] || {}).id
+  if (!gpuId) return null
+  if (item.type === 'maas') {
+    return SizingEngine.sizeMaaS({ model_id: item.model, dau: item.dau, precision: item.precision, commercial_sla: item.commercialSla }, gpuId)
+  }
+  if (item.type === 'gpuaas') {
+    return SizingEngine.sizeGPUaaS({ reserved_gpus: item.reservedGpus, burst_gpus: item.burstGpus }, gpuId)
+  }
+  if (item.type === 'bmaas') {
+    return SizingEngine.sizeBMaaS({ servers: item.servers })
+  }
+  return null
+}
+
+// AIC's own commercial cost/BOM roll-up. NOTE: like Cloud Setup, this is
+// currently inline — same "should probably live in a shared pricing file"
+// caveat as PRAXIS's computeOemPricing. Flagged, not yet moved (Stage D).
+var GPU_UNIT_COST = 32000     // $/GPU, capex — ESTIMATE, matches PRAXIS ballpark
+var CPU_SERVER_COST = 12000   // $/server, capex — ESTIMATE
+function computePortfolioBOM() {
+  var lines = []
+  ;['maas','gpuaas','bmaas'].forEach(function(type){
+    PORTFOLIO[type].forEach(function(item){
+      var sz = sizePortfolioItem(item)
+      if (!sz) return
+      var gpus = sz.total_gpus || 0
+      var servers = sz.total_servers || 0
+      var cost = gpus * GPU_UNIT_COST + servers * CPU_SERVER_COST
+      lines.push({ type: type, item: item, sizing: sz, cost: cost })
+    })
+  })
+  var total = lines.reduce(function(s,l){ return s + l.cost }, 0)
+  return { lines: lines, total: total }
+}
+
+function renderPortfolioTab() {
+  var h = ''
+  if (!SE_READY) {
+    h += '<div class="card" style="background:#FFF8E7;border-color:#FFB600"><div class="card-hdr">⏳ Sizing engine loading…</div>'
+      + '<div class="card-sub">Portfolio items will size once SizingEngine is ready.</div></div>'
+  }
+
+  h += '<div class="card"><div class="card-hdr">Add to Portfolio</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button class="btn" onclick="addPortfolioItem(\'maas\')">+ MaaS</button>'
+    + '<button class="btn" onclick="addPortfolioItem(\'gpuaas\')">+ GPUaaS</button>'
+    + '<button class="btn" onclick="addPortfolioItem(\'bmaas\')">+ BMaaS</button>'
+    + '</div></div>'
+
+  h += renderPortfolioSection('maas', 'MaaS — Model as a Service')
+  h += renderPortfolioSection('gpuaas', 'GPUaaS — GPU as a Service')
+  h += renderPortfolioSection('bmaas', 'BMaaS — Bare Metal as a Service')
+
+  h += '<div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-primary" onclick="savePortfolio()">Save Portfolio</button></div>'
+  return h
+}
+
+function renderPortfolioSection(type, title) {
+  var items = PORTFOLIO[type]
+  if (!items.length) return ''
+  var h = '<div class="card"><div class="card-hdr">' + title + '</div>'
+  items.forEach(function(item){
+    var sz = sizePortfolioItem(item)
+    h += '<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px">'
+    h += renderItemFields(type, item)
+    if (sz) {
+      var gpuTxt = sz.total_gpus!=null ? sz.total_gpus + ' GPUs' : ''
+      var srvTxt = sz.total_servers!=null ? sz.total_servers + ' servers' : ''
+      h += '<div style="margin-top:8px;font-size:11px;color:var(--teal);font-weight:600">✓ Sized: ' + (gpuTxt||srvTxt) + ' — ' + esc(sz.notes||'') + '</div>'
+    } else if (SE_READY) {
+      h += '<div style="margin-top:8px;font-size:11px;color:var(--orange)">⚠ Select a model / check inputs to size this item</div>'
+    }
+    h += '<button class="btn" style="margin-top:8px;font-size:10px;padding:3px 10px" onclick="removePortfolioItem(\'' + type + '\',\'' + item.id + '\')">Remove</button>'
+    h += '</div>'
+  })
+  h += '</div>'
+  return h
+}
+
+function renderItemFields(type, item) {
+  var models = SE_READY ? SizingEngine.getModels() : []
+  var h = '<div class="form-grid g3">'
+  if (type === 'maas') {
+    h += fg('Model', '<select onchange="setPortfolioField(\'maas\',\'' + item.id + '\',\'model\',this.value,false)">'
+      + '<option value="">-- select --</option>'
+      + models.map(function(m){ return '<option value="' + m.id + '"' + (item.model===m.id?' selected':'') + '>' + esc(m.name) + '</option>' }).join('')
+      + '</select>')
+    h += fg('DAU', num('maas', item.id, 'dau', item.dau))
+    h += fg('Precision', selInput('maas', item.id, 'precision', ['INT4','INT8','FP16'], item.precision))
+    h += '</div><div class="form-grid g3">'
+    h += fg('Commercial SLA', selInput('maas', item.id, 'commercialSla', ['standard','enterprise'], item.commercialSla))
+    h += fg('Price $/Mtok', num('maas', item.id, 'pricePerMtok', item.pricePerMtok))
+    h += fg('Customer Security', selInput('maas', item.id, 'custSecurity', ['standard','enhanced','dedicated-key'], item.custSecurity))
+  } else if (type === 'gpuaas') {
+    h += fg('Reserved GPUs', num('gpuaas', item.id, 'reservedGpus', item.reservedGpus))
+    h += fg('Burst GPUs', num('gpuaas', item.id, 'burstGpus', item.burstGpus))
+    h += fg('Rate Tier', selInput('gpuaas', item.id, 'rateTier', ['ondemand','12mo','24mo','spot'], item.rateTier))
+    h += '</div><div class="form-grid g3">'
+    h += fg('Dedication Model', selInput('gpuaas', item.id, 'dedicationModel', ['dedicated','shared'], item.dedicationModel))
+    h += fg('Customer Security', selInput('gpuaas', item.id, 'custSecurity', ['standard','enhanced','dedicated-key'], item.custSecurity))
+  } else if (type === 'bmaas') {
+    h += fg('Server Count', num('bmaas', item.id, 'servers', item.servers))
+    h += fg('SLA Tier', selInput('bmaas', item.id, 'slaTier', ['gold','silver','bronze'], item.slaTier))
+    h += fg('Guest OS', selInput('bmaas', item.id, 'guestOs', ['ubuntu','rhel','custom'], item.guestOs))
+    h += '</div><div class="form-grid g3">'
+    h += fg('Customer Security', selInput('bmaas', item.id, 'custSecurity', ['standard','enhanced','dedicated-key'], item.custSecurity))
+  }
+  h += '</div>'
+  return h
+}
+function num(type, id, field, val) { return '<input type="number" value="' + (val==null?'':val) + '" onchange="setPortfolioField(\'' + type + '\',\'' + id + '\',\'' + field + '\',this.value,true)">' }
+function selInput(type, id, field, opts, current) {
+  return '<select onchange="setPortfolioField(\'' + type + '\',\'' + id + '\',\'' + field + '\',this.value,false)">'
+    + opts.map(function(o){ return '<option value="' + o + '"' + (current===o?' selected':'') + '>' + o + '</option>' }).join('')
+    + '</select>'
+}
+
+async function savePortfolio() {
+  if (!ENGAGEMENT_ID) { showToast('Select an engagement first', 'error'); return }
+  var bom = computePortfolioBOM()
+  var payload = {
+    id: 'aic-portfolio-' + ENGAGEMENT_ID,
+    engagement_id: ENGAGEMENT_ID,
+    name: 'aic_portfolio',
+    label: 'AI Cloud Configurator — Portfolio',
+    model_json: PORTFOLIO,
+    results_json: { portfolioBOM: bom },
+    updated_at: new Date().toISOString()
+  }
+  var ok = await sbPost('tsap_scenarios', payload)
+  showToast(ok ? 'Portfolio saved' : 'Save failed', ok ? '' : 'error')
+}
+async function loadPortfolio() {
+  if (!ENGAGEMENT_ID) return
+  var rows = await sbFetch('tsap_scenarios', 'engagement_id=eq.' + ENGAGEMENT_ID + '&name=eq.aic_portfolio', 1)
+  if (rows && rows.length && rows[0].model_json) PORTFOLIO = rows[0].model_json
 }
 
 // ── Persistence (tsap_scenarios, proven pattern) ────────────────────────────
@@ -322,11 +498,22 @@ async function selectEngagement(id) {
   CURRENT_ENG = ENGAGEMENTS.find(function(e){ return e.id === id }) || { id: id }
   document.getElementById('hdr-eng').innerHTML = '<strong>' + esc(CURRENT_ENG.name||id) + '</strong>'
   await loadAIC()
+  await loadPortfolio()
+  renderTab(ACTIVE_TAB)
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────
-loadEngagements()
-renderTab('setup')
+;(async function boot() {
+  var sb = getSB()
+  if (sb.url && sb.key) {
+    try {
+      await SizingEngine.init(sb.url, sb.key)
+      SE_READY = true
+    } catch(e) { console.warn('[SizingEngine] init failed:', e) }
+  }
+  await loadEngagements()
+  renderTab(ACTIVE_TAB)
+})()
 </script>
 </body>
 </html>
