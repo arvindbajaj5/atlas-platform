@@ -525,6 +525,112 @@
 
   // ─── PUBLIC API ────────────────────────────────────────────────────────────
 
+
+  // ── workloadYield (moved from PRAXIS Phase 1.1) ─────────────────────────
+  function workloadYield(w) {
+    if (!w) return 1.0
+    var tp = w.tp || 'uc'
+    if (tp === 'gpuaas' || tp === 'bmaas' || tp === 'closed') return 1.0
+    var rag = w.ragType || 'none'
+    var RAG_YIELD = {
+      simple: 0.97, hybrid: 0.95, multi_stage: 0.92, graph: 0.90, agentic: 0.85, none: 0.88
+    }
+    var base = (rag in RAG_YIELD) ? RAG_YIELD[rag] : 0.88
+    if (tp === 'maas' && rag === 'none') base = 0.82
+    var steps = w.steps || w.agentSteps || 0
+    var effective
+    if (w.isAgentic && steps > 1) {
+      var s = Math.min(steps, 50)
+      effective = Math.pow(base, s)
+    } else {
+      effective = base
+    }
+    return Math.max(0.30, Math.min(1.0, effective))
+  }
+
+  // ── computeEntryAnchor (moved from PRAXIS Phase 1.1) ────────────────────
+  // entryModeConfig: {mode: 1|2, mwBudget} — passed explicitly by the caller
+  // (was M.entryMode inside PRAXIS; shared engine takes no implicit globals).
+  function computeEntryAnchor(bomGpuTotal, bomPowerKw, det, skuBom, entryModeConfig) {
+    var cfg = entryModeConfig || {}
+    var mode = cfg.mode || 2
+    var skuKeys = (skuBom && skuBom.bySku) ? Object.keys(skuBom.bySku) : []
+    var dominant = skuKeys.length ? skuBom.bySku[skuKeys[0]] : null
+    var skuUnit = (dominant && dominant.skuUnit) || 8
+    var kwPerGpu = bomGpuTotal > 0 ? (bomPowerKw / bomGpuTotal) : 1.4
+    var anchorGpus
+    if (mode === 1) {
+      var mwBudget = cfg.mwBudget || 6.7667
+      var rawFit = Math.floor((mwBudget * 1000) / kwPerGpu)
+      anchorGpus = skuUnit ? Math.floor(rawFit / skuUnit) * skuUnit : rawFit
+    } else {
+      anchorGpus = bomGpuTotal
+    }
+    var totalRaw = 0, totalYieldedRaw = 0
+    ;(det || []).forEach(function (d) {
+      var g = d.rawGpus || 0
+      if (!g) return
+      var y = workloadYield(d)
+      totalRaw += g
+      totalYieldedRaw += g * y
+    })
+    var blendedYield = totalRaw > 0 ? (totalYieldedRaw / totalRaw) : 1.0
+    var effectiveCapacity = anchorGpus * blendedYield
+    var utilization = anchorGpus > 0 ? (bomGpuTotal / anchorGpus) : 0
+    var headroom = anchorGpus - bomGpuTotal
+    return {
+      mode: mode, anchorGpus: anchorGpus, demandGpus: bomGpuTotal,
+      kwPerGpu: kwPerGpu, skuUnit: skuUnit,
+      blendedYield: blendedYield, effectiveCapacity: effectiveCapacity,
+      utilization: utilization, headroom: headroom,
+      fitsWithinBudget: mode === 1 ? (bomGpuTotal <= anchorGpus) : true
+    }
+  }
+
+  // ── benchLookup (moved + consolidated from PRAXIS's praxisBenchLookup) ──
+  // Was a separate, redundant fetch (PRAXIS's own M.benchmarkMap). Now uses
+  // this module's own internal getBenchmark(), populated once by init() —
+  // one benchmark_results fetch for every caller, not one per tool.
+  function benchLookup(gpuId, modelId, engine, quant) {
+    if (!gpuId || !modelId) return null
+    var bm = getBenchmark(gpuId, modelId)
+    if (!bm) return null
+    var baseTps = bm.tokens_per_sec || bm.tokens_per_sec_p50
+    if (!baseTps) return null
+    var engFactor = (engine === 'trt_llm') ? 1.3 : (engine === 'sglang') ? 1.1 : 1.0
+    var quantFactor = (quant === 'fp16') ? 0.5 : (quant === 'int4') ? 1.3 : 1.0
+    return {
+      tps: Math.round(baseTps * engFactor * quantFactor),
+      source: 'measured (benchmark_results, gpu×model, engine/quant-adjusted)'
+    }
+  }
+
+  // ── checkQuantCompat (moved from PRAXIS Phase 1.1) ──────────────────────
+  // servingEngineMap: optional {engineName: {supported_precisions:[...]}} —
+  // passed explicitly (was M.servingEngineMap; never actually populated in
+  // PRAXIS, so behavior is unchanged — always used the documented fallback).
+  function checkQuantCompat(engine, precision, servingEngineMap) {
+    var live = servingEngineMap ? servingEngineMap[engine] : null
+    if (live && Array.isArray(live.supported_precisions)) {
+      var ok = live.supported_precisions.indexOf(precision) !== -1
+      return { compatible: ok, source: 'serving_engine_configs', warning: ok ? null : (precision.toUpperCase() + ' not in ' + engine + "'s supported precisions") }
+    }
+    var FALLBACK_MATRIX = {
+      vllm: ['fp16', 'fp8', 'int8', 'int4'],
+      trt_llm: ['fp16', 'fp8', 'int8', 'int4'],
+      sglang: ['fp16', 'fp8', 'int4'],
+      triton: ['fp16', 'fp8', 'int8'],
+      lorax: ['fp16', 'int8']
+    }
+    var supported = FALLBACK_MATRIX[engine] || ['fp16', 'fp8', 'int8', 'int4']
+    var isOk = supported.indexOf(precision) !== -1
+    return {
+      compatible: isOk,
+      source: 'documented-fallback (unverified against Supabase)',
+      warning: isOk ? null : (precision.toUpperCase() + ' is not commonly supported on ' + engine + ' — verify before committing to this configuration')
+    }
+  }
+
   var SizingEngine = {
 
     ready: false,
@@ -1217,7 +1323,15 @@
     SLA_BUFFERS:          SLA_BUFFERS,
     RESILIENCE_OVERHEAD:  RESILIENCE_OVERHEAD,
     BYTES_PER_PARAM:      BYTES_PER_PARAM,
-    KV_CACHE_MB_PER_TOKEN: KV_CACHE_MB_PER_TOKEN
+    KV_CACHE_MB_PER_TOKEN: KV_CACHE_MB_PER_TOKEN,
+
+    // Moved from PRAXIS (Phase 1 Stage B1) — production yield, entry-mode
+    // anchor, benchmark lookup (consolidated with this module's own
+    // getBenchmark), quant-engine compatibility.
+    workloadYield:       workloadYield,
+    computeEntryAnchor:  computeEntryAnchor,
+    benchLookup:         benchLookup,
+    checkQuantCompat:    checkQuantCompat
   }
 
   // Export
