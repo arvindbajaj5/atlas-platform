@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Cloud Configurator — ATLAS</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#002870;--orange:#FF5539;--teal:#00B290;--blue:#1C38F5;--amber:#FFB600;
+  --dark:#111827;--mid:#6B7280;--light:#F8F9FA;--white:#fff;--border:#E5E7EB;--card:#fff;
+  --r:8px;--r-sm:6px
+}
+body{font-family:'Roboto',sans-serif;font-size:13px;color:var(--dark);background:#F0F2F5;min-height:100vh}
+.atlas-hdr{background:var(--navy);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+.atlas-hdr-left{display:flex;align-items:center;gap:12px}
+.atlas-brand{font-size:16px;font-weight:900;color:#fff;letter-spacing:3px;white-space:nowrap}
+.atlas-brand span{color:#FF5539}
+.atlas-tool-name{font-size:12px;font-weight:600;color:rgba(255,255,255,0.75);padding:3px 8px;background:rgba(255,255,255,0.1);border-radius:4px;letter-spacing:.3px}
+.atlas-eng-badge{font-size:11px;color:rgba(255,255,255,0.6);padding:3px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atlas-eng-badge strong{color:#fff}
+.atlas-nav-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;font-family:inherit;border:1px solid rgba(255,255,255,0.25);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;white-space:nowrap}
+.atlas-nav-btn:hover{background:rgba(255,255,255,0.1);color:#fff}
+.atlas-nav-btn.orange{background:#FF5539;border-color:#FF5539;color:#fff}
+.eng-bar{background:var(--white);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:10px}
+.eng-bar select{flex:1;max-width:300px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Roboto',sans-serif}
+.tab-bar{display:flex;background:var(--white);border-bottom:1px solid var(--border);padding:0 16px;overflow-x:auto}
+.tab-btn{padding:10px 14px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:var(--mid);font-family:'Roboto',sans-serif;white-space:nowrap;margin-bottom:-1px}
+.tab-btn.active{color:var(--navy);border-bottom-color:var(--orange);font-weight:700}
+.tab-btn:disabled{opacity:0.4;cursor:not-allowed}
+.main{padding:16px;max-width:1040px;margin:0 auto}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.card-hdr{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px}
+.card-sub{font-size:11px;color:var(--mid);margin-bottom:12px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.form-grid.g3{grid-template-columns:1fr 1fr 1fr}
+label{display:block;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:'Roboto',sans-serif;color:var(--dark);background:var(--white)}
+.hint{font-size:10px;color:var(--mid);margin-top:2px}
+.assumption-badge{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--orange);background:#FFF3F1;padding:2px 7px;border-radius:8px;margin-left:6px}
+.bom-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.bom-tbl th{text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);color:var(--mid);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.bom-tbl td{padding:6px 8px;border-bottom:1px solid var(--border)}
+.bom-tbl .total-row td{font-weight:700;color:var(--navy);border-top:2px solid var(--navy)}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:'Roboto',sans-serif;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--dark)}
+.btn-primary{background:var(--orange);color:#fff;border-color:var(--orange)}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--dark);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none}
+.toast.show{opacity:1}
+.toast.toast-err{background:#c0341a}
+.empty{text-align:center;padding:60px 20px;color:var(--mid)}
+.empty-icon{font-size:32px;margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<div class="atlas-hdr">
+  <div class="atlas-hdr-left">
+    <div class="atlas-brand">ATL<span>A</span>S</div>
+    <div class="atlas-tool-name">AI Cloud Configurator</div>
+    <div class="atlas-eng-badge" id="hdr-eng">No engagement selected</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#fff" id="hdr-cloudsetup-cost"> </div><div style="font-size:9px;color:rgba(255,255,255,0.45)">Cloud Setup BOM</div></div>
+    <div style="color:rgba(255,255,255,0.15)">|</div>
+    <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#4ade80" id="hdr-portfolio-cost"> </div><div style="font-size:9px;color:rgba(255,255,255,0.45)">Portfolio BOM</div></div>
+  </div>
+  <div><button class="atlas-nav-btn orange" onclick="window.location.href='../../'">&#8592; Portal</button></div>
+</div>
+
+<div class="eng-bar">
+  <span style="font-size:11px;font-weight:600;color:var(--mid);white-space:nowrap">Engagement:</span>
+  <select id="eng-select" onchange="selectEngagement(this.value)">
+    <option value="">-- Select an engagement --</option>
+  </select>
+  <span style="font-size:11px;color:var(--teal);font-weight:600" id="eng-status"></span>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="setup" onclick="switchTab('setup')">Cloud Setup</button>
+  <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')" disabled title="Coming next">Portfolio (soon)</button>
+  <button class="tab-btn" data-tab="bom" onclick="switchTab('bom')">AI Cloud BOM</button>
+</div>
+
+<div class="main" id="tab-body"></div>
+<div class="toast" id="toast"></div>
+
+<script src="../../shared/atlas-solution.js"></script>
+<script>
+// ── State ────────────────────────────────────────────────────────────────
+var ENGAGEMENT_ID = null, CURRENT_ENG = null, ENGAGEMENTS = []
+var ACTIVE_TAB = 'setup'
+
+// Cloud Setup config — the global, one-per-instance layer.
+// NOTE: cost drivers below are DOCUMENTED ESTIMATES, not ported from any
+// proven Excel/tool source (unlike PRAXIS's GPU BOM). Flagged inline with
+// "assumption-badge" in the UI and tracked in memory for later validation.
+var AIC = {
+  resilience: { dr_strategy: 'warm-standby', rto_hours: 4, rpo_hours: 1, backup_freq: 'daily', backup_retention_days: 30, sla_target: '99.95' },
+  controlPlane: { orch_nodes: 3, gateway_nodes: 2, billing_nodes: 2 },
+  networking: { tenant_isolation: 'vpc-per-tenant', external_bw_gbps: 10, lb_tier: 'standard' },
+  identity: { auth_approach: 'oidc-sso', rate_limiting: true },
+  monitoring: { stack_tier: 'standard', log_retention_days: 90 },
+  security: { compliance_certs: 'iso27001', perimeter: 'waf-ddos', encryption_at_rest: 'aes256-full' }
+}
+
+function esc(s) { return (s==null?'':String(s)).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] }) }
+function showToast(msg, type) {
+  var t = document.getElementById('toast')
+  t.textContent = msg; t.className = 'toast show' + (type==='error' ? ' toast-err' : '')
+  setTimeout(function(){ t.className = 'toast' }, 2500)
+}
+
+// ── Cloud Setup BOM (documented estimates — see note above) ────────────────
+function computeCloudSetupBOM() {
+  var r = AIC.resilience, cp = AIC.controlPlane, net = AIC.networking, mon = AIC.monitoring, sec = AIC.security
+
+  var CP_NODE_COST = 12000 // $/node, general-purpose CPU server — ESTIMATE
+  var controlPlaneCost = (cp.orch_nodes + cp.gateway_nodes + cp.billing_nodes) * CP_NODE_COST
+
+  var DR_MULT = { 'none': 0, 'warm-standby': 0.30, 'hot-standby': 0.80, 'active-active': 1.00 } // ESTIMATE
+  var drCost = controlPlaneCost * (DR_MULT[r.dr_strategy] || 0)
+
+  var LB_COST = { 'standard': 8000, 'premium': 25000 } // ESTIMATE — one-time
+  var netCost = (LB_COST[net.lb_tier] || 8000) + (net.external_bw_gbps * 400) // $400/Gbps uplink capex — ESTIMATE
+
+  var MON_COST = { 'basic': 15000, 'standard': 35000, 'advanced': 75000 } // ESTIMATE — annual
+  var monCost = MON_COST[mon.stack_tier] || 35000
+
+  var CERT_COST = { 'none': 0, 'iso27001': 40000, 'soc2': 60000, 'both': 90000 } // ESTIMATE — one-time audit/cert
+  var secCost = (CERT_COST[sec.compliance_certs] || 0) + 20000 // + flat perimeter tooling — ESTIMATE
+
+  var total = controlPlaneCost + drCost + netCost + monCost + secCost
+  return {
+    lines: [
+      { label: 'Control-plane / CPU nodes', cost: controlPlaneCost },
+      { label: 'DR & Resilience (' + r.dr_strategy + ')', cost: drCost },
+      { label: 'Networking & Load Balancing', cost: netCost },
+      { label: 'Monitoring & Observability (annual)', cost: monCost },
+      { label: 'Security & Compliance', cost: secCost }
+    ],
+    total: total
+  }
+}
+
+// ── Rendering ────────────────────────────────────────────────────────────
+function renderTab(tab) {
+  ACTIVE_TAB = tab
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.tab===tab) })
+  var el = document.getElementById('tab-body')
+  if (!CURRENT_ENG) { el.innerHTML = '<div class="empty"><div class="empty-icon">&#9729;</div><div>Select an engagement to configure its AI Cloud.</div></div>'; return }
+  if (tab === 'setup') el.innerHTML = renderSetupTab()
+  else if (tab === 'portfolio') el.innerHTML = '<div class="empty"><div class="empty-icon">&#128188;</div><div>Portfolio (MaaS/GPUaaS/BMaaS) — coming next.</div></div>'
+  else if (tab === 'bom') el.innerHTML = renderBomTab()
+  updateHeaderKpis()
+}
+function switchTab(tab) { renderTab(tab) }
+
+function renderSetupTab() {
+  var r = AIC.resilience, cp = AIC.controlPlane, net = AIC.networking, id = AIC.identity, mon = AIC.monitoring, sec = AIC.security
+  var h = ''
+
+  h += '<div class="card"><div class="card-hdr">Resilience &amp; DR</div>'
+    + '<div class="card-sub">Backup, disaster recovery, and availability commitments for the whole AI Cloud.</div>'
+    + '<div class="form-grid g3">'
+    + fg('DR Strategy', sel('r_dr', ['none','warm-standby','hot-standby','active-active'], r.dr_strategy, ['None','Warm standby','Hot standby','Active-active']))
+    + fg('SLA Target', sel('r_sla', ['99.9','99.95','99.99'], r.sla_target, ['99.9%','99.95%','99.99%']))
+    + fg('Backup Frequency', sel('r_backup', ['daily','6h','hourly'], r.backup_freq, ['Daily','Every 6h','Hourly']))
+    + '</div><div class="form-grid g3">'
+    + fg('RTO (hours)', num('r_rto', r.rto_hours))
+    + fg('RPO (hours)', num('r_rpo', r.rpo_hours))
+    + fg('Backup Retention (days)', num('r_retention', r.backup_retention_days))
+    + '</div></div>'
+
+  h += '<div class="card"><div class="card-hdr">Control-Plane / CPU Infra</div>'
+    + '<div class="card-sub">Orchestration, API gateway, billing/metering — general-purpose compute, separate from GPU inference nodes.</div>'
+    + '<div class="form-grid g3">'
+    + fg('Orchestration Nodes', num('cp_orch', cp.orch_nodes))
+    + fg('API Gateway Nodes', num('cp_gw', cp.gateway_nodes))
+    + fg('Billing/Metering Nodes', num('cp_bill', cp.billing_nodes))
+    + '</div></div>'
+
+  h += '<div class="card"><div class="card-hdr">Networking</div>'
+    + '<div class="form-grid g3">'
+    + fg('Tenant Isolation', sel('net_iso', ['shared','vpc-per-tenant'], net.tenant_isolation, ['Shared with isolation','VPC per tenant']))
+    + fg('External API Bandwidth (Gbps)', num('net_bw', net.external_bw_gbps))
+    + fg('Load Balancer Tier', sel('net_lb', ['standard','premium'], net.lb_tier, ['Standard','Premium']))
+    + '</div></div>'
+
+  h += '<div class="card"><div class="card-hdr">Identity &amp; Tenancy</div>'
+    + '<div class="form-grid g3">'
+    + fg('Auth Approach', sel('id_auth', ['api-key','oidc-sso'], id.auth_approach, ['API key only','OIDC / SSO']))
+    + fg('Rate Limiting', sel('id_rl', ['true','false'], String(id.rate_limiting), ['Enabled','Disabled']))
+    + '</div></div>'
+
+  h += '<div class="card"><div class="card-hdr">Monitoring &amp; Observability</div>'
+    + '<div class="form-grid g3">'
+    + fg('Stack Tier', sel('mon_tier', ['basic','standard','advanced'], mon.stack_tier, ['Basic','Standard','Advanced']))
+    + fg('Log Retention (days)', num('mon_ret', mon.log_retention_days))
+    + '</div></div>'
+
+  h += '<div class="card"><div class="card-hdr">Security <span class="assumption-badge">site-level</span></div>'
+    + '<div class="card-sub">Customer-level security lives in Portfolio, per aaS line item.</div>'
+    + '<div class="form-grid g3">'
+    + fg('Compliance Certification', sel('sec_cert', ['none','iso27001','soc2','both'], sec.compliance_certs, ['None','ISO 27001','SOC 2','Both']))
+    + fg('Perimeter Security', sel('sec_perim', ['waf-ddos','waf-only'], sec.perimeter, ['WAF + DDoS protection','WAF only']))
+    + fg('Encryption at Rest', sel('sec_enc', ['aes256-full','aes256-sensitive'], sec.encryption_at_rest, ['AES-256, all data','AES-256, sensitive only']))
+    + '</div></div>'
+
+  h += '<div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-primary" onclick="saveAIC()">Save Cloud Setup</button></div>'
+  return h
+}
+
+function fg(label, inputHtml) { return '<div><label>' + label + '</label>' + inputHtml + '</div>' }
+function num(field, val) { return '<input type="number" value="' + (val==null?'':val) + '" onchange="setField(\'' + field + '\',this.value,true)">' }
+function sel(field, opts, current, labels) {
+  return '<select onchange="setField(\'' + field + '\',this.value,false)">' + opts.map(function(o,i){
+    return '<option value="' + o + '"' + (String(current)===o?' selected':'') + '>' + (labels?labels[i]:o) + '</option>'
+  }).join('') + '</select>'
+}
+
+var FIELD_MAP = {
+  r_dr:['resilience','dr_strategy'], r_sla:['resilience','sla_target'], r_backup:['resilience','backup_freq'],
+  r_rto:['resilience','rto_hours'], r_rpo:['resilience','rpo_hours'], r_retention:['resilience','backup_retention_days'],
+  cp_orch:['controlPlane','orch_nodes'], cp_gw:['controlPlane','gateway_nodes'], cp_bill:['controlPlane','billing_nodes'],
+  net_iso:['networking','tenant_isolation'], net_bw:['networking','external_bw_gbps'], net_lb:['networking','lb_tier'],
+  id_auth:['identity','auth_approach'], id_rl:['identity','rate_limiting'],
+  mon_tier:['monitoring','stack_tier'], mon_ret:['monitoring','log_retention_days'],
+  sec_cert:['security','compliance_certs'], sec_perim:['security','perimeter'], sec_enc:['security','encryption_at_rest']
+}
+function setField(field, value, isNum) {
+  var m = FIELD_MAP[field]; if (!m) return
+  var v = isNum ? (+value || 0) : (value==='true' ? true : value==='false' ? false : value)
+  AIC[m[0]][m[1]] = v
+  renderTab(ACTIVE_TAB)
+}
+
+function renderBomTab() {
+  var cs = computeCloudSetupBOM()
+  var h = '<div class="card"><div class="card-hdr">AI Cloud BOM</div>'
+    + '<div class="card-sub">Cloud Setup (global) + Portfolio (aaS-level, coming next) = AI Cloud BOM. PRAXIS BOM + AI Cloud BOM = full Operator BOM.</div>'
+    + '<table class="bom-tbl"><thead><tr><th>Line</th><th>Cost</th></tr></thead><tbody>'
+    + cs.lines.map(function(l){ return '<tr><td>' + esc(l.label) + '</td><td>' + fmt$(l.cost) + '</td></tr>' }).join('')
+    + '<tr class="total-row"><td>TOTAL — Cloud Setup</td><td>' + fmt$(cs.total) + '</td></tr>'
+    + '<tr><td colspan="2" style="color:var(--mid);font-size:11px;padding-top:10px">Portfolio BOM (MaaS/GPUaaS/BMaaS) not yet wired — coming next.</td></tr>'
+    + '</tbody></table></div>'
+  return h
+}
+function fmt$(v) { return '$' + Math.round(v||0).toLocaleString() }
+
+function updateHeaderKpis() {
+  var cs = computeCloudSetupBOM()
+  document.getElementById('hdr-cloudsetup-cost').textContent = fmt$(cs.total)
+  document.getElementById('hdr-portfolio-cost').textContent = '—'
+}
+
+// ── Persistence (tsap_scenarios, proven pattern) ────────────────────────────
+function getSB() {
+  try { return JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}') } catch(e) { return {} }
+}
+async function sbFetch(table, query, limit) {
+  var sb = getSB(); if (!sb.url) return []
+  var url = sb.url + '/rest/v1/' + table + '?' + (query||'')
+  if (limit) url += '&limit=' + limit
+  try {
+    var r = await fetch(url, { headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key } })
+    if (!r.ok) return []
+    return await r.json()
+  } catch(e) { console.warn('[sbFetch]', table, e.message); return [] }
+}
+async function sbPost(table, data) {
+  var sb = getSB(); if (!sb.url) return false
+  try {
+    var r = await fetch(sb.url + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: { apikey: sb.key, Authorization: 'Bearer ' + sb.key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(data)
+    })
+    return r.ok
+  } catch(e) { console.warn('[sbPost]', table, e.message); return false }
+}
+
+async function saveAIC() {
+  if (!ENGAGEMENT_ID) { showToast('Select an engagement first', 'error'); return }
+  var payload = {
+    id: 'aic-' + ENGAGEMENT_ID,
+    engagement_id: ENGAGEMENT_ID,
+    name: 'aic_cloud_setup',
+    label: 'AI Cloud Configurator — Cloud Setup',
+    model_json: AIC,
+    results_json: { cloudSetupBOM: computeCloudSetupBOM() },
+    updated_at: new Date().toISOString()
+  }
+  var ok = await sbPost('tsap_scenarios', payload)
+  showToast(ok ? 'Cloud Setup saved' : 'Save failed', ok ? '' : 'error')
+}
+
+async function loadAIC() {
+  if (!ENGAGEMENT_ID) return
+  var rows = await sbFetch('tsap_scenarios', 'engagement_id=eq.' + ENGAGEMENT_ID + '&name=eq.aic_cloud_setup', 1)
+  if (rows && rows.length && rows[0].model_json) {
+    AIC = rows[0].model_json
+    showToast('Cloud Setup loaded')
+  }
+  renderTab(ACTIVE_TAB)
+}
+
+// ── Engagement selection ────────────────────────────────────────────────
+async function loadEngagements() {
+  var rows = await sbFetch('engagements', 'order=updated_at.desc', 100)
+  ENGAGEMENTS = rows || []
+  var sel = document.getElementById('eng-select')
+  sel.innerHTML = '<option value="">-- Select an engagement --</option>'
+    + ENGAGEMENTS.map(function(e){ return '<option value="' + e.id + '">' + esc(e.name||e.id) + '</option>' }).join('')
+  var qp = new URLSearchParams(window.location.search)
+  var engParam = qp.get('eng')
+  if (engParam) { sel.value = engParam; selectEngagement(engParam) }
+}
+async function selectEngagement(id) {
+  if (!id) { ENGAGEMENT_ID = null; CURRENT_ENG = null; document.getElementById('hdr-eng').textContent = 'No engagement selected'; renderTab(ACTIVE_TAB); return }
+  ENGAGEMENT_ID = id
+  CURRENT_ENG = ENGAGEMENTS.find(function(e){ return e.id === id }) || { id: id }
+  document.getElementById('hdr-eng').innerHTML = '<strong>' + esc(CURRENT_ENG.name||id) + '</strong>'
+  await loadAIC()
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────────
+loadEngagements()
+renderTab('setup')
+</script>
+</body>
+</html>

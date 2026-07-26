@@ -1643,8 +1643,8 @@ function portfolioNeedsServiceEconomics() {
   return SERVICE_ECON_TRIGGERS.some(function(c){ return PORTFOLIO_SELECTION.includes(c) })
 }
 
-// Flag 2: same-party (operator self-funds; AI Service Model alone suffices)
-// vs different-party (separate investing agency; needs AI Service Model +
+// Flag 2: same-party (operator self-funds; AI Cloud Configurator alone suffices)
+// vs different-party (separate investing agency; needs AI Cloud Configurator +
 // Finance). Defaults from customer type, but is explicitly overridable —
 // engagement_type sets a sensible starting point, not a hard rule.
 function getPartyStructure() {
@@ -1680,7 +1680,7 @@ function renderTerritoryTab() {
   var isTSAP = ['TSAP','tsap'].includes(engType)
   var needsEcon = portfolioNeedsServiceEconomics()
   var party = getPartyStructure()
-  var aiServiceUrl = '../../tools/ai-service-model/index.html?eng=' + (eng.id||'')
+  var aiServiceUrl = '../../tools/ai-cloud-configurator/index.html?eng=' + (eng.id||'')
   var financeUrl    = '../../tools/finance/index.html?eng=' + (eng.id||'')
 
   // Equipment-only deal, no operator/investor layer applies — PRAXIS pricing
@@ -1784,9 +1784,9 @@ function renderTerritoryTab() {
 
     html += '<div class="' + (party==='different' ? 'g2' : '') + '" style="gap:14px' + (party==='different' ? '' : ';max-width:280px') + '">'
       + '<div class="card" style="background:#EFF3FF;border-color:#BDD7FF">'
-      + '<div class="card-title" style="color:var(--blue)">AI Service Model</div>'
+      + '<div class="card-title" style="color:var(--blue)">AI Cloud Configurator</div>'
       + '<div style="font-size:11px;color:var(--mid);margin-bottom:12px;line-height:1.5">Operator economics — fine per-tenant demand, service margin, utilisation.</div>'
-      + '<a href="' + aiServiceUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open AI Service Model →</a>'
+      + '<a href="' + aiServiceUrl + '" style="display:inline-block;padding:9px 18px;background:var(--navy);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open AI Cloud Configurator →</a>'
       + '</div>'
       + (party==='different'
           ? '<div class="card" style="background:#FFF3F1;border-color:#FECFC5">'
