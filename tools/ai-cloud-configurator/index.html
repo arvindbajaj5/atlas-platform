@@ -105,12 +105,15 @@ var AIC = {
   networking: { tenant_isolation: 'vpc-per-tenant', external_bw_gbps: 10, lb_tier: 'standard' },
   identity: { auth_approach: 'oidc-sso', rate_limiting: true },
   monitoring: { stack_tier: 'standard', log_retention_days: 90 },
-  security: { compliance_certs: 'iso27001', perimeter: 'waf-ddos', encryption_at_rest: 'aes256-full' }
+  security: { compliance_certs: 'iso27001', perimeter: 'waf-ddos', encryption_at_rest: 'aes256-full' },
+  // Storage (was explicitly deferred as an add-on) — tenant data + logging +
+  // backup/snapshot storage tiers, beyond PRAXIS's model/KV-cache tier.
+  storage: { tier: 'standard', capacity_tb: 20 }
 }
 
 // Portfolio (aaS) — sizing comes from SizingEngine (shared/sasc-sizing.js),
 // AIC only owns the commercial/tenancy layer on top of the sized result.
-var PORTFOLIO = { maas: [], gpuaas: [], bmaas: [] }
+var PORTFOLIO = { maas: [], gpuaas: [], bmaas: [], services: [] }
 var SE_READY = false
 
 // Pricing (Stage D): AIC previously had no margin/price layer at all — only
@@ -134,7 +137,7 @@ function showToast(msg, type) {
 
 // ── Cloud Setup BOM (documented estimates — see note above) ────────────────
 function computeCloudSetupBOM() {
-  var r = AIC.resilience, cp = AIC.controlPlane, net = AIC.networking, mon = AIC.monitoring, sec = AIC.security
+  var r = AIC.resilience, cp = AIC.controlPlane, net = AIC.networking, mon = AIC.monitoring, sec = AIC.security, stor = AIC.storage
 
   var CP_NODE_COST = 12000 // $/node, general-purpose CPU server — ESTIMATE
   var controlPlaneCost = (cp.orch_nodes + cp.gateway_nodes + cp.billing_nodes) * CP_NODE_COST
@@ -151,10 +154,16 @@ function computeCloudSetupBOM() {
   var CERT_COST = { 'none': 0, 'iso27001': 40000, 'soc2': 60000, 'both': 90000 } // ESTIMATE — one-time audit/cert
   var secCost = (CERT_COST[sec.compliance_certs] || 0) + 20000 // + flat perimeter tooling — ESTIMATE
 
+  // Storage — tenant data + logging + backup/snapshot, beyond PRAXIS's
+  // model/KV-cache tier. $/TB tier rates — ESTIMATE, no proven source.
+  var STOR_COST_PER_TB = { 'standard': 900, 'premium': 2200 }
+  var storCost = (STOR_COST_PER_TB[stor.tier] || 900) * (stor.capacity_tb || 0)
+
   var lines = [
     { key: 'controlplane', label: 'Control-plane / CPU nodes', cost: controlPlaneCost },
     { key: 'dr',           label: 'DR & Resilience (' + r.dr_strategy + ')', cost: drCost },
     { key: 'network',      label: 'Networking & Load Balancing', cost: netCost },
+    { key: 'storage',      label: 'Storage (' + stor.tier + ', ' + stor.capacity_tb + 'TB)', cost: storCost },
     { key: 'monitoring',   label: 'Monitoring & Observability (annual)', cost: monCost },
     { key: 'security',     label: 'Security & Compliance', cost: secCost }
   ]
@@ -177,7 +186,7 @@ function renderTab(tab) {
 function switchTab(tab) { renderTab(tab) }
 
 function renderSetupTab() {
-  var r = AIC.resilience, cp = AIC.controlPlane, net = AIC.networking, id = AIC.identity, mon = AIC.monitoring, sec = AIC.security
+  var r = AIC.resilience, cp = AIC.controlPlane, net = AIC.networking, id = AIC.identity, mon = AIC.monitoring, sec = AIC.security, stor = AIC.storage
   var h = ''
 
   h += '<div class="card"><div class="card-hdr">Resilience &amp; DR</div>'
@@ -205,6 +214,13 @@ function renderSetupTab() {
     + fg('Tenant Isolation', sel('net_iso', ['shared','vpc-per-tenant'], net.tenant_isolation, ['Shared with isolation','VPC per tenant']))
     + fg('External API Bandwidth (Gbps)', num('net_bw', net.external_bw_gbps))
     + fg('Load Balancer Tier', sel('net_lb', ['standard','premium'], net.lb_tier, ['Standard','Premium']))
+    + '</div></div>'
+
+  h += '<div class="card"><div class="card-hdr">Storage</div>'
+    + '<div class="card-sub">Tenant data + logging + backup/snapshot storage, beyond the model/KV-cache tier already sized by AI Infra & Platform Configurator.</div>'
+    + '<div class="form-grid g3">'
+    + fg('Tier', sel('stor_tier', ['standard','premium'], stor.tier, ['Standard','Premium']))
+    + fg('Capacity (TB)', num('stor_cap', stor.capacity_tb))
     + '</div></div>'
 
   h += '<div class="card"><div class="card-hdr">Identity &amp; Tenancy</div>'
@@ -246,7 +262,8 @@ var FIELD_MAP = {
   net_iso:['networking','tenant_isolation'], net_bw:['networking','external_bw_gbps'], net_lb:['networking','lb_tier'],
   id_auth:['identity','auth_approach'], id_rl:['identity','rate_limiting'],
   mon_tier:['monitoring','stack_tier'], mon_ret:['monitoring','log_retention_days'],
-  sec_cert:['security','compliance_certs'], sec_perim:['security','perimeter'], sec_enc:['security','encryption_at_rest']
+  sec_cert:['security','compliance_certs'], sec_perim:['security','perimeter'], sec_enc:['security','encryption_at_rest'],
+  stor_tier:['storage','tier'], stor_cap:['storage','capacity_tb']
 }
 function setField(field, value, isNum) {
   var m = FIELD_MAP[field]; if (!m) return
@@ -255,9 +272,35 @@ function setField(field, value, isNum) {
   renderTab(ACTIVE_TAB)
 }
 
+// Multi-model catalog memory (V_catalog) — INFORMATIONAL ONLY, not a full
+// solve. Real packing (whether multiple catalog models collectively fit
+// shared host memory pools) needs portfolio-wide allocation logic that
+// doesn't exist yet — flagged, not built. This just sums each unique
+// MaaS model's weight VRAM using the same BYTES_PER_PARAM SizingEngine
+// itself uses, so the number is at least consistent with the real engine,
+// not a second invented formula.
+function computeCatalogMemoryCheck() {
+  if (!SE_READY) return null
+  var models = SizingEngine.getModels()
+  var seen = {}
+  var totalGB = 0
+  var count = 0
+  PORTFOLIO.maas.forEach(function(item){
+    if (!item.model || seen[item.model]) return
+    seen[item.model] = true
+    var m = models.filter(function(mm){ return mm.id === item.model })[0]
+    if (!m || !m.params_b) return
+    var bpp = SizingEngine.BYTES_PER_PARAM[item.precision] || 2
+    totalGB += m.params_b * bpp
+    count++
+  })
+  return { uniqueModels: count, totalWeightsGB: Math.round(totalGB) }
+}
+
 function renderBomTab() {
   var cs = computeCloudSetupBOM()
   var pf = computePortfolioBOM()
+  var cat = computeCatalogMemoryCheck()
   var h = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
     + '<div class="card-hdr" style="margin:0">AI Cloud BOM</div>'
     + '<div style="display:flex;align-items:center;gap:6px"><label style="font-size:11px;color:var(--mid)">Default margin</label>'
@@ -270,7 +313,15 @@ function renderBomTab() {
     + pf.rows.map(function(r){ return bomRow(r) }).join('')
     + '<tr class="total-row"><td>TOTAL — Portfolio</td><td>' + fmt$(pf.totalCost) + '</td><td>' + (pf.weightedMarginPct*100).toFixed(1) + '%</td><td>' + fmt$(pf.totalPrice) + '</td></tr>'
     + '<tr class="total-row" style="border-top:3px solid var(--orange)"><td>TOTAL — AI Cloud BOM</td><td>' + fmt$(cs.totalCost + pf.totalCost) + '</td><td></td><td>' + fmt$(cs.totalPrice + pf.totalPrice) + '</td></tr>'
-    + '</tbody></table></div>'
+    + '</tbody></table>'
+    + (cat && cat.uniqueModels > 0
+        ? '<div style="margin-top:10px;padding:10px 12px;background:#F8FAFC;border-radius:6px;font-size:11px;color:var(--mid)">'
+          + '<b style="color:var(--navy)">Catalog Memory Check</b> <span class="assumption-badge">informational only</span><br>'
+          + cat.uniqueModels + ' unique MaaS model(s) in Portfolio, ~' + cat.totalWeightsGB + 'GB combined weights. '
+          + 'This does NOT check whether these fit a shared host pool together — that needs portfolio-wide allocation logic not yet built. Each item is still sized independently.'
+          + '</div>'
+        : '')
+    + '</div>'
   return h
 }
 function bomRow(r) {
@@ -489,11 +540,16 @@ async function loadDemandPlanning() {
 function addPortfolioItem(type) {
   var item = { id: 'pi-' + Date.now(), type: type }
   if (type === 'maas') Object.assign(item, { model: '', dau: 5000, precision: 'INT4', commercialSla: 'enterprise',
-    pricePerMtok: 0.75, custSecurity: 'standard', ragType: 'none', isAgentic: false, agentSteps: 5 })
+    pricePerMtok: 0.75, custSecurity: 'standard', ragType: 'none', isAgentic: false, agentSteps: 5, loraBaseModel: '' })
   if (type === 'gpuaas') Object.assign(item, { reservedGpus: 16, burstGpus: 4,
     rateTier: '12mo', dedicationModel: 'dedicated', custSecurity: 'standard' })
   if (type === 'bmaas') Object.assign(item, { servers: 8,
     slaTier: 'gold', guestOs: 'ubuntu', custSecurity: 'standard' })
+  // Fine-tuning/Post-training — pure services, confirmed no infra-sizing
+  // upfront (execution-time compute is a separate, later add-on concern).
+  // Flat effort-based fee, no SizingEngine involvement.
+  if (type === 'services') Object.assign(item, { name: '', serviceType: 'fine-tuning',
+    effortDays: 15, dayRate: 1200 })
   PORTFOLIO[type].push(item)
   renderTab('portfolio')
 }
@@ -519,10 +575,10 @@ function sizePortfolioItem(item) {
   var gpuId = (SizingEngine.getGPUConfigs()[0] || {}).id
   if (!gpuId) return null
   if (item.type === 'maas') {
-    return SizingEngine.sizeMaaS({ model_id: item.model, dau: item.dau, precision: item.precision, commercial_sla: item.commercialSla, rag_type: item.ragType, is_agentic: item.isAgentic, agent_steps: item.agentSteps }, gpuId)
+    return SizingEngine.sizeMaaS({ model_id: item.model, dau: item.dau, precision: item.precision, commercial_sla: item.commercialSla, rag_type: item.ragType, is_agentic: item.isAgentic, agent_steps: item.agentSteps, lora_base_model_id: item.loraBaseModel || null }, gpuId)
   }
   if (item.type === 'gpuaas') {
-    return SizingEngine.sizeGPUaaS({ reserved_gpus: item.reservedGpus, burst_gpus: item.burstGpus }, gpuId)
+    return SizingEngine.sizeGPUaaS({ reserved_gpus: item.reservedGpus, burst_gpus: item.burstGpus, pool_type: item.dedicationModel === 'shared' ? 'shared' : 'dedicated' }, gpuId)
   }
   if (item.type === 'bmaas') {
     return SizingEngine.sizeBMaaS({ servers: item.servers })
@@ -559,6 +615,13 @@ function computePortfolioBOM() {
       rawLines.push({ key: item.id, label: label, cost: cost, type: type, item: item, sizing: sz })
     })
   })
+  // Services (fine-tuning/post-training) — flat effort-based cost, no
+  // SizingEngine involvement, pure services per confirmed scope.
+  PORTFOLIO.services.forEach(function(item){
+    var cost = (item.effortDays || 0) * (item.dayRate || 0)
+    var label = 'SERVICES — ' + (item.serviceType||'') + (item.name ? ': ' + item.name : '')
+    rawLines.push({ key: item.id, label: label, cost: cost, type: 'services', item: item, sizing: null })
+  })
   var priced = FinanceEngine.marginLines(rawLines, AIC_MARGIN.defaultMarginPct, AIC_MARGIN.overrides)
   // Re-attach the type/item/sizing context marginLines doesn't carry (it only knows key/label/cost)
   priced.rows.forEach(function(row, i){ row.type = rawLines[i].type; row.item = rawLines[i].item; row.sizing = rawLines[i].sizing })
@@ -577,11 +640,13 @@ function renderPortfolioTab() {
     + '<button class="btn" onclick="addPortfolioItem(\'maas\')">+ MaaS</button>'
     + '<button class="btn" onclick="addPortfolioItem(\'gpuaas\')">+ GPUaaS</button>'
     + '<button class="btn" onclick="addPortfolioItem(\'bmaas\')">+ BMaaS</button>'
+    + '<button class="btn" onclick="addPortfolioItem(\'services\')">+ Fine-tuning / Post-training</button>'
     + '</div></div>'
 
   h += renderPortfolioSection('maas', 'MaaS — Model as a Service')
   h += renderPortfolioSection('gpuaas', 'GPUaaS — GPU as a Service')
   h += renderPortfolioSection('bmaas', 'BMaaS — Bare Metal as a Service')
+  h += renderPortfolioSection('services', 'Services — Fine-tuning / Post-training')
 
   h += '<div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-primary" onclick="savePortfolio()">Save Portfolio</button></div>'
   return h
@@ -592,15 +657,19 @@ function renderPortfolioSection(type, title) {
   if (!items.length) return ''
   var h = '<div class="card"><div class="card-hdr">' + title + '</div>'
   items.forEach(function(item){
-    var sz = sizePortfolioItem(item)
     h += '<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px">'
     h += renderItemFields(type, item)
-    if (sz) {
-      var gpuTxt = sz.total_gpus!=null ? sz.total_gpus + ' GPUs' : ''
-      var srvTxt = sz.total_servers!=null ? sz.total_servers + ' servers' : ''
-      h += '<div style="margin-top:8px;font-size:11px;color:var(--teal);font-weight:600">✓ Sized: ' + (gpuTxt||srvTxt) + ' — ' + esc(sz.notes||'') + '</div>'
-    } else if (SE_READY) {
-      h += '<div style="margin-top:8px;font-size:11px;color:var(--orange)">⚠ Select a model / check inputs to size this item</div>'
+    if (type === 'services') {
+      h += '<div style="margin-top:8px;font-size:11px;color:var(--teal);font-weight:600">Fee: ' + fmt$((item.effortDays||0) * (item.dayRate||0)) + '</div>'
+    } else {
+      var sz = sizePortfolioItem(item)
+      if (sz) {
+        var gpuTxt = sz.total_gpus!=null ? sz.total_gpus + ' GPUs' : ''
+        var srvTxt = sz.total_servers!=null ? sz.total_servers + ' servers' : ''
+        h += '<div style="margin-top:8px;font-size:11px;color:var(--teal);font-weight:600">✓ Sized: ' + (gpuTxt||srvTxt) + ' — ' + esc(sz.notes||'') + '</div>'
+      } else if (SE_READY) {
+        h += '<div style="margin-top:8px;font-size:11px;color:var(--orange)">⚠ Select a model / check inputs to size this item</div>'
+      }
     }
     h += '<button class="btn" style="margin-top:8px;font-size:10px;padding:3px 10px" onclick="removePortfolioItem(\'' + type + '\',\'' + item.id + '\')">Remove</button>'
     h += '</div>'
@@ -630,6 +699,11 @@ function renderItemFields(type, item) {
       + '<option value="true"' + (item.isAgentic?' selected':'') + '>Yes</option>'
       + '</select>')
     h += item.isAgentic ? fg('Agent Steps', num('maas', item.id, 'agentSteps', item.agentSteps)) : ''
+    h += '</div><div class="form-grid g3">'
+    h += fg('LoRA of <span style="font-weight:400;color:var(--mid)">(near-zero extra VRAM if set)</span>', '<select onchange="setPortfolioField(\'maas\',\'' + item.id + '\',\'loraBaseModel\',this.value,false)">'
+      + '<option value="">-- Not a LoRA variant --</option>'
+      + PORTFOLIO.maas.filter(function(m){ return m.id !== item.id && m.model }).map(function(m){ return '<option value="' + m.model + '"' + (item.loraBaseModel===m.model?' selected':'') + '>' + esc(m.model) + '</option>' }).join('')
+      + '</select>')
   } else if (type === 'gpuaas') {
     h += fg('Reserved GPUs', num('gpuaas', item.id, 'reservedGpus', item.reservedGpus))
     h += fg('Burst GPUs', num('gpuaas', item.id, 'burstGpus', item.burstGpus))
@@ -643,6 +717,12 @@ function renderItemFields(type, item) {
     h += fg('Guest OS', selInput('bmaas', item.id, 'guestOs', ['ubuntu','rhel','custom'], item.guestOs))
     h += '</div><div class="form-grid g3">'
     h += fg('Customer Security', selInput('bmaas', item.id, 'custSecurity', ['standard','enhanced','dedicated-key'], item.custSecurity))
+  } else if (type === 'services') {
+    h += fg('Name', '<input type="text" value="' + esc(item.name) + '" placeholder="e.g. Fine-tune support model" onchange="setPortfolioField(\'services\',\'' + item.id + '\',\'name\',this.value,false)">')
+    h += fg('Service Type', selInput('services', item.id, 'serviceType', ['fine-tuning','post-training'], item.serviceType))
+    h += fg('Effort (days)', num('services', item.id, 'effortDays', item.effortDays))
+    h += '</div><div class="form-grid g3">'
+    h += fg('Day Rate ($)', num('services', item.id, 'dayRate', item.dayRate))
   }
   h += '</div>'
   return h
@@ -673,6 +753,9 @@ async function loadPortfolio() {
   if (!ENGAGEMENT_ID) return
   var rows = await sbFetch('tsap_scenarios', 'engagement_id=eq.' + ENGAGEMENT_ID + '&name=eq.aic_portfolio', 1)
   if (rows && rows.length && rows[0].model_json) PORTFOLIO = rows[0].model_json
+  // Backfill for snapshots saved before 'services' existed — avoids a
+  // throw on PORTFOLIO.services.forEach elsewhere.
+  if (!PORTFOLIO.services) PORTFOLIO.services = []
 }
 
 
