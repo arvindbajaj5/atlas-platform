@@ -432,7 +432,13 @@ async function loadPortfolio() {
 
 // ── Persistence (tsap_scenarios, proven pattern) ────────────────────────────
 function getSB() {
-  try { return JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}') } catch(e) { return {} }
+  // Normalize field names — atlas_global_cfg stores sbUrl/sb_url and
+  // sbKey/sb_key (per shared/atlas-db.js), not url/key. Every caller in
+  // this file expects sb.url/sb.key, so normalize here once.
+  try {
+    var g = JSON.parse(localStorage.getItem('atlas_global_cfg') || '{}')
+    return { url: g.sbUrl || g.sb_url || '', key: g.sbKey || g.sb_key || '' }
+  } catch(e) { return { url: '', key: '' } }
 }
 async function sbFetch(table, query, limit) {
   var sb = getSB(); if (!sb.url) return []
