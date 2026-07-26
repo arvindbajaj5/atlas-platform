@@ -79,6 +79,7 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="setup" onclick="switchTab('setup')">Cloud Setup</button>
   <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">Portfolio</button>
+  <button class="tab-btn" data-tab="demand" onclick="switchTab('demand')">Demand Planning</button>
   <button class="tab-btn" data-tab="bom" onclick="switchTab('bom')">AI Cloud BOM</button>
 </div>
 
@@ -158,6 +159,7 @@ function renderTab(tab) {
   if (!CURRENT_ENG) { el.innerHTML = '<div class="empty"><div class="empty-icon">&#9729;</div><div>Select an engagement to configure its AI Cloud.</div></div>'; return }
   if (tab === 'setup') el.innerHTML = renderSetupTab()
   else if (tab === 'portfolio') el.innerHTML = renderPortfolioTab()
+  else if (tab === 'demand') el.innerHTML = renderDemandPlanningTab()
   else if (tab === 'bom') el.innerHTML = renderBomTab()
   updateHeaderKpis()
 }
@@ -280,6 +282,193 @@ function updateHeaderKpis() {
   document.getElementById('hdr-portfolio-cost').textContent = fmt$(pf.totalPrice)
 }
 
+
+
+// ── Demand Planning (Phase 1, design-time bucket) ───────────────────────────
+// Restores + extends what existed across 3 Excel sheets (MaaS-Usage-Levers,
+// PRAXIS's deleted Demand Planner, Demand-Summary) and was lost entirely when
+// aaS was stripped from PRAXIS — confirmed zero coverage in AIC before this.
+// Design-time only: pipeline + volume/growth planning. Config-time (Cloud
+// Setup/Portfolio) and production (live operational) stay separate per
+// Arvind's 3-phase scope split.
+
+var PIPELINE = []          // opportunity pipeline (MaaS-Usage-Levers equivalent)
+var DEMAND_SOURCES = {}    // keyed by PORTFOLIO.maas item id -> array of growth sources
+
+// ── Pipeline ─────────────────────────────────────────────────────────────
+function addPipelineItem() {
+  PIPELINE.push({
+    id: 'pl-' + Date.now(), name: '', category: 'Government', targetBuyer: '',
+    likelyModel: '', status: 'prospecting', estDau: 5000
+  })
+  renderTab('demand')
+}
+function removePipelineItem(id) {
+  PIPELINE = PIPELINE.filter(function(i){ return i.id !== id })
+  renderTab('demand')
+}
+function setPipelineField(id, field, value, isNum) {
+  var item = PIPELINE.find(function(i){ return i.id === id })
+  if (!item) return
+  item[field] = isNum ? (+value || 0) : value
+  renderTab('demand')
+}
+
+function renderPipelineSection() {
+  var STATUS_COLOR = { prospecting: 'var(--mid)', pitched: 'var(--amber)', committed: 'var(--teal)' }
+  var h = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+    + '<div class="card-hdr" style="margin:0">Opportunity Pipeline</div>'
+    + '<button class="btn" onclick="addPipelineItem()">+ Add Opportunity</button></div>'
+    + '<div class="card-sub">Track potential offerings before they become configured Portfolio items — status moves from Prospecting → Pitched → Committed.</div>'
+  if (!PIPELINE.length) {
+    h += '<div style="text-align:center;padding:20px;color:var(--mid);font-size:12px">No pipeline items yet.</div>'
+  } else {
+    h += '<table class="bom-tbl"><thead><tr><th>Name</th><th>Category</th><th>Target Buyer</th><th>Likely Model</th><th>Status</th><th>Est. DAU</th><th></th></tr></thead><tbody>'
+    PIPELINE.forEach(function(item){
+      h += '<tr>'
+        + '<td><input type="text" value="' + esc(item.name) + '" placeholder="e.g. Citizen Grievance Chatbot" style="width:100%;font-size:12px;padding:4px 6px" onchange="setPipelineField(\'' + item.id + '\',\'name\',this.value,false)"></td>'
+        + '<td><select style="font-size:12px;padding:4px 6px" onchange="setPipelineField(\'' + item.id + '\',\'category\',this.value,false)">'
+        + ['Government','Enterprise'].map(function(c){ return '<option value="' + c + '"' + (item.category===c?' selected':'') + '>' + c + '</option>' }).join('')
+        + '</select></td>'
+        + '<td><input type="text" value="' + esc(item.targetBuyer) + '" placeholder="e.g. Welfare dept" style="width:100%;font-size:12px;padding:4px 6px" onchange="setPipelineField(\'' + item.id + '\',\'targetBuyer\',this.value,false)"></td>'
+        + '<td><input type="text" value="' + esc(item.likelyModel) + '" placeholder="e.g. Llama 3.3 70B" style="width:100%;font-size:12px;padding:4px 6px" onchange="setPipelineField(\'' + item.id + '\',\'likelyModel\',this.value,false)"></td>'
+        + '<td><select style="font-size:12px;padding:4px 6px;color:' + (STATUS_COLOR[item.status]||'var(--mid)') + ';font-weight:700" onchange="setPipelineField(\'' + item.id + '\',\'status\',this.value,false)">'
+        + ['prospecting','pitched','committed'].map(function(s){ return '<option value="' + s + '"' + (item.status===s?' selected':'') + '>' + s.charAt(0).toUpperCase()+s.slice(1) + '</option>' }).join('')
+        + '</select></td>'
+        + '<td><input type="number" value="' + item.estDau + '" style="width:80px;font-size:12px;padding:4px 6px" onchange="setPipelineField(\'' + item.id + '\',\'estDau\',this.value,true)"></td>'
+        + '<td><button onclick="removePipelineItem(\'' + item.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--mid);font-size:14px">&times;</button></td>'
+        + '</tr>'
+    })
+    h += '</tbody></table>'
+  }
+  h += '</div>'
+  return h
+}
+
+// ── Growth sources per MaaS Portfolio item ──────────────────────────────
+function addDemandSource(itemId) {
+  if (!DEMAND_SOURCES[itemId]) DEMAND_SOURCES[itemId] = []
+  DEMAND_SOURCES[itemId].push({
+    id: 'ds-' + Date.now(), label: 'Source ' + (DEMAND_SOURCES[itemId].length + 1),
+    customerType: 'tsap', customersY1: 10, customerGrowthPct: 30,
+    tokensPerCustomerM: 5.0, tokenGrowthPct: 20
+  })
+  renderTab('demand')
+}
+function removeDemandSource(itemId, srcId) {
+  if (!DEMAND_SOURCES[itemId]) return
+  DEMAND_SOURCES[itemId] = DEMAND_SOURCES[itemId].filter(function(s){ return s.id !== srcId })
+  renderTab('demand')
+}
+function setDemandSourceField(itemId, srcId, field, value, isNum) {
+  var src = (DEMAND_SOURCES[itemId] || []).find(function(s){ return s.id === srcId })
+  if (!src) return
+  src[field] = isNum ? (+value || 0) : value
+  renderTab('demand')
+}
+
+// 6-year projection for one item's demand sources — customers/tokens/revenue,
+// checked against sized capacity (from SizingEngine, same as Portfolio tab).
+function projectDemand(itemId) {
+  var sources = DEMAND_SOURCES[itemId] || []
+  var item = PORTFOLIO.maas.find(function(i){ return i.id === itemId })
+  if (!item) return []
+  var sz = sizePortfolioItem(item)
+  var capacityGpus = sz ? (sz.total_gpus || 0) : 0
+  // Rough capacity in tokens/month: GPUs * assumed throughput — reuses the
+  // same benchmark-or-estimate path Portfolio already sizes with, so this
+  // stays consistent rather than inventing a second throughput number.
+  var supplyTokB = capacityGpus * 15417 * 730 * 3600 / 1e9 // GPU-months -> tokens billions, rough constant matching existing convention
+
+  var years = []
+  for (var yr = 1; yr <= 6; yr++) {
+    var totalCust = 0, totalTokB = 0
+    sources.forEach(function(s){
+      var custs = (s.customersY1 || 0) * Math.pow(1 + (s.customerGrowthPct || 0) / 100, yr - 1)
+      var tokPerCust = (s.tokensPerCustomerM || 0) * Math.pow(1 + (s.tokenGrowthPct || 0) / 100, yr - 1)
+      totalCust += custs
+      totalTokB += (custs * tokPerCust) / 1000
+    })
+    var util = supplyTokB > 0 ? totalTokB / supplyTokB : 0
+    var revenue = totalTokB * 1000 * (item.pricePerMtok || 0.75)
+    years.push({ year: yr, customers: Math.round(totalCust), tokensB: totalTokB, supplyTokB: supplyTokB, utilization: util, revenue: revenue })
+  }
+  return years
+}
+
+function renderGrowthSection() {
+  var h = '<div class="card"><div class="card-hdr">Growth Projections — MaaS Volume Planning</div>'
+    + '<div class="card-sub">Model multiple demand sources per MaaS product (e.g. different customer segments), project 6-year volume and revenue against sized capacity.</div>'
+  if (!PORTFOLIO.maas.length) {
+    h += '<div style="text-align:center;padding:20px;color:var(--mid);font-size:12px">Add a MaaS item in Portfolio first — growth sources attach to a specific MaaS product.</div></div>'
+    return h
+  }
+  PORTFOLIO.maas.forEach(function(item){
+    var sources = DEMAND_SOURCES[item.id] || []
+    h += '<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center">'
+      + '<b style="font-size:12px">' + esc(item.model || 'MaaS item') + ' <span style="color:var(--mid);font-weight:400">($' + (item.pricePerMtok||0.75) + '/Mtok)</span></b>'
+      + '<button class="btn" style="font-size:10px;padding:3px 10px" onclick="addDemandSource(\'' + item.id + '\')">+ Add Demand Source</button>'
+      + '</div>'
+    if (sources.length) {
+      sources.forEach(function(s){
+        h += '<div class="form-grid g3" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'
+          + fg('Label', '<input type="text" value="' + esc(s.label) + '" onchange="setDemandSourceField(\'' + item.id + '\',\'' + s.id + '\',\'label\',this.value,false)">')
+          + fg('Customer Type', '<select onchange="setDemandSourceField(\'' + item.id + '\',\'' + s.id + '\',\'customerType\',this.value,false)">'
+              + ['tsap','enterprise','government','other'].map(function(c){ return '<option value="'+c+'"'+(s.customerType===c?' selected':'')+'>'+c+'</option>' }).join('') + '</select>')
+          + fg('Customers (Y1)', '<input type="number" value="' + s.customersY1 + '" onchange="setDemandSourceField(\'' + item.id + '\',\'' + s.id + '\',\'customersY1\',this.value,true)">')
+          + '</div><div class="form-grid g3">'
+          + fg('Customer Growth %/yr', '<input type="number" value="' + s.customerGrowthPct + '" onchange="setDemandSourceField(\'' + item.id + '\',\'' + s.id + '\',\'customerGrowthPct\',this.value,true)">')
+          + fg('Tokens/Customer (M/mo)', '<input type="number" step="0.1" value="' + s.tokensPerCustomerM + '" onchange="setDemandSourceField(\'' + item.id + '\',\'' + s.id + '\',\'tokensPerCustomerM\',this.value,true)">')
+          + fg('Token Growth %/yr', '<input type="number" value="' + s.tokenGrowthPct + '" onchange="setDemandSourceField(\'' + item.id + '\',\'' + s.id + '\',\'tokenGrowthPct\',this.value,true)">')
+          + '</div>'
+          + '<button onclick="removeDemandSource(\'' + item.id + '\',\'' + s.id + '\')" style="margin-top:4px;font-size:10px;padding:2px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--mid)">Remove source</button>'
+      })
+      var proj = projectDemand(item.id)
+      h += '<table class="bom-tbl" style="margin-top:10px"><thead><tr><th>Year</th><th>Customers</th><th>Tokens (B/mo)</th><th>Supply (B/mo)</th><th>Utilization</th><th>Revenue/mo</th></tr></thead><tbody>'
+      proj.forEach(function(p){
+        var col = p.utilization > 1 ? 'var(--orange)' : p.utilization > 0.85 ? '#B45309' : 'var(--teal)'
+        var status = p.utilization > 1 ? 'Under-provisioned' : p.utilization > 0.85 ? 'Near full' : p.utilization > 0.3 ? 'Healthy' : 'Low'
+        h += '<tr><td>Y' + p.year + '</td><td>' + p.customers.toLocaleString() + '</td><td>' + p.tokensB.toFixed(2) + '</td><td>' + p.supplyTokB.toFixed(1) + '</td>'
+          + '<td style="color:' + col + ';font-weight:700">' + Math.min(p.utilization*100,999).toFixed(1) + '% (' + status + ')</td>'
+          + '<td>' + fmt$(p.revenue) + '</td></tr>'
+      })
+      h += '</tbody></table>'
+    } else {
+      h += '<div style="font-size:11px;color:var(--mid);margin-top:8px">No demand sources yet — add one to project volume/revenue.</div>'
+    }
+    h += '</div>'
+  })
+  h += '</div>'
+  return h
+}
+
+function renderDemandPlanningTab() {
+  return renderPipelineSection() + renderGrowthSection()
+    + '<div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-primary" onclick="saveDemandPlanning()">Save Demand Planning</button></div>'
+}
+
+async function saveDemandPlanning() {
+  if (!ENGAGEMENT_ID) { showToast('Select an engagement first', 'error'); return }
+  var payload = {
+    id: 'aic-demand-' + ENGAGEMENT_ID,
+    engagement_id: ENGAGEMENT_ID,
+    name: 'aic_demand_planning',
+    label: 'AI Cloud Configurator — Demand Planning',
+    model_json: { pipeline: PIPELINE, demandSources: DEMAND_SOURCES },
+    updated_at: new Date().toISOString()
+  }
+  var ok = await sbPost('tsap_scenarios', payload)
+  showToast(ok ? 'Demand Planning saved' : 'Save failed', ok ? '' : 'error')
+}
+async function loadDemandPlanning() {
+  if (!ENGAGEMENT_ID) return
+  var rows = await sbFetch('tsap_scenarios', 'engagement_id=eq.' + ENGAGEMENT_ID + '&name=eq.aic_demand_planning', 1)
+  if (rows && rows.length && rows[0].model_json) {
+    PIPELINE = rows[0].model_json.pipeline || []
+    DEMAND_SOURCES = rows[0].model_json.demandSources || {}
+  }
+}
 
 // ── Portfolio tab (Phase 1.4 Stage C) ───────────────────────────────────────
 // Sizing: SizingEngine.sizeMaaS/sizeGPUaaS/sizeBMaaS (shared/sasc-sizing.js).
@@ -524,6 +713,7 @@ async function selectEngagement(id) {
   document.getElementById('hdr-eng').innerHTML = '<strong>' + esc(CURRENT_ENG.name||id) + '</strong>'
   await loadAIC()
   await loadPortfolio()
+  await loadDemandPlanning()
   renderTab(ACTIVE_TAB)
 }
 
