@@ -631,6 +631,123 @@
     }
   }
 
+
+  // ── UC/MaaS legacy estimator (moved from PRAXIS, Phase 1 Stage B2) ───────
+  // NOTE: this is the EXISTING PRAXIS methodology, moved verbatim (zero
+  // behavior change) — deliberately NOT reconciled with sizeUC()'s newer
+  // Little's-Law/three-constraint approach above. Reconciling the two into
+  // one methodology is a separate, later decision — this move only
+  // centralizes WHERE the code lives, per Arvind's direction: no calc logic
+  // inside any tool, everything here, so MaaS/agentic/etc share exactly one
+  // implementation regardless of which tool calls it.
+  // Takes model/gpu/decode-proc objects and the decode proc's unit price as
+  // explicit params rather than calling a local lookup/price function
+  // internally — keeps this a pure function, no dependency on any one
+  // tool's data-fetching or pricing layer. decodePricePerUnit is the ONLY
+  // pricing input (needed for decCost, which downstream code sums directly
+  // into total gCost) — everything else here is pure sizing.
+  var MIG_PROFILES = {
+    "full": {n:"Full GPU (7/7)", frac:1,     inst:1},
+    "4g":   {n:"4/7 (~109GB B200)", frac:0.571, inst:1},
+    "3g":   {n:"3/7 (~82GB B200)",  frac:0.428, inst:2},
+    "2g":   {n:"2/7 (~54GB B200)",  frac:0.285, inst:3},
+    "1g":   {n:"1/7 (~27GB B200)",  frac:0.142, inst:7}
+  }
+  var HA_TIERS = {
+    mission_critical: {n:"Mission Critical", gpu_mult:1.5, n_plus:2},
+    business:         {n:"Business Critical", gpu_mult:1.2, n_plus:1},
+    best_effort:      {n:"Best Effort",       gpu_mult:1,   n_plus:0}
+  }
+
+  function estimateUC(w, m, p, decodeP, decodePricePerUnit) {
+    if (!m || !p || (!p.hbm && p.t !== 'CPU')) return {gpus:0, kv:0, tpsG:0, peakConc:0, dailyReqs:0, dailyTok:0, moTok:0, memG:0, perfG:0, decGPUs:0, decCost:0, decPow:0}
+
+    var vram = w.qt === 'fp16' ? m.v16 : (m.v8 || m.v16 / 2)
+    var prec = w.qt === 'fp16' ? 2 : 1
+    var migFrac = ((MIG_PROFILES[w.migProfile] || {}).frac) || 1
+    var effHBM = (p.hbm || 80) * migFrac
+
+    // Multimodal: visual tokens
+    var effAI = w.ai
+    if (w.inputModality === 'image_text' && w.avgImgPerReq > 0) {
+      var vtokPerImg = w.imgRes === '512' ? 576 : w.imgRes === '1024' ? 1024 : 2048
+      effAI += w.avgImgPerReq * vtokPerImg
+    }
+
+    // Agentic: multiply by steps
+    var effTokensPerTask = w.isAgentic ? (effAI + w.ao) * w.steps : (effAI + w.ao)
+    var gpuUtilFactor = w.isAgentic ? w.gpuUtil : 0.85
+
+    // KV cache
+    var layers = Math.max(Math.ceil(m.pb * 1.2), 1), hdim = Math.ceil(Math.sqrt(Math.max(m.pb, 0.01) * 1e9 / layers / 4) / 128) * 128
+    var heads = Math.max(1, Math.floor(hdim / 128))
+    var bSz = w.batch || 8
+    var ctxForKV = w.isAgentic ? Math.min(effAI * w.steps, 32768) : Math.min(effAI, 8192)
+    var kv = (2 * layers * heads * 128 * ctxForKV * bSz * prec) / 1e9
+    var tot = vram + kv
+    var memG = Math.ceil(tot / (effHBM * 0.85))
+
+    // TPS per GPU — benchmark lookup first, then estimation fallback
+    var bm = benchLookup(w.proc, w.md, w.eng, w.qt)
+    var tpsG_raw, estTTFT_bm = 0, estTBT_bm = 0, bmSource = 'estimated'
+    if (bm) {
+      tpsG_raw = bm.tps * migFrac
+      estTTFT_bm = bm.ttft_ms || 0
+      estTBT_bm = bm.tbt_ms || 0
+      bmSource = bm.source
+    } else {
+      tpsG_raw = (m.tps || 100) * ((p.fp8 || p.fp16 || 1000) / 4500) * (w.qt === 'fp16' ? 0.5 : w.qt === 'int4' ? 1.3 : 1) * migFrac
+      var engFactor = w.eng === 'trt_llm' && p.v === 'NVIDIA' ? 1.3 : w.eng === 'sglang' ? 1.1 : 1.0
+      tpsG_raw *= engFactor
+    }
+    var tpsG = tpsG_raw * gpuUtilFactor
+
+    // Traffic
+    var dailyReqs = w.dau * w.rpud, avgRPS = dailyReqs / 86400, peakRPS = avgRPS * w.pk
+    var reqDur = w.isAgentic ? (w.ao * w.steps / Math.max(tpsG_raw, 1) + w.steps * w.toolWait / 1000) : (w.ao > 0 ? w.ao / Math.max(tpsG_raw, 1) : 0.5)
+    var peakConc = Math.max(1, Math.ceil(peakRPS * Math.max(reqDur, 0.05)))
+    var perfG = Math.ceil(peakConc * Math.max(reqDur, 0.05) / bSz / gpuUtilFactor)
+
+    // HA multiplier
+    var ha = HA_TIERS[w.criticality] || HA_TIERS.best_effort
+    var raw = Math.max(memG, perfG, 1)
+    var need = Math.ceil(raw * ha.gpu_mult) + ha.n_plus
+
+    // Cascade: split load
+    var cascadeGPUs = 0
+    if (w.cascadeModel && w.cascadeSplit > 0) {
+      cascadeGPUs = Math.max(1, Math.ceil(need * w.cascadeSplit / 100 * 0.5))
+    }
+
+    // Disaggregated decode
+    var decGPUs = 0, decCost = 0, decPow = 0, tbtPenalty = 1
+    if (w.disaggAccepted && w.decodeProc && decodeP) {
+      decGPUs = Math.max(1, Math.ceil(need * 0.6))
+      decCost = decGPUs * (decodePricePerUnit || 0) * 1.8
+      decPow = decGPUs * (decodeP.tdp || 300) * 1.1 / 1000
+      tbtPenalty = decodeP.tbt_factor || 1
+    }
+
+    // Hybrid: reduce on-prem by split
+    var onPremFrac = 1
+    if (w.src === 'hybrid') onPremFrac = w.hybridSplit / 100
+    if (w.src === 'api') onPremFrac = 0
+    var adjustedGPUs = Math.ceil((need + cascadeGPUs) * onPremFrac)
+
+    var dailyTok = dailyReqs * effTokensPerTask
+    var moTok = dailyTok * 30
+
+    return {
+      gpus: adjustedGPUs, kv: kv, tpsG: tpsG, peakConc: peakConc, dailyReqs: dailyReqs,
+      avgRPS: avgRPS.toFixed(1), peakRPS: peakRPS.toFixed(1),
+      dailyTok: dailyTok, moTok: moTok, memG: memG, perfG: perfG, vramTot: tot,
+      decGPUs: decGPUs, decCost: decCost, decPow: decPow, cascadeGPUs: cascadeGPUs, tbtPenalty: tbtPenalty,
+      need: need + cascadeGPUs, effAI: effAI, effTokensPerTask: effTokensPerTask, reqDur: reqDur,
+      onPremFrac: onPremFrac, bSz: bSz,
+      bmTTFT: estTTFT_bm, bmTBT: estTBT_bm, bmSource: bmSource
+    }
+  }
+
   var SizingEngine = {
 
     ready: false,
@@ -1331,7 +1448,10 @@
     workloadYield:       workloadYield,
     computeEntryAnchor:  computeEntryAnchor,
     benchLookup:         benchLookup,
-    checkQuantCompat:    checkQuantCompat
+    checkQuantCompat:    checkQuantCompat,
+    estimateUC:          estimateUC,
+    MIG_PROFILES:        MIG_PROFILES,
+    HA_TIERS:             HA_TIERS
   }
 
   // Export
