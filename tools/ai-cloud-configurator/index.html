@@ -81,6 +81,7 @@ input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px
   <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">Portfolio</button>
   <button class="tab-btn" data-tab="demand" onclick="switchTab('demand')">Demand Planning</button>
   <button class="tab-btn" data-tab="bom" onclick="switchTab('bom')">AI Cloud BOM</button>
+  <button class="tab-btn" data-tab="financials" onclick="switchTab('financials')">Financials</button>
 </div>
 
 <div class="main" id="tab-body"></div>
@@ -114,6 +115,14 @@ var SE_READY = false
 // Pricing (Stage D): AIC previously had no margin/price layer at all — only
 // raw cost. Now wired to shared FinanceEngine, same convention as PRAXIS.
 var AIC_MARGIN = { defaultMarginPct: 0.35, overrides: {} }
+
+// Currency roles (Stage: AIC financials) — same rule as FinanceEngine, NOT
+// hardcoded to INR/USD/EUR specifically. Default matches today's business,
+// always overridable per engagement.
+var AIC_CURRENCY = { local: 'INR', procurement: 'USD', reporting: 'USD', overrideRate: null }
+// Inflation assumptions for AIC's own multi-year recurring costs — reuses
+// FinanceEngine's category-specific defaults (labor/power), not invented here.
+var AIC_INFLATION_YEARS = 6  // matches Demand Planning's 6-year horizon
 
 function esc(s) { return (s==null?'':String(s)).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] }) }
 function showToast(msg, type) {
@@ -161,6 +170,7 @@ function renderTab(tab) {
   else if (tab === 'portfolio') el.innerHTML = renderPortfolioTab()
   else if (tab === 'demand') el.innerHTML = renderDemandPlanningTab()
   else if (tab === 'bom') el.innerHTML = renderBomTab()
+  else if (tab === 'financials') el.innerHTML = renderFinancialsTab()
   updateHeaderKpis()
 }
 function switchTab(tab) { renderTab(tab) }
@@ -477,7 +487,7 @@ async function loadDemandPlanning() {
 function addPortfolioItem(type) {
   var item = { id: 'pi-' + Date.now(), type: type }
   if (type === 'maas') Object.assign(item, { model: '', dau: 5000, precision: 'INT4', commercialSla: 'enterprise',
-    pricePerMtok: 0.75, custSecurity: 'standard' })
+    pricePerMtok: 0.75, custSecurity: 'standard', ragType: 'none', isAgentic: false, agentSteps: 5 })
   if (type === 'gpuaas') Object.assign(item, { reservedGpus: 16, burstGpus: 4,
     rateTier: '12mo', dedicationModel: 'dedicated', custSecurity: 'standard' })
   if (type === 'bmaas') Object.assign(item, { servers: 8,
@@ -495,13 +505,19 @@ function setPortfolioField(type, id, field, value, isNum) {
   item[field] = isNum ? (+value || 0) : value
   renderTab('portfolio')
 }
+function setPortfolioBoolField(type, id, field, value) {
+  var item = PORTFOLIO[type].find(function(i){ return i.id === id })
+  if (!item) return
+  item[field] = (value === 'true' || value === true)
+  renderTab('portfolio')
+}
 
 function sizePortfolioItem(item) {
   if (!SE_READY) return null
   var gpuId = (SizingEngine.getGPUConfigs()[0] || {}).id
   if (!gpuId) return null
   if (item.type === 'maas') {
-    return SizingEngine.sizeMaaS({ model_id: item.model, dau: item.dau, precision: item.precision, commercial_sla: item.commercialSla }, gpuId)
+    return SizingEngine.sizeMaaS({ model_id: item.model, dau: item.dau, precision: item.precision, commercial_sla: item.commercialSla, rag_type: item.ragType, is_agentic: item.isAgentic, agent_steps: item.agentSteps }, gpuId)
   }
   if (item.type === 'gpuaas') {
     return SizingEngine.sizeGPUaaS({ reserved_gpus: item.reservedGpus, burst_gpus: item.burstGpus }, gpuId)
@@ -593,6 +609,13 @@ function renderItemFields(type, item) {
     h += fg('Commercial SLA', selInput('maas', item.id, 'commercialSla', ['standard','enterprise'], item.commercialSla))
     h += fg('Price $/Mtok', num('maas', item.id, 'pricePerMtok', item.pricePerMtok))
     h += fg('Customer Security', selInput('maas', item.id, 'custSecurity', ['standard','enhanced','dedicated-key'], item.custSecurity))
+    h += '</div><div class="form-grid g3">'
+    h += fg('RAG Type <span style="font-weight:400;color:var(--mid)">(production yield)</span>', selInput('maas', item.id, 'ragType', ['none','simple','hybrid','multi_stage','graph','agentic'], item.ragType))
+    h += fg('Agentic Workflow', '<select onchange="setPortfolioBoolField(\'maas\',\'' + item.id + '\',\'isAgentic\',this.value)">'
+      + '<option value="false"' + (!item.isAgentic?' selected':'') + '>No</option>'
+      + '<option value="true"' + (item.isAgentic?' selected':'') + '>Yes</option>'
+      + '</select>')
+    h += item.isAgentic ? fg('Agent Steps', num('maas', item.id, 'agentSteps', item.agentSteps)) : ''
   } else if (type === 'gpuaas') {
     h += fg('Reserved GPUs', num('gpuaas', item.id, 'reservedGpus', item.reservedGpus))
     h += fg('Burst GPUs', num('gpuaas', item.id, 'burstGpus', item.burstGpus))
@@ -636,6 +659,87 @@ async function loadPortfolio() {
   if (!ENGAGEMENT_ID) return
   var rows = await sbFetch('tsap_scenarios', 'engagement_id=eq.' + ENGAGEMENT_ID + '&name=eq.aic_portfolio', 1)
   if (rows && rows.length && rows[0].model_json) PORTFOLIO = rows[0].model_json
+}
+
+
+// ── Financials (design-time bucket): multi-year, inflation, forex, all via
+// FinanceEngine. NPV/IRR explicitly OUT of scope — Investment Modeling &
+// Justification's job, not AIC's (same-party operator view, not investor).
+function computeMultiYearFinancials() {
+  var cs = computeCloudSetupBOM()
+  var pf = computePortfolioBOM()
+
+  // One-time capex: everything except Cloud Setup's 'monitoring' line (the
+  // only genuinely annual line, per its own cost-driver comments) + all of
+  // Portfolio (aaS infra build, one-time like PRAXIS capex).
+  var capexY1 = cs.rows.filter(function(r){ return r.key !== 'monitoring' })
+    .reduce(function(s, r){ return s + r.price }, 0) + pf.totalPrice
+
+  // Recurring: Cloud Setup's monitoring line, inflated. NOTE: monitoring is
+  // SaaS/tooling cost — doesn't cleanly fit FinanceEngine's labor/power
+  // categories, so it's left UNINFLATED (flat) by default rather than
+  // force-fit to a rate that doesn't represent it. Flagged, not solved.
+  var monitoringRow = cs.rows.filter(function(r){ return r.key === 'monitoring' })[0]
+  var monitoringY1 = monitoringRow ? monitoringRow.price : 0
+
+  // Revenue: sum of all MaaS items' projected monthly revenue, annualised,
+  // per year — reuses Demand Planning's own projectDemand(), not a second
+  // number invented here.
+  var years = []
+  for (var yr = 1; yr <= AIC_INFLATION_YEARS; yr++) {
+    var revenue = 0
+    PORTFOLIO.maas.forEach(function(item){
+      var proj = projectDemand(item.id)
+      var yearData = proj[yr - 1]
+      if (yearData) revenue += yearData.revenue * 12
+    })
+    var opex = monitoringY1 // flat — see note above; category doesn't fit labor/power
+    var capex = yr === 1 ? capexY1 : 0
+    var operatingCF = revenue - opex
+    var fcf = FinanceEngine.calcFCF(operatingCF, capex)
+    years.push({ year: yr, revenue: revenue, opex: opex, capex: capex, operatingCF: operatingCF, fcf: fcf })
+  }
+  return { capexY1: capexY1, monitoringY1: monitoringY1, years: years }
+}
+
+function renderFinancialsTab() {
+  var fin = computeMultiYearFinancials()
+  var h = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+    + '<div class="card-hdr" style="margin:0">Multi-Year Financials</div>'
+    + '<div style="display:flex;gap:8px;align-items:center;font-size:11px">'
+    + '<label>Local</label><input type="text" value="' + esc(AIC_CURRENCY.local) + '" style="width:45px;font-size:11px;padding:3px 5px" onchange="setAicCurrency(\'local\',this.value)">'
+    + '<label>Procurement</label><input type="text" value="' + esc(AIC_CURRENCY.procurement) + '" style="width:45px;font-size:11px;padding:3px 5px" onchange="setAicCurrency(\'procurement\',this.value)">'
+    + '<label>Reporting</label><input type="text" value="' + esc(AIC_CURRENCY.reporting) + '" style="width:45px;font-size:11px;padding:3px 5px" onchange="setAicCurrency(\'reporting\',this.value)">'
+    + '<button class="btn" style="font-size:10px;padding:3px 8px" onclick="convertFinancialsCurrency()">Convert &rarr; Reporting</button>'
+    + '</div></div>'
+    + '<div class="card-sub">Y1 capex (Cloud Setup + Portfolio, one-time) + annual revenue (from Demand Planning) − opex → FCF. NPV/IRR are Investment Modeling & Justification\'s job, not shown here. All pricing already flows through FinanceEngine (margin/price on BOM tab) — this view adds the time dimension.</div>'
+    + '<table class="bom-tbl"><thead><tr><th>Year</th><th>Revenue</th><th>Opex</th><th>Capex</th><th>Operating CF</th><th>FCF</th></tr></thead><tbody>'
+  fin.years.forEach(function(y){
+    h += '<tr><td>Y' + y.year + '</td><td>' + fmt$(y.revenue) + '</td><td>' + fmt$(y.opex) + '</td><td>' + fmt$(y.capex) + '</td><td>' + fmt$(y.operatingCF) + '</td>'
+      + '<td style="font-weight:700;color:' + (y.fcf >= 0 ? 'var(--teal)' : 'var(--orange)') + '">' + fmt$(y.fcf) + '</td></tr>'
+  })
+  h += '</tbody></table>'
+  h += '<div id="fx-converted-note" style="margin-top:8px;font-size:11px;color:var(--mid)"></div>'
+  h += '<div style="margin-top:8px;font-size:11px;color:var(--mid)">Opex (monitoring/tooling) shown flat — doesn\'t cleanly fit FinanceEngine\'s labor/power inflation categories, left uninflated rather than force-fit. All other Cloud Setup lines are one-time capex (control-plane, DR, network, security), included in Y1 only.</div>'
+  h += '</div>'
+  return h
+}
+
+function setAicCurrency(role, value) {
+  AIC_CURRENCY[role] = (value || '').toUpperCase().trim()
+  renderTab('financials')
+}
+async function convertFinancialsCurrency() {
+  var fin = computeMultiYearFinancials()
+  var totalFcf = fin.years.reduce(function(s, y){ return s + y.fcf }, 0)
+  var converted = await FinanceEngine.convertBetweenRoles(totalFcf, 'local', 'reporting', AIC_CURRENCY, AIC_CURRENCY.overrideRate, getSB())
+  var note = document.getElementById('fx-converted-note')
+  if (!note) return
+  if (converted == null) {
+    note.innerHTML = '<span style="color:var(--orange)">No forex rate available for ' + AIC_CURRENCY.local + '→' + AIC_CURRENCY.reporting + ' (live fetch failed, no app_config rate) — enter a manual rate to proceed.</span> <input type="number" step="0.01" placeholder="rate" style="width:70px;font-size:11px" onchange="AIC_CURRENCY.overrideRate=+this.value;convertFinancialsCurrency()">'
+  } else {
+    note.textContent = '6-year total FCF (' + AIC_CURRENCY.local + '): ' + fmt$(totalFcf) + '  →  (' + AIC_CURRENCY.reporting + '): ' + Math.round(converted).toLocaleString()
+  }
 }
 
 // ── Persistence (tsap_scenarios, proven pattern) ────────────────────────────
