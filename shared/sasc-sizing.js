@@ -1208,6 +1208,23 @@
       var peakConcPct = config.peak_concurrent_pct || presetCfg.peak_concurrent_pct || 5
       var params_b    = model ? model.params_b : 7
 
+      // ── Base Model + Multi-LoRA (MaaS_Infrastructure_Sizing_Blueprint):
+      // "a massive base model remains permanently resident in VRAM, and
+      // hundreds of custom fine-tuned LoRA adapters are applied dynamically
+      // per API request, causing near-zero extra memory footprint." When
+      // this item IS a LoRA-served variant, the memory-fit constraint uses
+      // the adapter's small incremental VRAM instead of a full separate
+      // model load — throughput/compute sizing is UNCHANGED (adapters don't
+      // reduce compute needed to serve traffic, only the memory question).
+      // NOTE: cross-adapter GPU-sharing (multiple LoRA variants packed onto
+      // one shared base pool) is NOT modeled here — this item still sizes
+      // its own throughput-GPU need independently, which is a safe/
+      // conservative assumption, not an exploited cost saving. That
+      // portfolio-level packing optimization is a separate, bigger question
+      // (flagged, not built) — same open item as dedicated-vs-shared pooling.
+      var isLoraVariant   = !!config.lora_base_model_id
+      var LORA_ADAPTER_VRAM_GB = 1.5  // ESTIMATE — typical rank-16/32 adapter footprint; not from the blueprint (which doesn't give an exact figure), flagged for validation
+
       // Peak concurrent users at any moment
       var peakConcurrent = Math.ceil(dau * peakConcPct / 100)
 
@@ -1215,8 +1232,16 @@
       // At peak, concurrent users are actively generating — assume 1 req/10s average
       var peakRPS = Math.ceil(peakConcurrent / 10)
 
-      // GPU fit (VRAM for model + KV cache for concurrent sessions)
-      var gpusForFit = calcGPUsForFit(params_b, precision, gpu, model, contextLen, peakConcurrent)
+      // GPU fit (VRAM for model + KV cache for concurrent sessions) — LoRA
+      // variants use adapter-only VRAM instead of the full model
+      var gpusForFit
+      if (isLoraVariant) {
+        var kvForLora = calcKVCache(model, contextLen, peakConcurrent, precision, config.engine)
+        var vramPerGPU_lora = effectiveVRAM(gpu)
+        gpusForFit = Math.max(1, Math.ceil(((LORA_ADAPTER_VRAM_GB + kvForLora) * RUNTIME_OVERHEAD) / vramPerGPU_lora))
+      } else {
+        gpusForFit = calcGPUsForFit(params_b, precision, gpu, model, contextLen, peakConcurrent, config.engine)
+      }
 
       // GPU throughput (Profile A — compute bound at large batch)
       var gpusForThroughput = calcGPUsForThroughput(peakRPS, outputTok, gpu, model, params_b, precision, 'A', derating)
@@ -1260,6 +1285,8 @@
         peak_rps:              peakRPS,
         precision:             precision,
         params_b:              params_b,
+        is_lora_variant:       isLoraVariant,
+        lora_base_model_id:    config.lora_base_model_id || null,
 
         // GPU breakdown
         gpus_for_fit:          gpusForFit,
@@ -1289,7 +1316,7 @@
         // Explanation
         sizing_profile: 'A',
         notes: [
-          'Profile A (MaaS API): compute-bound at batch 128+',
+          'Profile A (MaaS API): compute-bound at batch 128+' + (isLoraVariant ? ' | LoRA variant of ' + config.lora_base_model_id + ' — adapter-only VRAM (' + LORA_ADAPTER_VRAM_GB + 'GB), cross-adapter pool-sharing not modeled' : ''),
           'SLA: ' + commercialSla.toUpperCase() + ' (TTFT ' + ttftTargetMs + 'ms, ' + uptimePct + '% uptime) — pool: ' + poolType,
           'DAU ' + dau + ' → ' + peakConcurrent + ' peak concurrent (' + peakConcPct + '%)',
           'Base: max(' + gpusForFit + ' fit, ' + gpusForThroughput + ' throughput) = ' + baseGPUs + ' (' + bindingConstraint + ')',
